@@ -169,6 +169,103 @@ $grouped = Query::groupByType($queries);
 $cursors = Query::getByType($queries, [Query::TYPE_CURSOR_AFTER, Query::TYPE_CURSOR_BEFORE]);
 ```
 
+### Building an Adapter
+
+The `Query` object is backend-agnostic — your library decides how to translate it. Use `groupByType` to break queries apart, then map each piece to your target syntax:
+
+```php
+use Utopia\Query\Query;
+
+class SQLAdapter
+{
+    /**
+     * @param array<Query> $queries
+     */
+    public function find(string $table, array $queries): array
+    {
+        $grouped = Query::groupByType($queries);
+
+        // SELECT
+        $columns = '*';
+        if (!empty($grouped['selections'])) {
+            $columns = implode(', ', $grouped['selections'][0]->getValues());
+        }
+
+        $sql = "SELECT {$columns} FROM {$table}";
+
+        // WHERE
+        $conditions = [];
+        foreach ($grouped['filters'] as $filter) {
+            $conditions[] = match ($filter->getMethod()) {
+                Query::TYPE_EQUAL        => $filter->getAttribute() . ' IN (' . $this->placeholders($filter->getValues()) . ')',
+                Query::TYPE_NOT_EQUAL    => $filter->getAttribute() . ' != ?',
+                Query::TYPE_GREATER      => $filter->getAttribute() . ' > ?',
+                Query::TYPE_LESSER       => $filter->getAttribute() . ' < ?',
+                Query::TYPE_BETWEEN      => $filter->getAttribute() . ' BETWEEN ? AND ?',
+                Query::TYPE_IS_NULL      => $filter->getAttribute() . ' IS NULL',
+                Query::TYPE_IS_NOT_NULL  => $filter->getAttribute() . ' IS NOT NULL',
+                Query::TYPE_STARTS_WITH  => $filter->getAttribute() . " LIKE CONCAT(?, '%')",
+                // ... handle other types
+            };
+        }
+
+        if (!empty($conditions)) {
+            $sql .= ' WHERE ' . implode(' AND ', $conditions);
+        }
+
+        // ORDER BY
+        foreach ($grouped['orderAttributes'] as $i => $attr) {
+            $sql .= ($i === 0 ? ' ORDER BY ' : ', ') . $attr . ' ' . $grouped['orderTypes'][$i];
+        }
+
+        // LIMIT / OFFSET
+        if ($grouped['limit'] !== null) {
+            $sql .= ' LIMIT ' . $grouped['limit'];
+        }
+        if ($grouped['offset'] !== null) {
+            $sql .= ' OFFSET ' . $grouped['offset'];
+        }
+
+        // Execute $sql with bound parameters ...
+    }
+}
+```
+
+The same pattern works for any backend. A Redis adapter might map filters to sorted-set range commands, an Elasticsearch adapter might build a `bool` query, or a MongoDB adapter might produce a `find()` filter document — the Query objects stay the same regardless:
+
+```php
+class RedisAdapter
+{
+    /**
+     * @param array<Query> $queries
+     */
+    public function find(string $key, array $queries): array
+    {
+        $grouped = Query::groupByType($queries);
+
+        foreach ($grouped['filters'] as $filter) {
+            match ($filter->getMethod()) {
+                Query::TYPE_BETWEEN => $this->redis->zRangeByScore(
+                    $key,
+                    $filter->getValues()[0],
+                    $filter->getValues()[1],
+                ),
+                Query::TYPE_GREATER => $this->redis->zRangeByScore(
+                    $key,
+                    '(' . $filter->getValue(),
+                    '+inf',
+                ),
+                // ... handle other types
+            };
+        }
+
+        // ...
+    }
+}
+```
+
+This keeps your application code decoupled from any particular storage engine — swap adapters without changing a single query.
+
 ## Contributing
 
 All code contributions should go through a pull request and be approved by a core developer before being merged. This is to ensure a proper review of all the code.
