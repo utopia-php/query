@@ -250,7 +250,7 @@ class Query
     /**
      * Sets method
      */
-    public function setMethod(string $method): self
+    public function setMethod(string $method): static
     {
         $this->method = $method;
 
@@ -260,7 +260,7 @@ class Query
     /**
      * Sets attribute
      */
-    public function setAttribute(string $attribute): self
+    public function setAttribute(string $attribute): static
     {
         $this->attribute = $attribute;
 
@@ -272,7 +272,7 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public function setValues(array $values): self
+    public function setValues(array $values): static
     {
         $this->values = $values;
 
@@ -282,7 +282,7 @@ class Query
     /**
      * Sets value
      */
-    public function setValue(mixed $value): self
+    public function setValue(mixed $value): static
     {
         $this->values = [$value];
 
@@ -375,7 +375,7 @@ class Query
      *
      * @throws QueryException
      */
-    public static function parse(string $query): self
+    public static function parse(string $query): static
     {
         try {
             $query = \json_decode($query, true, flags: JSON_THROW_ON_ERROR);
@@ -398,7 +398,7 @@ class Query
      *
      * @throws QueryException
      */
-    public static function parseQuery(array $query): self
+    public static function parseQuery(array $query): static
     {
         $method = $query['method'] ?? '';
         $attribute = $query['attribute'] ?? '';
@@ -434,7 +434,7 @@ class Query
      * Parse an array of queries
      *
      * @param  array<string>  $queries
-     * @return array<Query>
+     * @return array<static>
      *
      * @throws QueryException
      */
@@ -492,7 +492,7 @@ class Query
      *
      * @param  array<string|int|float|bool|array<mixed,mixed>>  $values
      */
-    public static function equal(string $attribute, array $values): self
+    public static function equal(string $attribute, array $values): static
     {
         return new static(self::TYPE_EQUAL, $attribute, $values);
     }
@@ -502,7 +502,7 @@ class Query
      *
      * @param  string|int|float|bool|array<mixed,mixed>  $value
      */
-    public static function notEqual(string $attribute, string|int|float|bool|array $value): self
+    public static function notEqual(string $attribute, string|int|float|bool|array $value): static
     {
         // maps or not an array
         if ((is_array($value) && ! array_is_list($value)) || ! is_array($value)) {
@@ -515,7 +515,7 @@ class Query
     /**
      * Helper method to create Query with lessThan method
      */
-    public static function lessThan(string $attribute, string|int|float|bool $value): self
+    public static function lessThan(string $attribute, string|int|float|bool $value): static
     {
         return new static(self::TYPE_LESSER, $attribute, [$value]);
     }
@@ -523,7 +523,7 @@ class Query
     /**
      * Helper method to create Query with lessThanEqual method
      */
-    public static function lessThanEqual(string $attribute, string|int|float|bool $value): self
+    public static function lessThanEqual(string $attribute, string|int|float|bool $value): static
     {
         return new static(self::TYPE_LESSER_EQUAL, $attribute, [$value]);
     }
@@ -531,7 +531,7 @@ class Query
     /**
      * Helper method to create Query with greaterThan method
      */
-    public static function greaterThan(string $attribute, string|int|float|bool $value): self
+    public static function greaterThan(string $attribute, string|int|float|bool $value): static
     {
         return new static(self::TYPE_GREATER, $attribute, [$value]);
     }
@@ -539,7 +539,7 @@ class Query
     /**
      * Helper method to create Query with greaterThanEqual method
      */
-    public static function greaterThanEqual(string $attribute, string|int|float|bool $value): self
+    public static function greaterThanEqual(string $attribute, string|int|float|bool $value): static
     {
         return new static(self::TYPE_GREATER_EQUAL, $attribute, [$value]);
     }
@@ -551,7 +551,7 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public static function contains(string $attribute, array $values): self
+    public static function contains(string $attribute, array $values): static
     {
         return new static(self::TYPE_CONTAINS, $attribute, $values);
     }
@@ -562,7 +562,7 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public static function containsAny(string $attribute, array $values): self
+    public static function containsAny(string $attribute, array $values): static
     {
         return new static(self::TYPE_CONTAINS_ANY, $attribute, $values);
     }
@@ -572,7 +572,7 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public static function notContains(string $attribute, array $values): self
+    public static function notContains(string $attribute, array $values): static
     {
         return new static(self::TYPE_NOT_CONTAINS, $attribute, $values);
     }
@@ -580,7 +580,7 @@ class Query
     /**
      * Helper method to create Query with between method
      */
-    public static function between(string $attribute, string|int|float|bool $start, string|int|float|bool $end): self
+    public static function between(string $attribute, string|int|float|bool $start, string|int|float|bool $end): static
     {
         return new static(self::TYPE_BETWEEN, $attribute, [$start, $end]);
     }
@@ -588,7 +588,7 @@ class Query
     /**
      * Helper method to create Query with notBetween method
      */
-    public static function notBetween(string $attribute, string|int|float|bool $start, string|int|float|bool $end): self
+    public static function notBetween(string $attribute, string|int|float|bool $start, string|int|float|bool $end): static
     {
         return new static(self::TYPE_NOT_BETWEEN, $attribute, [$start, $end]);
     }
@@ -596,7 +596,7 @@ class Query
     /**
      * Helper method to create Query with search method
      */
-    public static function search(string $attribute, string $value): self
+    public static function search(string $attribute, string $value): static
     {
         return new static(self::TYPE_SEARCH, $attribute, [$value]);
     }
@@ -604,7 +604,7 @@ class Query
     /**
      * Helper method to create Query with notSearch method
      */
-    public static function notSearch(string $attribute, string $value): self
+    public static function notSearch(string $attribute, string $value): static
     {
         return new static(self::TYPE_NOT_SEARCH, $attribute, [$value]);
     }
@@ -614,7 +614,7 @@ class Query
      *
      * @param  array<string>  $attributes
      */
-    public static function select(array $attributes): self
+    public static function select(array $attributes): static
     {
         return new static(self::TYPE_SELECT, values: $attributes);
     }
@@ -622,7 +622,7 @@ class Query
     /**
      * Helper method to create Query with orderDesc method
      */
-    public static function orderDesc(string $attribute = ''): self
+    public static function orderDesc(string $attribute = ''): static
     {
         return new static(self::TYPE_ORDER_DESC, $attribute);
     }
@@ -630,7 +630,7 @@ class Query
     /**
      * Helper method to create Query with orderAsc method
      */
-    public static function orderAsc(string $attribute = ''): self
+    public static function orderAsc(string $attribute = ''): static
     {
         return new static(self::TYPE_ORDER_ASC, $attribute);
     }
@@ -638,7 +638,7 @@ class Query
     /**
      * Helper method to create Query with orderRandom method
      */
-    public static function orderRandom(): self
+    public static function orderRandom(): static
     {
         return new static(self::TYPE_ORDER_RANDOM);
     }
@@ -646,7 +646,7 @@ class Query
     /**
      * Helper method to create Query with limit method
      */
-    public static function limit(int $value): self
+    public static function limit(int $value): static
     {
         return new static(self::TYPE_LIMIT, values: [$value]);
     }
@@ -654,7 +654,7 @@ class Query
     /**
      * Helper method to create Query with offset method
      */
-    public static function offset(int $value): self
+    public static function offset(int $value): static
     {
         return new static(self::TYPE_OFFSET, values: [$value]);
     }
@@ -662,7 +662,7 @@ class Query
     /**
      * Helper method to create Query with cursorAfter method
      */
-    public static function cursorAfter(mixed $value): self
+    public static function cursorAfter(mixed $value): static
     {
         return new static(self::TYPE_CURSOR_AFTER, values: [$value]);
     }
@@ -670,7 +670,7 @@ class Query
     /**
      * Helper method to create Query with cursorBefore method
      */
-    public static function cursorBefore(mixed $value): self
+    public static function cursorBefore(mixed $value): static
     {
         return new static(self::TYPE_CURSOR_BEFORE, values: [$value]);
     }
@@ -678,7 +678,7 @@ class Query
     /**
      * Helper method to create Query with isNull method
      */
-    public static function isNull(string $attribute): self
+    public static function isNull(string $attribute): static
     {
         return new static(self::TYPE_IS_NULL, $attribute);
     }
@@ -686,27 +686,27 @@ class Query
     /**
      * Helper method to create Query with isNotNull method
      */
-    public static function isNotNull(string $attribute): self
+    public static function isNotNull(string $attribute): static
     {
         return new static(self::TYPE_IS_NOT_NULL, $attribute);
     }
 
-    public static function startsWith(string $attribute, string $value): self
+    public static function startsWith(string $attribute, string $value): static
     {
         return new static(self::TYPE_STARTS_WITH, $attribute, [$value]);
     }
 
-    public static function notStartsWith(string $attribute, string $value): self
+    public static function notStartsWith(string $attribute, string $value): static
     {
         return new static(self::TYPE_NOT_STARTS_WITH, $attribute, [$value]);
     }
 
-    public static function endsWith(string $attribute, string $value): self
+    public static function endsWith(string $attribute, string $value): static
     {
         return new static(self::TYPE_ENDS_WITH, $attribute, [$value]);
     }
 
-    public static function notEndsWith(string $attribute, string $value): self
+    public static function notEndsWith(string $attribute, string $value): static
     {
         return new static(self::TYPE_NOT_ENDS_WITH, $attribute, [$value]);
     }
@@ -714,55 +714,55 @@ class Query
     /**
      * Helper method to create Query for documents created before a specific date
      */
-    public static function createdBefore(string $value): self
+    public static function createdBefore(string $value): static
     {
-        return self::lessThan('$createdAt', $value);
+        return static::lessThan('$createdAt', $value);
     }
 
     /**
      * Helper method to create Query for documents created after a specific date
      */
-    public static function createdAfter(string $value): self
+    public static function createdAfter(string $value): static
     {
-        return self::greaterThan('$createdAt', $value);
+        return static::greaterThan('$createdAt', $value);
     }
 
     /**
      * Helper method to create Query for documents updated before a specific date
      */
-    public static function updatedBefore(string $value): self
+    public static function updatedBefore(string $value): static
     {
-        return self::lessThan('$updatedAt', $value);
+        return static::lessThan('$updatedAt', $value);
     }
 
     /**
      * Helper method to create Query for documents updated after a specific date
      */
-    public static function updatedAfter(string $value): self
+    public static function updatedAfter(string $value): static
     {
-        return self::greaterThan('$updatedAt', $value);
+        return static::greaterThan('$updatedAt', $value);
     }
 
     /**
      * Helper method to create Query for documents created between two dates
      */
-    public static function createdBetween(string $start, string $end): self
+    public static function createdBetween(string $start, string $end): static
     {
-        return self::between('$createdAt', $start, $end);
+        return static::between('$createdAt', $start, $end);
     }
 
     /**
      * Helper method to create Query for documents updated between two dates
      */
-    public static function updatedBetween(string $start, string $end): self
+    public static function updatedBetween(string $start, string $end): static
     {
-        return self::between('$updatedAt', $start, $end);
+        return static::between('$updatedAt', $start, $end);
     }
 
     /**
      * @param  array<Query>  $queries
      */
-    public static function or(array $queries): self
+    public static function or(array $queries): static
     {
         return new static(self::TYPE_OR, '', $queries);
     }
@@ -770,7 +770,7 @@ class Query
     /**
      * @param  array<Query>  $queries
      */
-    public static function and(array $queries): self
+    public static function and(array $queries): static
     {
         return new static(self::TYPE_AND, '', $queries);
     }
@@ -778,7 +778,7 @@ class Query
     /**
      * @param  array<mixed>  $values
      */
-    public static function containsAll(string $attribute, array $values): self
+    public static function containsAll(string $attribute, array $values): static
     {
         return new static(self::TYPE_CONTAINS_ALL, $attribute, $values);
     }
@@ -786,9 +786,9 @@ class Query
     /**
      * Filters $queries for $types
      *
-     * @param  array<Query>  $queries
+     * @param  array<static>  $queries
      * @param  array<string>  $types
-     * @return array<Query>
+     * @return array<static>
      */
     public static function getByType(array $queries, array $types, bool $clone = true): array
     {
@@ -804,8 +804,8 @@ class Query
     }
 
     /**
-     * @param  array<Query>  $queries
-     * @return array<Query>
+     * @param  array<static>  $queries
+     * @return array<static>
      */
     public static function getCursorQueries(array $queries, bool $clone = true): array
     {
@@ -824,8 +824,8 @@ class Query
      *
      * @param  array<mixed>  $queries
      * @return array{
-     *     filters: array<Query>,
-     *     selections: array<Query>,
+     *     filters: array<static>,
+     *     selections: array<static>,
      *     limit: int|null,
      *     offset: int|null,
      *     orderAttributes: array<string>,
@@ -957,7 +957,7 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public static function distanceEqual(string $attribute, array $values, int|float $distance, bool $meters = false): self
+    public static function distanceEqual(string $attribute, array $values, int|float $distance, bool $meters = false): static
     {
         return new static(self::TYPE_DISTANCE_EQUAL, $attribute, [[$values, $distance, $meters]]);
     }
@@ -967,7 +967,7 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public static function distanceNotEqual(string $attribute, array $values, int|float $distance, bool $meters = false): self
+    public static function distanceNotEqual(string $attribute, array $values, int|float $distance, bool $meters = false): static
     {
         return new static(self::TYPE_DISTANCE_NOT_EQUAL, $attribute, [[$values, $distance, $meters]]);
     }
@@ -977,7 +977,7 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public static function distanceGreaterThan(string $attribute, array $values, int|float $distance, bool $meters = false): self
+    public static function distanceGreaterThan(string $attribute, array $values, int|float $distance, bool $meters = false): static
     {
         return new static(self::TYPE_DISTANCE_GREATER_THAN, $attribute, [[$values, $distance, $meters]]);
     }
@@ -987,7 +987,7 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public static function distanceLessThan(string $attribute, array $values, int|float $distance, bool $meters = false): self
+    public static function distanceLessThan(string $attribute, array $values, int|float $distance, bool $meters = false): static
     {
         return new static(self::TYPE_DISTANCE_LESS_THAN, $attribute, [[$values, $distance, $meters]]);
     }
@@ -997,7 +997,7 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public static function intersects(string $attribute, array $values): self
+    public static function intersects(string $attribute, array $values): static
     {
         return new static(self::TYPE_INTERSECTS, $attribute, [$values]);
     }
@@ -1007,7 +1007,7 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public static function notIntersects(string $attribute, array $values): self
+    public static function notIntersects(string $attribute, array $values): static
     {
         return new static(self::TYPE_NOT_INTERSECTS, $attribute, [$values]);
     }
@@ -1017,7 +1017,7 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public static function crosses(string $attribute, array $values): self
+    public static function crosses(string $attribute, array $values): static
     {
         return new static(self::TYPE_CROSSES, $attribute, [$values]);
     }
@@ -1027,7 +1027,7 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public static function notCrosses(string $attribute, array $values): self
+    public static function notCrosses(string $attribute, array $values): static
     {
         return new static(self::TYPE_NOT_CROSSES, $attribute, [$values]);
     }
@@ -1037,7 +1037,7 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public static function overlaps(string $attribute, array $values): self
+    public static function overlaps(string $attribute, array $values): static
     {
         return new static(self::TYPE_OVERLAPS, $attribute, [$values]);
     }
@@ -1047,7 +1047,7 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public static function notOverlaps(string $attribute, array $values): self
+    public static function notOverlaps(string $attribute, array $values): static
     {
         return new static(self::TYPE_NOT_OVERLAPS, $attribute, [$values]);
     }
@@ -1057,7 +1057,7 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public static function touches(string $attribute, array $values): self
+    public static function touches(string $attribute, array $values): static
     {
         return new static(self::TYPE_TOUCHES, $attribute, [$values]);
     }
@@ -1067,7 +1067,7 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public static function notTouches(string $attribute, array $values): self
+    public static function notTouches(string $attribute, array $values): static
     {
         return new static(self::TYPE_NOT_TOUCHES, $attribute, [$values]);
     }
@@ -1077,7 +1077,7 @@ class Query
      *
      * @param  array<float>  $vector
      */
-    public static function vectorDot(string $attribute, array $vector): self
+    public static function vectorDot(string $attribute, array $vector): static
     {
         return new static(self::TYPE_VECTOR_DOT, $attribute, [$vector]);
     }
@@ -1087,7 +1087,7 @@ class Query
      *
      * @param  array<float>  $vector
      */
-    public static function vectorCosine(string $attribute, array $vector): self
+    public static function vectorCosine(string $attribute, array $vector): static
     {
         return new static(self::TYPE_VECTOR_COSINE, $attribute, [$vector]);
     }
@@ -1097,7 +1097,7 @@ class Query
      *
      * @param  array<float>  $vector
      */
-    public static function vectorEuclidean(string $attribute, array $vector): self
+    public static function vectorEuclidean(string $attribute, array $vector): static
     {
         return new static(self::TYPE_VECTOR_EUCLIDEAN, $attribute, [$vector]);
     }
@@ -1105,7 +1105,7 @@ class Query
     /**
      * Helper method to create Query with regex method
      */
-    public static function regex(string $attribute, string $pattern): self
+    public static function regex(string $attribute, string $pattern): static
     {
         return new static(self::TYPE_REGEX, $attribute, [$pattern]);
     }
@@ -1115,7 +1115,7 @@ class Query
      *
      * @param  array<string>  $attributes
      */
-    public static function exists(array $attributes): self
+    public static function exists(array $attributes): static
     {
         return new static(self::TYPE_EXISTS, '', $attributes);
     }
@@ -1125,7 +1125,7 @@ class Query
      *
      * @param  string|int|float|bool|array<mixed,mixed>  $attribute
      */
-    public static function notExists(string|int|float|bool|array $attribute): self
+    public static function notExists(string|int|float|bool|array $attribute): static
     {
         return new static(self::TYPE_NOT_EXISTS, '', is_array($attribute) ? $attribute : [$attribute]);
     }
@@ -1133,7 +1133,7 @@ class Query
     /**
      * @param  array<Query>  $queries
      */
-    public static function elemMatch(string $attribute, array $queries): self
+    public static function elemMatch(string $attribute, array $queries): static
     {
         return new static(self::TYPE_ELEM_MATCH, $attribute, $queries);
     }
