@@ -5,7 +5,10 @@ namespace Tests\Query\Builder;
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Builder\ClickHouse as Builder;
 use Utopia\Query\Compiler;
+use Utopia\Query\Condition;
 use Utopia\Query\Exception;
+use Utopia\Query\Hook\AttributeMapHook;
+use Utopia\Query\Hook\FilterHook;
 use Utopia\Query\Query;
 
 class ClickHouseTest extends TestCase
@@ -361,10 +364,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('events')
-            ->setAttributeResolver(fn (string $a): string => match ($a) {
-                '$id' => '_uid',
-                default => $a,
-            })
+            ->addHook(new AttributeMapHook(['$id' => '_uid']))
             ->filter([Query::equal('$id', ['abc'])])
             ->build();
 
@@ -378,12 +378,16 @@ class ClickHouseTest extends TestCase
 
     public function testConditionProvider(): void
     {
+        $hook = new class () implements FilterHook {
+            public function filter(string $table): Condition
+            {
+                return new Condition('_tenant = ?', ['t1']);
+            }
+        };
+
         $result = (new Builder())
             ->from('events')
-            ->addConditionProvider(fn (string $table): array => [
-                '_tenant = ?',
-                ['t1'],
-            ])
+            ->addHook($hook)
             ->filter([Query::equal('status', ['active'])])
             ->build();
 
@@ -927,7 +931,12 @@ class ClickHouseTest extends TestCase
             ->from('events')
             ->prewhere([Query::equal('type', ['click'])])
             ->filter([Query::greaterThan('count', 5)])
-            ->addConditionProvider(fn (string $table): array => ['tenant_id = ?', ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('tenant_id = ?', ['t1']);
+                }
+            })
             ->build();
 
         $this->assertEquals(['click', 5, 't1'], $result['bindings']);
@@ -956,7 +965,12 @@ class ClickHouseTest extends TestCase
             ->from('events')
             ->prewhere([Query::equal('type', ['click'])])
             ->filter([Query::greaterThan('count', 5)])
-            ->addConditionProvider(fn (string $table): array => ['tenant = ?', ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('tenant = ?', ['t1']);
+                }
+            })
             ->cursorAfter('cur1')
             ->sortAsc('_cursor')
             ->count('*', 'total')
@@ -978,10 +992,9 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('events')
-            ->setAttributeResolver(fn (string $a): string => match ($a) {
+            ->addHook(new AttributeMapHook([
                 '$id' => '_uid',
-                default => $a,
-            })
+            ]))
             ->prewhere([Query::equal('$id', ['abc'])])
             ->build();
 
@@ -1298,7 +1311,12 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->final()
-            ->setAttributeResolver(fn (string $a): string => 'col_' . $a)
+            ->addHook(new class () implements \Utopia\Query\Hook\AttributeHook {
+                public function resolve(string $attribute): string
+                {
+                    return 'col_' . $attribute;
+                }
+            })
             ->filter([Query::equal('status', ['active'])])
             ->build();
 
@@ -1311,7 +1329,12 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->final()
-            ->addConditionProvider(fn (string $table): array => ['deleted = ?', [0]])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('deleted = ?', [0]);
+                }
+            })
             ->build();
 
         $this->assertStringContainsString('FROM `events` FINAL', $result['query']);
@@ -1611,7 +1634,12 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->sample(0.5)
-            ->setAttributeResolver(fn (string $a): string => 'r_' . $a)
+            ->addHook(new class () implements \Utopia\Query\Hook\AttributeHook {
+                public function resolve(string $attribute): string
+                {
+                    return 'r_' . $attribute;
+                }
+            })
             ->filter([Query::equal('col', ['v'])])
             ->build();
 
@@ -1716,7 +1744,12 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('logs')
-            ->setAttributeResolver(fn (string $a): string => 'col_' . $a)
+            ->addHook(new class () implements \Utopia\Query\Hook\AttributeHook {
+                public function resolve(string $attribute): string
+                {
+                    return 'col_' . $attribute;
+                }
+            })
             ->filter([Query::regex('msg', 'test')])
             ->build();
 
@@ -2527,10 +2560,9 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('events')
-            ->setAttributeResolver(fn (string $a): string => match ($a) {
+            ->addHook(new AttributeMapHook([
                 'amt' => 'amount_cents',
-                default => $a,
-            })
+            ]))
             ->prewhere([Query::equal('type', ['sale'])])
             ->sum('amt', 'total')
             ->build();
@@ -2543,7 +2575,12 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->prewhere([Query::equal('type', ['sale'])])
-            ->addConditionProvider(fn (string $t): array => ['tenant = ?', ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('tenant = ?', ['t1']);
+                }
+            })
             ->count('*', 'cnt')
             ->build();
 
@@ -2726,10 +2763,9 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('events')
-            ->setAttributeResolver(fn (string $a): string => match ($a) {
+            ->addHook(new AttributeMapHook([
                 'uid' => 'user_id',
-                default => $a,
-            })
+            ]))
             ->join('users', 'events.uid', 'users.id')
             ->prewhere([Query::equal('uid', ['abc'])])
             ->build();
@@ -2743,7 +2779,12 @@ class ClickHouseTest extends TestCase
             ->from('events')
             ->join('users', 'events.uid', 'users.id')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addConditionProvider(fn (string $t): array => ['tenant = ?', ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('tenant = ?', ['t1']);
+                }
+            })
             ->build();
 
         $this->assertStringContainsString('PREWHERE', $result['query']);
@@ -3185,10 +3226,15 @@ class ClickHouseTest extends TestCase
 
     public function testResetPreservesAttributeResolver(): void
     {
-        $resolver = fn (string $a): string => 'r_' . $a;
+        $hook = new class () implements \Utopia\Query\Hook\AttributeHook {
+            public function resolve(string $attribute): string
+            {
+                return 'r_' . $attribute;
+            }
+        };
         $builder = (new Builder())
             ->from('events')
-            ->setAttributeResolver($resolver)
+            ->addHook($hook)
             ->final();
         $builder->build();
         $builder->reset();
@@ -3201,7 +3247,12 @@ class ClickHouseTest extends TestCase
     {
         $builder = (new Builder())
             ->from('events')
-            ->addConditionProvider(fn (string $t): array => ['tenant = ?', ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('tenant = ?', ['t1']);
+                }
+            })
             ->final();
         $builder->build();
         $builder->reset();
@@ -3454,7 +3505,12 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addConditionProvider(fn (string $t): array => ['deleted = ?', [0]])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('deleted = ?', [0]);
+                }
+            })
             ->build();
 
         $this->assertStringContainsString('PREWHERE', $result['query']);
@@ -3466,7 +3522,12 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->final()
-            ->addConditionProvider(fn (string $t): array => ['deleted = ?', [0]])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('deleted = ?', [0]);
+                }
+            })
             ->build();
 
         $this->assertStringContainsString('FINAL', $result['query']);
@@ -3478,7 +3539,12 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->sample(0.5)
-            ->addConditionProvider(fn (string $t): array => ['deleted = ?', [0]])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('deleted = ?', [0]);
+                }
+            })
             ->build();
 
         $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
@@ -3491,7 +3557,12 @@ class ClickHouseTest extends TestCase
             ->from('events')
             ->prewhere([Query::equal('type', ['click'])])
             ->filter([Query::greaterThan('count', 5)])
-            ->addConditionProvider(fn (string $t): array => ['tenant = ?', ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('tenant = ?', ['t1']);
+                }
+            })
             ->build();
 
         // prewhere, filter, provider
@@ -3503,8 +3574,18 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addConditionProvider(fn (string $t): array => ['tenant = ?', ['t1']])
-            ->addConditionProvider(fn (string $t): array => ['org = ?', ['o1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('tenant = ?', ['t1']);
+                }
+            })
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('org = ?', ['o1']);
+                }
+            })
             ->build();
 
         $this->assertEquals(['click', 't1', 'o1'], $result['bindings']);
@@ -3515,7 +3596,12 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addConditionProvider(fn (string $t): array => ['tenant = ?', ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('tenant = ?', ['t1']);
+                }
+            })
             ->cursorAfter('cur1')
             ->sortAsc('_cursor')
             ->limit(10)
@@ -3536,7 +3622,12 @@ class ClickHouseTest extends TestCase
             ->sample(0.1)
             ->prewhere([Query::equal('type', ['click'])])
             ->filter([Query::greaterThan('count', 0)])
-            ->addConditionProvider(fn (string $t): array => ['tenant = ?', ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('tenant = ?', ['t1']);
+                }
+            })
             ->build();
 
         $this->assertStringContainsString('FINAL SAMPLE 0.1', $result['query']);
@@ -3549,7 +3640,12 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addConditionProvider(fn (string $t): array => ['tenant = ?', ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('tenant = ?', ['t1']);
+                }
+            })
             ->count('*', 'cnt')
             ->build();
 
@@ -3564,7 +3660,12 @@ class ClickHouseTest extends TestCase
             ->from('events')
             ->join('users', 'events.uid', 'users.id')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addConditionProvider(fn (string $t): array => ['tenant = ?', ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('tenant = ?', ['t1']);
+                }
+            })
             ->build();
 
         $this->assertStringContainsString('JOIN', $result['query']);
@@ -3577,10 +3678,12 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->final()
-            ->addConditionProvider(fn (string $table): array => [
-                $table . '.deleted = ?',
-                [0],
-            ])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition($table . '.deleted = ?', [0]);
+                }
+            })
             ->build();
 
         $this->assertStringContainsString('events.deleted = ?', $result['query']);
@@ -3676,7 +3779,12 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addConditionProvider(fn (string $t): array => ['tenant = ?', ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('tenant = ?', ['t1']);
+                }
+            })
             ->cursorAfter('cur1')
             ->sortAsc('_cursor')
             ->build();
@@ -4291,7 +4399,12 @@ class ClickHouseTest extends TestCase
             ->from('events')
             ->sample(0.1)
             ->prewhere([Query::equal('type', ['click'])])
-            ->addConditionProvider(fn (string $t): array => ['tenant = ?', ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('tenant = ?', ['t1']);
+                }
+            })
             ->cursorAfter('cur1')
             ->sortAsc('_cursor')
             ->filter([Query::greaterThan('count', 5)])
@@ -4686,7 +4799,12 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())->from('t')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addConditionProvider(fn (string $t) => ["_tenant = ?", ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('_tenant = ?', ['t1']);
+                }
+            })
             ->cursorAfter('abc')
             ->sortAsc('_cursor')
             ->build();
@@ -4779,7 +4897,12 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())->from('t')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addConditionProvider(fn (string $t) => ["_tenant = ?", ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('_tenant = ?', ['t1']);
+                }
+            })
             ->build();
         $query = $result['query'];
         $prewherePos = strpos($query, 'PREWHERE');
@@ -4794,7 +4917,12 @@ class ClickHouseTest extends TestCase
     public function testConditionProviderWithNoFiltersClickHouse(): void
     {
         $result = (new Builder())->from('t')
-            ->addConditionProvider(fn (string $t) => ["_deleted = ?", [0]])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('_deleted = ?', [0]);
+                }
+            })
             ->build();
         $this->assertEquals('SELECT * FROM `t` WHERE _deleted = ?', $result['query']);
         $this->assertEquals([0], $result['bindings']);
@@ -4971,7 +5099,12 @@ class ClickHouseTest extends TestCase
         $builder = (new Builder())
             ->from('t')
             ->final()
-            ->addConditionProvider(fn (string $t) => ["_tenant = ?", ['t1']]);
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('_tenant = ?', ['t1']);
+                }
+            });
         $builder->build();
         $builder->reset()->from('other');
         $result = $builder->build();

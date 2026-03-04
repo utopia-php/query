@@ -5,6 +5,9 @@ namespace Tests\Query\Builder;
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Builder\SQL as Builder;
 use Utopia\Query\Compiler;
+use Utopia\Query\Condition;
+use Utopia\Query\Hook\AttributeMapHook;
+use Utopia\Query\Hook\FilterHook;
 use Utopia\Query\Query;
 
 class SQLTest extends TestCase
@@ -574,11 +577,10 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('users')
-            ->setAttributeResolver(fn (string $a): string => match ($a) {
+            ->addHook(new AttributeMapHook([
                 '$id' => '_uid',
                 '$createdAt' => '_createdAt',
-                default => $a,
-            })
+            ]))
             ->filter([Query::equal('$id', ['abc'])])
             ->sortAsc('$createdAt')
             ->build();
@@ -588,6 +590,59 @@ class SQLTest extends TestCase
             $result['query']
         );
         $this->assertEquals(['abc'], $result['bindings']);
+    }
+
+    public function testMultipleAttributeHooksChain(): void
+    {
+        $prefixHook = new class () implements \Utopia\Query\Hook\AttributeHook {
+            public function resolve(string $attribute): string
+            {
+                return 'col_' . $attribute;
+            }
+        };
+
+        $result = (new Builder())
+            ->from('t')
+            ->addHook(new AttributeMapHook(['name' => 'full_name']))
+            ->addHook($prefixHook)
+            ->filter([Query::equal('name', ['Alice'])])
+            ->build();
+
+        // First hook maps name→full_name, second prepends col_
+        $this->assertEquals(
+            'SELECT * FROM `t` WHERE `col_full_name` IN (?)',
+            $result['query']
+        );
+    }
+
+    public function testDualInterfaceHook(): void
+    {
+        $hook = new class () implements \Utopia\Query\Hook\FilterHook, \Utopia\Query\Hook\AttributeHook {
+            public function filter(string $table): Condition
+            {
+                return new Condition('_tenant = ?', ['t1']);
+            }
+
+            public function resolve(string $attribute): string
+            {
+                return match ($attribute) {
+                    '$id' => '_uid',
+                    default => $attribute,
+                };
+            }
+        };
+
+        $result = (new Builder())
+            ->from('users')
+            ->addHook($hook)
+            ->filter([Query::equal('$id', ['abc'])])
+            ->build();
+
+        $this->assertEquals(
+            'SELECT * FROM `users` WHERE `_uid` IN (?) AND _tenant = ?',
+            $result['query']
+        );
+        $this->assertEquals(['abc', 't1'], $result['bindings']);
     }
 
     public function testWrapChar(): void
@@ -607,12 +662,18 @@ class SQLTest extends TestCase
 
     public function testConditionProvider(): void
     {
+        $hook = new class () implements FilterHook {
+            public function filter(string $table): Condition
+            {
+                return new Condition(
+                    "_uid IN (SELECT _document FROM {$table}_perms WHERE _type = 'read')",
+                );
+            }
+        };
+
         $result = (new Builder())
             ->from('users')
-            ->addConditionProvider(fn (string $table): array => [
-                "_uid IN (SELECT _document FROM {$table}_perms WHERE _type = 'read')",
-                [],
-            ])
+            ->addHook($hook)
             ->filter([Query::equal('status', ['active'])])
             ->build();
 
@@ -625,12 +686,16 @@ class SQLTest extends TestCase
 
     public function testConditionProviderWithBindings(): void
     {
+        $hook = new class () implements FilterHook {
+            public function filter(string $table): Condition
+            {
+                return new Condition('_tenant = ?', ['tenant_abc']);
+            }
+        };
+
         $result = (new Builder())
             ->from('docs')
-            ->addConditionProvider(fn (string $table): array => [
-                '_tenant = ?',
-                ['tenant_abc'],
-            ])
+            ->addHook($hook)
             ->filter([Query::equal('status', ['active'])])
             ->build();
 
@@ -638,25 +703,29 @@ class SQLTest extends TestCase
             'SELECT * FROM `docs` WHERE `status` IN (?) AND _tenant = ?',
             $result['query']
         );
-        // filter bindings first, then provider bindings
+        // filter bindings first, then hook bindings
         $this->assertEquals(['active', 'tenant_abc'], $result['bindings']);
     }
 
     public function testBindingOrderingWithProviderAndCursor(): void
     {
+        $hook = new class () implements FilterHook {
+            public function filter(string $table): Condition
+            {
+                return new Condition('_tenant = ?', ['t1']);
+            }
+        };
+
         $result = (new Builder())
             ->from('docs')
-            ->addConditionProvider(fn (string $table): array => [
-                '_tenant = ?',
-                ['t1'],
-            ])
+            ->addHook($hook)
             ->filter([Query::equal('status', ['active'])])
             ->cursorAfter('cursor_val')
             ->limit(10)
             ->offset(5)
             ->build();
 
-        // binding order: filter, provider, cursor, limit, offset
+        // binding order: filter, hook, cursor, limit, offset
         $this->assertEquals(['active', 't1', 'cursor_val', 10, 5], $result['bindings']);
     }
 
@@ -1640,12 +1709,16 @@ class SQLTest extends TestCase
 
     public function testBindingOrderFilterProviderCursorLimitOffset(): void
     {
+        $hook = new class () implements FilterHook {
+            public function filter(string $table): Condition
+            {
+                return new Condition('_tenant = ?', ['tenant1']);
+            }
+        };
+
         $result = (new Builder())
             ->from('t')
-            ->addConditionProvider(fn (string $table): array => [
-                '_tenant = ?',
-                ['tenant1'],
-            ])
+            ->addHook($hook)
             ->filter([
                 Query::equal('a', ['x']),
                 Query::greaterThan('b', 5),
@@ -1655,16 +1728,29 @@ class SQLTest extends TestCase
             ->offset(20)
             ->build();
 
-        // Order: filter bindings, provider bindings, cursor, limit, offset
+        // Order: filter bindings, hook bindings, cursor, limit, offset
         $this->assertEquals(['x', 5, 'tenant1', 'cursor_abc', 10, 20], $result['bindings']);
     }
 
     public function testBindingOrderMultipleProviders(): void
     {
+        $hook1 = new class () implements FilterHook {
+            public function filter(string $table): Condition
+            {
+                return new Condition('p1 = ?', ['v1']);
+            }
+        };
+        $hook2 = new class () implements FilterHook {
+            public function filter(string $table): Condition
+            {
+                return new Condition('p2 = ?', ['v2']);
+            }
+        };
+
         $result = (new Builder())
             ->from('t')
-            ->addConditionProvider(fn (string $table): array => ['p1 = ?', ['v1']])
-            ->addConditionProvider(fn (string $table): array => ['p2 = ?', ['v2']])
+            ->addHook($hook1)
+            ->addHook($hook2)
             ->filter([Query::equal('a', ['x'])])
             ->build();
 
@@ -1705,10 +1791,17 @@ class SQLTest extends TestCase
     {
         $sub = (new Builder())->from('archive')->filter([Query::equal('year', [2023])]);
 
+        $hook = new class () implements FilterHook {
+            public function filter(string $table): Condition
+            {
+                return new Condition('_org = ?', ['org1']);
+            }
+        };
+
         $result = (new Builder())
             ->from('orders')
             ->count('*', 'cnt')
-            ->addConditionProvider(fn (string $t): array => ['_org = ?', ['org1']])
+            ->addHook($hook)
             ->filter([Query::equal('status', ['paid'])])
             ->groupBy(['status'])
             ->having([Query::greaterThan('cnt', 1)])
@@ -1718,7 +1811,7 @@ class SQLTest extends TestCase
             ->union($sub)
             ->build();
 
-        // filter, provider, cursor, having, limit, offset, union
+        // filter, hook, cursor, having, limit, offset, union
         $this->assertEquals(['paid', 'org1', 'cur1', 1, 10, 5, 2023], $result['bindings']);
     }
 
@@ -1728,10 +1821,7 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->setAttributeResolver(fn (string $a): string => match ($a) {
-                '$price' => '_price',
-                default => $a,
-            })
+            ->addHook(new AttributeMapHook(['$price' => '_price']))
             ->sum('$price', 'total')
             ->build();
 
@@ -1742,10 +1832,7 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->setAttributeResolver(fn (string $a): string => match ($a) {
-                '$status' => '_status',
-                default => $a,
-            })
+            ->addHook(new AttributeMapHook(['$status' => '_status']))
             ->count('*', 'total')
             ->groupBy(['$status'])
             ->build();
@@ -1760,11 +1847,10 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->setAttributeResolver(fn (string $a): string => match ($a) {
+            ->addHook(new AttributeMapHook([
                 '$id' => '_uid',
                 '$ref' => '_ref',
-                default => $a,
-            })
+            ]))
             ->join('other', '$id', '$ref')
             ->build();
 
@@ -1778,10 +1864,7 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->setAttributeResolver(fn (string $a): string => match ($a) {
-                '$total' => '_total',
-                default => $a,
-            })
+            ->addHook(new AttributeMapHook(['$total' => '_total']))
             ->count('*', 'cnt')
             ->groupBy(['status'])
             ->having([Query::greaterThan('$total', 5)])
@@ -1837,13 +1920,17 @@ class SQLTest extends TestCase
 
     public function testConditionProviderWithJoins(): void
     {
+        $hook = new class () implements FilterHook {
+            public function filter(string $table): Condition
+            {
+                return new Condition('users.org_id = ?', ['org1']);
+            }
+        };
+
         $result = (new Builder())
             ->from('users')
             ->join('orders', 'users.id', 'orders.user_id')
-            ->addConditionProvider(fn (string $table): array => [
-                'users.org_id = ?',
-                ['org1'],
-            ])
+            ->addHook($hook)
             ->filter([Query::greaterThan('orders.total', 100)])
             ->build();
 
@@ -1856,13 +1943,17 @@ class SQLTest extends TestCase
 
     public function testConditionProviderWithAggregation(): void
     {
+        $hook = new class () implements FilterHook {
+            public function filter(string $table): Condition
+            {
+                return new Condition('org_id = ?', ['org1']);
+            }
+        };
+
         $result = (new Builder())
             ->from('orders')
             ->count('*', 'total')
-            ->addConditionProvider(fn (string $table): array => [
-                'org_id = ?',
-                ['org1'],
-            ])
+            ->addHook($hook)
             ->groupBy(['status'])
             ->build();
 
@@ -1888,18 +1979,25 @@ class SQLTest extends TestCase
 
     // ── Reset behavior ──
 
-    public function testResetDoesNotClearWrapCharOrResolver(): void
+    public function testResetDoesNotClearWrapCharOrHooks(): void
     {
+        $hook = new class () implements \Utopia\Query\Hook\AttributeHook {
+            public function resolve(string $attribute): string
+            {
+                return '_' . $attribute;
+            }
+        };
+
         $builder = (new Builder())
             ->from('t')
             ->setWrapChar('"')
-            ->setAttributeResolver(fn (string $a): string => '_' . $a)
+            ->addHook($hook)
             ->filter([Query::equal('x', [1])]);
 
         $builder->build();
         $builder->reset();
 
-        // wrapChar and resolver should persist since reset() only clears queries/bindings/table/unions
+        // wrapChar and hooks should persist since reset() only clears queries/bindings/table/unions
         $result = $builder->from('t2')->filter([Query::equal('y', [2])])->build();
         $this->assertEquals('SELECT * FROM "t2" WHERE "_y" IN (?)', $result['query']);
     }
@@ -1961,7 +2059,12 @@ class SQLTest extends TestCase
                 Query::equal('orders.status', ['paid']),
                 Query::greaterThan('orders.total', 0),
             ])
-            ->addConditionProvider(fn (string $t): array => ['org = ?', ['o1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('org = ?', ['o1']);
+                }
+            })
             ->groupBy(['status'])
             ->having([Query::greaterThan('cnt', 1)])
             ->sortDesc('sum_total')
@@ -2221,10 +2324,9 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->setAttributeResolver(fn (string $a): string => match ($a) {
+            ->addHook(new AttributeMapHook([
                 '$slug' => '_slug',
-                default => $a,
-            })
+            ]))
             ->filter([Query::regex('$slug', '^test')])
             ->build();
 
@@ -2395,10 +2497,9 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->setAttributeResolver(fn (string $a): string => match ($a) {
+            ->addHook(new AttributeMapHook([
                 '$body' => '_body',
-                default => $a,
-            })
+            ]))
             ->filter([Query::search('$body', 'hello')])
             ->build();
 
@@ -2653,7 +2754,12 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->setAttributeResolver(fn (string $a): string => '_' . $a)
+            ->addHook(new class () implements \Utopia\Query\Hook\AttributeHook {
+                public function resolve(string $attribute): string
+                {
+                    return '_' . $attribute;
+                }
+            })
             ->sortRandom()
             ->build();
 
@@ -3035,10 +3141,12 @@ class SQLTest extends TestCase
         $result = (new Builder())
             ->setWrapChar('"')
             ->from('t')
-            ->addConditionProvider(fn (string $table): array => [
-                'raw_condition = 1',
-                [],
-            ])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('raw_condition = 1', []);
+                }
+            })
             ->build();
 
         $this->assertStringContainsString('WHERE raw_condition = 1', $result['query']);
@@ -4000,10 +4108,9 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->setAttributeResolver(fn (string $a): string => match ($a) {
+            ->addHook(new AttributeMapHook([
                 '$amount' => '_amount',
-                default => $a,
-            })
+            ]))
             ->sum('$amount', 'total')
             ->build();
 
@@ -4155,11 +4262,10 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->setAttributeResolver(fn (string $a): string => match ($a) {
+            ->addHook(new AttributeMapHook([
                 '$id' => '_uid',
                 '$ref' => '_ref_id',
-                default => $a,
-            })
+            ]))
             ->join('other', '$id', '$ref')
             ->build();
 
@@ -4355,11 +4461,21 @@ class SQLTest extends TestCase
     {
         $sub = (new Builder())
             ->from('other')
-            ->addConditionProvider(fn (string $t): array => ['org = ?', ['org2']]);
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('org = ?', ['org2']);
+                }
+            });
 
         $result = (new Builder())
             ->from('main')
-            ->addConditionProvider(fn (string $t): array => ['org = ?', ['org1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('org = ?', ['org1']);
+                }
+            })
             ->union($sub)
             ->build();
 
@@ -4808,9 +4924,24 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->addConditionProvider(fn (string $t): array => ['p1 = ?', ['v1']])
-            ->addConditionProvider(fn (string $t): array => ['p2 = ?', ['v2']])
-            ->addConditionProvider(fn (string $t): array => ['p3 = ?', ['v3']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('p1 = ?', ['v1']);
+                }
+            })
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('p2 = ?', ['v2']);
+                }
+            })
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('p3 = ?', ['v3']);
+                }
+            })
             ->build();
 
         $this->assertEquals(
@@ -4824,7 +4955,12 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->addConditionProvider(fn (string $t): array => ['', []])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('', []);
+                }
+            })
             ->build();
 
         // Empty string still appears as a WHERE clause element
@@ -4835,10 +4971,12 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->addConditionProvider(fn (string $t): array => [
-                'a IN (?, ?, ?, ?, ?)',
-                [1, 2, 3, 4, 5],
-            ])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('a IN (?, ?, ?, ?, ?)', [1, 2, 3, 4, 5]);
+                }
+            })
             ->build();
 
         $this->assertEquals(
@@ -4853,7 +4991,12 @@ class SQLTest extends TestCase
         $result = (new Builder())
             ->from('t')
             ->count('*', 'cnt')
-            ->addConditionProvider(fn (string $t): array => ['org = ?', ['org1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('org = ?', ['org1']);
+                }
+            })
             ->filter([Query::equal('status', ['active'])])
             ->cursorAfter('cur1')
             ->groupBy(['status'])
@@ -4871,7 +5014,12 @@ class SQLTest extends TestCase
         $result = (new Builder())
             ->from('users')
             ->join('orders', 'users.id', 'orders.uid')
-            ->addConditionProvider(fn (string $t): array => ['tenant = ?', ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('tenant = ?', ['t1']);
+                }
+            })
             ->build();
 
         $this->assertStringContainsString('JOIN `orders`', $result['query']);
@@ -4885,7 +5033,12 @@ class SQLTest extends TestCase
 
         $result = (new Builder())
             ->from('current')
-            ->addConditionProvider(fn (string $t): array => ['org = ?', ['org1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('org = ?', ['org1']);
+                }
+            })
             ->union($sub)
             ->build();
 
@@ -4899,7 +5052,12 @@ class SQLTest extends TestCase
         $result = (new Builder())
             ->from('orders')
             ->count('*', 'total')
-            ->addConditionProvider(fn (string $t): array => ['org = ?', ['org1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('org = ?', ['org1']);
+                }
+            })
             ->groupBy(['status'])
             ->build();
 
@@ -4911,10 +5069,12 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('users')
-            ->addConditionProvider(fn (string $table): array => [
-                "EXISTS (SELECT 1 FROM {$table}_perms WHERE type = ?)",
-                ['read'],
-            ])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition("EXISTS (SELECT 1 FROM {$table}_perms WHERE type = ?)", ['read']);
+                }
+            })
             ->build();
 
         $this->assertStringContainsString('users_perms', $result['query']);
@@ -4926,7 +5086,12 @@ class SQLTest extends TestCase
         $result = (new Builder())
             ->setWrapChar('"')
             ->from('t')
-            ->addConditionProvider(fn (string $t): array => ['raw_col = ?', [1]])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('raw_col = ?', [1]);
+                }
+            })
             ->build();
 
         // Provider SQL is NOT wrapped - only the FROM clause is
@@ -4938,8 +5103,18 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->addConditionProvider(fn (string $t): array => ['p1 = ?', ['pv1']])
-            ->addConditionProvider(fn (string $t): array => ['p2 = ?', ['pv2']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('p1 = ?', ['pv1']);
+                }
+            })
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('p2 = ?', ['pv2']);
+                }
+            })
             ->filter([
                 Query::equal('a', ['va']),
                 Query::greaterThan('b', 10),
@@ -4957,7 +5132,12 @@ class SQLTest extends TestCase
     {
         $builder = (new Builder())
             ->from('t')
-            ->addConditionProvider(fn (string $t): array => ['org = ?', ['org1']]);
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('org = ?', ['org1']);
+                }
+            });
 
         $builder->build();
         $builder->reset();
@@ -4971,10 +5151,30 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->addConditionProvider(fn (string $t): array => ['a = ?', [1]])
-            ->addConditionProvider(fn (string $t): array => ['b = ?', [2]])
-            ->addConditionProvider(fn (string $t): array => ['c = ?', [3]])
-            ->addConditionProvider(fn (string $t): array => ['d = ?', [4]])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('a = ?', [1]);
+                }
+            })
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('b = ?', [2]);
+                }
+            })
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('c = ?', [3]);
+                }
+            })
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('d = ?', [4]);
+                }
+            })
             ->build();
 
         $this->assertEquals(
@@ -4988,7 +5188,12 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->addConditionProvider(fn (string $t): array => ['1 = 1', []])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('1 = 1', []);
+                }
+            })
             ->build();
 
         $this->assertEquals('SELECT * FROM `t` WHERE 1 = 1', $result['query']);
@@ -5003,7 +5208,12 @@ class SQLTest extends TestCase
     {
         $builder = (new Builder())
             ->from('t')
-            ->setAttributeResolver(fn (string $a): string => '_' . $a)
+            ->addHook(new class () implements \Utopia\Query\Hook\AttributeHook {
+                public function resolve(string $attribute): string
+                {
+                    return '_' . $attribute;
+                }
+            })
             ->filter([Query::equal('x', [1])]);
 
         $builder->build();
@@ -5017,7 +5227,12 @@ class SQLTest extends TestCase
     {
         $builder = (new Builder())
             ->from('t')
-            ->addConditionProvider(fn (string $t): array => ['org = ?', ['org1']]);
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('org = ?', ['org1']);
+                }
+            });
 
         $builder->build();
         $builder->reset();
@@ -5230,7 +5445,12 @@ class SQLTest extends TestCase
     {
         $builder = (new Builder())
             ->from('t')
-            ->addConditionProvider(fn (string $t): array => ['org = ?', ['org1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('org = ?', ['org1']);
+                }
+            })
             ->filter([Query::equal('status', ['active'])]);
 
         $result1 = $builder->build();
@@ -5337,9 +5557,24 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->addConditionProvider(fn (string $t): array => ['p1 = ?', ['pv1']])
-            ->addConditionProvider(fn (string $t): array => ['p2 = ?', ['pv2']])
-            ->addConditionProvider(fn (string $t): array => ['p3 = ?', ['pv3']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('p1 = ?', ['pv1']);
+                }
+            })
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('p2 = ?', ['pv2']);
+                }
+            })
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('p3 = ?', ['pv3']);
+                }
+            })
             ->build();
 
         $this->assertEquals(['pv1', 'pv2', 'pv3'], $result['bindings']);
@@ -5452,7 +5687,12 @@ class SQLTest extends TestCase
         $result = (new Builder())
             ->from('orders')
             ->count('*', 'cnt')
-            ->addConditionProvider(fn (string $t): array => ['tenant = ?', ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('tenant = ?', ['t1']);
+                }
+            })
             ->filter([
                 Query::equal('status', ['paid']),
                 Query::greaterThan('total', 0),
@@ -5527,7 +5767,12 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->addConditionProvider(fn (string $t): array => ['org = ?', ['org1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('org = ?', ['org1']);
+                }
+            })
             ->filter([Query::equal('a', ['x'])])
             ->cursorBefore('my_cursor')
             ->limit(10)
@@ -5899,7 +6144,12 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->addConditionProvider(fn (string $table) => ["_tenant = ?", ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('_tenant = ?', ['t1']);
+                }
+            })
             ->build();
         $this->assertEquals('SELECT * FROM `t` WHERE _tenant = ?', $result['query']);
         $this->assertEquals(['t1'], $result['bindings']);
@@ -5909,7 +6159,12 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->addConditionProvider(fn (string $table) => ["_tenant = ?", ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('_tenant = ?', ['t1']);
+                }
+            })
             ->cursorAfter('abc')
             ->build();
         $this->assertStringContainsString('_tenant = ?', $result['query']);
@@ -5923,7 +6178,12 @@ class SQLTest extends TestCase
         $result = (new Builder())
             ->from('t')
             ->distinct()
-            ->addConditionProvider(fn (string $table) => ["_tenant = ?", ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('_tenant = ?', ['t1']);
+                }
+            })
             ->build();
         $this->assertEquals('SELECT DISTINCT * FROM `t` WHERE _tenant = ?', $result['query']);
         $this->assertEquals(['t1'], $result['bindings']);
@@ -5933,7 +6193,12 @@ class SQLTest extends TestCase
     {
         $builder = (new Builder())
             ->from('t')
-            ->addConditionProvider(fn (string $table) => ["_tenant = ?", ['t1']]);
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('_tenant = ?', ['t1']);
+                }
+            });
         $builder->build();
         $builder->reset()->from('other');
         $result = $builder->build();
@@ -5948,7 +6213,12 @@ class SQLTest extends TestCase
             ->from('t')
             ->count('*', 'total')
             ->groupBy(['status'])
-            ->addConditionProvider(fn (string $table) => ["_tenant = ?", ['t1']])
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('_tenant = ?', ['t1']);
+                }
+            })
             ->having([Query::greaterThan('total', 5)])
             ->build();
         // Provider should be in WHERE, not HAVING
@@ -5962,7 +6232,12 @@ class SQLTest extends TestCase
     {
         $sub = (new Builder())
             ->from('b')
-            ->addConditionProvider(fn (string $table) => ["_deleted = ?", [0]]);
+            ->addHook(new class () implements FilterHook {
+                public function filter(string $table): Condition
+                {
+                    return new Condition('_deleted = ?', [0]);
+                }
+            });
         $result = (new Builder())
             ->from('a')
             ->union($sub)

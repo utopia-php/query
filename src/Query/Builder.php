@@ -3,6 +3,8 @@
 namespace Utopia\Query;
 
 use Closure;
+use Utopia\Query\Hook\AttributeHook;
+use Utopia\Query\Hook\FilterHook;
 
 abstract class Builder implements Compiler
 {
@@ -23,12 +25,11 @@ abstract class Builder implements Compiler
      */
     protected array $unions = [];
 
-    protected ?Closure $attributeResolver = null;
+    /** @var list<FilterHook> */
+    protected array $filterHooks = [];
 
-    /**
-     * @var array<Closure>
-     */
-    protected array $conditionProviders = [];
+    /** @var list<AttributeHook> */
+    protected array $attributeHooks = [];
 
     // ── Abstract (dialect-specific) ──
 
@@ -163,19 +164,14 @@ abstract class Builder implements Compiler
         return $this;
     }
 
-    public function setAttributeResolver(Closure $resolver): static
+    public function addHook(Hook $hook): static
     {
-        $this->attributeResolver = $resolver;
-
-        return $this;
-    }
-
-    /**
-     * @param  Closure(string): array{0: string, 1: list<mixed>}  $provider
-     */
-    public function addConditionProvider(Closure $provider): static
-    {
-        $this->conditionProviders[] = $provider;
+        if ($hook instanceof FilterHook) {
+            $this->filterHooks[] = $hook;
+        }
+        if ($hook instanceof AttributeHook) {
+            $this->attributeHooks[] = $hook;
+        }
 
         return $this;
     }
@@ -395,11 +391,10 @@ abstract class Builder implements Compiler
             $whereClauses[] = $this->compileFilter($filter);
         }
 
-        foreach ($this->conditionProviders as $provider) {
-            /** @var array{0: string, 1: list<mixed>} $result */
-            $result = $provider($this->table);
-            $whereClauses[] = $result[0];
-            foreach ($result[1] as $binding) {
+        foreach ($this->filterHooks as $hook) {
+            $condition = $hook->filter($this->table);
+            $whereClauses[] = $condition->getExpression();
+            foreach ($condition->getBindings() as $binding) {
                 $this->addBinding($binding);
             }
         }
@@ -665,9 +660,8 @@ abstract class Builder implements Compiler
 
     protected function resolveAttribute(string $attribute): string
     {
-        if ($this->attributeResolver !== null) {
-            /** @var string */
-            return ($this->attributeResolver)($attribute);
+        foreach ($this->attributeHooks as $hook) {
+            $attribute = $hook->resolve($attribute);
         }
 
         return $attribute;
@@ -795,8 +789,9 @@ abstract class Builder implements Compiler
      */
     private function compileLike(string $attribute, array $values, string $prefix, string $suffix, bool $not): string
     {
-        /** @var string $val */
-        $val = $this->escapeLikeValue($values[0]);
+        /** @var string $rawVal */
+        $rawVal = $values[0];
+        $val = $this->escapeLikeValue($rawVal);
         $this->addBinding($prefix . $val . $suffix);
         $keyword = $not ? 'NOT LIKE' : 'LIKE';
 
