@@ -138,4 +138,73 @@ class QueryTest extends TestCase
         $query = Query::equal('name', []);
         $this->assertEquals([], $query->getValues());
     }
+
+    public function testTypesConstantContainsNewTypes(): void
+    {
+        $this->assertContains(Query::TYPE_COUNT, Query::TYPES);
+        $this->assertContains(Query::TYPE_SUM, Query::TYPES);
+        $this->assertContains(Query::TYPE_AVG, Query::TYPES);
+        $this->assertContains(Query::TYPE_MIN, Query::TYPES);
+        $this->assertContains(Query::TYPE_MAX, Query::TYPES);
+        $this->assertContains(Query::TYPE_GROUP_BY, Query::TYPES);
+        $this->assertContains(Query::TYPE_HAVING, Query::TYPES);
+        $this->assertContains(Query::TYPE_DISTINCT, Query::TYPES);
+        $this->assertContains(Query::TYPE_JOIN, Query::TYPES);
+        $this->assertContains(Query::TYPE_LEFT_JOIN, Query::TYPES);
+        $this->assertContains(Query::TYPE_RIGHT_JOIN, Query::TYPES);
+        $this->assertContains(Query::TYPE_CROSS_JOIN, Query::TYPES);
+        $this->assertContains(Query::TYPE_UNION, Query::TYPES);
+        $this->assertContains(Query::TYPE_UNION_ALL, Query::TYPES);
+        $this->assertContains(Query::TYPE_RAW, Query::TYPES);
+    }
+
+    public function testIsMethodNewTypes(): void
+    {
+        $this->assertTrue(Query::isMethod('count'));
+        $this->assertTrue(Query::isMethod('sum'));
+        $this->assertTrue(Query::isMethod('avg'));
+        $this->assertTrue(Query::isMethod('min'));
+        $this->assertTrue(Query::isMethod('max'));
+        $this->assertTrue(Query::isMethod('groupBy'));
+        $this->assertTrue(Query::isMethod('having'));
+        $this->assertTrue(Query::isMethod('distinct'));
+        $this->assertTrue(Query::isMethod('join'));
+        $this->assertTrue(Query::isMethod('leftJoin'));
+        $this->assertTrue(Query::isMethod('rightJoin'));
+        $this->assertTrue(Query::isMethod('crossJoin'));
+        $this->assertTrue(Query::isMethod('union'));
+        $this->assertTrue(Query::isMethod('unionAll'));
+        $this->assertTrue(Query::isMethod('raw'));
+    }
+
+    public function testDistinctFactory(): void
+    {
+        $query = Query::distinct();
+        $this->assertEquals(Query::TYPE_DISTINCT, $query->getMethod());
+        $this->assertEquals('', $query->getAttribute());
+        $this->assertEquals([], $query->getValues());
+    }
+
+    public function testRawFactory(): void
+    {
+        $query = Query::raw('score > ?', [10]);
+        $this->assertEquals(Query::TYPE_RAW, $query->getMethod());
+        $this->assertEquals('score > ?', $query->getAttribute());
+        $this->assertEquals([10], $query->getValues());
+    }
+
+    public function testUnionFactory(): void
+    {
+        $inner = [Query::equal('x', [1])];
+        $query = Query::union($inner);
+        $this->assertEquals(Query::TYPE_UNION, $query->getMethod());
+        $this->assertCount(1, $query->getValues());
+    }
+
+    public function testUnionAllFactory(): void
+    {
+        $inner = [Query::equal('x', [1])];
+        $query = Query::unionAll($inner);
+        $this->assertEquals(Query::TYPE_UNION_ALL, $query->getMethod());
+    }
 }

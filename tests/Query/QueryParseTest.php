@@ -187,4 +187,91 @@ class QueryParseTest extends TestCase
         $this->assertCount(2, $parsed->getValues());
         $this->assertInstanceOf(Query::class, $parsed->getValues()[0]);
     }
+
+    // ── Round-trip tests for new types ──
+
+    public function testRoundTripCount(): void
+    {
+        $original = Query::count('id', 'total');
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('count', $parsed->getMethod());
+        $this->assertEquals('id', $parsed->getAttribute());
+        $this->assertEquals(['total'], $parsed->getValues());
+    }
+
+    public function testRoundTripSum(): void
+    {
+        $original = Query::sum('price');
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('sum', $parsed->getMethod());
+        $this->assertEquals('price', $parsed->getAttribute());
+    }
+
+    public function testRoundTripGroupBy(): void
+    {
+        $original = Query::groupBy(['status', 'country']);
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('groupBy', $parsed->getMethod());
+        $this->assertEquals(['status', 'country'], $parsed->getValues());
+    }
+
+    public function testRoundTripHaving(): void
+    {
+        $original = Query::having([Query::greaterThan('total', 5)]);
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('having', $parsed->getMethod());
+        $this->assertCount(1, $parsed->getValues());
+        $this->assertInstanceOf(Query::class, $parsed->getValues()[0]);
+    }
+
+    public function testRoundTripDistinct(): void
+    {
+        $original = Query::distinct();
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('distinct', $parsed->getMethod());
+    }
+
+    public function testRoundTripJoin(): void
+    {
+        $original = Query::join('orders', 'users.id', 'orders.user_id');
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('join', $parsed->getMethod());
+        $this->assertEquals('orders', $parsed->getAttribute());
+        $this->assertEquals(['users.id', '=', 'orders.user_id'], $parsed->getValues());
+    }
+
+    public function testRoundTripCrossJoin(): void
+    {
+        $original = Query::crossJoin('colors');
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('crossJoin', $parsed->getMethod());
+        $this->assertEquals('colors', $parsed->getAttribute());
+    }
+
+    public function testRoundTripRaw(): void
+    {
+        $original = Query::raw('score > ?', [10]);
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('raw', $parsed->getMethod());
+        $this->assertEquals('score > ?', $parsed->getAttribute());
+        $this->assertEquals([10], $parsed->getValues());
+    }
+
+    public function testRoundTripUnion(): void
+    {
+        $original = Query::union([Query::equal('x', [1])]);
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('union', $parsed->getMethod());
+        $this->assertCount(1, $parsed->getValues());
+        $this->assertInstanceOf(Query::class, $parsed->getValues()[0]);
+    }
 }

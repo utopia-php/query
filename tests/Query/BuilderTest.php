@@ -669,4 +669,392 @@ class BuilderTest extends TestCase
 
         $this->assertEquals('SELECT * FROM `t`', $result['query']);
     }
+
+    // ── Aggregations ──
+
+    public function testCountStar(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->count()
+            ->build();
+
+        $this->assertEquals('SELECT COUNT(*) FROM `t`', $result['query']);
+        $this->assertEquals([], $result['bindings']);
+    }
+
+    public function testCountWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->count('*', 'total')
+            ->build();
+
+        $this->assertEquals('SELECT COUNT(*) AS `total` FROM `t`', $result['query']);
+    }
+
+    public function testSumColumn(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->sum('price', 'total_price')
+            ->build();
+
+        $this->assertEquals('SELECT SUM(`price`) AS `total_price` FROM `orders`', $result['query']);
+    }
+
+    public function testAvgColumn(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->avg('score')
+            ->build();
+
+        $this->assertEquals('SELECT AVG(`score`) FROM `t`', $result['query']);
+    }
+
+    public function testMinColumn(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->min('price')
+            ->build();
+
+        $this->assertEquals('SELECT MIN(`price`) FROM `t`', $result['query']);
+    }
+
+    public function testMaxColumn(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->max('price')
+            ->build();
+
+        $this->assertEquals('SELECT MAX(`price`) FROM `t`', $result['query']);
+    }
+
+    public function testAggregationWithSelection(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->count('*', 'total')
+            ->select(['status'])
+            ->groupBy(['status'])
+            ->build();
+
+        $this->assertEquals(
+            'SELECT COUNT(*) AS `total`, `status` FROM `orders` GROUP BY `status`',
+            $result['query']
+        );
+    }
+
+    // ── Group By ──
+
+    public function testGroupBy(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->count('*', 'total')
+            ->groupBy(['status'])
+            ->build();
+
+        $this->assertEquals(
+            'SELECT COUNT(*) AS `total` FROM `orders` GROUP BY `status`',
+            $result['query']
+        );
+    }
+
+    public function testGroupByMultiple(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->count('*', 'total')
+            ->groupBy(['status', 'country'])
+            ->build();
+
+        $this->assertEquals(
+            'SELECT COUNT(*) AS `total` FROM `orders` GROUP BY `status`, `country`',
+            $result['query']
+        );
+    }
+
+    // ── Having ──
+
+    public function testHaving(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->count('*', 'total')
+            ->groupBy(['status'])
+            ->having([Query::greaterThan('total', 5)])
+            ->build();
+
+        $this->assertEquals(
+            'SELECT COUNT(*) AS `total` FROM `orders` GROUP BY `status` HAVING `total` > ?',
+            $result['query']
+        );
+        $this->assertEquals([5], $result['bindings']);
+    }
+
+    // ── Distinct ──
+
+    public function testDistinct(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->distinct()
+            ->select(['status'])
+            ->build();
+
+        $this->assertEquals('SELECT DISTINCT `status` FROM `t`', $result['query']);
+    }
+
+    public function testDistinctStar(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->distinct()
+            ->build();
+
+        $this->assertEquals('SELECT DISTINCT * FROM `t`', $result['query']);
+    }
+
+    // ── Joins ──
+
+    public function testJoin(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->join('orders', 'users.id', 'orders.user_id')
+            ->build();
+
+        $this->assertEquals(
+            'SELECT * FROM `users` JOIN `orders` ON `users.id` = `orders.user_id`',
+            $result['query']
+        );
+    }
+
+    public function testLeftJoin(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->leftJoin('profiles', 'users.id', 'profiles.user_id')
+            ->build();
+
+        $this->assertEquals(
+            'SELECT * FROM `users` LEFT JOIN `profiles` ON `users.id` = `profiles.user_id`',
+            $result['query']
+        );
+    }
+
+    public function testRightJoin(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->rightJoin('orders', 'users.id', 'orders.user_id')
+            ->build();
+
+        $this->assertEquals(
+            'SELECT * FROM `users` RIGHT JOIN `orders` ON `users.id` = `orders.user_id`',
+            $result['query']
+        );
+    }
+
+    public function testCrossJoin(): void
+    {
+        $result = (new Builder())
+            ->from('sizes')
+            ->crossJoin('colors')
+            ->build();
+
+        $this->assertEquals(
+            'SELECT * FROM `sizes` CROSS JOIN `colors`',
+            $result['query']
+        );
+    }
+
+    public function testJoinWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->join('orders', 'users.id', 'orders.user_id')
+            ->filter([Query::greaterThan('orders.total', 100)])
+            ->build();
+
+        $this->assertEquals(
+            'SELECT * FROM `users` JOIN `orders` ON `users.id` = `orders.user_id` WHERE `orders.total` > ?',
+            $result['query']
+        );
+        $this->assertEquals([100], $result['bindings']);
+    }
+
+    // ── Raw ──
+
+    public function testRawFilter(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::raw('score > ? AND score < ?', [10, 100])])
+            ->build();
+
+        $this->assertEquals('SELECT * FROM `t` WHERE score > ? AND score < ?', $result['query']);
+        $this->assertEquals([10, 100], $result['bindings']);
+    }
+
+    public function testRawFilterNoBindings(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::raw('1 = 1')])
+            ->build();
+
+        $this->assertEquals('SELECT * FROM `t` WHERE 1 = 1', $result['query']);
+        $this->assertEquals([], $result['bindings']);
+    }
+
+    // ── Union ──
+
+    public function testUnion(): void
+    {
+        $admins = (new Builder())->from('admins')->filter([Query::equal('role', ['admin'])]);
+        $result = (new Builder())
+            ->from('users')
+            ->filter([Query::equal('status', ['active'])])
+            ->union($admins)
+            ->build();
+
+        $this->assertEquals(
+            'SELECT * FROM `users` WHERE `status` IN (?) UNION SELECT * FROM `admins` WHERE `role` IN (?)',
+            $result['query']
+        );
+        $this->assertEquals(['active', 'admin'], $result['bindings']);
+    }
+
+    public function testUnionAll(): void
+    {
+        $other = (new Builder())->from('archive');
+        $result = (new Builder())
+            ->from('current')
+            ->unionAll($other)
+            ->build();
+
+        $this->assertEquals(
+            'SELECT * FROM `current` UNION ALL SELECT * FROM `archive`',
+            $result['query']
+        );
+    }
+
+    // ── when() ──
+
+    public function testWhenTrue(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->when(true, fn (Builder $b) => $b->filter([Query::equal('status', ['active'])]))
+            ->build();
+
+        $this->assertEquals('SELECT * FROM `t` WHERE `status` IN (?)', $result['query']);
+        $this->assertEquals(['active'], $result['bindings']);
+    }
+
+    public function testWhenFalse(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->when(false, fn (Builder $b) => $b->filter([Query::equal('status', ['active'])]))
+            ->build();
+
+        $this->assertEquals('SELECT * FROM `t`', $result['query']);
+        $this->assertEquals([], $result['bindings']);
+    }
+
+    // ── page() ──
+
+    public function testPage(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->page(3, 10)
+            ->build();
+
+        $this->assertEquals('SELECT * FROM `t` LIMIT ? OFFSET ?', $result['query']);
+        $this->assertEquals([10, 20], $result['bindings']);
+    }
+
+    public function testPageDefaultPerPage(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->page(1)
+            ->build();
+
+        $this->assertEquals('SELECT * FROM `t` LIMIT ? OFFSET ?', $result['query']);
+        $this->assertEquals([25, 0], $result['bindings']);
+    }
+
+    // ── toRawSql() ──
+
+    public function testToRawSql(): void
+    {
+        $sql = (new Builder())
+            ->from('users')
+            ->filter([Query::equal('status', ['active'])])
+            ->limit(10)
+            ->toRawSql();
+
+        $this->assertEquals(
+            "SELECT * FROM `users` WHERE `status` IN ('active') LIMIT 10",
+            $sql
+        );
+    }
+
+    public function testToRawSqlNumericBindings(): void
+    {
+        $sql = (new Builder())
+            ->from('t')
+            ->filter([Query::greaterThan('age', 18)])
+            ->toRawSql();
+
+        $this->assertEquals("SELECT * FROM `t` WHERE `age` > 18", $sql);
+    }
+
+    // ── Combined complex query ──
+
+    public function testCombinedAggregationJoinGroupByHaving(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->count('*', 'order_count')
+            ->sum('total', 'total_amount')
+            ->select(['users.name'])
+            ->join('users', 'orders.user_id', 'users.id')
+            ->groupBy(['users.name'])
+            ->having([Query::greaterThan('order_count', 5)])
+            ->sortDesc('total_amount')
+            ->limit(10)
+            ->build();
+
+        $this->assertEquals(
+            'SELECT COUNT(*) AS `order_count`, SUM(`total`) AS `total_amount`, `users.name` FROM `orders` JOIN `users` ON `orders.user_id` = `users.id` GROUP BY `users.name` HAVING `order_count` > ? ORDER BY `total_amount` DESC LIMIT ?',
+            $result['query']
+        );
+        $this->assertEquals([5, 10], $result['bindings']);
+    }
+
+    // ── Reset clears unions ──
+
+    public function testResetClearsUnions(): void
+    {
+        $other = (new Builder())->from('archive');
+        $builder = (new Builder())
+            ->from('current')
+            ->union($other);
+
+        $builder->build();
+        $builder->reset();
+
+        $result = $builder->from('fresh')->build();
+
+        $this->assertEquals('SELECT * FROM `fresh`', $result['query']);
+    }
 }

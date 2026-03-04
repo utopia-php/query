@@ -35,6 +35,21 @@ class QueryHelperTest extends TestCase
         $this->assertTrue(Query::isMethod('containsAll'));
         $this->assertTrue(Query::isMethod('elemMatch'));
         $this->assertTrue(Query::isMethod('regex'));
+        $this->assertTrue(Query::isMethod('count'));
+        $this->assertTrue(Query::isMethod('sum'));
+        $this->assertTrue(Query::isMethod('avg'));
+        $this->assertTrue(Query::isMethod('min'));
+        $this->assertTrue(Query::isMethod('max'));
+        $this->assertTrue(Query::isMethod('groupBy'));
+        $this->assertTrue(Query::isMethod('having'));
+        $this->assertTrue(Query::isMethod('distinct'));
+        $this->assertTrue(Query::isMethod('join'));
+        $this->assertTrue(Query::isMethod('leftJoin'));
+        $this->assertTrue(Query::isMethod('rightJoin'));
+        $this->assertTrue(Query::isMethod('crossJoin'));
+        $this->assertTrue(Query::isMethod('union'));
+        $this->assertTrue(Query::isMethod('unionAll'));
+        $this->assertTrue(Query::isMethod('raw'));
     }
 
     public function testIsMethodInvalid(): void
@@ -265,5 +280,229 @@ class QueryHelperTest extends TestCase
     {
         $grouped = Query::groupByType(['not a query', null, 42]);
         $this->assertEquals([], $grouped['filters']);
+    }
+
+    // ── groupByType with new types ──
+
+    public function testGroupByTypeAggregations(): void
+    {
+        $queries = [
+            Query::count('*', 'total'),
+            Query::sum('price'),
+            Query::avg('score'),
+            Query::min('age'),
+            Query::max('salary'),
+        ];
+
+        $grouped = Query::groupByType($queries);
+        $this->assertCount(5, $grouped['aggregations']);
+        $this->assertEquals(Query::TYPE_COUNT, $grouped['aggregations'][0]->getMethod());
+        $this->assertEquals(Query::TYPE_MAX, $grouped['aggregations'][4]->getMethod());
+    }
+
+    public function testGroupByTypeGroupBy(): void
+    {
+        $queries = [Query::groupBy(['status', 'country'])];
+        $grouped = Query::groupByType($queries);
+        $this->assertEquals(['status', 'country'], $grouped['groupBy']);
+    }
+
+    public function testGroupByTypeHaving(): void
+    {
+        $queries = [Query::having([Query::greaterThan('total', 5)])];
+        $grouped = Query::groupByType($queries);
+        $this->assertCount(1, $grouped['having']);
+        $this->assertEquals(Query::TYPE_HAVING, $grouped['having'][0]->getMethod());
+    }
+
+    public function testGroupByTypeDistinct(): void
+    {
+        $queries = [Query::distinct()];
+        $grouped = Query::groupByType($queries);
+        $this->assertTrue($grouped['distinct']);
+    }
+
+    public function testGroupByTypeDistinctDefaultFalse(): void
+    {
+        $grouped = Query::groupByType([]);
+        $this->assertFalse($grouped['distinct']);
+    }
+
+    public function testGroupByTypeJoins(): void
+    {
+        $queries = [
+            Query::join('orders', 'users.id', 'orders.user_id'),
+            Query::leftJoin('profiles', 'users.id', 'profiles.user_id'),
+            Query::crossJoin('colors'),
+        ];
+        $grouped = Query::groupByType($queries);
+        $this->assertCount(3, $grouped['joins']);
+        $this->assertEquals(Query::TYPE_JOIN, $grouped['joins'][0]->getMethod());
+        $this->assertEquals(Query::TYPE_CROSS_JOIN, $grouped['joins'][2]->getMethod());
+    }
+
+    public function testGroupByTypeUnions(): void
+    {
+        $queries = [
+            Query::union([Query::equal('x', [1])]),
+            Query::unionAll([Query::equal('y', [2])]),
+        ];
+        $grouped = Query::groupByType($queries);
+        $this->assertCount(2, $grouped['unions']);
+    }
+
+    // ── merge() ──
+
+    public function testMergeConcatenates(): void
+    {
+        $a = [Query::equal('name', ['John'])];
+        $b = [Query::greaterThan('age', 18)];
+
+        $result = Query::merge($a, $b);
+        $this->assertCount(2, $result);
+        $this->assertEquals('equal', $result[0]->getMethod());
+        $this->assertEquals('greaterThan', $result[1]->getMethod());
+    }
+
+    public function testMergeLimitOverrides(): void
+    {
+        $a = [Query::limit(10)];
+        $b = [Query::limit(50)];
+
+        $result = Query::merge($a, $b);
+        $this->assertCount(1, $result);
+        $this->assertEquals(50, $result[0]->getValue());
+    }
+
+    public function testMergeOffsetOverrides(): void
+    {
+        $a = [Query::offset(5), Query::equal('x', [1])];
+        $b = [Query::offset(100)];
+
+        $result = Query::merge($a, $b);
+        $this->assertCount(2, $result);
+        // equal stays, offset replaced
+        $this->assertEquals('equal', $result[0]->getMethod());
+        $this->assertEquals(100, $result[1]->getValue());
+    }
+
+    public function testMergeCursorOverrides(): void
+    {
+        $a = [Query::cursorAfter('abc')];
+        $b = [Query::cursorAfter('xyz')];
+
+        $result = Query::merge($a, $b);
+        $this->assertCount(1, $result);
+        $this->assertEquals('xyz', $result[0]->getValue());
+    }
+
+    // ── diff() ──
+
+    public function testDiffReturnsUnique(): void
+    {
+        $shared = Query::equal('name', ['John']);
+        $a = [$shared, Query::greaterThan('age', 18)];
+        $b = [$shared];
+
+        $result = Query::diff($a, $b);
+        $this->assertCount(1, $result);
+        $this->assertEquals('greaterThan', $result[0]->getMethod());
+    }
+
+    public function testDiffEmpty(): void
+    {
+        $q = Query::equal('x', [1]);
+        $result = Query::diff([$q], [$q]);
+        $this->assertCount(0, $result);
+    }
+
+    public function testDiffNoOverlap(): void
+    {
+        $a = [Query::equal('x', [1])];
+        $b = [Query::equal('y', [2])];
+        $result = Query::diff($a, $b);
+        $this->assertCount(1, $result);
+    }
+
+    // ── validate() ──
+
+    public function testValidatePassesAllowed(): void
+    {
+        $queries = [
+            Query::equal('name', ['John']),
+            Query::greaterThan('age', 18),
+        ];
+        $errors = Query::validate($queries, ['name', 'age']);
+        $this->assertCount(0, $errors);
+    }
+
+    public function testValidateFailsInvalid(): void
+    {
+        $queries = [
+            Query::equal('name', ['John']),
+            Query::greaterThan('secret', 42),
+        ];
+        $errors = Query::validate($queries, ['name', 'age']);
+        $this->assertCount(1, $errors);
+        $this->assertStringContainsString('secret', $errors[0]);
+    }
+
+    public function testValidateSkipsNoAttribute(): void
+    {
+        $queries = [
+            Query::limit(10),
+            Query::offset(5),
+            Query::distinct(),
+            Query::orderRandom(),
+        ];
+        $errors = Query::validate($queries, []);
+        $this->assertCount(0, $errors);
+    }
+
+    public function testValidateRecursesNested(): void
+    {
+        $queries = [
+            Query::or([
+                Query::equal('name', ['John']),
+                Query::equal('invalid', ['x']),
+            ]),
+        ];
+        $errors = Query::validate($queries, ['name']);
+        $this->assertCount(1, $errors);
+        $this->assertStringContainsString('invalid', $errors[0]);
+    }
+
+    public function testValidateGroupByColumns(): void
+    {
+        $queries = [Query::groupBy(['status', 'bad_col'])];
+        $errors = Query::validate($queries, ['status']);
+        $this->assertCount(1, $errors);
+        $this->assertStringContainsString('bad_col', $errors[0]);
+    }
+
+    public function testValidateSkipsStar(): void
+    {
+        $queries = [Query::count()]; // attribute = '*'
+        $errors = Query::validate($queries, []);
+        $this->assertCount(0, $errors);
+    }
+
+    // ── page() static helper ──
+
+    public function testPageStaticHelper(): void
+    {
+        $result = Query::page(3, 10);
+        $this->assertCount(2, $result);
+        $this->assertEquals(Query::TYPE_LIMIT, $result[0]->getMethod());
+        $this->assertEquals(10, $result[0]->getValue());
+        $this->assertEquals(Query::TYPE_OFFSET, $result[1]->getMethod());
+        $this->assertEquals(20, $result[1]->getValue());
+    }
+
+    public function testPageStaticHelperFirstPage(): void
+    {
+        $result = Query::page(1);
+        $this->assertEquals(25, $result[0]->getValue());
+        $this->assertEquals(0, $result[1]->getValue());
     }
 }
