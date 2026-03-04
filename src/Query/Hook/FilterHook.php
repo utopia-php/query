@@ -1,0 +1,11 @@
+<?php
+
+namespace Utopia\Query\Hook;
+
+use Utopia\Query\Condition;
+use Utopia\Query\Hook;
+
+interface FilterHook extends Hook
+{
+    public function filter(string $table): Condition;
+}
