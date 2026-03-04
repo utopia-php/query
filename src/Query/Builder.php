@@ -18,6 +18,11 @@ class Builder implements Compiler
      */
     protected array $bindings = [];
 
+    /**
+     * @var array<array{type: string, query: string, bindings: list<mixed>}>
+     */
+    protected array $unions = [];
+
     private string $wrapChar = '`';
 
     private ?Closure $attributeResolver = null;
@@ -179,6 +184,166 @@ class Builder implements Compiler
         return $this;
     }
 
+    // ── Aggregation fluent API ──
+
+    public function count(string $attribute = '*', string $alias = ''): static
+    {
+        $this->pendingQueries[] = Query::count($attribute, $alias);
+
+        return $this;
+    }
+
+    public function sum(string $attribute, string $alias = ''): static
+    {
+        $this->pendingQueries[] = Query::sum($attribute, $alias);
+
+        return $this;
+    }
+
+    public function avg(string $attribute, string $alias = ''): static
+    {
+        $this->pendingQueries[] = Query::avg($attribute, $alias);
+
+        return $this;
+    }
+
+    public function min(string $attribute, string $alias = ''): static
+    {
+        $this->pendingQueries[] = Query::min($attribute, $alias);
+
+        return $this;
+    }
+
+    public function max(string $attribute, string $alias = ''): static
+    {
+        $this->pendingQueries[] = Query::max($attribute, $alias);
+
+        return $this;
+    }
+
+    /**
+     * @param  array<string>  $columns
+     */
+    public function groupBy(array $columns): static
+    {
+        $this->pendingQueries[] = Query::groupBy($columns);
+
+        return $this;
+    }
+
+    /**
+     * @param  array<Query>  $queries
+     */
+    public function having(array $queries): static
+    {
+        $this->pendingQueries[] = Query::having($queries);
+
+        return $this;
+    }
+
+    public function distinct(): static
+    {
+        $this->pendingQueries[] = Query::distinct();
+
+        return $this;
+    }
+
+    // ── Join fluent API ──
+
+    public function join(string $table, string $left, string $right, string $operator = '='): static
+    {
+        $this->pendingQueries[] = Query::join($table, $left, $right, $operator);
+
+        return $this;
+    }
+
+    public function leftJoin(string $table, string $left, string $right, string $operator = '='): static
+    {
+        $this->pendingQueries[] = Query::leftJoin($table, $left, $right, $operator);
+
+        return $this;
+    }
+
+    public function rightJoin(string $table, string $left, string $right, string $operator = '='): static
+    {
+        $this->pendingQueries[] = Query::rightJoin($table, $left, $right, $operator);
+
+        return $this;
+    }
+
+    public function crossJoin(string $table): static
+    {
+        $this->pendingQueries[] = Query::crossJoin($table);
+
+        return $this;
+    }
+
+    // ── Union fluent API ──
+
+    public function union(Builder $other): static
+    {
+        $result = $other->build();
+        $this->unions[] = [
+            'type' => 'UNION',
+            'query' => $result['query'],
+            'bindings' => $result['bindings'],
+        ];
+
+        return $this;
+    }
+
+    public function unionAll(Builder $other): static
+    {
+        $result = $other->build();
+        $this->unions[] = [
+            'type' => 'UNION ALL',
+            'query' => $result['query'],
+            'bindings' => $result['bindings'],
+        ];
+
+        return $this;
+    }
+
+    // ── Convenience methods ──
+
+    public function when(bool $condition, Closure $callback): static
+    {
+        if ($condition) {
+            $callback($this);
+        }
+
+        return $this;
+    }
+
+    public function page(int $page, int $perPage = 25): static
+    {
+        $this->pendingQueries[] = Query::limit($perPage);
+        $this->pendingQueries[] = Query::offset(($page - 1) * $perPage);
+
+        return $this;
+    }
+
+    public function toRawSql(): string
+    {
+        $result = $this->build();
+        $sql = $result['query'];
+
+        foreach ($result['bindings'] as $binding) {
+            if (\is_string($binding)) {
+                $value = "'" . $binding . "'";
+            } elseif (\is_int($binding) || \is_float($binding)) {
+                $value = (string) $binding;
+            } elseif (\is_bool($binding)) {
+                $value = $binding ? '1' : '0';
+            } else {
+                $value = 'NULL';
+            }
+            $sql = \preg_replace('/\?/', $value, $sql, 1) ?? $sql;
+        }
+
+        return $sql;
+    }
+
     /**
      * Build the query and bindings from accumulated state
      *
@@ -193,14 +358,32 @@ class Builder implements Compiler
         $parts = [];
 
         // SELECT
-        $selectSQL = '*';
-        if (! empty($grouped['selections'])) {
-            $selectSQL = $this->compileSelect($grouped['selections'][0]);
+        $selectParts = [];
+
+        if (! empty($grouped['aggregations'])) {
+            foreach ($grouped['aggregations'] as $agg) {
+                $selectParts[] = $this->compileAggregate($agg);
+            }
         }
-        $parts[] = 'SELECT ' . $selectSQL;
+
+        if (! empty($grouped['selections'])) {
+            $selectParts[] = $this->compileSelect($grouped['selections'][0]);
+        }
+
+        $selectSQL = ! empty($selectParts) ? \implode(', ', $selectParts) : '*';
+
+        $selectKeyword = $grouped['distinct'] ? 'SELECT DISTINCT' : 'SELECT';
+        $parts[] = $selectKeyword . ' ' . $selectSQL;
 
         // FROM
         $parts[] = 'FROM ' . $this->wrapIdentifier($this->table);
+
+        // JOINS
+        if (! empty($grouped['joins'])) {
+            foreach ($grouped['joins'] as $joinQuery) {
+                $parts[] = $this->compileJoin($joinQuery);
+            }
+        }
 
         // WHERE
         $whereClauses = [];
@@ -240,6 +423,29 @@ class Builder implements Compiler
             $parts[] = 'WHERE ' . \implode(' AND ', $whereClauses);
         }
 
+        // GROUP BY
+        if (! empty($grouped['groupBy'])) {
+            $groupByCols = \array_map(
+                fn (string $col): string => $this->resolveAndWrap($col),
+                $grouped['groupBy']
+            );
+            $parts[] = 'GROUP BY ' . \implode(', ', $groupByCols);
+        }
+
+        // HAVING
+        if (! empty($grouped['having'])) {
+            $havingClauses = [];
+            foreach ($grouped['having'] as $havingQuery) {
+                foreach ($havingQuery->getValues() as $subQuery) {
+                    /** @var Query $subQuery */
+                    $havingClauses[] = $this->compileFilter($subQuery);
+                }
+            }
+            if (! empty($havingClauses)) {
+                $parts[] = 'HAVING ' . \implode(' AND ', $havingClauses);
+            }
+        }
+
         // ORDER BY
         $orderClauses = [];
         $orderQueries = Query::getByType($this->pendingQueries, [
@@ -266,8 +472,18 @@ class Builder implements Compiler
             $this->addBinding($grouped['offset']);
         }
 
+        $sql = \implode(' ', $parts);
+
+        // UNION
+        foreach ($this->unions as $union) {
+            $sql .= ' ' . $union['type'] . ' ' . $union['query'];
+            foreach ($union['bindings'] as $binding) {
+                $this->addBinding($binding);
+            }
+        }
+
         return [
-            'query' => \implode(' ', $parts),
+            'query' => $sql,
             'bindings' => $this->bindings,
         ];
     }
@@ -290,6 +506,7 @@ class Builder implements Compiler
         $this->pendingQueries = [];
         $this->bindings = [];
         $this->table = '';
+        $this->unions = [];
 
         return $this;
     }
@@ -326,8 +543,10 @@ class Builder implements Compiler
             Query::TYPE_IS_NOT_NULL => $attribute . ' IS NOT NULL',
             Query::TYPE_AND => $this->compileLogical($query, 'AND'),
             Query::TYPE_OR => $this->compileLogical($query, 'OR'),
+            Query::TYPE_HAVING => $this->compileLogical($query, 'AND'),
             Query::TYPE_EXISTS => $this->compileExists($query),
             Query::TYPE_NOT_EXISTS => $this->compileNotExists($query),
+            Query::TYPE_RAW => $this->compileRaw($query),
             default => throw new Exception('Unsupported filter type: ' . $method),
         };
     }
@@ -376,6 +595,64 @@ class Builder implements Compiler
         $operator = $query->getMethod() === Query::TYPE_CURSOR_AFTER ? '>' : '<';
 
         return '_cursor ' . $operator . ' ?';
+    }
+
+    public function compileAggregate(Query $query): string
+    {
+        $func = \strtoupper($query->getMethod());
+        $attr = $query->getAttribute();
+        $col = $attr === '*' ? '*' : $this->resolveAndWrap($attr);
+        /** @var string $alias */
+        $alias = $query->getValue('');
+        $sql = $func . '(' . $col . ')';
+
+        if ($alias !== '') {
+            $sql .= ' AS ' . $this->wrapIdentifier($alias);
+        }
+
+        return $sql;
+    }
+
+    public function compileGroupBy(Query $query): string
+    {
+        /** @var array<string> $values */
+        $values = $query->getValues();
+        $columns = \array_map(
+            fn (string $col): string => $this->resolveAndWrap($col),
+            $values
+        );
+
+        return \implode(', ', $columns);
+    }
+
+    public function compileJoin(Query $query): string
+    {
+        $type = match ($query->getMethod()) {
+            Query::TYPE_JOIN => 'JOIN',
+            Query::TYPE_LEFT_JOIN => 'LEFT JOIN',
+            Query::TYPE_RIGHT_JOIN => 'RIGHT JOIN',
+            Query::TYPE_CROSS_JOIN => 'CROSS JOIN',
+            default => throw new Exception('Unsupported join type: ' . $query->getMethod()),
+        };
+
+        $table = $this->wrapIdentifier($query->getAttribute());
+        $values = $query->getValues();
+
+        if (empty($values)) {
+            return $type . ' ' . $table;
+        }
+
+        /** @var string $leftCol */
+        $leftCol = $values[0];
+        /** @var string $operator */
+        $operator = $values[1];
+        /** @var string $rightCol */
+        $rightCol = $values[2];
+
+        $left = $this->resolveAndWrap($leftCol);
+        $right = $this->resolveAndWrap($rightCol);
+
+        return $type . ' ' . $table . ' ON ' . $left . ' ' . $operator . ' ' . $right;
     }
 
     // ── Protected (overridable) ──
@@ -586,5 +863,14 @@ class Builder implements Compiler
         }
 
         return '(' . \implode(' AND ', $parts) . ')';
+    }
+
+    private function compileRaw(Query $query): string
+    {
+        foreach ($query->getValues() as $binding) {
+            $this->addBinding($binding);
+        }
+
+        return $query->getAttribute();
     }
 }
