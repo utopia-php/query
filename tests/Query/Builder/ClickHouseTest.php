@@ -207,7 +207,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `events` JOIN `users` ON `events.user_id` = `users.id` PREWHERE `event_type` IN (?) WHERE `users.age` > ?',
+            'SELECT * FROM `events` JOIN `users` ON `events`.`user_id` = `users`.`id` PREWHERE `event_type` IN (?) WHERE `users`.`age` > ?',
             $result['query']
         );
         $this->assertEquals(['click', 18], $result['bindings']);
@@ -264,7 +264,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `events` JOIN `users` ON `events.user_id` = `users.id` LEFT JOIN `sessions` ON `events.session_id` = `sessions.id`',
+            'SELECT * FROM `events` JOIN `users` ON `events`.`user_id` = `users`.`id` LEFT JOIN `sessions` ON `events`.`session_id` = `sessions`.`id`',
             $result['query']
         );
     }
@@ -435,8 +435,8 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('FROM `events` FINAL SAMPLE 0.1', $query);
         $this->assertStringContainsString('JOIN `users`', $query);
         $this->assertStringContainsString('PREWHERE `event_type` IN (?)', $query);
-        $this->assertStringContainsString('WHERE `events.amount` > ?', $query);
-        $this->assertStringContainsString('GROUP BY `users.country`', $query);
+        $this->assertStringContainsString('WHERE `events`.`amount` > ?', $query);
+        $this->assertStringContainsString('GROUP BY `users`.`country`', $query);
         $this->assertStringContainsString('HAVING `total` > ?', $query);
         $this->assertStringContainsString('ORDER BY `total` DESC', $query);
         $this->assertStringContainsString('LIMIT ?', $query);
@@ -1179,7 +1179,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertStringContainsString('FROM `events` FINAL', $result['query']);
-        $this->assertStringContainsString('_cursor > ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
     }
 
     public function testFinalWithUnion(): void
@@ -1471,7 +1471,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
-        $this->assertStringContainsString('_cursor > ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
     }
 
     public function testSampleWithUnion(): void
@@ -2582,7 +2582,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `events` FINAL JOIN `users` ON `events.uid` = `users.id`',
+            'SELECT * FROM `events` FINAL JOIN `users` ON `events`.`uid` = `users`.`id`',
             $result['query']
         );
     }
@@ -2596,7 +2596,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `events` SAMPLE 0.5 JOIN `users` ON `events.uid` = `users.id`',
+            'SELECT * FROM `events` SAMPLE 0.5 JOIN `users` ON `events`.`uid` = `users`.`id`',
             $result['query']
         );
     }
@@ -3601,7 +3601,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('_cursor > ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
     }
 
     public function testCursorBeforeWithPrewhere(): void
@@ -3614,7 +3614,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('_cursor < ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` < ?', $result['query']);
     }
 
     public function testCursorPrewhereWhere(): void
@@ -3629,7 +3629,7 @@ class ClickHouseTest extends TestCase
 
         $this->assertStringContainsString('PREWHERE', $result['query']);
         $this->assertStringContainsString('WHERE', $result['query']);
-        $this->assertStringContainsString('_cursor > ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
     }
 
     public function testCursorWithFinal(): void
@@ -3642,7 +3642,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertStringContainsString('FINAL', $result['query']);
-        $this->assertStringContainsString('_cursor > ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
     }
 
     public function testCursorWithSample(): void
@@ -3655,7 +3655,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
-        $this->assertStringContainsString('_cursor > ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
     }
 
     public function testCursorPrewhereBindingOrder(): void
@@ -3703,7 +3703,7 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('FINAL SAMPLE 0.1', $query);
         $this->assertStringContainsString('PREWHERE', $query);
         $this->assertStringContainsString('WHERE', $query);
-        $this->assertStringContainsString('_cursor > ?', $query);
+        $this->assertStringContainsString('`_cursor` > ?', $query);
         $this->assertStringContainsString('LIMIT', $query);
     }
 
@@ -4573,7 +4573,7 @@ class ClickHouseTest extends TestCase
     {
         $builder = new Builder();
         $sql = $builder->compileCursor(Query::cursorAfter('abc'));
-        $this->assertEquals('_cursor > ?', $sql);
+        $this->assertEquals('`_cursor` > ?', $sql);
         $this->assertEquals(['abc'], $builder->getBindings());
     }
 
@@ -4581,7 +4581,7 @@ class ClickHouseTest extends TestCase
     {
         $builder = new Builder();
         $sql = $builder->compileCursor(Query::cursorBefore('xyz'));
-        $this->assertEquals('_cursor < ?', $sql);
+        $this->assertEquals('`_cursor` < ?', $sql);
         $this->assertEquals(['xyz'], $builder->getBindings());
     }
 
@@ -4624,7 +4624,7 @@ class ClickHouseTest extends TestCase
     {
         $builder = new Builder();
         $sql = $builder->compileJoin(Query::join('orders', 'u.id', 'o.uid'));
-        $this->assertEquals('JOIN `orders` ON `u.id` = `o.uid`', $sql);
+        $this->assertEquals('JOIN `orders` ON `u`.`id` = `o`.`uid`', $sql);
     }
 
     public function testCompileJoinExceptionStandalone(): void
@@ -4738,7 +4738,7 @@ class ClickHouseTest extends TestCase
             ->leftJoin('users', 'events.uid', 'users.id')
             ->build();
         $this->assertEquals(
-            'SELECT * FROM `events` FINAL SAMPLE 0.1 LEFT JOIN `users` ON `events.uid` = `users.id`',
+            'SELECT * FROM `events` FINAL SAMPLE 0.1 LEFT JOIN `users` ON `events`.`uid` = `users`.`id`',
             $result['query']
         );
     }
@@ -5023,7 +5023,7 @@ class ClickHouseTest extends TestCase
             ->union($sub)
             ->build();
         $this->assertEquals(
-            'SELECT DISTINCT COUNT(*) AS `total`, `event_type` FROM `events` FINAL SAMPLE 0.1 JOIN `users` ON `events.uid` = `users.id` PREWHERE `event_type` IN (?) WHERE `amount` > ? GROUP BY `event_type` HAVING `total` > ? ORDER BY `total` DESC LIMIT ? OFFSET ? UNION SELECT * FROM `archive` FINAL WHERE `status` IN (?)',
+            'SELECT DISTINCT COUNT(*) AS `total`, `event_type` FROM `events` FINAL SAMPLE 0.1 JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `event_type` IN (?) WHERE `amount` > ? GROUP BY `event_type` HAVING `total` > ? ORDER BY `total` DESC LIMIT ? OFFSET ? UNION SELECT * FROM `archive` FINAL WHERE `status` IN (?)',
             $result['query']
         );
         $this->assertEquals(['purchase', 100, 5, 50, 10, 'closed'], $result['bindings']);
@@ -5073,7 +5073,7 @@ class ClickHouseTest extends TestCase
     {
         $builder = new Builder();
         $sql = Query::join('orders', 'u.id', 'o.uid')->compile($builder);
-        $this->assertEquals('JOIN `orders` ON `u.id` = `o.uid`', $sql);
+        $this->assertEquals('JOIN `orders` ON `u`.`id` = `o`.`uid`', $sql);
     }
 
     public function testQueryCompileGroupByViaClickHouse(): void
@@ -5180,9 +5180,10 @@ class ClickHouseTest extends TestCase
 
     public function testNegativeOffset(): void
     {
+        // OFFSET without LIMIT is suppressed
         $result = (new Builder())->from('t')->offset(-5)->build();
-        $this->assertEquals('SELECT * FROM `t` OFFSET ?', $result['query']);
-        $this->assertEquals([-5], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t`', $result['query']);
+        $this->assertEquals([], $result['bindings']);
     }
 
     public function testLimitZero(): void
@@ -5204,14 +5205,15 @@ class ClickHouseTest extends TestCase
 
     public function testMultipleOffsetsFirstWins(): void
     {
+        // OFFSET without LIMIT is suppressed
         $result = (new Builder())->from('t')->offset(5)->offset(50)->build();
-        $this->assertEquals([5], $result['bindings']);
+        $this->assertEquals([], $result['bindings']);
     }
 
     public function testCursorAfterAndBeforeFirstWins(): void
     {
         $result = (new Builder())->from('t')->cursorAfter('a')->cursorBefore('b')->sortAsc('_cursor')->build();
-        $this->assertStringContainsString('_cursor > ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
     }
 
     // ══════════════════════════════════════════════════════════════════

@@ -67,7 +67,17 @@ class ClickHouse extends BaseBuilder
 
     protected function wrapIdentifier(string $identifier): string
     {
-        return '`' . $identifier . '`';
+        $segments = \explode('.', $identifier);
+        $wrapped = \array_map(function (string $segment): string {
+            if ($segment === '*') {
+                return '*';
+            }
+            $escaped = \str_replace('`', '``', $segment);
+
+            return '`' . $escaped . '`';
+        }, $segments);
+
+        return \implode('.', $wrapped);
     }
 
     protected function compileRandom(): string

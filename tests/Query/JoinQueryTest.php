@@ -107,7 +107,7 @@ class JoinQueryTest extends TestCase
         $builder = new \Utopia\Query\Builder\SQL();
         $query = Query::join('orders', 'users.id', 'orders.uid');
         $sql = $query->compile($builder);
-        $this->assertEquals('JOIN `orders` ON `users.id` = `orders.uid`', $sql);
+        $this->assertEquals('JOIN `orders` ON `users`.`id` = `orders`.`uid`', $sql);
     }
 
     public function testLeftJoinCompileDispatch(): void
@@ -115,7 +115,7 @@ class JoinQueryTest extends TestCase
         $builder = new \Utopia\Query\Builder\SQL();
         $query = Query::leftJoin('p', 'u.id', 'p.uid');
         $sql = $query->compile($builder);
-        $this->assertEquals('LEFT JOIN `p` ON `u.id` = `p.uid`', $sql);
+        $this->assertEquals('LEFT JOIN `p` ON `u`.`id` = `p`.`uid`', $sql);
     }
 
     public function testRightJoinCompileDispatch(): void
@@ -123,7 +123,7 @@ class JoinQueryTest extends TestCase
         $builder = new \Utopia\Query\Builder\SQL();
         $query = Query::rightJoin('o', 'u.id', 'o.uid');
         $sql = $query->compile($builder);
-        $this->assertEquals('RIGHT JOIN `o` ON `u.id` = `o.uid`', $sql);
+        $this->assertEquals('RIGHT JOIN `o` ON `u`.`id` = `o`.`uid`', $sql);
     }
 
     public function testCrossJoinCompileDispatch(): void

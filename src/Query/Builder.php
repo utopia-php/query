@@ -466,8 +466,8 @@ abstract class Builder implements Compiler
             $this->addBinding($grouped['limit']);
         }
 
-        // OFFSET
-        if ($grouped['offset'] !== null) {
+        // OFFSET (only emit if LIMIT is also present)
+        if ($grouped['offset'] !== null && $grouped['limit'] !== null) {
             $parts[] = 'OFFSET ?';
             $this->addBinding($grouped['offset']);
         }
@@ -589,14 +589,14 @@ abstract class Builder implements Compiler
 
         $operator = $query->getMethod() === Query::TYPE_CURSOR_AFTER ? '>' : '<';
 
-        return '_cursor ' . $operator . ' ?';
+        return $this->wrapIdentifier('_cursor') . ' ' . $operator . ' ?';
     }
 
     public function compileAggregate(Query $query): string
     {
         $func = \strtoupper($query->getMethod());
         $attr = $query->getAttribute();
-        $col = $attr === '*' ? '*' : $this->resolveAndWrap($attr);
+        $col = ($attr === '*' || $attr === '') ? '*' : $this->resolveAndWrap($attr);
         /** @var string $alias */
         $alias = $query->getValue('');
         $sql = $func . '(' . $col . ')';
@@ -643,6 +643,11 @@ abstract class Builder implements Compiler
         $operator = $values[1];
         /** @var string $rightCol */
         $rightCol = $values[2];
+
+        $allowedOperators = ['=', '!=', '<', '>', '<=', '>=', '<>'];
+        if (!\in_array($operator, $allowedOperators, true)) {
+            throw new \InvalidArgumentException('Invalid join operator: ' . $operator);
+        }
 
         $left = $this->resolveAndWrap($leftCol);
         $right = $this->resolveAndWrap($rightCol);
@@ -785,7 +790,7 @@ abstract class Builder implements Compiler
     private function compileLike(string $attribute, array $values, string $prefix, string $suffix, bool $not): string
     {
         /** @var string $val */
-        $val = $values[0];
+        $val = $this->escapeLikeValue($values[0]);
         $this->addBinding($prefix . $val . $suffix);
         $keyword = $not ? 'NOT LIKE' : 'LIKE';
 
@@ -799,14 +804,14 @@ abstract class Builder implements Compiler
     {
         /** @var array<string> $values */
         if (\count($values) === 1) {
-            $this->addBinding('%' . $values[0] . '%');
+            $this->addBinding('%' . $this->escapeLikeValue($values[0]) . '%');
 
             return $attribute . ' LIKE ?';
         }
 
         $parts = [];
         foreach ($values as $value) {
-            $this->addBinding('%' . $value . '%');
+            $this->addBinding('%' . $this->escapeLikeValue($value) . '%');
             $parts[] = $attribute . ' LIKE ?';
         }
 
@@ -821,7 +826,7 @@ abstract class Builder implements Compiler
         /** @var array<string> $values */
         $parts = [];
         foreach ($values as $value) {
-            $this->addBinding('%' . $value . '%');
+            $this->addBinding('%' . $this->escapeLikeValue($value) . '%');
             $parts[] = $attribute . ' LIKE ?';
         }
 
@@ -835,18 +840,26 @@ abstract class Builder implements Compiler
     {
         /** @var array<string> $values */
         if (\count($values) === 1) {
-            $this->addBinding('%' . $values[0] . '%');
+            $this->addBinding('%' . $this->escapeLikeValue($values[0]) . '%');
 
             return $attribute . ' NOT LIKE ?';
         }
 
         $parts = [];
         foreach ($values as $value) {
-            $this->addBinding('%' . $value . '%');
+            $this->addBinding('%' . $this->escapeLikeValue($value) . '%');
             $parts[] = $attribute . ' NOT LIKE ?';
         }
 
         return '(' . \implode(' AND ', $parts) . ')';
+    }
+
+    /**
+     * Escape LIKE metacharacters in user input before wrapping with wildcards.
+     */
+    private function escapeLikeValue(string $value): string
+    {
+        return \str_replace(['%', '_'], ['\\%', '\\_'], $value);
     }
 
     private function compileLogical(Query $query, string $operator): string
@@ -896,10 +909,16 @@ abstract class Builder implements Compiler
 
     private function compileRaw(Query $query): string
     {
+        $attribute = $query->getAttribute();
+
+        if ($attribute === '') {
+            return '1 = 1';
+        }
+
         foreach ($query->getValues() as $binding) {
             $this->addBinding($binding);
         }
 
-        return $query->getAttribute();
+        return $attribute;
     }
 }

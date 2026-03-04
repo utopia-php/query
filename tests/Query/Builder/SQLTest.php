@@ -475,13 +475,14 @@ class SQLTest extends TestCase
 
     public function testOffsetOnly(): void
     {
+        // OFFSET without LIMIT is invalid in MySQL/ClickHouse, so offset is suppressed
         $result = (new Builder())
             ->from('t')
             ->offset(50)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` OFFSET ?', $result['query']);
-        $this->assertEquals([50], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t`', $result['query']);
+        $this->assertEquals([], $result['bindings']);
     }
 
     public function testCursorAfter(): void
@@ -491,7 +492,7 @@ class SQLTest extends TestCase
             ->cursorAfter('abc123')
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE _cursor > ?', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `_cursor` > ?', $result['query']);
         $this->assertEquals(['abc123'], $result['bindings']);
     }
 
@@ -502,7 +503,7 @@ class SQLTest extends TestCase
             ->cursorBefore('xyz789')
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE _cursor < ?', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `_cursor` < ?', $result['query']);
         $this->assertEquals(['xyz789'], $result['bindings']);
     }
 
@@ -829,7 +830,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `users` JOIN `orders` ON `users.id` = `orders.user_id`',
+            'SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id`',
             $result['query']
         );
     }
@@ -842,7 +843,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `users` LEFT JOIN `profiles` ON `users.id` = `profiles.user_id`',
+            'SELECT * FROM `users` LEFT JOIN `profiles` ON `users`.`id` = `profiles`.`user_id`',
             $result['query']
         );
     }
@@ -855,7 +856,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `users` RIGHT JOIN `orders` ON `users.id` = `orders.user_id`',
+            'SELECT * FROM `users` RIGHT JOIN `orders` ON `users`.`id` = `orders`.`user_id`',
             $result['query']
         );
     }
@@ -882,7 +883,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `users` JOIN `orders` ON `users.id` = `orders.user_id` WHERE `orders.total` > ?',
+            'SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` WHERE `orders`.`total` > ?',
             $result['query']
         );
         $this->assertEquals([100], $result['bindings']);
@@ -1035,7 +1036,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT COUNT(*) AS `order_count`, SUM(`total`) AS `total_amount`, `users.name` FROM `orders` JOIN `users` ON `orders.user_id` = `users.id` GROUP BY `users.name` HAVING `order_count` > ? ORDER BY `total_amount` DESC LIMIT ?',
+            'SELECT COUNT(*) AS `order_count`, SUM(`total`) AS `total_amount`, `users`.`name` FROM `orders` JOIN `users` ON `orders`.`user_id` = `users`.`id` GROUP BY `users`.`name` HAVING `order_count` > ? ORDER BY `total_amount` DESC LIMIT ?',
             $result['query']
         );
         $this->assertEquals([5, 10], $result['bindings']);
@@ -1081,7 +1082,7 @@ class SQLTest extends TestCase
             ->count('')
             ->build();
 
-        $this->assertEquals('SELECT COUNT(``) FROM `t`', $result['query']);
+        $this->assertEquals('SELECT COUNT(*) FROM `t`', $result['query']);
     }
 
     public function testMultipleAggregations(): void
@@ -1279,7 +1280,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT DISTINCT `users.name` FROM `users` JOIN `orders` ON `users.id` = `orders.user_id`',
+            'SELECT DISTINCT `users`.`name` FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id`',
             $result['query']
         );
     }
@@ -1312,7 +1313,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `users` JOIN `orders` ON `users.id` = `orders.user_id` LEFT JOIN `profiles` ON `users.id` = `profiles.user_id` RIGHT JOIN `departments` ON `users.dept_id` = `departments.id`',
+            'SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` LEFT JOIN `profiles` ON `users`.`id` = `profiles`.`user_id` RIGHT JOIN `departments` ON `users`.`dept_id` = `departments`.`id`',
             $result['query']
         );
     }
@@ -1327,7 +1328,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT COUNT(*) AS `order_count` FROM `users` JOIN `orders` ON `users.id` = `orders.user_id` GROUP BY `users.name`',
+            'SELECT COUNT(*) AS `order_count` FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` GROUP BY `users`.`name`',
             $result['query']
         );
     }
@@ -1344,7 +1345,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `users` JOIN `orders` ON `users.id` = `orders.user_id` WHERE `orders.total` > ? ORDER BY `orders.total` DESC LIMIT ? OFFSET ?',
+            'SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` WHERE `orders`.`total` > ? ORDER BY `orders`.`total` DESC LIMIT ? OFFSET ?',
             $result['query']
         );
         $this->assertEquals([50, 10, 20], $result['bindings']);
@@ -1358,7 +1359,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `a` JOIN `b` ON `a.val` != `b.val`',
+            'SELECT * FROM `a` JOIN `b` ON `a`.`val` != `b`.`val`',
             $result['query']
         );
     }
@@ -1372,7 +1373,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `sizes` CROSS JOIN `colors` LEFT JOIN `inventory` ON `sizes.id` = `inventory.size_id`',
+            'SELECT * FROM `sizes` CROSS JOIN `colors` LEFT JOIN `inventory` ON `sizes`.`id` = `inventory`.`size_id`',
             $result['query']
         );
     }
@@ -1800,7 +1801,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM "users" JOIN "orders" ON "users.id" = "orders.uid"',
+            'SELECT * FROM "users" JOIN "orders" ON "users"."id" = "orders"."uid"',
             $result['query']
         );
     }
@@ -1847,7 +1848,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `users` JOIN `orders` ON `users.id` = `orders.user_id` WHERE `orders.total` > ? AND users.org_id = ?',
+            'SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` WHERE `orders`.`total` > ? AND users.org_id = ?',
             $result['query']
         );
         $this->assertEquals([100, 'org1'], $result['bindings']);
@@ -1923,7 +1924,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `t` WHERE _cursor > ? LIMIT ? OFFSET ?',
+            'SELECT * FROM `t` WHERE `_cursor` > ? LIMIT ? OFFSET ?',
             $result['query']
         );
         $this->assertEquals(['abc', 10, 5], $result['bindings']);
@@ -1938,7 +1939,7 @@ class SQLTest extends TestCase
             ->build();
 
         // Cursor + limit from page + offset from page; first limit/offset wins
-        $this->assertStringContainsString('_cursor > ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
         $this->assertStringContainsString('LIMIT ?', $result['query']);
     }
 
@@ -2041,8 +2042,9 @@ class SQLTest extends TestCase
             ->offset(0)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` OFFSET ?', $result['query']);
-        $this->assertEquals([0], $result['bindings']);
+        // OFFSET without LIMIT is suppressed
+        $this->assertEquals('SELECT * FROM `t`', $result['query']);
+        $this->assertEquals([], $result['bindings']);
     }
 
     // ── Fluent chaining returns same instance ──
@@ -2772,7 +2774,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM "users" JOIN "orders" ON "users.id" = "orders.uid"',
+            'SELECT * FROM "users" JOIN "orders" ON "users"."id" = "orders"."uid"',
             $result['query']
         );
     }
@@ -2786,7 +2788,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM "users" LEFT JOIN "profiles" ON "users.id" = "profiles.uid"',
+            'SELECT * FROM "users" LEFT JOIN "profiles" ON "users"."id" = "profiles"."uid"',
             $result['query']
         );
     }
@@ -2800,7 +2802,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM "users" RIGHT JOIN "orders" ON "users.id" = "orders.uid"',
+            'SELECT * FROM "users" RIGHT JOIN "orders" ON "users"."id" = "orders"."uid"',
             $result['query']
         );
     }
@@ -3358,7 +3360,7 @@ class SQLTest extends TestCase
     {
         $builder = new Builder();
         $sql = $builder->compileCursor(Query::cursorAfter('abc'));
-        $this->assertEquals('_cursor > ?', $sql);
+        $this->assertEquals('`_cursor` > ?', $sql);
         $this->assertEquals(['abc'], $builder->getBindings());
     }
 
@@ -3366,7 +3368,7 @@ class SQLTest extends TestCase
     {
         $builder = new Builder();
         $sql = $builder->compileCursor(Query::cursorBefore('xyz'));
-        $this->assertEquals('_cursor < ?', $sql);
+        $this->assertEquals('`_cursor` < ?', $sql);
         $this->assertEquals(['xyz'], $builder->getBindings());
     }
 
@@ -3423,21 +3425,21 @@ class SQLTest extends TestCase
     {
         $builder = new Builder();
         $sql = $builder->compileJoin(Query::join('orders', 'users.id', 'orders.uid'));
-        $this->assertEquals('JOIN `orders` ON `users.id` = `orders.uid`', $sql);
+        $this->assertEquals('JOIN `orders` ON `users`.`id` = `orders`.`uid`', $sql);
     }
 
     public function testCompileLeftJoinStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileJoin(Query::leftJoin('profiles', 'users.id', 'profiles.uid'));
-        $this->assertEquals('LEFT JOIN `profiles` ON `users.id` = `profiles.uid`', $sql);
+        $this->assertEquals('LEFT JOIN `profiles` ON `users`.`id` = `profiles`.`uid`', $sql);
     }
 
     public function testCompileRightJoinStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileJoin(Query::rightJoin('orders', 'users.id', 'orders.uid'));
-        $this->assertEquals('RIGHT JOIN `orders` ON `users.id` = `orders.uid`', $sql);
+        $this->assertEquals('RIGHT JOIN `orders` ON `users`.`id` = `orders`.`uid`', $sql);
     }
 
     public function testCompileCrossJoinStandalone(): void
@@ -3827,7 +3829,7 @@ class SQLTest extends TestCase
             ->filter([Query::equal('table.column', ['value'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `table.column` IN (?)', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `table`.`column` IN (?)', $result['query']);
     }
 
     public function testFilterWithUnderscoresInAttributeName(): void
@@ -3985,8 +3987,8 @@ class SQLTest extends TestCase
         $this->assertStringContainsString('COUNT(*) AS `cnt`', $result['query']);
         $this->assertStringContainsString('SUM(`total`) AS `revenue`', $result['query']);
         $this->assertStringContainsString('JOIN `users`', $result['query']);
-        $this->assertStringContainsString('WHERE `orders.total` > ?', $result['query']);
-        $this->assertStringContainsString('GROUP BY `users.name`', $result['query']);
+        $this->assertStringContainsString('WHERE `orders`.`total` > ?', $result['query']);
+        $this->assertStringContainsString('GROUP BY `users`.`name`', $result['query']);
         $this->assertStringContainsString('HAVING `cnt` > ?', $result['query']);
         $this->assertStringContainsString('ORDER BY `revenue` DESC', $result['query']);
         $this->assertStringContainsString('LIMIT ?', $result['query']);
@@ -4045,7 +4047,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `employees` JOIN `employees` ON `employees.manager_id` = `employees.id`',
+            'SELECT * FROM `employees` JOIN `employees` ON `employees`.`manager_id` = `employees`.`id`',
             $result['query']
         );
     }
@@ -4079,8 +4081,8 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertStringContainsString('JOIN `orders`', $result['query']);
-        $this->assertStringContainsString('WHERE `orders.status` IN (?) AND `orders.total` > ?', $result['query']);
-        $this->assertStringContainsString('ORDER BY `orders.total` DESC', $result['query']);
+        $this->assertStringContainsString('WHERE `orders`.`status` IN (?) AND `orders`.`total` > ?', $result['query']);
+        $this->assertStringContainsString('ORDER BY `orders`.`total` DESC', $result['query']);
         $this->assertStringContainsString('LIMIT ?', $result['query']);
         $this->assertStringContainsString('OFFSET ?', $result['query']);
         $this->assertEquals(['paid', 100, 25, 50], $result['bindings']);
@@ -4098,7 +4100,7 @@ class SQLTest extends TestCase
 
         $this->assertStringContainsString('COUNT(*) AS `cnt`', $result['query']);
         $this->assertStringContainsString('JOIN `users`', $result['query']);
-        $this->assertStringContainsString('GROUP BY `users.name`', $result['query']);
+        $this->assertStringContainsString('GROUP BY `users`.`name`', $result['query']);
         $this->assertStringContainsString('HAVING `cnt` > ?', $result['query']);
         $this->assertEquals([3], $result['bindings']);
     }
@@ -4112,7 +4114,7 @@ class SQLTest extends TestCase
             ->join('orders', 'users.id', 'orders.user_id')
             ->build();
 
-        $this->assertStringContainsString('SELECT DISTINCT `users.name`', $result['query']);
+        $this->assertStringContainsString('SELECT DISTINCT `users`.`name`', $result['query']);
         $this->assertStringContainsString('JOIN `orders`', $result['query']);
     }
 
@@ -4176,7 +4178,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertStringContainsString('CROSS JOIN `colors`', $result['query']);
-        $this->assertStringContainsString('WHERE `sizes.active` IN (?)', $result['query']);
+        $this->assertStringContainsString('WHERE `sizes`.`active` IN (?)', $result['query']);
     }
 
     public function testCrossJoinFollowedByRegularJoin(): void
@@ -4188,7 +4190,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `a` CROSS JOIN `b` JOIN `c` ON `a.id` = `c.a_id`',
+            'SELECT * FROM `a` CROSS JOIN `b` JOIN `c` ON `a`.`id` = `c`.`a_id`',
             $result['query']
         );
     }
@@ -4207,8 +4209,8 @@ class SQLTest extends TestCase
 
         $this->assertStringContainsString('JOIN `orders`', $result['query']);
         $this->assertStringContainsString('LEFT JOIN `profiles`', $result['query']);
-        $this->assertStringContainsString('`orders.total` > ?', $result['query']);
-        $this->assertStringContainsString('`profiles.avatar` IS NOT NULL', $result['query']);
+        $this->assertStringContainsString('`orders`.`total` > ?', $result['query']);
+        $this->assertStringContainsString('`profiles`.`avatar` IS NOT NULL', $result['query']);
     }
 
     public function testJoinWithCustomOperatorLessThan(): void
@@ -4219,7 +4221,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `a` JOIN `b` ON `a.start` < `b.end`',
+            'SELECT * FROM `a` JOIN `b` ON `a`.`start` < `b`.`end`',
             $result['query']
         );
     }
@@ -5560,13 +5562,14 @@ class SQLTest extends TestCase
 
     public function testBuildWithOnlyOffset(): void
     {
+        // OFFSET without LIMIT is suppressed
         $result = (new Builder())
             ->from('')
             ->offset(50)
             ->build();
 
-        $this->assertStringContainsString('OFFSET ?', $result['query']);
-        $this->assertEquals([50], $result['bindings']);
+        $this->assertStringNotContainsString('OFFSET ?', $result['query']);
+        $this->assertEquals([], $result['bindings']);
     }
 
     public function testBuildWithOnlySort(): void
@@ -5824,7 +5827,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT DISTINCT COUNT(*) AS `total`, `status` FROM `orders` JOIN `users` ON `orders.uid` = `users.id` WHERE `amount` > ? GROUP BY `status` HAVING `total` > ? ORDER BY `status` ASC LIMIT ? OFFSET ? UNION SELECT * FROM `archive` WHERE `status` IN (?)',
+            'SELECT DISTINCT COUNT(*) AS `total`, `status` FROM `orders` JOIN `users` ON `orders`.`uid` = `users`.`id` WHERE `amount` > ? GROUP BY `status` HAVING `total` > ? ORDER BY `status` ASC LIMIT ? OFFSET ? UNION SELECT * FROM `archive` WHERE `status` IN (?)',
             $result['query']
         );
         $this->assertEquals([100, 5, 10, 20, 'closed'], $result['bindings']);
@@ -5873,7 +5876,7 @@ class SQLTest extends TestCase
             ->cursorAfter('abc')
             ->build();
         $this->assertStringContainsString('COUNT(*)', $result['query']);
-        $this->assertStringContainsString('_cursor > ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
         $this->assertContains('abc', $result['bindings']);
     }
 
@@ -5910,7 +5913,7 @@ class SQLTest extends TestCase
             ->cursorAfter('abc')
             ->build();
         $this->assertStringContainsString('_tenant = ?', $result['query']);
-        $this->assertStringContainsString('_cursor > ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
         // Provider bindings come before cursor bindings
         $this->assertEquals(['t1', 'abc'], $result['bindings']);
     }
@@ -5982,9 +5985,10 @@ class SQLTest extends TestCase
 
     public function testNegativeOffset(): void
     {
+        // OFFSET without LIMIT is suppressed
         $result = (new Builder())->from('t')->offset(-5)->build();
-        $this->assertEquals('SELECT * FROM `t` OFFSET ?', $result['query']);
-        $this->assertEquals([-5], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t`', $result['query']);
+        $this->assertEquals([], $result['bindings']);
     }
 
     public function testEqualWithNullOnly(): void
@@ -6033,14 +6037,14 @@ class SQLTest extends TestCase
     {
         $result = (new Builder())->from('t')->filter([Query::contains('bio', ['100%'])])->build();
         $this->assertEquals('SELECT * FROM `t` WHERE `bio` LIKE ?', $result['query']);
-        $this->assertEquals(['%100%%'], $result['bindings']);
+        $this->assertEquals(['%100\%%'], $result['bindings']);
     }
 
     public function testStartsWithWithWildcard(): void
     {
         $result = (new Builder())->from('t')->filter([Query::startsWith('name', '%admin')])->build();
         $this->assertEquals('SELECT * FROM `t` WHERE `name` LIKE ?', $result['query']);
-        $this->assertEquals(['%admin%'], $result['bindings']);
+        $this->assertEquals(['\%admin%'], $result['bindings']);
     }
 
     public function testCursorWithNullValue(): void
@@ -6054,14 +6058,14 @@ class SQLTest extends TestCase
     public function testCursorWithIntegerValue(): void
     {
         $result = (new Builder())->from('t')->cursorAfter(42)->build();
-        $this->assertStringContainsString('_cursor > ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
         $this->assertSame([42], $result['bindings']);
     }
 
     public function testCursorWithFloatValue(): void
     {
         $result = (new Builder())->from('t')->cursorAfter(3.14)->build();
-        $this->assertStringContainsString('_cursor > ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
         $this->assertSame([3.14], $result['bindings']);
     }
 
@@ -6074,16 +6078,17 @@ class SQLTest extends TestCase
 
     public function testMultipleOffsetsFirstWins(): void
     {
+        // OFFSET without LIMIT is suppressed
         $result = (new Builder())->from('t')->offset(5)->offset(50)->build();
-        $this->assertEquals('SELECT * FROM `t` OFFSET ?', $result['query']);
-        $this->assertEquals([5], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t`', $result['query']);
+        $this->assertEquals([], $result['bindings']);
     }
 
     public function testCursorAfterAndBeforeFirstWins(): void
     {
         $result = (new Builder())->from('t')->cursorAfter('a')->cursorBefore('b')->build();
-        $this->assertStringContainsString('_cursor > ?', $result['query']);
-        $this->assertStringNotContainsString('_cursor < ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
+        $this->assertStringNotContainsString('`_cursor` < ?', $result['query']);
     }
 
     public function testEmptyTableWithJoin(): void
@@ -6221,14 +6226,14 @@ class SQLTest extends TestCase
     public function testQueryCompileCursorAfter(): void
     {
         $builder = new Builder();
-        $this->assertEquals('_cursor > ?', Query::cursorAfter('x')->compile($builder));
+        $this->assertEquals('`_cursor` > ?', Query::cursorAfter('x')->compile($builder));
         $this->assertEquals(['x'], $builder->getBindings());
     }
 
     public function testQueryCompileCursorBefore(): void
     {
         $builder = new Builder();
-        $this->assertEquals('_cursor < ?', Query::cursorBefore('x')->compile($builder));
+        $this->assertEquals('`_cursor` < ?', Query::cursorBefore('x')->compile($builder));
         $this->assertEquals(['x'], $builder->getBindings());
     }
 
@@ -6282,8 +6287,8 @@ class SQLTest extends TestCase
             ->from('t')
             ->cursorAfter('abc')
             ->build();
-        // _cursor is hardcoded, not wrapped
-        $this->assertStringContainsString('_cursor > ?', $result['query']);
+        // _cursor is now properly wrapped with the configured wrap character
+        $this->assertStringContainsString('"_cursor" > ?', $result['query']);
     }
 
     public function testSetWrapCharWithToRawSql(): void
