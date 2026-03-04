@@ -33,4 +33,19 @@ interface Compiler
      * Compile a cursor query (cursorAfter, cursorBefore)
      */
     public function compileCursor(Query $query): string;
+
+    /**
+     * Compile an aggregate query (count, sum, avg, min, max)
+     */
+    public function compileAggregate(Query $query): string;
+
+    /**
+     * Compile a group by query
+     */
+    public function compileGroupBy(Query $query): string;
+
+    /**
+     * Compile a join query (join, leftJoin, rightJoin, crossJoin)
+     */
+    public function compileJoin(Query $query): string;
 }

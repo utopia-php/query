@@ -112,6 +112,41 @@ class Query
 
     public const TYPE_ELEM_MATCH = 'elemMatch';
 
+    // Aggregation methods
+    public const TYPE_COUNT = 'count';
+
+    public const TYPE_SUM = 'sum';
+
+    public const TYPE_AVG = 'avg';
+
+    public const TYPE_MIN = 'min';
+
+    public const TYPE_MAX = 'max';
+
+    public const TYPE_GROUP_BY = 'groupBy';
+
+    public const TYPE_HAVING = 'having';
+
+    // Distinct
+    public const TYPE_DISTINCT = 'distinct';
+
+    // Join methods
+    public const TYPE_JOIN = 'join';
+
+    public const TYPE_LEFT_JOIN = 'leftJoin';
+
+    public const TYPE_RIGHT_JOIN = 'rightJoin';
+
+    public const TYPE_CROSS_JOIN = 'crossJoin';
+
+    // Union
+    public const TYPE_UNION = 'union';
+
+    public const TYPE_UNION_ALL = 'unionAll';
+
+    // Raw
+    public const TYPE_RAW = 'raw';
+
     public const DEFAULT_ALIAS = 'main';
 
     // Order direction constants (inlined from Database)
@@ -176,6 +211,36 @@ class Query
         self::TYPE_CONTAINS_ALL,
         self::TYPE_ELEM_MATCH,
         self::TYPE_REGEX,
+        self::TYPE_COUNT,
+        self::TYPE_SUM,
+        self::TYPE_AVG,
+        self::TYPE_MIN,
+        self::TYPE_MAX,
+        self::TYPE_GROUP_BY,
+        self::TYPE_HAVING,
+        self::TYPE_DISTINCT,
+        self::TYPE_JOIN,
+        self::TYPE_LEFT_JOIN,
+        self::TYPE_RIGHT_JOIN,
+        self::TYPE_CROSS_JOIN,
+        self::TYPE_UNION,
+        self::TYPE_UNION_ALL,
+        self::TYPE_RAW,
+    ];
+
+    public const AGGREGATE_TYPES = [
+        self::TYPE_COUNT,
+        self::TYPE_SUM,
+        self::TYPE_AVG,
+        self::TYPE_MIN,
+        self::TYPE_MAX,
+    ];
+
+    public const JOIN_TYPES = [
+        self::TYPE_JOIN,
+        self::TYPE_LEFT_JOIN,
+        self::TYPE_RIGHT_JOIN,
+        self::TYPE_CROSS_JOIN,
     ];
 
     public const VECTOR_TYPES = [
@@ -188,6 +253,9 @@ class Query
         self::TYPE_AND,
         self::TYPE_OR,
         self::TYPE_ELEM_MATCH,
+        self::TYPE_HAVING,
+        self::TYPE_UNION,
+        self::TYPE_UNION_ALL,
     ];
 
     protected string $method = '';
@@ -343,7 +411,22 @@ class Query
             self::TYPE_VECTOR_EUCLIDEAN,
             self::TYPE_EXISTS,
             self::TYPE_NOT_EXISTS,
-            self::TYPE_REGEX => true,
+            self::TYPE_REGEX,
+            self::TYPE_COUNT,
+            self::TYPE_SUM,
+            self::TYPE_AVG,
+            self::TYPE_MIN,
+            self::TYPE_MAX,
+            self::TYPE_GROUP_BY,
+            self::TYPE_HAVING,
+            self::TYPE_DISTINCT,
+            self::TYPE_JOIN,
+            self::TYPE_LEFT_JOIN,
+            self::TYPE_RIGHT_JOIN,
+            self::TYPE_CROSS_JOIN,
+            self::TYPE_UNION,
+            self::TYPE_UNION_ALL,
+            self::TYPE_RAW => true,
             default => false,
         };
     }
@@ -493,6 +576,21 @@ class Query
             self::TYPE_CURSOR_BEFORE => $compiler->compileCursor($this),
 
             self::TYPE_SELECT => $compiler->compileSelect($this),
+
+            self::TYPE_COUNT,
+            self::TYPE_SUM,
+            self::TYPE_AVG,
+            self::TYPE_MIN,
+            self::TYPE_MAX => $compiler->compileAggregate($this),
+
+            self::TYPE_GROUP_BY => $compiler->compileGroupBy($this),
+
+            self::TYPE_JOIN,
+            self::TYPE_LEFT_JOIN,
+            self::TYPE_RIGHT_JOIN,
+            self::TYPE_CROSS_JOIN => $compiler->compileJoin($this),
+
+            self::TYPE_HAVING => $compiler->compileFilter($this),
 
             default => $compiler->compileFilter($this),
         };
@@ -849,6 +947,12 @@ class Query
      * @return array{
      *     filters: list<Query>,
      *     selections: list<Query>,
+     *     aggregations: list<Query>,
+     *     groupBy: list<string>,
+     *     having: list<Query>,
+     *     distinct: bool,
+     *     joins: list<Query>,
+     *     unions: list<Query>,
      *     limit: int|null,
      *     offset: int|null,
      *     orderAttributes: array<string>,
@@ -861,6 +965,12 @@ class Query
     {
         $filters = [];
         $selections = [];
+        $aggregations = [];
+        $groupBy = [];
+        $having = [];
+        $distinct = false;
+        $joins = [];
+        $unions = [];
         $limit = null;
         $offset = null;
         $orderAttributes = [];
@@ -923,6 +1033,41 @@ class Query
                     $selections[] = clone $query;
                     break;
 
+                case Query::TYPE_COUNT:
+                case Query::TYPE_SUM:
+                case Query::TYPE_AVG:
+                case Query::TYPE_MIN:
+                case Query::TYPE_MAX:
+                    $aggregations[] = clone $query;
+                    break;
+
+                case Query::TYPE_GROUP_BY:
+                    /** @var array<string> $values */
+                    foreach ($values as $col) {
+                        $groupBy[] = $col;
+                    }
+                    break;
+
+                case Query::TYPE_HAVING:
+                    $having[] = clone $query;
+                    break;
+
+                case Query::TYPE_DISTINCT:
+                    $distinct = true;
+                    break;
+
+                case Query::TYPE_JOIN:
+                case Query::TYPE_LEFT_JOIN:
+                case Query::TYPE_RIGHT_JOIN:
+                case Query::TYPE_CROSS_JOIN:
+                    $joins[] = clone $query;
+                    break;
+
+                case Query::TYPE_UNION:
+                case Query::TYPE_UNION_ALL:
+                    $unions[] = clone $query;
+                    break;
+
                 default:
                     $filters[] = clone $query;
                     break;
@@ -932,6 +1077,12 @@ class Query
         return [
             'filters' => $filters,
             'selections' => $selections,
+            'aggregations' => $aggregations,
+            'groupBy' => $groupBy,
+            'having' => $having,
+            'distinct' => $distinct,
+            'joins' => $joins,
+            'unions' => $unions,
             'limit' => $limit,
             'offset' => $offset,
             'orderAttributes' => $orderAttributes,
@@ -1159,5 +1310,251 @@ class Query
     public static function elemMatch(string $attribute, array $queries): static
     {
         return new static(self::TYPE_ELEM_MATCH, $attribute, $queries);
+    }
+
+    // Aggregation factory methods
+
+    public static function count(string $attribute = '*', string $alias = ''): static
+    {
+        return new static(self::TYPE_COUNT, $attribute, $alias !== '' ? [$alias] : []);
+    }
+
+    public static function sum(string $attribute, string $alias = ''): static
+    {
+        return new static(self::TYPE_SUM, $attribute, $alias !== '' ? [$alias] : []);
+    }
+
+    public static function avg(string $attribute, string $alias = ''): static
+    {
+        return new static(self::TYPE_AVG, $attribute, $alias !== '' ? [$alias] : []);
+    }
+
+    public static function min(string $attribute, string $alias = ''): static
+    {
+        return new static(self::TYPE_MIN, $attribute, $alias !== '' ? [$alias] : []);
+    }
+
+    public static function max(string $attribute, string $alias = ''): static
+    {
+        return new static(self::TYPE_MAX, $attribute, $alias !== '' ? [$alias] : []);
+    }
+
+    /**
+     * @param  array<string>  $attributes
+     */
+    public static function groupBy(array $attributes): static
+    {
+        return new static(self::TYPE_GROUP_BY, '', $attributes);
+    }
+
+    /**
+     * @param  array<Query>  $queries
+     */
+    public static function having(array $queries): static
+    {
+        return new static(self::TYPE_HAVING, '', $queries);
+    }
+
+    public static function distinct(): static
+    {
+        return new static(self::TYPE_DISTINCT);
+    }
+
+    // Join factory methods
+
+    public static function join(string $table, string $left, string $right, string $operator = '='): static
+    {
+        return new static(self::TYPE_JOIN, $table, [$left, $operator, $right]);
+    }
+
+    public static function leftJoin(string $table, string $left, string $right, string $operator = '='): static
+    {
+        return new static(self::TYPE_LEFT_JOIN, $table, [$left, $operator, $right]);
+    }
+
+    public static function rightJoin(string $table, string $left, string $right, string $operator = '='): static
+    {
+        return new static(self::TYPE_RIGHT_JOIN, $table, [$left, $operator, $right]);
+    }
+
+    public static function crossJoin(string $table): static
+    {
+        return new static(self::TYPE_CROSS_JOIN, $table);
+    }
+
+    // Union factory methods
+
+    /**
+     * @param  array<Query>  $queries
+     */
+    public static function union(array $queries): static
+    {
+        return new static(self::TYPE_UNION, '', $queries);
+    }
+
+    /**
+     * @param  array<Query>  $queries
+     */
+    public static function unionAll(array $queries): static
+    {
+        return new static(self::TYPE_UNION_ALL, '', $queries);
+    }
+
+    // Raw factory method
+
+    /**
+     * @param  array<mixed>  $bindings
+     */
+    public static function raw(string $sql, array $bindings = []): static
+    {
+        return new static(self::TYPE_RAW, $sql, $bindings);
+    }
+
+    // Convenience: page
+
+    /**
+     * Returns an array of limit and offset queries for page-based pagination
+     *
+     * @return array{0: static, 1: static}
+     */
+    public static function page(int $page, int $perPage = 25): array
+    {
+        return [
+            static::limit($perPage),
+            static::offset(($page - 1) * $perPage),
+        ];
+    }
+
+    // Static helpers
+
+    /**
+     * Merge two query arrays. For limit/offset/cursor, values from $queriesB override $queriesA.
+     *
+     * @param  array<static>  $queriesA
+     * @param  array<static>  $queriesB
+     * @return array<static>
+     */
+    public static function merge(array $queriesA, array $queriesB): array
+    {
+        $singularTypes = [
+            self::TYPE_LIMIT,
+            self::TYPE_OFFSET,
+            self::TYPE_CURSOR_AFTER,
+            self::TYPE_CURSOR_BEFORE,
+        ];
+
+        $result = $queriesA;
+
+        foreach ($queriesB as $queryB) {
+            $method = $queryB->getMethod();
+
+            if (\in_array($method, $singularTypes, true)) {
+                // Remove existing queries of the same type from result
+                $result = \array_values(\array_filter(
+                    $result,
+                    fn (Query $q): bool => $q->getMethod() !== $method
+                ));
+            }
+
+            $result[] = $queryB;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Returns queries in A that are not in B (compared by toArray())
+     *
+     * @param  array<static>  $queriesA
+     * @param  array<static>  $queriesB
+     * @return array<static>
+     */
+    public static function diff(array $queriesA, array $queriesB): array
+    {
+        $bArrays = \array_map(fn (Query $q): array => $q->toArray(), $queriesB);
+
+        $result = [];
+        foreach ($queriesA as $queryA) {
+            $aArray = $queryA->toArray();
+            $found = false;
+
+            foreach ($bArrays as $bArray) {
+                if ($aArray === $bArray) {
+                    $found = true;
+                    break;
+                }
+            }
+
+            if (! $found) {
+                $result[] = $queryA;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Validate queries against allowed attributes
+     *
+     * @param  array<static>  $queries
+     * @param  array<string>  $allowedAttributes
+     * @return array<string>  Error messages
+     */
+    public static function validate(array $queries, array $allowedAttributes): array
+    {
+        $errors = [];
+        $skipTypes = [
+            self::TYPE_LIMIT,
+            self::TYPE_OFFSET,
+            self::TYPE_CURSOR_AFTER,
+            self::TYPE_CURSOR_BEFORE,
+            self::TYPE_ORDER_RANDOM,
+            self::TYPE_DISTINCT,
+            self::TYPE_SELECT,
+            self::TYPE_EXISTS,
+            self::TYPE_NOT_EXISTS,
+        ];
+
+        foreach ($queries as $query) {
+            $method = $query->getMethod();
+
+            // Recursively validate nested queries
+            if (\in_array($method, self::LOGICAL_TYPES, true)) {
+                /** @var array<static> $nested */
+                $nested = $query->getValues();
+                $errors = \array_merge($errors, static::validate($nested, $allowedAttributes));
+
+                continue;
+            }
+
+            if (\in_array($method, $skipTypes, true)) {
+                continue;
+            }
+
+            // GROUP_BY stores attributes in values
+            if ($method === self::TYPE_GROUP_BY) {
+                /** @var array<string> $columns */
+                $columns = $query->getValues();
+                foreach ($columns as $col) {
+                    if (! \in_array($col, $allowedAttributes, true)) {
+                        $errors[] = "Invalid attribute \"{$col}\" used in {$method}";
+                    }
+                }
+
+                continue;
+            }
+
+            $attribute = $query->getAttribute();
+
+            if ($attribute === '' || $attribute === '*') {
+                continue;
+            }
+
+            if (! \in_array($attribute, $allowedAttributes, true)) {
+                $errors[] = "Invalid attribute \"{$attribute}\" used in {$method}";
+            }
+        }
+
+        return $errors;
     }
 }
