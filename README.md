@@ -435,21 +435,54 @@ $errors = Query::validate($queries, ['name', 'age', 'status']);
 [$limit, $offset] = Query::page(3, 10);
 ```
 
-**Pluggable extensions** — customize attribute mapping, identifier wrapping, and inject extra conditions:
+**Hooks** — extend the builder with reusable, testable hook classes for attribute resolution and condition injection:
 
 ```php
+use Utopia\Query\Hook\AttributeMapHook;
+use Utopia\Query\Hook\TenantFilterHook;
+use Utopia\Query\Hook\PermissionFilterHook;
+
 $result = (new Builder())
     ->from('users')
-    ->setAttributeResolver(fn(string $a) => match($a) {
-        '$id' => '_uid', '$createdAt' => '_createdAt', default => $a
-    })
+    ->addHook(new AttributeMapHook([
+        '$id' => '_uid',
+        '$createdAt' => '_createdAt',
+    ]))
+    ->addHook(new TenantFilterHook(['tenant_abc']))
     ->setWrapChar('"') // PostgreSQL
-    ->addConditionProvider(fn(string $table) => [
-        "_uid IN (SELECT _document FROM {$table}_perms WHERE _type = 'read')",
-        [],
-    ])
     ->filter([Query::equal('status', ['active'])])
     ->build();
+
+// SELECT * FROM "users" WHERE "status" IN (?) AND _tenant IN (?)
+// bindings: ['active', 'tenant_abc']
+```
+
+Built-in hooks:
+
+- `AttributeMapHook` — maps query attribute names to underlying column names
+- `TenantFilterHook` — injects a tenant ID filter (multi-tenancy)
+- `PermissionFilterHook` — injects a permission subquery filter
+
+Custom hooks implement `FilterHook` or `AttributeHook`:
+
+```php
+use Utopia\Query\Condition;
+use Utopia\Query\Hook\FilterHook;
+
+class SoftDeleteHook implements FilterHook
+{
+    public function filter(string $table): Condition
+    {
+        return new Condition('deleted_at IS NULL');
+    }
+}
+
+$result = (new Builder())
+    ->from('users')
+    ->addHook(new SoftDeleteHook())
+    ->build();
+
+// SELECT * FROM `users` WHERE deleted_at IS NULL
 ```
 
 ### ClickHouse Builder
