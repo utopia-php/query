@@ -274,4 +274,323 @@ class QueryParseTest extends TestCase
         $this->assertCount(1, $parsed->getValues());
         $this->assertInstanceOf(Query::class, $parsed->getValues()[0]);
     }
+
+    // ══════════════════════════════════════════
+    //  ADDITIONAL EDGE CASES
+    // ══════════════════════════════════════════
+
+    // ── Round-trip additional ──
+
+    public function testRoundTripAvg(): void
+    {
+        $original = Query::avg('score', 'avg_score');
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('avg', $parsed->getMethod());
+        $this->assertEquals('score', $parsed->getAttribute());
+        $this->assertEquals(['avg_score'], $parsed->getValues());
+    }
+
+    public function testRoundTripMin(): void
+    {
+        $original = Query::min('price');
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('min', $parsed->getMethod());
+        $this->assertEquals('price', $parsed->getAttribute());
+        $this->assertEquals([], $parsed->getValues());
+    }
+
+    public function testRoundTripMax(): void
+    {
+        $original = Query::max('age', 'oldest');
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('max', $parsed->getMethod());
+        $this->assertEquals(['oldest'], $parsed->getValues());
+    }
+
+    public function testRoundTripCountWithoutAlias(): void
+    {
+        $original = Query::count('id');
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('count', $parsed->getMethod());
+        $this->assertEquals('id', $parsed->getAttribute());
+        $this->assertEquals([], $parsed->getValues());
+    }
+
+    public function testRoundTripGroupByEmpty(): void
+    {
+        $original = Query::groupBy([]);
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('groupBy', $parsed->getMethod());
+        $this->assertEquals([], $parsed->getValues());
+    }
+
+    public function testRoundTripHavingMultiple(): void
+    {
+        $original = Query::having([
+            Query::greaterThan('total', 5),
+            Query::lessThan('total', 100),
+        ]);
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertCount(2, $parsed->getValues());
+        $this->assertInstanceOf(Query::class, $parsed->getValues()[0]);
+        $this->assertInstanceOf(Query::class, $parsed->getValues()[1]);
+    }
+
+    public function testRoundTripLeftJoin(): void
+    {
+        $original = Query::leftJoin('profiles', 'u.id', 'p.uid');
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('leftJoin', $parsed->getMethod());
+        $this->assertEquals('profiles', $parsed->getAttribute());
+        $this->assertEquals(['u.id', '=', 'p.uid'], $parsed->getValues());
+    }
+
+    public function testRoundTripRightJoin(): void
+    {
+        $original = Query::rightJoin('orders', 'u.id', 'o.uid');
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('rightJoin', $parsed->getMethod());
+    }
+
+    public function testRoundTripJoinWithSpecialOperator(): void
+    {
+        $original = Query::join('t', 'a.val', 'b.val', '!=');
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals(['a.val', '!=', 'b.val'], $parsed->getValues());
+    }
+
+    public function testRoundTripUnionAll(): void
+    {
+        $original = Query::unionAll([Query::equal('y', [2])]);
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('unionAll', $parsed->getMethod());
+        $this->assertCount(1, $parsed->getValues());
+        $this->assertInstanceOf(Query::class, $parsed->getValues()[0]);
+    }
+
+    public function testRoundTripRawNoBindings(): void
+    {
+        $original = Query::raw('1 = 1');
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('raw', $parsed->getMethod());
+        $this->assertEquals('1 = 1', $parsed->getAttribute());
+        $this->assertEquals([], $parsed->getValues());
+    }
+
+    public function testRoundTripRawWithMultipleBindings(): void
+    {
+        $original = Query::raw('a > ? AND b < ?', [10, 20]);
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals([10, 20], $parsed->getValues());
+    }
+
+    public function testRoundTripComplexNested(): void
+    {
+        $original = Query::or([
+            Query::and([
+                Query::equal('a', [1]),
+                Query::or([
+                    Query::equal('b', [2]),
+                    Query::equal('c', [3]),
+                ]),
+            ]),
+        ]);
+        $json = $original->toString();
+        $parsed = Query::parse($json);
+        $this->assertEquals('or', $parsed->getMethod());
+        $this->assertCount(1, $parsed->getValues());
+
+        /** @var Query $inner */
+        $inner = $parsed->getValues()[0];
+        $this->assertEquals('and', $inner->getMethod());
+        $this->assertCount(2, $inner->getValues());
+    }
+
+    // ── Parse edge cases ──
+
+    public function testParseEmptyStringThrows(): void
+    {
+        $this->expectException(Exception::class);
+        Query::parse('');
+    }
+
+    public function testParseWhitespaceThrows(): void
+    {
+        $this->expectException(Exception::class);
+        Query::parse('   ');
+    }
+
+    public function testParseMissingMethodUsesEmptyString(): void
+    {
+        // method defaults to '' which is not a valid method
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Invalid query method: ');
+        Query::parse('{"attribute":"x","values":[]}');
+    }
+
+    public function testParseMissingAttributeDefaultsToEmpty(): void
+    {
+        $query = Query::parse('{"method":"isNull","values":[]}');
+        $this->assertEquals('', $query->getAttribute());
+    }
+
+    public function testParseMissingValuesDefaultsToEmpty(): void
+    {
+        $query = Query::parse('{"method":"isNull"}');
+        $this->assertEquals([], $query->getValues());
+    }
+
+    public function testParseExtraFieldsIgnored(): void
+    {
+        $query = Query::parse('{"method":"equal","attribute":"x","values":[1],"extra":"ignored"}');
+        $this->assertEquals('equal', $query->getMethod());
+        $this->assertEquals('x', $query->getAttribute());
+    }
+
+    public function testParseNonObjectJsonThrows(): void
+    {
+        $this->expectException(Exception::class);
+        Query::parse('"just a string"');
+    }
+
+    public function testParseJsonArrayThrows(): void
+    {
+        $this->expectException(Exception::class);
+        Query::parse('[1,2,3]');
+    }
+
+    // ── toArray edge cases ──
+
+    public function testToArrayCountWithAlias(): void
+    {
+        $query = Query::count('id', 'total');
+        $array = $query->toArray();
+        $this->assertEquals('count', $array['method']);
+        $this->assertEquals('id', $array['attribute']);
+        $this->assertEquals(['total'], $array['values']);
+    }
+
+    public function testToArrayCountWithoutAlias(): void
+    {
+        $query = Query::count();
+        $array = $query->toArray();
+        $this->assertEquals('count', $array['method']);
+        $this->assertEquals('*', $array['attribute']);
+        $this->assertEquals([], $array['values']);
+    }
+
+    public function testToArrayDistinct(): void
+    {
+        $query = Query::distinct();
+        $array = $query->toArray();
+        $this->assertEquals('distinct', $array['method']);
+        $this->assertArrayNotHasKey('attribute', $array);
+        $this->assertEquals([], $array['values']);
+    }
+
+    public function testToArrayJoinPreservesOperator(): void
+    {
+        $query = Query::join('t', 'a', 'b', '!=');
+        $array = $query->toArray();
+        $this->assertEquals(['a', '!=', 'b'], $array['values']);
+    }
+
+    public function testToArrayCrossJoin(): void
+    {
+        $query = Query::crossJoin('t');
+        $array = $query->toArray();
+        $this->assertEquals('crossJoin', $array['method']);
+        $this->assertEquals('t', $array['attribute']);
+        $this->assertEquals([], $array['values']);
+    }
+
+    public function testToArrayHaving(): void
+    {
+        $query = Query::having([Query::greaterThan('x', 1), Query::lessThan('y', 10)]);
+        $array = $query->toArray();
+        $this->assertEquals('having', $array['method']);
+
+        /** @var array<int, array<string, mixed>> $values */
+        $values = $array['values'] ?? [];
+        $this->assertCount(2, $values);
+        $this->assertEquals('greaterThan', $values[0]['method']);
+    }
+
+    public function testToArrayUnionAll(): void
+    {
+        $query = Query::unionAll([Query::equal('x', [1])]);
+        $array = $query->toArray();
+        $this->assertEquals('unionAll', $array['method']);
+
+        /** @var array<int, array<string, mixed>> $values */
+        $values = $array['values'] ?? [];
+        $this->assertCount(1, $values);
+    }
+
+    public function testToArrayRaw(): void
+    {
+        $query = Query::raw('a > ?', [10]);
+        $array = $query->toArray();
+        $this->assertEquals('raw', $array['method']);
+        $this->assertEquals('a > ?', $array['attribute']);
+        $this->assertEquals([10], $array['values']);
+    }
+
+    // ── parseQueries edge cases ──
+
+    public function testParseQueriesEmpty(): void
+    {
+        $result = Query::parseQueries([]);
+        $this->assertCount(0, $result);
+    }
+
+    public function testParseQueriesWithNewTypes(): void
+    {
+        $queries = Query::parseQueries([
+            '{"method":"count","attribute":"*","values":["total"]}',
+            '{"method":"groupBy","values":["status","country"]}',
+            '{"method":"distinct","values":[]}',
+            '{"method":"join","attribute":"orders","values":["u.id","=","o.uid"]}',
+        ]);
+        $this->assertCount(4, $queries);
+        $this->assertEquals('count', $queries[0]->getMethod());
+        $this->assertEquals('groupBy', $queries[1]->getMethod());
+        $this->assertEquals('distinct', $queries[2]->getMethod());
+        $this->assertEquals('join', $queries[3]->getMethod());
+    }
+
+    // ── toString edge cases ──
+
+    public function testToStringGroupByProducesValidJson(): void
+    {
+        $query = Query::groupBy(['a', 'b']);
+        $json = $query->toString();
+        $decoded = json_decode($json, true);
+        $this->assertIsArray($decoded);
+        $this->assertEquals('groupBy', $decoded['method']);
+        $this->assertEquals(['a', 'b'], $decoded['values']);
+    }
+
+    public function testToStringRawProducesValidJson(): void
+    {
+        $query = Query::raw('x > ? AND y < ?', [1, 2]);
+        $json = $query->toString();
+        $decoded = json_decode($json, true);
+        $this->assertIsArray($decoded);
+        $this->assertEquals('raw', $decoded['method']);
+        $this->assertEquals('x > ? AND y < ?', $decoded['attribute']);
+        $this->assertEquals([1, 2], $decoded['values']);
+    }
 }

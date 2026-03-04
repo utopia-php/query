@@ -52,4 +52,91 @@ class JoinQueryTest extends TestCase
         $this->assertContains(Query::TYPE_CROSS_JOIN, Query::JOIN_TYPES);
         $this->assertCount(4, Query::JOIN_TYPES);
     }
+
+    // ── Edge cases ──
+
+    public function testJoinWithEmptyTableName(): void
+    {
+        $query = Query::join('', 'left', 'right');
+        $this->assertEquals('', $query->getAttribute());
+        $this->assertEquals(['left', '=', 'right'], $query->getValues());
+    }
+
+    public function testJoinWithEmptyLeftColumn(): void
+    {
+        $query = Query::join('t', '', 'right');
+        $this->assertEquals(['', '=', 'right'], $query->getValues());
+    }
+
+    public function testJoinWithEmptyRightColumn(): void
+    {
+        $query = Query::join('t', 'left', '');
+        $this->assertEquals(['left', '=', ''], $query->getValues());
+    }
+
+    public function testJoinWithSpecialOperators(): void
+    {
+        $ops = ['!=', '<>', '<', '>', '<=', '>='];
+        foreach ($ops as $op) {
+            $query = Query::join('t', 'a', 'b', $op);
+            $this->assertEquals(['a', $op, 'b'], $query->getValues());
+        }
+    }
+
+    public function testLeftJoinValues(): void
+    {
+        $query = Query::leftJoin('t', 'a.id', 'b.aid', '!=');
+        $this->assertEquals(['a.id', '!=', 'b.aid'], $query->getValues());
+    }
+
+    public function testRightJoinValues(): void
+    {
+        $query = Query::rightJoin('t', 'a.id', 'b.aid');
+        $this->assertEquals(['a.id', '=', 'b.aid'], $query->getValues());
+    }
+
+    public function testCrossJoinEmptyTableName(): void
+    {
+        $query = Query::crossJoin('');
+        $this->assertEquals('', $query->getAttribute());
+        $this->assertEquals([], $query->getValues());
+    }
+
+    public function testJoinCompileDispatch(): void
+    {
+        $builder = new \Utopia\Query\Builder\SQL();
+        $query = Query::join('orders', 'users.id', 'orders.uid');
+        $sql = $query->compile($builder);
+        $this->assertEquals('JOIN `orders` ON `users.id` = `orders.uid`', $sql);
+    }
+
+    public function testLeftJoinCompileDispatch(): void
+    {
+        $builder = new \Utopia\Query\Builder\SQL();
+        $query = Query::leftJoin('p', 'u.id', 'p.uid');
+        $sql = $query->compile($builder);
+        $this->assertEquals('LEFT JOIN `p` ON `u.id` = `p.uid`', $sql);
+    }
+
+    public function testRightJoinCompileDispatch(): void
+    {
+        $builder = new \Utopia\Query\Builder\SQL();
+        $query = Query::rightJoin('o', 'u.id', 'o.uid');
+        $sql = $query->compile($builder);
+        $this->assertEquals('RIGHT JOIN `o` ON `u.id` = `o.uid`', $sql);
+    }
+
+    public function testCrossJoinCompileDispatch(): void
+    {
+        $builder = new \Utopia\Query\Builder\SQL();
+        $query = Query::crossJoin('colors');
+        $sql = $query->compile($builder);
+        $this->assertEquals('CROSS JOIN `colors`', $sql);
+    }
+
+    public function testJoinIsNotNested(): void
+    {
+        $query = Query::join('t', 'a', 'b');
+        $this->assertFalse($query->isNested());
+    }
 }

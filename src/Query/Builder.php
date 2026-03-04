@@ -4,7 +4,7 @@ namespace Utopia\Query;
 
 use Closure;
 
-class Builder implements Compiler
+abstract class Builder implements Compiler
 {
     protected string $table = '';
 
@@ -23,18 +23,56 @@ class Builder implements Compiler
      */
     protected array $unions = [];
 
-    private string $wrapChar = '`';
-
-    private ?Closure $attributeResolver = null;
+    protected ?Closure $attributeResolver = null;
 
     /**
      * @var array<Closure>
      */
-    private array $conditionProviders = [];
+    protected array $conditionProviders = [];
+
+    // ── Abstract (dialect-specific) ──
+
+    abstract protected function wrapIdentifier(string $identifier): string;
 
     /**
-     * Set the collection/table name
+     * Compile a random ordering expression (e.g. RAND() or rand())
      */
+    abstract protected function compileRandom(): string;
+
+    /**
+     * Compile a regex filter
+     *
+     * @param  array<mixed>  $values
+     */
+    abstract protected function compileRegex(string $attribute, array $values): string;
+
+    /**
+     * Compile a full-text search filter
+     *
+     * @param  array<mixed>  $values
+     */
+    abstract protected function compileSearch(string $attribute, array $values, bool $not): string;
+
+    // ── Hooks (overridable) ──
+
+    protected function buildTableClause(): string
+    {
+        return 'FROM ' . $this->wrapIdentifier($this->table);
+    }
+
+    /**
+     * Hook called after JOIN clauses, before WHERE. Override to inject e.g. PREWHERE.
+     *
+     * @param  array<string>  $parts
+     * @param  array<string, mixed>  $grouped
+     */
+    protected function buildAfterJoins(array &$parts, array $grouped): void
+    {
+        // no-op by default
+    }
+
+    // ── Fluent API ──
+
     public function from(string $table): static
     {
         $this->table = $table;
@@ -43,8 +81,6 @@ class Builder implements Compiler
     }
 
     /**
-     * Add a SELECT clause
-     *
      * @param  array<string>  $columns
      */
     public function select(array $columns): static
@@ -55,8 +91,6 @@ class Builder implements Compiler
     }
 
     /**
-     * Add filter queries
-     *
      * @param  array<Query>  $queries
      */
     public function filter(array $queries): static
@@ -68,9 +102,6 @@ class Builder implements Compiler
         return $this;
     }
 
-    /**
-     * Add sort ascending
-     */
     public function sortAsc(string $attribute): static
     {
         $this->pendingQueries[] = Query::orderAsc($attribute);
@@ -78,9 +109,6 @@ class Builder implements Compiler
         return $this;
     }
 
-    /**
-     * Add sort descending
-     */
     public function sortDesc(string $attribute): static
     {
         $this->pendingQueries[] = Query::orderDesc($attribute);
@@ -88,9 +116,6 @@ class Builder implements Compiler
         return $this;
     }
 
-    /**
-     * Add sort random
-     */
     public function sortRandom(): static
     {
         $this->pendingQueries[] = Query::orderRandom();
@@ -98,9 +123,6 @@ class Builder implements Compiler
         return $this;
     }
 
-    /**
-     * Set LIMIT
-     */
     public function limit(int $value): static
     {
         $this->pendingQueries[] = Query::limit($value);
@@ -108,9 +130,6 @@ class Builder implements Compiler
         return $this;
     }
 
-    /**
-     * Set OFFSET
-     */
     public function offset(int $value): static
     {
         $this->pendingQueries[] = Query::offset($value);
@@ -118,9 +137,6 @@ class Builder implements Compiler
         return $this;
     }
 
-    /**
-     * Set cursor after
-     */
     public function cursorAfter(mixed $value): static
     {
         $this->pendingQueries[] = Query::cursorAfter($value);
@@ -128,9 +144,6 @@ class Builder implements Compiler
         return $this;
     }
 
-    /**
-     * Set cursor before
-     */
     public function cursorBefore(mixed $value): static
     {
         $this->pendingQueries[] = Query::cursorBefore($value);
@@ -139,8 +152,6 @@ class Builder implements Compiler
     }
 
     /**
-     * Add multiple queries at once (batch mode)
-     *
      * @param  array<Query>  $queries
      */
     public function queries(array $queries): static
@@ -152,19 +163,6 @@ class Builder implements Compiler
         return $this;
     }
 
-    /**
-     * Set the wrap character for identifiers
-     */
-    public function setWrapChar(string $char): static
-    {
-        $this->wrapChar = $char;
-
-        return $this;
-    }
-
-    /**
-     * Set an attribute resolver closure
-     */
     public function setAttributeResolver(Closure $resolver): static
     {
         $this->attributeResolver = $resolver;
@@ -173,8 +171,6 @@ class Builder implements Compiler
     }
 
     /**
-     * Add a condition provider closure
-     *
      * @param  Closure(string): array{0: string, 1: list<mixed>}  $provider
      */
     public function addConditionProvider(Closure $provider): static
@@ -280,7 +276,7 @@ class Builder implements Compiler
 
     // ── Union fluent API ──
 
-    public function union(Builder $other): static
+    public function union(self $other): static
     {
         $result = $other->build();
         $this->unions[] = [
@@ -292,7 +288,7 @@ class Builder implements Compiler
         return $this;
     }
 
-    public function unionAll(Builder $other): static
+    public function unionAll(self $other): static
     {
         $result = $other->build();
         $this->unions[] = [
@@ -318,7 +314,7 @@ class Builder implements Compiler
     public function page(int $page, int $perPage = 25): static
     {
         $this->pendingQueries[] = Query::limit($perPage);
-        $this->pendingQueries[] = Query::offset(($page - 1) * $perPage);
+        $this->pendingQueries[] = Query::offset(max(0, ($page - 1) * $perPage));
 
         return $this;
     }
@@ -327,10 +323,11 @@ class Builder implements Compiler
     {
         $result = $this->build();
         $sql = $result['query'];
+        $offset = 0;
 
         foreach ($result['bindings'] as $binding) {
             if (\is_string($binding)) {
-                $value = "'" . $binding . "'";
+                $value = "'" . str_replace("'", "''", $binding) . "'";
             } elseif (\is_int($binding) || \is_float($binding)) {
                 $value = (string) $binding;
             } elseif (\is_bool($binding)) {
@@ -338,15 +335,18 @@ class Builder implements Compiler
             } else {
                 $value = 'NULL';
             }
-            $sql = \preg_replace('/\?/', $value, $sql, 1) ?? $sql;
+
+            $pos = \strpos($sql, '?', $offset);
+            if ($pos !== false) {
+                $sql = \substr_replace($sql, $value, $pos, 1);
+                $offset = $pos + \strlen($value);
+            }
         }
 
         return $sql;
     }
 
     /**
-     * Build the query and bindings from accumulated state
-     *
      * @return array{query: string, bindings: list<mixed>}
      */
     public function build(): array
@@ -376,7 +376,7 @@ class Builder implements Compiler
         $parts[] = $selectKeyword . ' ' . $selectSQL;
 
         // FROM
-        $parts[] = 'FROM ' . $this->wrapIdentifier($this->table);
+        $parts[] = $this->buildTableClause();
 
         // JOINS
         if (! empty($grouped['joins'])) {
@@ -385,15 +385,16 @@ class Builder implements Compiler
             }
         }
 
+        // Hook: after joins (e.g. ClickHouse PREWHERE)
+        $this->buildAfterJoins($parts, $grouped);
+
         // WHERE
         $whereClauses = [];
 
-        // Compile filters
         foreach ($grouped['filters'] as $filter) {
             $whereClauses[] = $this->compileFilter($filter);
         }
 
-        // Condition providers
         $providerBindings = [];
         foreach ($this->conditionProviders as $provider) {
             /** @var array{0: string, 1: list<mixed>} $result */
@@ -407,7 +408,6 @@ class Builder implements Compiler
             $this->addBinding($binding);
         }
 
-        // Cursor
         $cursorSQL = '';
         if ($grouped['cursor'] !== null && $grouped['cursorDirection'] !== null) {
             $cursorQueries = Query::getCursorQueries($this->pendingQueries, false);
@@ -489,8 +489,6 @@ class Builder implements Compiler
     }
 
     /**
-     * Get bindings from last build/compile
-     *
      * @return list<mixed>
      */
     public function getBindings(): array
@@ -498,9 +496,6 @@ class Builder implements Compiler
         return $this->bindings;
     }
 
-    /**
-     * Clear all accumulated state for reuse
-     */
     public function reset(): static
     {
         $this->pendingQueries = [];
@@ -556,7 +551,7 @@ class Builder implements Compiler
         return match ($query->getMethod()) {
             Query::TYPE_ORDER_ASC => $this->resolveAndWrap($query->getAttribute()) . ' ASC',
             Query::TYPE_ORDER_DESC => $this->resolveAndWrap($query->getAttribute()) . ' DESC',
-            Query::TYPE_ORDER_RANDOM => 'RAND()',
+            Query::TYPE_ORDER_RANDOM => $this->compileRandom(),
             default => throw new Exception('Unsupported order type: ' . $query->getMethod()),
         };
     }
@@ -655,7 +650,7 @@ class Builder implements Compiler
         return $type . ' ' . $table . ' ON ' . $left . ' ' . $operator . ' ' . $right;
     }
 
-    // ── Protected (overridable) ──
+    // ── Protected helpers ──
 
     protected function resolveAttribute(string $attribute): string
     {
@@ -667,34 +662,55 @@ class Builder implements Compiler
         return $attribute;
     }
 
-    protected function wrapIdentifier(string $identifier): string
-    {
-        return $this->wrapChar . $identifier . $this->wrapChar;
-    }
-
     protected function resolveAndWrap(string $attribute): string
     {
         return $this->wrapIdentifier($this->resolveAttribute($attribute));
     }
 
-    // ── Private helpers ──
-
-    private function addBinding(mixed $value): void
+    protected function addBinding(mixed $value): void
     {
         $this->bindings[] = $value;
     }
+
+    // ── Private helpers (shared SQL syntax) ──
 
     /**
      * @param  array<mixed>  $values
      */
     private function compileIn(string $attribute, array $values): string
     {
-        $placeholders = \array_fill(0, \count($values), '?');
-        foreach ($values as $value) {
-            $this->addBinding($value);
+        if ($values === []) {
+            return '1 = 0';
         }
 
-        return $attribute . ' IN (' . \implode(', ', $placeholders) . ')';
+        $hasNulls = false;
+        $nonNulls = [];
+
+        foreach ($values as $value) {
+            if ($value === null) {
+                $hasNulls = true;
+            } else {
+                $nonNulls[] = $value;
+            }
+        }
+
+        $hasNonNulls = $nonNulls !== [];
+
+        if ($hasNulls && ! $hasNonNulls) {
+            return $attribute . ' IS NULL';
+        }
+
+        $placeholders = \array_fill(0, \count($nonNulls), '?');
+        foreach ($nonNulls as $value) {
+            $this->addBinding($value);
+        }
+        $inClause = $attribute . ' IN (' . \implode(', ', $placeholders) . ')';
+
+        if ($hasNulls) {
+            return '(' . $inClause . ' OR ' . $attribute . ' IS NULL)';
+        }
+
+        return $inClause;
     }
 
     /**
@@ -702,18 +718,43 @@ class Builder implements Compiler
      */
     private function compileNotIn(string $attribute, array $values): string
     {
-        if (\count($values) === 1) {
-            $this->addBinding($values[0]);
-
-            return $attribute . ' != ?';
+        if ($values === []) {
+            return '1 = 1';
         }
 
-        $placeholders = \array_fill(0, \count($values), '?');
+        $hasNulls = false;
+        $nonNulls = [];
+
         foreach ($values as $value) {
-            $this->addBinding($value);
+            if ($value === null) {
+                $hasNulls = true;
+            } else {
+                $nonNulls[] = $value;
+            }
         }
 
-        return $attribute . ' NOT IN (' . \implode(', ', $placeholders) . ')';
+        $hasNonNulls = $nonNulls !== [];
+
+        if ($hasNulls && ! $hasNonNulls) {
+            return $attribute . ' IS NOT NULL';
+        }
+
+        if (\count($nonNulls) === 1) {
+            $this->addBinding($nonNulls[0]);
+            $notClause = $attribute . ' != ?';
+        } else {
+            $placeholders = \array_fill(0, \count($nonNulls), '?');
+            foreach ($nonNulls as $value) {
+                $this->addBinding($value);
+            }
+            $notClause = $attribute . ' NOT IN (' . \implode(', ', $placeholders) . ')';
+        }
+
+        if ($hasNulls) {
+            return '(' . $notClause . ' AND ' . $attribute . ' IS NOT NULL)';
+        }
+
+        return $notClause;
     }
 
     /**
@@ -808,36 +849,16 @@ class Builder implements Compiler
         return '(' . \implode(' AND ', $parts) . ')';
     }
 
-    /**
-     * @param  array<mixed>  $values
-     */
-    private function compileSearch(string $attribute, array $values, bool $not): string
-    {
-        $this->addBinding($values[0]);
-
-        if ($not) {
-            return 'NOT MATCH(' . $attribute . ') AGAINST(?)';
-        }
-
-        return 'MATCH(' . $attribute . ') AGAINST(?)';
-    }
-
-    /**
-     * @param  array<mixed>  $values
-     */
-    private function compileRegex(string $attribute, array $values): string
-    {
-        $this->addBinding($values[0]);
-
-        return $attribute . ' REGEXP ?';
-    }
-
     private function compileLogical(Query $query, string $operator): string
     {
         $parts = [];
         foreach ($query->getValues() as $subQuery) {
             /** @var Query $subQuery */
             $parts[] = $this->compileFilter($subQuery);
+        }
+
+        if ($parts === []) {
+            return $operator === 'OR' ? '1 = 0' : '1 = 1';
         }
 
         return '(' . \implode(' ' . $operator . ' ', $parts) . ')';
@@ -851,6 +872,10 @@ class Builder implements Compiler
             $parts[] = $this->resolveAndWrap($attr) . ' IS NOT NULL';
         }
 
+        if ($parts === []) {
+            return '1 = 1';
+        }
+
         return '(' . \implode(' AND ', $parts) . ')';
     }
 
@@ -860,6 +885,10 @@ class Builder implements Compiler
         foreach ($query->getValues() as $attr) {
             /** @var string $attr */
             $parts[] = $this->resolveAndWrap($attr) . ' IS NULL';
+        }
+
+        if ($parts === []) {
+            return '1 = 1';
         }
 
         return '(' . \implode(' AND ', $parts) . ')';

@@ -505,4 +505,387 @@ class QueryHelperTest extends TestCase
         $this->assertEquals(25, $result[0]->getValue());
         $this->assertEquals(0, $result[1]->getValue());
     }
+
+    public function testPageStaticHelperZero(): void
+    {
+        $result = Query::page(0, 10);
+        $this->assertEquals(10, $result[0]->getValue());
+        $this->assertEquals(-10, $result[1]->getValue());
+    }
+
+    public function testPageStaticHelperLarge(): void
+    {
+        $result = Query::page(500, 50);
+        $this->assertEquals(50, $result[0]->getValue());
+        $this->assertEquals(24950, $result[1]->getValue());
+    }
+
+    // ══════════════════════════════════════════
+    //  ADDITIONAL EDGE CASES
+    // ══════════════════════════════════════════
+
+    // ── groupByType with all new types combined ──
+
+    public function testGroupByTypeAllNewTypes(): void
+    {
+        $queries = [
+            Query::equal('name', ['John']),
+            Query::count('*', 'total'),
+            Query::sum('price'),
+            Query::groupBy(['status']),
+            Query::having([Query::greaterThan('total', 5)]),
+            Query::distinct(),
+            Query::join('orders', 'u.id', 'o.uid'),
+            Query::union([Query::equal('x', [1])]),
+            Query::select(['name']),
+            Query::orderAsc('name'),
+            Query::limit(10),
+            Query::offset(5),
+        ];
+
+        $grouped = Query::groupByType($queries);
+
+        $this->assertCount(1, $grouped['filters']);
+        $this->assertCount(1, $grouped['selections']);
+        $this->assertCount(2, $grouped['aggregations']);
+        $this->assertEquals(['status'], $grouped['groupBy']);
+        $this->assertCount(1, $grouped['having']);
+        $this->assertTrue($grouped['distinct']);
+        $this->assertCount(1, $grouped['joins']);
+        $this->assertCount(1, $grouped['unions']);
+        $this->assertEquals(10, $grouped['limit']);
+        $this->assertEquals(5, $grouped['offset']);
+        $this->assertEquals(['name'], $grouped['orderAttributes']);
+    }
+
+    public function testGroupByTypeMultipleGroupByMerges(): void
+    {
+        $queries = [
+            Query::groupBy(['a', 'b']),
+            Query::groupBy(['c']),
+        ];
+        $grouped = Query::groupByType($queries);
+        $this->assertEquals(['a', 'b', 'c'], $grouped['groupBy']);
+    }
+
+    public function testGroupByTypeMultipleDistinct(): void
+    {
+        $queries = [
+            Query::distinct(),
+            Query::distinct(),
+        ];
+        $grouped = Query::groupByType($queries);
+        $this->assertTrue($grouped['distinct']);
+    }
+
+    public function testGroupByTypeMultipleHaving(): void
+    {
+        $queries = [
+            Query::having([Query::greaterThan('x', 1)]),
+            Query::having([Query::lessThan('y', 100)]),
+        ];
+        $grouped = Query::groupByType($queries);
+        $this->assertCount(2, $grouped['having']);
+    }
+
+    public function testGroupByTypeRawGoesToFilters(): void
+    {
+        $queries = [Query::raw('1 = 1')];
+        $grouped = Query::groupByType($queries);
+        $this->assertCount(1, $grouped['filters']);
+        $this->assertEquals(Query::TYPE_RAW, $grouped['filters'][0]->getMethod());
+    }
+
+    public function testGroupByTypeEmptyNewKeys(): void
+    {
+        $grouped = Query::groupByType([]);
+        $this->assertEquals([], $grouped['aggregations']);
+        $this->assertEquals([], $grouped['groupBy']);
+        $this->assertEquals([], $grouped['having']);
+        $this->assertFalse($grouped['distinct']);
+        $this->assertEquals([], $grouped['joins']);
+        $this->assertEquals([], $grouped['unions']);
+    }
+
+    // ── merge() additional edge cases ──
+
+    public function testMergeEmptyA(): void
+    {
+        $b = [Query::equal('x', [1])];
+        $result = Query::merge([], $b);
+        $this->assertCount(1, $result);
+    }
+
+    public function testMergeEmptyB(): void
+    {
+        $a = [Query::equal('x', [1])];
+        $result = Query::merge($a, []);
+        $this->assertCount(1, $result);
+    }
+
+    public function testMergeBothEmpty(): void
+    {
+        $result = Query::merge([], []);
+        $this->assertCount(0, $result);
+    }
+
+    public function testMergePreservesNonSingularFromBoth(): void
+    {
+        $a = [Query::equal('a', [1]), Query::greaterThan('b', 2)];
+        $b = [Query::lessThan('c', 3), Query::equal('d', [4])];
+        $result = Query::merge($a, $b);
+        $this->assertCount(4, $result);
+    }
+
+    public function testMergeBothLimitAndOffset(): void
+    {
+        $a = [Query::limit(10), Query::offset(5)];
+        $b = [Query::limit(50), Query::offset(100)];
+        $result = Query::merge($a, $b);
+        // Both should be overridden
+        $this->assertCount(2, $result);
+        $limits = array_filter($result, fn (Query $q) => $q->getMethod() === Query::TYPE_LIMIT);
+        $offsets = array_filter($result, fn (Query $q) => $q->getMethod() === Query::TYPE_OFFSET);
+        $this->assertEquals(50, array_values($limits)[0]->getValue());
+        $this->assertEquals(100, array_values($offsets)[0]->getValue());
+    }
+
+    public function testMergeCursorTypesIndependent(): void
+    {
+        $a = [Query::cursorAfter('abc')];
+        $b = [Query::cursorBefore('xyz')];
+        $result = Query::merge($a, $b);
+        // cursorAfter and cursorBefore are different types, both should exist
+        $this->assertCount(2, $result);
+    }
+
+    public function testMergeMixedWithFilters(): void
+    {
+        $a = [Query::equal('x', [1]), Query::limit(10), Query::offset(0)];
+        $b = [Query::greaterThan('y', 5), Query::limit(50)];
+        $result = Query::merge($a, $b);
+        // equal stays, old limit removed, offset stays, greaterThan added, new limit added
+        $this->assertCount(4, $result);
+    }
+
+    // ── diff() additional edge cases ──
+
+    public function testDiffEmptyA(): void
+    {
+        $result = Query::diff([], [Query::equal('x', [1])]);
+        $this->assertCount(0, $result);
+    }
+
+    public function testDiffEmptyB(): void
+    {
+        $a = [Query::equal('x', [1]), Query::limit(10)];
+        $result = Query::diff($a, []);
+        $this->assertCount(2, $result);
+    }
+
+    public function testDiffBothEmpty(): void
+    {
+        $result = Query::diff([], []);
+        $this->assertCount(0, $result);
+    }
+
+    public function testDiffPartialOverlap(): void
+    {
+        $shared1 = Query::equal('a', [1]);
+        $shared2 = Query::equal('b', [2]);
+        $unique = Query::greaterThan('c', 3);
+
+        $a = [$shared1, $shared2, $unique];
+        $b = [$shared1, $shared2];
+        $result = Query::diff($a, $b);
+        $this->assertCount(1, $result);
+        $this->assertEquals('greaterThan', $result[0]->getMethod());
+    }
+
+    public function testDiffByValueNotReference(): void
+    {
+        $a = [Query::equal('x', [1])];
+        $b = [Query::equal('x', [1])]; // Different objects, same content
+        $result = Query::diff($a, $b);
+        $this->assertCount(0, $result); // Should match by value
+    }
+
+    public function testDiffDoesNotRemoveDuplicatesInA(): void
+    {
+        $a = [Query::equal('x', [1]), Query::equal('x', [1])];
+        $b = [];
+        $result = Query::diff($a, $b);
+        $this->assertCount(2, $result);
+    }
+
+    public function testDiffComplexNested(): void
+    {
+        $nested = Query::or([Query::equal('a', [1]), Query::equal('b', [2])]);
+        $a = [$nested, Query::limit(10)];
+        $b = [$nested];
+        $result = Query::diff($a, $b);
+        $this->assertCount(1, $result);
+        $this->assertEquals('limit', $result[0]->getMethod());
+    }
+
+    // ── validate() additional edge cases ──
+
+    public function testValidateEmptyQueries(): void
+    {
+        $errors = Query::validate([], ['name', 'age']);
+        $this->assertCount(0, $errors);
+    }
+
+    public function testValidateEmptyAllowedAttributes(): void
+    {
+        $queries = [Query::equal('name', ['John'])];
+        $errors = Query::validate($queries, []);
+        $this->assertCount(1, $errors);
+    }
+
+    public function testValidateMixedValidAndInvalid(): void
+    {
+        $queries = [
+            Query::equal('name', ['John']),
+            Query::greaterThan('age', 18),
+            Query::equal('secret', ['x']),
+            Query::lessThan('forbidden', 5),
+        ];
+        $errors = Query::validate($queries, ['name', 'age']);
+        $this->assertCount(2, $errors);
+    }
+
+    public function testValidateNestedMultipleLevels(): void
+    {
+        $queries = [
+            Query::or([
+                Query::and([
+                    Query::equal('name', ['John']),
+                    Query::equal('bad', ['x']),
+                ]),
+                Query::equal('also_bad', ['y']),
+            ]),
+        ];
+        $errors = Query::validate($queries, ['name']);
+        $this->assertCount(2, $errors);
+    }
+
+    public function testValidateHavingInnerQueries(): void
+    {
+        $queries = [
+            Query::having([
+                Query::greaterThan('total', 5),
+                Query::lessThan('bad_col', 100),
+            ]),
+        ];
+        $errors = Query::validate($queries, ['total']);
+        $this->assertCount(1, $errors);
+        $this->assertStringContainsString('bad_col', $errors[0]);
+    }
+
+    public function testValidateGroupByAllValid(): void
+    {
+        $queries = [Query::groupBy(['status', 'country'])];
+        $errors = Query::validate($queries, ['status', 'country']);
+        $this->assertCount(0, $errors);
+    }
+
+    public function testValidateGroupByMultipleInvalid(): void
+    {
+        $queries = [Query::groupBy(['status', 'bad1', 'bad2'])];
+        $errors = Query::validate($queries, ['status']);
+        $this->assertCount(2, $errors);
+    }
+
+    public function testValidateAggregateWithAttribute(): void
+    {
+        $queries = [Query::sum('forbidden_col')];
+        $errors = Query::validate($queries, ['allowed_col']);
+        $this->assertCount(1, $errors);
+        $this->assertStringContainsString('forbidden_col', $errors[0]);
+    }
+
+    public function testValidateAggregateWithAllowedAttribute(): void
+    {
+        $queries = [Query::sum('price')];
+        $errors = Query::validate($queries, ['price']);
+        $this->assertCount(0, $errors);
+    }
+
+    public function testValidateDollarSignAttributes(): void
+    {
+        $queries = [
+            Query::equal('$id', ['abc']),
+            Query::greaterThan('$createdAt', '2024-01-01'),
+        ];
+        $errors = Query::validate($queries, ['$id', '$createdAt']);
+        $this->assertCount(0, $errors);
+    }
+
+    public function testValidateJoinAttributeIsTableName(): void
+    {
+        // Join's attribute is the table name, not a column, so it gets validated
+        $queries = [Query::join('orders', 'u.id', 'o.uid')];
+        $errors = Query::validate($queries, ['name']);
+        $this->assertCount(1, $errors);
+        $this->assertStringContainsString('orders', $errors[0]);
+    }
+
+    public function testValidateSelectSkipped(): void
+    {
+        $queries = [Query::select(['any_col', 'other_col'])];
+        $errors = Query::validate($queries, []);
+        $this->assertCount(0, $errors);
+    }
+
+    public function testValidateExistsSkipped(): void
+    {
+        $queries = [Query::exists(['any_col'])];
+        $errors = Query::validate($queries, []);
+        $this->assertCount(0, $errors);
+    }
+
+    public function testValidateOrderAscAttribute(): void
+    {
+        $queries = [Query::orderAsc('forbidden')];
+        $errors = Query::validate($queries, ['name']);
+        $this->assertCount(1, $errors);
+    }
+
+    public function testValidateOrderDescAttribute(): void
+    {
+        $queries = [Query::orderDesc('allowed')];
+        $errors = Query::validate($queries, ['allowed']);
+        $this->assertCount(0, $errors);
+    }
+
+    public function testValidateEmptyAttributeSkipped(): void
+    {
+        // Queries with empty string attribute should be skipped
+        $queries = [Query::orderAsc('')];
+        $errors = Query::validate($queries, []);
+        $this->assertCount(0, $errors);
+    }
+
+    // ── getByType additional ──
+
+    public function testGetByTypeWithNewTypes(): void
+    {
+        $queries = [
+            Query::count('*', 'total'),
+            Query::sum('price'),
+            Query::join('t', 'a', 'b'),
+            Query::distinct(),
+            Query::groupBy(['status']),
+        ];
+
+        $aggs = Query::getByType($queries, Query::AGGREGATE_TYPES);
+        $this->assertCount(2, $aggs);
+
+        $joins = Query::getByType($queries, Query::JOIN_TYPES);
+        $this->assertCount(1, $joins);
+
+        $distinct = Query::getByType($queries, [Query::TYPE_DISTINCT]);
+        $this->assertCount(1, $distinct);
+    }
 }

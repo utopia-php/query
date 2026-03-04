@@ -261,12 +261,17 @@ class RedisCompiler implements Compiler
 
 This is the pattern used by [utopia-php/database](https://github.com/utopia-php/database) — it implements `Compiler` for each supported database engine, keeping application code fully decoupled from any particular storage backend.
 
+### Builder Hierarchy
+
+The library includes a builder system for generating parameterized queries. The abstract `Builder` base class provides the fluent API and query orchestration, while concrete implementations handle dialect-specific compilation:
+
+- `Utopia\Query\Builder\SQL` — MySQL/MariaDB/SQLite (backtick quoting, `REGEXP`, `MATCH() AGAINST()`, `RAND()`)
+- `Utopia\Query\Builder\ClickHouse` — ClickHouse (backtick quoting, `match()`, `rand()`, `PREWHERE`, `FINAL`, `SAMPLE`)
+
 ### SQL Builder
 
-The library includes a built-in `Builder` class that implements `Compiler` and provides a fluent API for building parameterized SQL queries:
-
 ```php
-use Utopia\Query\Builder;
+use Utopia\Query\Builder\SQL as Builder;
 use Utopia\Query\Query;
 
 // Fluent API
@@ -446,6 +451,88 @@ $result = (new Builder())
     ->filter([Query::equal('status', ['active'])])
     ->build();
 ```
+
+### ClickHouse Builder
+
+The ClickHouse builder handles ClickHouse-specific SQL dialect differences:
+
+```php
+use Utopia\Query\Builder\ClickHouse as Builder;
+use Utopia\Query\Query;
+```
+
+**FINAL** — force merging of data parts (for ReplacingMergeTree, CollapsingMergeTree, etc.):
+
+```php
+$result = (new Builder())
+    ->from('events')
+    ->final()
+    ->filter([Query::equal('status', ['active'])])
+    ->build();
+
+// SELECT * FROM `events` FINAL WHERE `status` IN (?)
+```
+
+**SAMPLE** — approximate query processing on a fraction of data:
+
+```php
+$result = (new Builder())
+    ->from('events')
+    ->sample(0.1)
+    ->count('*', 'approx_total')
+    ->build();
+
+// SELECT COUNT(*) AS `approx_total` FROM `events` SAMPLE 0.1
+```
+
+**PREWHERE** — filter before reading all columns (major performance optimization for wide tables):
+
+```php
+$result = (new Builder())
+    ->from('events')
+    ->prewhere([Query::equal('event_type', ['click'])])
+    ->filter([Query::greaterThan('count', 5)])
+    ->build();
+
+// SELECT * FROM `events` PREWHERE `event_type` IN (?) WHERE `count` > ?
+```
+
+**Combined** — all ClickHouse features work together:
+
+```php
+$result = (new Builder())
+    ->from('events')
+    ->final()
+    ->sample(0.1)
+    ->prewhere([Query::equal('event_type', ['purchase'])])
+    ->join('users', 'events.user_id', 'users.id')
+    ->filter([Query::greaterThan('events.amount', 100)])
+    ->count('*', 'total')
+    ->groupBy(['users.country'])
+    ->sortDesc('total')
+    ->limit(50)
+    ->build();
+
+// SELECT COUNT(*) AS `total` FROM `events` FINAL SAMPLE 0.1
+//   JOIN `users` ON `events.user_id` = `users.id`
+//   PREWHERE `event_type` IN (?)
+//   WHERE `events.amount` > ?
+//   GROUP BY `users.country`
+//   ORDER BY `total` DESC LIMIT ?
+```
+
+**Regex** — uses ClickHouse's `match()` function instead of `REGEXP`:
+
+```php
+$result = (new Builder())
+    ->from('logs')
+    ->filter([Query::regex('path', '^/api/v[0-9]+')])
+    ->build();
+
+// SELECT * FROM `logs` WHERE match(`path`, ?)
+```
+
+> **Note:** Full-text search (`Query::search()`) is not supported in the ClickHouse builder and will throw an exception. Use `Query::contains()` or a custom full-text index instead.
 
 ## Contributing
 

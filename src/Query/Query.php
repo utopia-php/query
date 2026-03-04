@@ -611,7 +611,7 @@ class Query
     /**
      * Helper method to create Query with equal method
      *
-     * @param  array<string|int|float|bool|array<mixed,mixed>>  $values
+     * @param  array<string|int|float|bool|null|array<mixed,mixed>>  $values
      */
     public static function equal(string $attribute, array $values): static
     {
@@ -621,9 +621,9 @@ class Query
     /**
      * Helper method to create Query with notEqual method
      *
-     * @param  string|int|float|bool|array<mixed,mixed>  $value
+     * @param  string|int|float|bool|null|array<mixed,mixed>  $value
      */
-    public static function notEqual(string $attribute, string|int|float|bool|array $value): static
+    public static function notEqual(string $attribute, string|int|float|bool|array|null $value): static
     {
         // maps or not an array
         if ((is_array($value) && ! array_is_list($value)) || ! is_array($value)) {

@@ -207,4 +207,223 @@ class QueryTest extends TestCase
         $query = Query::unionAll($inner);
         $this->assertEquals(Query::TYPE_UNION_ALL, $query->getMethod());
     }
+
+    // ══════════════════════════════════════════
+    //  ADDITIONAL EDGE CASES
+    // ══════════════════════════════════════════
+
+    public function testTypesNoDuplicates(): void
+    {
+        $this->assertEquals(count(Query::TYPES), count(array_unique(Query::TYPES)));
+    }
+
+    public function testAggregateTypesNoDuplicates(): void
+    {
+        $this->assertEquals(count(Query::AGGREGATE_TYPES), count(array_unique(Query::AGGREGATE_TYPES)));
+    }
+
+    public function testJoinTypesNoDuplicates(): void
+    {
+        $this->assertEquals(count(Query::JOIN_TYPES), count(array_unique(Query::JOIN_TYPES)));
+    }
+
+    public function testAggregateTypesSubsetOfTypes(): void
+    {
+        foreach (Query::AGGREGATE_TYPES as $type) {
+            $this->assertContains($type, Query::TYPES);
+        }
+    }
+
+    public function testJoinTypesSubsetOfTypes(): void
+    {
+        foreach (Query::JOIN_TYPES as $type) {
+            $this->assertContains($type, Query::TYPES);
+        }
+    }
+
+    public function testIsMethodCaseSensitive(): void
+    {
+        $this->assertFalse(Query::isMethod('COUNT'));
+        $this->assertFalse(Query::isMethod('Sum'));
+        $this->assertFalse(Query::isMethod('JOIN'));
+        $this->assertFalse(Query::isMethod('DISTINCT'));
+        $this->assertFalse(Query::isMethod('GroupBy'));
+        $this->assertFalse(Query::isMethod('RAW'));
+    }
+
+    public function testRawFactoryEmptySql(): void
+    {
+        $query = Query::raw('');
+        $this->assertEquals('', $query->getAttribute());
+        $this->assertEquals([], $query->getValues());
+    }
+
+    public function testRawFactoryEmptyBindings(): void
+    {
+        $query = Query::raw('1 = 1', []);
+        $this->assertEquals([], $query->getValues());
+    }
+
+    public function testRawFactoryMixedBindings(): void
+    {
+        $query = Query::raw('a = ? AND b = ? AND c = ?', ['str', 42, 3.14]);
+        $this->assertEquals(['str', 42, 3.14], $query->getValues());
+    }
+
+    public function testUnionIsNested(): void
+    {
+        $query = Query::union([Query::equal('x', [1])]);
+        $this->assertTrue($query->isNested());
+    }
+
+    public function testUnionAllIsNested(): void
+    {
+        $query = Query::unionAll([Query::equal('x', [1])]);
+        $this->assertTrue($query->isNested());
+    }
+
+    public function testDistinctNotNested(): void
+    {
+        $this->assertFalse(Query::distinct()->isNested());
+    }
+
+    public function testCountNotNested(): void
+    {
+        $this->assertFalse(Query::count()->isNested());
+    }
+
+    public function testGroupByNotNested(): void
+    {
+        $this->assertFalse(Query::groupBy(['a'])->isNested());
+    }
+
+    public function testJoinNotNested(): void
+    {
+        $this->assertFalse(Query::join('t', 'a', 'b')->isNested());
+    }
+
+    public function testRawNotNested(): void
+    {
+        $this->assertFalse(Query::raw('1=1')->isNested());
+    }
+
+    public function testHavingNested(): void
+    {
+        $this->assertTrue(Query::having([Query::equal('x', [1])])->isNested());
+    }
+
+    public function testCloneDeepCopiesHavingQueries(): void
+    {
+        $inner = Query::greaterThan('total', 5);
+        $outer = Query::having([$inner]);
+        $cloned = clone $outer;
+
+        $clonedValues = $cloned->getValues();
+        $this->assertNotSame($inner, $clonedValues[0]);
+        $this->assertInstanceOf(Query::class, $clonedValues[0]);
+
+        /** @var Query $clonedInner */
+        $clonedInner = $clonedValues[0];
+        $this->assertEquals('greaterThan', $clonedInner->getMethod());
+    }
+
+    public function testCloneDeepCopiesUnionQueries(): void
+    {
+        $inner = Query::equal('x', [1]);
+        $outer = Query::union([$inner]);
+        $cloned = clone $outer;
+
+        $clonedValues = $cloned->getValues();
+        $this->assertNotSame($inner, $clonedValues[0]);
+    }
+
+    public function testCountConstantValue(): void
+    {
+        $this->assertEquals('count', Query::TYPE_COUNT);
+    }
+
+    public function testSumConstantValue(): void
+    {
+        $this->assertEquals('sum', Query::TYPE_SUM);
+    }
+
+    public function testAvgConstantValue(): void
+    {
+        $this->assertEquals('avg', Query::TYPE_AVG);
+    }
+
+    public function testMinConstantValue(): void
+    {
+        $this->assertEquals('min', Query::TYPE_MIN);
+    }
+
+    public function testMaxConstantValue(): void
+    {
+        $this->assertEquals('max', Query::TYPE_MAX);
+    }
+
+    public function testGroupByConstantValue(): void
+    {
+        $this->assertEquals('groupBy', Query::TYPE_GROUP_BY);
+    }
+
+    public function testHavingConstantValue(): void
+    {
+        $this->assertEquals('having', Query::TYPE_HAVING);
+    }
+
+    public function testDistinctConstantValue(): void
+    {
+        $this->assertEquals('distinct', Query::TYPE_DISTINCT);
+    }
+
+    public function testJoinConstantValue(): void
+    {
+        $this->assertEquals('join', Query::TYPE_JOIN);
+    }
+
+    public function testLeftJoinConstantValue(): void
+    {
+        $this->assertEquals('leftJoin', Query::TYPE_LEFT_JOIN);
+    }
+
+    public function testRightJoinConstantValue(): void
+    {
+        $this->assertEquals('rightJoin', Query::TYPE_RIGHT_JOIN);
+    }
+
+    public function testCrossJoinConstantValue(): void
+    {
+        $this->assertEquals('crossJoin', Query::TYPE_CROSS_JOIN);
+    }
+
+    public function testUnionConstantValue(): void
+    {
+        $this->assertEquals('union', Query::TYPE_UNION);
+    }
+
+    public function testUnionAllConstantValue(): void
+    {
+        $this->assertEquals('unionAll', Query::TYPE_UNION_ALL);
+    }
+
+    public function testRawConstantValue(): void
+    {
+        $this->assertEquals('raw', Query::TYPE_RAW);
+    }
+
+    public function testCountIsSpatialQueryFalse(): void
+    {
+        $this->assertFalse(Query::count()->isSpatialQuery());
+    }
+
+    public function testJoinIsSpatialQueryFalse(): void
+    {
+        $this->assertFalse(Query::join('t', 'a', 'b')->isSpatialQuery());
+    }
+
+    public function testDistinctIsSpatialQueryFalse(): void
+    {
+        $this->assertFalse(Query::distinct()->isSpatialQuery());
+    }
 }
