@@ -476,6 +476,29 @@ class Query
     }
 
     /**
+     * Compile this query using the given compiler
+     */
+    public function compile(Compiler $compiler): string
+    {
+        return match ($this->method) {
+            self::TYPE_ORDER_ASC,
+            self::TYPE_ORDER_DESC,
+            self::TYPE_ORDER_RANDOM => $compiler->compileOrder($this),
+
+            self::TYPE_LIMIT => $compiler->compileLimit($this),
+
+            self::TYPE_OFFSET => $compiler->compileOffset($this),
+
+            self::TYPE_CURSOR_AFTER,
+            self::TYPE_CURSOR_BEFORE => $compiler->compileCursor($this),
+
+            self::TYPE_SELECT => $compiler->compileSelect($this),
+
+            default => $compiler->compileFilter($this),
+        };
+    }
+
+    /**
      * @throws QueryException
      */
     public function toString(): string
@@ -824,8 +847,8 @@ class Query
      *
      * @param  array<mixed>  $queries
      * @return array{
-     *     filters: array<static>,
-     *     selections: array<static>,
+     *     filters: list<Query>,
+     *     selections: list<Query>,
      *     limit: int|null,
      *     offset: int|null,
      *     orderAttributes: array<string>,
