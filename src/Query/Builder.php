@@ -395,17 +395,13 @@ abstract class Builder implements Compiler
             $whereClauses[] = $this->compileFilter($filter);
         }
 
-        $providerBindings = [];
         foreach ($this->conditionProviders as $provider) {
             /** @var array{0: string, 1: list<mixed>} $result */
             $result = $provider($this->table);
             $whereClauses[] = $result[0];
             foreach ($result[1] as $binding) {
-                $providerBindings[] = $binding;
+                $this->addBinding($binding);
             }
-        }
-        foreach ($providerBindings as $binding) {
-            $this->addBinding($binding);
         }
 
         $cursorSQL = '';
@@ -475,8 +471,11 @@ abstract class Builder implements Compiler
         $sql = \implode(' ', $parts);
 
         // UNION
+        if (!empty($this->unions)) {
+            $sql = '(' . $sql . ')';
+        }
         foreach ($this->unions as $union) {
-            $sql .= ' ' . $union['type'] . ' ' . $union['query'];
+            $sql .= ' ' . $union['type'] . ' (' . $union['query'] . ')';
             foreach ($union['bindings'] as $binding) {
                 $this->addBinding($binding);
             }
@@ -594,7 +593,14 @@ abstract class Builder implements Compiler
 
     public function compileAggregate(Query $query): string
     {
-        $func = \strtoupper($query->getMethod());
+        $funcMap = [
+            Query::TYPE_COUNT => 'COUNT',
+            Query::TYPE_SUM   => 'SUM',
+            Query::TYPE_AVG   => 'AVG',
+            Query::TYPE_MIN   => 'MIN',
+            Query::TYPE_MAX   => 'MAX',
+        ];
+        $func = $funcMap[$query->getMethod()] ?? throw new \InvalidArgumentException("Unknown aggregate: {$query->getMethod()}");
         $attr = $query->getAttribute();
         $col = ($attr === '*' || $attr === '') ? '*' : $this->resolveAndWrap($attr);
         /** @var string $alias */
@@ -859,7 +865,7 @@ abstract class Builder implements Compiler
      */
     private function escapeLikeValue(string $value): string
     {
-        return \str_replace(['%', '_'], ['\\%', '\\_'], $value);
+        return \str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
     }
 
     private function compileLogical(Query $query, string $operator): string

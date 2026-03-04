@@ -925,7 +925,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `users` WHERE `status` IN (?) UNION SELECT * FROM `admins` WHERE `role` IN (?)',
+            '(SELECT * FROM `users` WHERE `status` IN (?)) UNION (SELECT * FROM `admins` WHERE `role` IN (?))',
             $result['query']
         );
         $this->assertEquals(['active', 'admin'], $result['bindings']);
@@ -940,7 +940,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `current` UNION ALL SELECT * FROM `archive`',
+            '(SELECT * FROM `current`) UNION ALL (SELECT * FROM `archive`)',
             $result['query']
         );
     }
@@ -1433,7 +1433,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `users` UNION SELECT * FROM `admins` UNION SELECT * FROM `mods`',
+            '(SELECT * FROM `users`) UNION (SELECT * FROM `admins`) UNION (SELECT * FROM `mods`)',
             $result['query']
         );
     }
@@ -1450,7 +1450,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `users` UNION SELECT * FROM `admins` UNION ALL SELECT * FROM `mods`',
+            '(SELECT * FROM `users`) UNION (SELECT * FROM `admins`) UNION ALL (SELECT * FROM `mods`)',
             $result['query']
         );
     }
@@ -1468,7 +1468,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `users` WHERE `status` IN (?) UNION SELECT * FROM `admins` WHERE `level` IN (?) UNION ALL SELECT * FROM `mods` WHERE `score` > ?',
+            '(SELECT * FROM `users` WHERE `status` IN (?)) UNION (SELECT * FROM `admins` WHERE `level` IN (?)) UNION ALL (SELECT * FROM `mods` WHERE `score` > ?)',
             $result['query']
         );
         $this->assertEquals(['active', 1, 50], $result['bindings']);
@@ -1485,7 +1485,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT COUNT(*) AS `total` FROM `orders_2024` UNION ALL SELECT COUNT(*) AS `total` FROM `orders_2023`',
+            '(SELECT COUNT(*) AS `total` FROM `orders_2024`) UNION ALL (SELECT COUNT(*) AS `total` FROM `orders_2023`)',
             $result['query']
         );
     }
@@ -4259,7 +4259,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `main` UNION SELECT * FROM `a` UNION SELECT * FROM `b` UNION SELECT * FROM `c`',
+            '(SELECT * FROM `main`) UNION (SELECT * FROM `a`) UNION (SELECT * FROM `b`) UNION (SELECT * FROM `c`)',
             $result['query']
         );
     }
@@ -4278,7 +4278,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `main` UNION ALL SELECT * FROM `a` UNION ALL SELECT * FROM `b` UNION ALL SELECT * FROM `c`',
+            '(SELECT * FROM `main`) UNION ALL (SELECT * FROM `a`) UNION ALL (SELECT * FROM `b`) UNION ALL (SELECT * FROM `c`)',
             $result['query']
         );
     }
@@ -4297,7 +4297,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `main` UNION SELECT * FROM `a` UNION ALL SELECT * FROM `b` UNION SELECT * FROM `c`',
+            '(SELECT * FROM `main`) UNION (SELECT * FROM `a`) UNION ALL (SELECT * FROM `b`) UNION (SELECT * FROM `c`)',
             $result['query']
         );
     }
@@ -4314,7 +4314,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertStringContainsString(
-            'UNION SELECT * FROM `archived_users` JOIN `archived_orders`',
+            'UNION (SELECT * FROM `archived_users` JOIN `archived_orders`',
             $result['query']
         );
     }
@@ -4333,7 +4333,7 @@ class SQLTest extends TestCase
             ->union($sub)
             ->build();
 
-        $this->assertStringContainsString('UNION SELECT COUNT(*) AS `cnt` FROM `orders_2023` GROUP BY `status`', $result['query']);
+        $this->assertStringContainsString('UNION (SELECT COUNT(*) AS `cnt` FROM `orders_2023` GROUP BY `status`)', $result['query']);
     }
 
     public function testUnionWhereSubQueryHasSortAndLimit(): void
@@ -4348,7 +4348,7 @@ class SQLTest extends TestCase
             ->union($sub)
             ->build();
 
-        $this->assertStringContainsString('UNION SELECT * FROM `archive` ORDER BY `created_at` DESC LIMIT ?', $result['query']);
+        $this->assertStringContainsString('UNION (SELECT * FROM `archive` ORDER BY `created_at` DESC LIMIT ?)', $result['query']);
     }
 
     public function testUnionWithConditionProviders(): void
@@ -4364,7 +4364,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertStringContainsString('WHERE org = ?', $result['query']);
-        $this->assertStringContainsString('UNION SELECT * FROM `other` WHERE org = ?', $result['query']);
+        $this->assertStringContainsString('UNION (SELECT * FROM `other` WHERE org = ?)', $result['query']);
         $this->assertEquals(['org1', 'org2'], $result['bindings']);
     }
 
@@ -4400,7 +4400,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertStringContainsString('SELECT DISTINCT `name` FROM `current`', $result['query']);
-        $this->assertStringContainsString('UNION SELECT DISTINCT `name` FROM `archive`', $result['query']);
+        $this->assertStringContainsString('UNION (SELECT DISTINCT `name` FROM `archive`)', $result['query']);
     }
 
     public function testUnionWithWrapChar(): void
@@ -4416,7 +4416,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM "current" UNION SELECT * FROM "archive"',
+            '(SELECT * FROM "current") UNION (SELECT * FROM "archive")',
             $result['query']
         );
     }
@@ -4431,7 +4431,7 @@ class SQLTest extends TestCase
         $result = $builder->from('fresh')->union($sub)->build();
 
         $this->assertEquals(
-            'SELECT * FROM `fresh` UNION SELECT * FROM `other`',
+            '(SELECT * FROM `fresh`) UNION (SELECT * FROM `other`)',
             $result['query']
         );
     }
@@ -5827,7 +5827,7 @@ class SQLTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT DISTINCT COUNT(*) AS `total`, `status` FROM `orders` JOIN `users` ON `orders`.`uid` = `users`.`id` WHERE `amount` > ? GROUP BY `status` HAVING `total` > ? ORDER BY `status` ASC LIMIT ? OFFSET ? UNION SELECT * FROM `archive` WHERE `status` IN (?)',
+            '(SELECT DISTINCT COUNT(*) AS `total`, `status` FROM `orders` JOIN `users` ON `orders`.`uid` = `users`.`id` WHERE `amount` > ? GROUP BY `status` HAVING `total` > ? ORDER BY `status` ASC LIMIT ? OFFSET ?) UNION (SELECT * FROM `archive` WHERE `status` IN (?))',
             $result['query']
         );
         $this->assertEquals([100, 5, 10, 20, 'closed'], $result['bindings']);
@@ -5841,7 +5841,7 @@ class SQLTest extends TestCase
     {
         $other = (new Builder())->from('b');
         $result = (new Builder())->from('a')->distinct()->union($other)->build();
-        $this->assertEquals('SELECT DISTINCT * FROM `a` UNION SELECT * FROM `b`', $result['query']);
+        $this->assertEquals('(SELECT DISTINCT * FROM `a`) UNION (SELECT * FROM `b`)', $result['query']);
         $this->assertEquals([], $result['bindings']);
     }
 
@@ -5968,7 +5968,7 @@ class SQLTest extends TestCase
             ->union($sub)
             ->build();
         // Sub-query should include the condition provider
-        $this->assertStringContainsString('UNION SELECT * FROM `b` WHERE _deleted = ?', $result['query']);
+        $this->assertStringContainsString('UNION (SELECT * FROM `b` WHERE _deleted = ?)', $result['query']);
         $this->assertEquals([0], $result['bindings']);
     }
 

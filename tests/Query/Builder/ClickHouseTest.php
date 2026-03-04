@@ -295,7 +295,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertEquals(
-            'SELECT * FROM `events` WHERE `year` IN (?) UNION SELECT * FROM `events_archive` WHERE `year` IN (?)',
+            '(SELECT * FROM `events` WHERE `year` IN (?)) UNION (SELECT * FROM `events_archive` WHERE `year` IN (?))',
             $result['query']
         );
         $this->assertEquals([2024, 2023], $result['bindings']);
@@ -893,7 +893,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertStringContainsString('PREWHERE `type` IN (?)', $result['query']);
-        $this->assertStringContainsString('UNION SELECT', $result['query']);
+        $this->assertStringContainsString('UNION (SELECT', $result['query']);
     }
 
     public function testPrewhereWithDistinct(): void
@@ -1192,7 +1192,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertStringContainsString('FROM `events` FINAL', $result['query']);
-        $this->assertStringContainsString('UNION SELECT', $result['query']);
+        $this->assertStringContainsString('UNION (SELECT', $result['query']);
     }
 
     public function testFinalWithPrewhere(): void
@@ -2806,7 +2806,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertStringContainsString('FROM `events` FINAL', $result['query']);
-        $this->assertStringContainsString('UNION SELECT * FROM `archive`', $result['query']);
+        $this->assertStringContainsString('UNION (SELECT * FROM `archive`)', $result['query']);
     }
 
     public function testUnionMainHasSample(): void
@@ -4470,27 +4470,26 @@ class ClickHouseTest extends TestCase
 
     public function testSampleZero(): void
     {
-        $result = (new Builder())->from('t')->sample(0.0)->build();
-        $this->assertStringContainsString('SAMPLE 0', $result['query']);
+        $this->expectException(\InvalidArgumentException::class);
+        (new Builder())->from('t')->sample(0.0);
     }
 
     public function testSampleOne(): void
     {
-        $result = (new Builder())->from('t')->sample(1.0)->build();
-        $this->assertStringContainsString('SAMPLE 1', $result['query']);
+        $this->expectException(\InvalidArgumentException::class);
+        (new Builder())->from('t')->sample(1.0);
     }
 
     public function testSampleNegative(): void
     {
-        // Builder doesn't validate - it passes through
-        $result = (new Builder())->from('t')->sample(-0.5)->build();
-        $this->assertStringContainsString('SAMPLE -0.5', $result['query']);
+        $this->expectException(\InvalidArgumentException::class);
+        (new Builder())->from('t')->sample(-0.5);
     }
 
     public function testSampleGreaterThanOne(): void
     {
-        $result = (new Builder())->from('t')->sample(2.0)->build();
-        $this->assertStringContainsString('SAMPLE 2', $result['query']);
+        $this->expectException(\InvalidArgumentException::class);
+        (new Builder())->from('t')->sample(2.0);
     }
 
     public function testSampleVerySmall(): void
@@ -4663,7 +4662,7 @@ class ClickHouseTest extends TestCase
             ->unionAll($sub)
             ->build();
         $this->assertStringContainsString('FROM `a` FINAL', $result['query']);
-        $this->assertStringContainsString('UNION ALL SELECT * FROM `b` FINAL', $result['query']);
+        $this->assertStringContainsString('UNION ALL (SELECT * FROM `b` FINAL)', $result['query']);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -5023,7 +5022,7 @@ class ClickHouseTest extends TestCase
             ->union($sub)
             ->build();
         $this->assertEquals(
-            'SELECT DISTINCT COUNT(*) AS `total`, `event_type` FROM `events` FINAL SAMPLE 0.1 JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `event_type` IN (?) WHERE `amount` > ? GROUP BY `event_type` HAVING `total` > ? ORDER BY `total` DESC LIMIT ? OFFSET ? UNION SELECT * FROM `archive` FINAL WHERE `status` IN (?)',
+            '(SELECT DISTINCT COUNT(*) AS `total`, `event_type` FROM `events` FINAL SAMPLE 0.1 JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `event_type` IN (?) WHERE `amount` > ? GROUP BY `event_type` HAVING `total` > ? ORDER BY `total` DESC LIMIT ? OFFSET ?) UNION (SELECT * FROM `archive` FINAL WHERE `status` IN (?))',
             $result['query']
         );
         $this->assertEquals(['purchase', 100, 5, 50, 10, 'closed'], $result['bindings']);
@@ -5224,6 +5223,6 @@ class ClickHouseTest extends TestCase
     {
         $other = (new Builder())->from('b');
         $result = (new Builder())->from('a')->distinct()->union($other)->build();
-        $this->assertEquals('SELECT DISTINCT * FROM `a` UNION SELECT * FROM `b`', $result['query']);
+        $this->assertEquals('(SELECT DISTINCT * FROM `a`) UNION (SELECT * FROM `b`)', $result['query']);
     }
 }

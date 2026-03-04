@@ -48,6 +48,10 @@ class ClickHouse extends BaseBuilder
      */
     public function sample(float $fraction): static
     {
+        if ($fraction <= 0.0 || $fraction >= 1.0) {
+            throw new \InvalidArgumentException('Sample fraction must be between 0 and 1 exclusive');
+        }
+
         $this->sampleFraction = $fraction;
 
         return $this;
