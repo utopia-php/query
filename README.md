@@ -314,6 +314,122 @@ $stmt->execute($result['bindings']);
 $rows = $stmt->fetchAll();
 ```
 
+**Aggregations** — count, sum, avg, min, max with optional aliases:
+
+```php
+$result = (new Builder())
+    ->from('orders')
+    ->count('*', 'total')
+    ->sum('price', 'total_price')
+    ->select(['status'])
+    ->groupBy(['status'])
+    ->having([Query::greaterThan('total', 5)])
+    ->build();
+
+// SELECT COUNT(*) AS `total`, SUM(`price`) AS `total_price`, `status`
+//   FROM `orders` GROUP BY `status` HAVING `total` > ?
+```
+
+**Distinct:**
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->distinct()
+    ->select(['country'])
+    ->build();
+
+// SELECT DISTINCT `country` FROM `users`
+```
+
+**Joins** — inner, left, right, and cross joins:
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->join('orders', 'users.id', 'orders.user_id')
+    ->leftJoin('profiles', 'users.id', 'profiles.user_id')
+    ->crossJoin('colors')
+    ->build();
+
+// SELECT * FROM `users`
+//   JOIN `orders` ON `users.id` = `orders.user_id`
+//   LEFT JOIN `profiles` ON `users.id` = `profiles.user_id`
+//   CROSS JOIN `colors`
+```
+
+**Raw expressions:**
+
+```php
+$result = (new Builder())
+    ->from('t')
+    ->filter([Query::raw('score > ? AND score < ?', [10, 100])])
+    ->build();
+
+// SELECT * FROM `t` WHERE score > ? AND score < ?
+// bindings: [10, 100]
+```
+
+**Union:**
+
+```php
+$admins = (new Builder())->from('admins')->filter([Query::equal('role', ['admin'])]);
+$result = (new Builder())
+    ->from('users')
+    ->filter([Query::equal('status', ['active'])])
+    ->union($admins)
+    ->build();
+
+// SELECT * FROM `users` WHERE `status` IN (?)
+//   UNION SELECT * FROM `admins` WHERE `role` IN (?)
+```
+
+**Conditional building** — `when()` applies a callback only when the condition is true:
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->when($filterActive, fn(Builder $b) => $b->filter([Query::equal('status', ['active'])]))
+    ->build();
+```
+
+**Page helper** — page-based pagination:
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->page(3, 10) // page 3, 10 per page → LIMIT 10 OFFSET 20
+    ->build();
+```
+
+**Debug** — `toRawSql()` inlines bindings for inspection (not for execution):
+
+```php
+$sql = (new Builder())
+    ->from('users')
+    ->filter([Query::equal('status', ['active'])])
+    ->limit(10)
+    ->toRawSql();
+
+// SELECT * FROM `users` WHERE `status` IN ('active') LIMIT 10
+```
+
+**Query helpers** — merge, diff, and validate:
+
+```php
+// Merge queries (later limit/offset/cursor overrides earlier)
+$merged = Query::merge($defaultQueries, $userQueries);
+
+// Diff — queries in A not in B
+$unique = Query::diff($queriesA, $queriesB);
+
+// Validate attributes against an allow-list
+$errors = Query::validate($queries, ['name', 'age', 'status']);
+
+// Page helper — returns [limit, offset] queries
+[$limit, $offset] = Query::page(3, 10);
+```
+
 **Pluggable extensions** — customize attribute mapping, identifier wrapping, and inject extra conditions:
 
 ```php
