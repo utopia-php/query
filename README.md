@@ -169,102 +169,167 @@ $grouped = Query::groupByType($queries);
 $cursors = Query::getByType($queries, [Query::TYPE_CURSOR_AFTER, Query::TYPE_CURSOR_BEFORE]);
 ```
 
-### Building an Adapter
+### Building a Compiler
 
-The `Query` object is backend-agnostic — your library decides how to translate it. Use `groupByType` to break queries apart, then map each piece to your target syntax:
+This library ships with a `Compiler` interface so you can translate queries into any backend syntax. Each query delegates to the correct compiler method via `$query->compile($compiler)`:
 
 ```php
+use Utopia\Query\Compiler;
 use Utopia\Query\Query;
 
-class SQLAdapter
+class SQLCompiler implements Compiler
 {
-    /**
-     * @param array<Query> $queries
-     */
-    public function find(string $table, array $queries): array
+    public function compileFilter(Query $query): string
     {
-        $grouped = Query::groupByType($queries);
+        return match ($query->getMethod()) {
+            Query::TYPE_EQUAL       => $query->getAttribute() . ' IN (' . $this->placeholders($query->getValues()) . ')',
+            Query::TYPE_NOT_EQUAL   => $query->getAttribute() . ' != ?',
+            Query::TYPE_GREATER     => $query->getAttribute() . ' > ?',
+            Query::TYPE_LESSER      => $query->getAttribute() . ' < ?',
+            Query::TYPE_BETWEEN     => $query->getAttribute() . ' BETWEEN ? AND ?',
+            Query::TYPE_IS_NULL     => $query->getAttribute() . ' IS NULL',
+            Query::TYPE_IS_NOT_NULL => $query->getAttribute() . ' IS NOT NULL',
+            Query::TYPE_STARTS_WITH => $query->getAttribute() . " LIKE CONCAT(?, '%')",
+            // ... handle remaining types
+        };
+    }
 
-        // SELECT
-        $columns = '*';
-        if (!empty($grouped['selections'])) {
-            $columns = implode(', ', $grouped['selections'][0]->getValues());
-        }
+    public function compileOrder(Query $query): string
+    {
+        return match ($query->getMethod()) {
+            Query::TYPE_ORDER_ASC    => $query->getAttribute() . ' ASC',
+            Query::TYPE_ORDER_DESC   => $query->getAttribute() . ' DESC',
+            Query::TYPE_ORDER_RANDOM => 'RAND()',
+        };
+    }
 
-        $sql = "SELECT {$columns} FROM {$table}";
+    public function compileLimit(Query $query): string
+    {
+        return 'LIMIT ' . $query->getValue();
+    }
 
-        // WHERE
-        $conditions = [];
-        foreach ($grouped['filters'] as $filter) {
-            $conditions[] = match ($filter->getMethod()) {
-                Query::TYPE_EQUAL        => $filter->getAttribute() . ' IN (' . $this->placeholders($filter->getValues()) . ')',
-                Query::TYPE_NOT_EQUAL    => $filter->getAttribute() . ' != ?',
-                Query::TYPE_GREATER      => $filter->getAttribute() . ' > ?',
-                Query::TYPE_LESSER       => $filter->getAttribute() . ' < ?',
-                Query::TYPE_BETWEEN      => $filter->getAttribute() . ' BETWEEN ? AND ?',
-                Query::TYPE_IS_NULL      => $filter->getAttribute() . ' IS NULL',
-                Query::TYPE_IS_NOT_NULL  => $filter->getAttribute() . ' IS NOT NULL',
-                Query::TYPE_STARTS_WITH  => $filter->getAttribute() . " LIKE CONCAT(?, '%')",
-                // ... handle other types
-            };
-        }
+    public function compileOffset(Query $query): string
+    {
+        return 'OFFSET ' . $query->getValue();
+    }
 
-        if (!empty($conditions)) {
-            $sql .= ' WHERE ' . implode(' AND ', $conditions);
-        }
+    public function compileSelect(Query $query): string
+    {
+        return implode(', ', $query->getValues());
+    }
 
-        // ORDER BY
-        foreach ($grouped['orderAttributes'] as $i => $attr) {
-            $sql .= ($i === 0 ? ' ORDER BY ' : ', ') . $attr . ' ' . $grouped['orderTypes'][$i];
-        }
-
-        // LIMIT / OFFSET
-        if ($grouped['limit'] !== null) {
-            $sql .= ' LIMIT ' . $grouped['limit'];
-        }
-        if ($grouped['offset'] !== null) {
-            $sql .= ' OFFSET ' . $grouped['offset'];
-        }
-
-        // Execute $sql with bound parameters ...
+    public function compileCursor(Query $query): string
+    {
+        // Cursor-based pagination is adapter-specific
+        return '';
     }
 }
 ```
 
-The same pattern works for any backend. A Redis adapter might map filters to sorted-set range commands, an Elasticsearch adapter might build a `bool` query, or a MongoDB adapter might produce a `find()` filter document — the Query objects stay the same regardless:
+Then calling `compile()` on any query routes to the right method automatically:
 
 ```php
-class RedisAdapter
+$compiler = new SQLCompiler();
+
+$filter = Query::greaterThan('age', 18);
+echo $filter->compile($compiler); // "age > ?"
+
+$order = Query::orderAsc('name');
+echo $order->compile($compiler); // "name ASC"
+
+$limit = Query::limit(25);
+echo $limit->compile($compiler); // "LIMIT 25"
+```
+
+The same interface works for any backend — implement `Compiler` for Redis, MongoDB, Elasticsearch, etc. and every query compiles without changes:
+
+```php
+class RedisCompiler implements Compiler
 {
-    /**
-     * @param array<Query> $queries
-     */
-    public function find(string $key, array $queries): array
+    public function compileFilter(Query $query): string
     {
-        $grouped = Query::groupByType($queries);
-
-        foreach ($grouped['filters'] as $filter) {
-            match ($filter->getMethod()) {
-                Query::TYPE_BETWEEN => $this->redis->zRangeByScore(
-                    $key,
-                    $filter->getValues()[0],
-                    $filter->getValues()[1],
-                ),
-                Query::TYPE_GREATER => $this->redis->zRangeByScore(
-                    $key,
-                    '(' . $filter->getValue(),
-                    '+inf',
-                ),
-                // ... handle other types
-            };
-        }
-
-        // ...
+        return match ($query->getMethod()) {
+            Query::TYPE_BETWEEN => $query->getValues()[0] . ' ' . $query->getValues()[1],
+            Query::TYPE_GREATER => '(' . $query->getValue() . ' +inf',
+            // ... handle remaining types
+        };
     }
+
+    // ... implement remaining methods
 }
 ```
 
-This keeps your application code decoupled from any particular storage engine — swap adapters without changing a single query.
+This is the pattern used by [utopia-php/database](https://github.com/utopia-php/database) — it implements `Compiler` for each supported database engine, keeping application code fully decoupled from any particular storage backend.
+
+### SQL Builder
+
+The library includes a built-in `Builder` class that implements `Compiler` and provides a fluent API for building parameterized SQL queries:
+
+```php
+use Utopia\Query\Builder;
+use Utopia\Query\Query;
+
+// Fluent API
+$result = (new Builder())
+    ->select(['name', 'email'])
+    ->from('users')
+    ->filter([
+        Query::equal('status', ['active']),
+        Query::greaterThan('age', 18),
+    ])
+    ->sortAsc('name')
+    ->limit(25)
+    ->offset(0)
+    ->build();
+
+$result['query'];    // SELECT `name`, `email` FROM `users` WHERE `status` IN (?) AND `age` > ? ORDER BY `name` ASC LIMIT ? OFFSET ?
+$result['bindings']; // ['active', 18, 25, 0]
+```
+
+**Batch mode** — pass all queries at once:
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->queries([
+        Query::select(['name', 'email']),
+        Query::equal('status', ['active']),
+        Query::orderAsc('name'),
+        Query::limit(25),
+    ])
+    ->build();
+```
+
+**Using with PDO:**
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->filter([Query::equal('status', ['active'])])
+    ->limit(10)
+    ->build();
+
+$stmt = $pdo->prepare($result['query']);
+$stmt->execute($result['bindings']);
+$rows = $stmt->fetchAll();
+```
+
+**Pluggable extensions** — customize attribute mapping, identifier wrapping, and inject extra conditions:
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->setAttributeResolver(fn(string $a) => match($a) {
+        '$id' => '_uid', '$createdAt' => '_createdAt', default => $a
+    })
+    ->setWrapChar('"') // PostgreSQL
+    ->addConditionProvider(fn(string $table) => [
+        "_uid IN (SELECT _document FROM {$table}_perms WHERE _type = 'read')",
+        [],
+    ])
+    ->filter([Query::equal('status', ['active'])])
+    ->build();
+```
 
 ## Contributing
 
