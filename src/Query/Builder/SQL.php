@@ -18,14 +18,9 @@ class SQL extends BaseBuilder
     protected function wrapIdentifier(string $identifier): string
     {
         $segments = \explode('.', $identifier);
-        $wrapped = \array_map(function (string $segment): string {
-            if ($segment === '*') {
-                return '*';
-            }
-            $escaped = \str_replace($this->wrapChar, $this->wrapChar . $this->wrapChar, $segment);
-
-            return $this->wrapChar . $escaped . $this->wrapChar;
-        }, $segments);
+        $wrapped = \array_map(fn (string $segment): string => $segment === '*'
+            ? '*'
+            : $this->wrapChar . \str_replace($this->wrapChar, $this->wrapChar . $this->wrapChar, $segment) . $this->wrapChar, $segments);
 
         return \implode('.', $wrapped);
     }

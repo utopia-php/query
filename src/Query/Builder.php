@@ -3,6 +3,9 @@
 namespace Utopia\Query;
 
 use Closure;
+use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\GroupedQueries;
+use Utopia\Query\Builder\UnionClause;
 use Utopia\Query\Hook\AttributeHook;
 use Utopia\Query\Hook\FilterHook;
 
@@ -21,7 +24,7 @@ abstract class Builder implements Compiler
     protected array $bindings = [];
 
     /**
-     * @var array<array{type: string, query: string, bindings: list<mixed>}>
+     * @var list<UnionClause>
      */
     protected array $unions = [];
 
@@ -65,9 +68,8 @@ abstract class Builder implements Compiler
      * Hook called after JOIN clauses, before WHERE. Override to inject e.g. PREWHERE.
      *
      * @param  array<string>  $parts
-     * @param  array<string, mixed>  $grouped
      */
-    protected function buildAfterJoins(array &$parts, array $grouped): void
+    protected function buildAfterJoins(array &$parts, GroupedQueries $grouped): void
     {
         // no-op by default
     }
@@ -275,11 +277,7 @@ abstract class Builder implements Compiler
     public function union(self $other): static
     {
         $result = $other->build();
-        $this->unions[] = [
-            'type' => 'UNION',
-            'query' => $result['query'],
-            'bindings' => $result['bindings'],
-        ];
+        $this->unions[] = new UnionClause('UNION', $result->query, $result->bindings);
 
         return $this;
     }
@@ -287,11 +285,7 @@ abstract class Builder implements Compiler
     public function unionAll(self $other): static
     {
         $result = $other->build();
-        $this->unions[] = [
-            'type' => 'UNION ALL',
-            'query' => $result['query'],
-            'bindings' => $result['bindings'],
-        ];
+        $this->unions[] = new UnionClause('UNION ALL', $result->query, $result->bindings);
 
         return $this;
     }
@@ -318,10 +312,10 @@ abstract class Builder implements Compiler
     public function toRawSql(): string
     {
         $result = $this->build();
-        $sql = $result['query'];
+        $sql = $result->query;
         $offset = 0;
 
-        foreach ($result['bindings'] as $binding) {
+        foreach ($result->bindings as $binding) {
             if (\is_string($binding)) {
                 $value = "'" . str_replace("'", "''", $binding) . "'";
             } elseif (\is_int($binding) || \is_float($binding)) {
@@ -342,10 +336,7 @@ abstract class Builder implements Compiler
         return $sql;
     }
 
-    /**
-     * @return array{query: string, bindings: list<mixed>}
-     */
-    public function build(): array
+    public function build(): BuildResult
     {
         $this->bindings = [];
 
@@ -356,27 +347,27 @@ abstract class Builder implements Compiler
         // SELECT
         $selectParts = [];
 
-        if (! empty($grouped['aggregations'])) {
-            foreach ($grouped['aggregations'] as $agg) {
+        if (! empty($grouped->aggregations)) {
+            foreach ($grouped->aggregations as $agg) {
                 $selectParts[] = $this->compileAggregate($agg);
             }
         }
 
-        if (! empty($grouped['selections'])) {
-            $selectParts[] = $this->compileSelect($grouped['selections'][0]);
+        if (! empty($grouped->selections)) {
+            $selectParts[] = $this->compileSelect($grouped->selections[0]);
         }
 
         $selectSQL = ! empty($selectParts) ? \implode(', ', $selectParts) : '*';
 
-        $selectKeyword = $grouped['distinct'] ? 'SELECT DISTINCT' : 'SELECT';
+        $selectKeyword = $grouped->distinct ? 'SELECT DISTINCT' : 'SELECT';
         $parts[] = $selectKeyword . ' ' . $selectSQL;
 
         // FROM
         $parts[] = $this->buildTableClause();
 
         // JOINS
-        if (! empty($grouped['joins'])) {
-            foreach ($grouped['joins'] as $joinQuery) {
+        if (! empty($grouped->joins)) {
+            foreach ($grouped->joins as $joinQuery) {
                 $parts[] = $this->compileJoin($joinQuery);
             }
         }
@@ -387,7 +378,7 @@ abstract class Builder implements Compiler
         // WHERE
         $whereClauses = [];
 
-        foreach ($grouped['filters'] as $filter) {
+        foreach ($grouped->filters as $filter) {
             $whereClauses[] = $this->compileFilter($filter);
         }
 
@@ -400,7 +391,7 @@ abstract class Builder implements Compiler
         }
 
         $cursorSQL = '';
-        if ($grouped['cursor'] !== null && $grouped['cursorDirection'] !== null) {
+        if ($grouped->cursor !== null && $grouped->cursorDirection !== null) {
             $cursorQueries = Query::getCursorQueries($this->pendingQueries, false);
             if (! empty($cursorQueries)) {
                 $cursorSQL = $this->compileCursor($cursorQueries[0]);
@@ -415,18 +406,18 @@ abstract class Builder implements Compiler
         }
 
         // GROUP BY
-        if (! empty($grouped['groupBy'])) {
+        if (! empty($grouped->groupBy)) {
             $groupByCols = \array_map(
                 fn (string $col): string => $this->resolveAndWrap($col),
-                $grouped['groupBy']
+                $grouped->groupBy
             );
             $parts[] = 'GROUP BY ' . \implode(', ', $groupByCols);
         }
 
         // HAVING
-        if (! empty($grouped['having'])) {
+        if (! empty($grouped->having)) {
             $havingClauses = [];
-            foreach ($grouped['having'] as $havingQuery) {
+            foreach ($grouped->having as $havingQuery) {
                 foreach ($havingQuery->getValues() as $subQuery) {
                     /** @var Query $subQuery */
                     $havingClauses[] = $this->compileFilter($subQuery);
@@ -440,9 +431,9 @@ abstract class Builder implements Compiler
         // ORDER BY
         $orderClauses = [];
         $orderQueries = Query::getByType($this->pendingQueries, [
-            Query::TYPE_ORDER_ASC,
-            Query::TYPE_ORDER_DESC,
-            Query::TYPE_ORDER_RANDOM,
+            Method::OrderAsc,
+            Method::OrderDesc,
+            Method::OrderRandom,
         ], false);
         foreach ($orderQueries as $orderQuery) {
             $orderClauses[] = $this->compileOrder($orderQuery);
@@ -452,15 +443,15 @@ abstract class Builder implements Compiler
         }
 
         // LIMIT
-        if ($grouped['limit'] !== null) {
+        if ($grouped->limit !== null) {
             $parts[] = 'LIMIT ?';
-            $this->addBinding($grouped['limit']);
+            $this->addBinding($grouped->limit);
         }
 
         // OFFSET (only emit if LIMIT is also present)
-        if ($grouped['offset'] !== null && $grouped['limit'] !== null) {
+        if ($grouped->offset !== null && $grouped->limit !== null) {
             $parts[] = 'OFFSET ?';
-            $this->addBinding($grouped['offset']);
+            $this->addBinding($grouped->offset);
         }
 
         $sql = \implode(' ', $parts);
@@ -470,16 +461,13 @@ abstract class Builder implements Compiler
             $sql = '(' . $sql . ')';
         }
         foreach ($this->unions as $union) {
-            $sql .= ' ' . $union['type'] . ' (' . $union['query'] . ')';
-            foreach ($union['bindings'] as $binding) {
+            $sql .= ' ' . $union->type . ' (' . $union->query . ')';
+            foreach ($union->bindings as $binding) {
                 $this->addBinding($binding);
             }
         }
 
-        return [
-            'query' => $sql,
-            'bindings' => $this->bindings,
-        ];
+        return new BuildResult($sql, $this->bindings);
     }
 
     /**
@@ -509,44 +497,44 @@ abstract class Builder implements Compiler
         $values = $query->getValues();
 
         return match ($method) {
-            Query::TYPE_EQUAL => $this->compileIn($attribute, $values),
-            Query::TYPE_NOT_EQUAL => $this->compileNotIn($attribute, $values),
-            Query::TYPE_LESSER => $this->compileComparison($attribute, '<', $values),
-            Query::TYPE_LESSER_EQUAL => $this->compileComparison($attribute, '<=', $values),
-            Query::TYPE_GREATER => $this->compileComparison($attribute, '>', $values),
-            Query::TYPE_GREATER_EQUAL => $this->compileComparison($attribute, '>=', $values),
-            Query::TYPE_BETWEEN => $this->compileBetween($attribute, $values, false),
-            Query::TYPE_NOT_BETWEEN => $this->compileBetween($attribute, $values, true),
-            Query::TYPE_STARTS_WITH => $this->compileLike($attribute, $values, '', '%', false),
-            Query::TYPE_NOT_STARTS_WITH => $this->compileLike($attribute, $values, '', '%', true),
-            Query::TYPE_ENDS_WITH => $this->compileLike($attribute, $values, '%', '', false),
-            Query::TYPE_NOT_ENDS_WITH => $this->compileLike($attribute, $values, '%', '', true),
-            Query::TYPE_CONTAINS => $this->compileContains($attribute, $values),
-            Query::TYPE_CONTAINS_ANY => $this->compileIn($attribute, $values),
-            Query::TYPE_CONTAINS_ALL => $this->compileContainsAll($attribute, $values),
-            Query::TYPE_NOT_CONTAINS => $this->compileNotContains($attribute, $values),
-            Query::TYPE_SEARCH => $this->compileSearch($attribute, $values, false),
-            Query::TYPE_NOT_SEARCH => $this->compileSearch($attribute, $values, true),
-            Query::TYPE_REGEX => $this->compileRegex($attribute, $values),
-            Query::TYPE_IS_NULL => $attribute . ' IS NULL',
-            Query::TYPE_IS_NOT_NULL => $attribute . ' IS NOT NULL',
-            Query::TYPE_AND => $this->compileLogical($query, 'AND'),
-            Query::TYPE_OR => $this->compileLogical($query, 'OR'),
-            Query::TYPE_HAVING => $this->compileLogical($query, 'AND'),
-            Query::TYPE_EXISTS => $this->compileExists($query),
-            Query::TYPE_NOT_EXISTS => $this->compileNotExists($query),
-            Query::TYPE_RAW => $this->compileRaw($query),
-            default => throw new Exception('Unsupported filter type: ' . $method),
+            Method::Equal => $this->compileIn($attribute, $values),
+            Method::NotEqual => $this->compileNotIn($attribute, $values),
+            Method::LessThan => $this->compileComparison($attribute, '<', $values),
+            Method::LessThanEqual => $this->compileComparison($attribute, '<=', $values),
+            Method::GreaterThan => $this->compileComparison($attribute, '>', $values),
+            Method::GreaterThanEqual => $this->compileComparison($attribute, '>=', $values),
+            Method::Between => $this->compileBetween($attribute, $values, false),
+            Method::NotBetween => $this->compileBetween($attribute, $values, true),
+            Method::StartsWith => $this->compileLike($attribute, $values, '', '%', false),
+            Method::NotStartsWith => $this->compileLike($attribute, $values, '', '%', true),
+            Method::EndsWith => $this->compileLike($attribute, $values, '%', '', false),
+            Method::NotEndsWith => $this->compileLike($attribute, $values, '%', '', true),
+            Method::Contains => $this->compileContains($attribute, $values),
+            Method::ContainsAny => $this->compileIn($attribute, $values),
+            Method::ContainsAll => $this->compileContainsAll($attribute, $values),
+            Method::NotContains => $this->compileNotContains($attribute, $values),
+            Method::Search => $this->compileSearch($attribute, $values, false),
+            Method::NotSearch => $this->compileSearch($attribute, $values, true),
+            Method::Regex => $this->compileRegex($attribute, $values),
+            Method::IsNull => $attribute . ' IS NULL',
+            Method::IsNotNull => $attribute . ' IS NOT NULL',
+            Method::And => $this->compileLogical($query, 'AND'),
+            Method::Or => $this->compileLogical($query, 'OR'),
+            Method::Having => $this->compileLogical($query, 'AND'),
+            Method::Exists => $this->compileExists($query),
+            Method::NotExists => $this->compileNotExists($query),
+            Method::Raw => $this->compileRaw($query),
+            default => throw new Exception('Unsupported filter type: ' . $method->value),
         };
     }
 
     public function compileOrder(Query $query): string
     {
         return match ($query->getMethod()) {
-            Query::TYPE_ORDER_ASC => $this->resolveAndWrap($query->getAttribute()) . ' ASC',
-            Query::TYPE_ORDER_DESC => $this->resolveAndWrap($query->getAttribute()) . ' DESC',
-            Query::TYPE_ORDER_RANDOM => $this->compileRandom(),
-            default => throw new Exception('Unsupported order type: ' . $query->getMethod()),
+            Method::OrderAsc => $this->resolveAndWrap($query->getAttribute()) . ' ASC',
+            Method::OrderDesc => $this->resolveAndWrap($query->getAttribute()) . ' DESC',
+            Method::OrderRandom => $this->compileRandom(),
+            default => throw new Exception('Unsupported order type: ' . $query->getMethod()->value),
         };
     }
 
@@ -581,21 +569,21 @@ abstract class Builder implements Compiler
         $value = $query->getValue();
         $this->addBinding($value);
 
-        $operator = $query->getMethod() === Query::TYPE_CURSOR_AFTER ? '>' : '<';
+        $operator = $query->getMethod() === Method::CursorAfter ? '>' : '<';
 
         return $this->wrapIdentifier('_cursor') . ' ' . $operator . ' ?';
     }
 
     public function compileAggregate(Query $query): string
     {
-        $funcMap = [
-            Query::TYPE_COUNT => 'COUNT',
-            Query::TYPE_SUM   => 'SUM',
-            Query::TYPE_AVG   => 'AVG',
-            Query::TYPE_MIN   => 'MIN',
-            Query::TYPE_MAX   => 'MAX',
-        ];
-        $func = $funcMap[$query->getMethod()] ?? throw new \InvalidArgumentException("Unknown aggregate: {$query->getMethod()}");
+        $func = match ($query->getMethod()) {
+            Method::Count => 'COUNT',
+            Method::Sum => 'SUM',
+            Method::Avg => 'AVG',
+            Method::Min => 'MIN',
+            Method::Max => 'MAX',
+            default => throw new \InvalidArgumentException("Unknown aggregate: {$query->getMethod()->value}"),
+        };
         $attr = $query->getAttribute();
         $col = ($attr === '*' || $attr === '') ? '*' : $this->resolveAndWrap($attr);
         /** @var string $alias */
@@ -624,11 +612,11 @@ abstract class Builder implements Compiler
     public function compileJoin(Query $query): string
     {
         $type = match ($query->getMethod()) {
-            Query::TYPE_JOIN => 'JOIN',
-            Query::TYPE_LEFT_JOIN => 'LEFT JOIN',
-            Query::TYPE_RIGHT_JOIN => 'RIGHT JOIN',
-            Query::TYPE_CROSS_JOIN => 'CROSS JOIN',
-            default => throw new Exception('Unsupported join type: ' . $query->getMethod()),
+            Method::Join => 'JOIN',
+            Method::LeftJoin => 'LEFT JOIN',
+            Method::RightJoin => 'RIGHT JOIN',
+            Method::CrossJoin => 'CROSS JOIN',
+            default => throw new Exception('Unsupported join type: ' . $query->getMethod()->value),
         };
 
         $table = $this->wrapIdentifier($query->getAttribute());

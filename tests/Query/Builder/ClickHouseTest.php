@@ -4,8 +4,8 @@ namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Builder\ClickHouse as Builder;
+use Utopia\Query\Builder\Condition;
 use Utopia\Query\Compiler;
-use Utopia\Query\Condition;
 use Utopia\Query\Exception;
 use Utopia\Query\Hook\AttributeMapHook;
 use Utopia\Query\Hook\FilterHook;
@@ -30,7 +30,7 @@ class ClickHouseTest extends TestCase
             ->select(['name', 'timestamp'])
             ->build();
 
-        $this->assertEquals('SELECT `name`, `timestamp` FROM `events`', $result['query']);
+        $this->assertEquals('SELECT `name`, `timestamp` FROM `events`', $result->query);
     }
 
     public function testFilterAndSort(): void
@@ -47,9 +47,9 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` WHERE `status` IN (?) AND `count` > ? ORDER BY `timestamp` DESC LIMIT ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['active', 10, 100], $result['bindings']);
+        $this->assertEquals(['active', 10, 100], $result->bindings);
     }
 
     // ── ClickHouse-specific: regex uses match() ──
@@ -61,8 +61,8 @@ class ClickHouseTest extends TestCase
             ->filter([Query::regex('path', '^/api/v[0-9]+')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `logs` WHERE match(`path`, ?)', $result['query']);
-        $this->assertEquals(['^/api/v[0-9]+'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `logs` WHERE match(`path`, ?)', $result->query);
+        $this->assertEquals(['^/api/v[0-9]+'], $result->bindings);
     }
 
     // ── ClickHouse-specific: search throws exception ──
@@ -98,7 +98,7 @@ class ClickHouseTest extends TestCase
             ->sortRandom()
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` ORDER BY rand()', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` ORDER BY rand()', $result->query);
     }
 
     // ── FINAL keyword ──
@@ -110,7 +110,7 @@ class ClickHouseTest extends TestCase
             ->final()
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` FINAL', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` FINAL', $result->query);
     }
 
     public function testFinalWithFilters(): void
@@ -124,9 +124,9 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` FINAL WHERE `status` IN (?) LIMIT ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['active', 10], $result['bindings']);
+        $this->assertEquals(['active', 10], $result->bindings);
     }
 
     // ── SAMPLE clause ──
@@ -138,7 +138,7 @@ class ClickHouseTest extends TestCase
             ->sample(0.1)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.1', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.1', $result->query);
     }
 
     public function testSampleWithFinal(): void
@@ -149,7 +149,7 @@ class ClickHouseTest extends TestCase
             ->sample(0.5)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` FINAL SAMPLE 0.5', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` FINAL SAMPLE 0.5', $result->query);
     }
 
     // ── PREWHERE clause ──
@@ -163,9 +163,9 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` PREWHERE `event_type` IN (?)',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['click'], $result['bindings']);
+        $this->assertEquals(['click'], $result->bindings);
     }
 
     public function testPrewhereWithMultipleConditions(): void
@@ -180,9 +180,9 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` PREWHERE `event_type` IN (?) AND `timestamp` > ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['click', '2024-01-01'], $result['bindings']);
+        $this->assertEquals(['click', '2024-01-01'], $result->bindings);
     }
 
     public function testPrewhereWithWhere(): void
@@ -195,9 +195,9 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` PREWHERE `event_type` IN (?) WHERE `count` > ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['click', 5], $result['bindings']);
+        $this->assertEquals(['click', 5], $result->bindings);
     }
 
     public function testPrewhereWithJoinAndWhere(): void
@@ -211,9 +211,9 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` JOIN `users` ON `events`.`user_id` = `users`.`id` PREWHERE `event_type` IN (?) WHERE `users`.`age` > ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['click', 18], $result['bindings']);
+        $this->assertEquals(['click', 18], $result->bindings);
     }
 
     // ── Combined ClickHouse features ──
@@ -232,9 +232,9 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` FINAL SAMPLE 0.1 PREWHERE `event_type` IN (?) WHERE `count` > ? ORDER BY `timestamp` DESC LIMIT ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['click', 5, 100], $result['bindings']);
+        $this->assertEquals(['click', 5, 100], $result->bindings);
     }
 
     // ── Aggregations work ──
@@ -251,9 +251,9 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT COUNT(*) AS `total`, SUM(`duration`) AS `total_duration` FROM `events` GROUP BY `event_type` HAVING `total` > ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([10], $result['bindings']);
+        $this->assertEquals([10], $result->bindings);
     }
 
     // ── Joins work ──
@@ -268,7 +268,7 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` JOIN `users` ON `events`.`user_id` = `users`.`id` LEFT JOIN `sessions` ON `events`.`session_id` = `sessions`.`id`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -282,7 +282,7 @@ class ClickHouseTest extends TestCase
             ->select(['user_id'])
             ->build();
 
-        $this->assertEquals('SELECT DISTINCT `user_id` FROM `events`', $result['query']);
+        $this->assertEquals('SELECT DISTINCT `user_id` FROM `events`', $result->query);
     }
 
     // ── Union ──
@@ -299,9 +299,9 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             '(SELECT * FROM `events` WHERE `year` IN (?)) UNION (SELECT * FROM `events_archive` WHERE `year` IN (?))',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([2024, 2023], $result['bindings']);
+        $this->assertEquals([2024, 2023], $result->bindings);
     }
 
     // ── toRawSql ──
@@ -337,8 +337,8 @@ class ClickHouseTest extends TestCase
 
         $result = $builder->from('logs')->build();
 
-        $this->assertEquals('SELECT * FROM `logs`', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `logs`', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     // ── Fluent chaining ──
@@ -370,7 +370,7 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` WHERE `_uid` IN (?)',
-            $result['query']
+            $result->query
         );
     }
 
@@ -393,9 +393,9 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` WHERE `status` IN (?) AND _tenant = ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['active', 't1'], $result['bindings']);
+        $this->assertEquals(['active', 't1'], $result->bindings);
     }
 
     // ── Prewhere binding order ──
@@ -410,7 +410,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         // prewhere bindings come before where bindings
-        $this->assertEquals(['click', 5, 10], $result['bindings']);
+        $this->assertEquals(['click', 5, 10], $result->bindings);
     }
 
     // ── Combined PREWHERE + WHERE + JOIN + GROUP BY ──
@@ -432,7 +432,7 @@ class ClickHouseTest extends TestCase
             ->limit(50)
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
 
         // Verify clause ordering
         $this->assertStringContainsString('SELECT', $query);
@@ -460,8 +460,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events`', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events`', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testPrewhereSingleEqual(): void
@@ -471,8 +471,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('status', ['active'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `status` IN (?)', $result['query']);
-        $this->assertEquals(['active'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `status` IN (?)', $result->query);
+        $this->assertEquals(['active'], $result->bindings);
     }
 
     public function testPrewhereSingleNotEqual(): void
@@ -482,8 +482,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::notEqual('status', 'deleted')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `status` != ?', $result['query']);
-        $this->assertEquals(['deleted'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `status` != ?', $result->query);
+        $this->assertEquals(['deleted'], $result->bindings);
     }
 
     public function testPrewhereLessThan(): void
@@ -493,8 +493,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::lessThan('age', 30)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `age` < ?', $result['query']);
-        $this->assertEquals([30], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `age` < ?', $result->query);
+        $this->assertEquals([30], $result->bindings);
     }
 
     public function testPrewhereLessThanEqual(): void
@@ -504,8 +504,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::lessThanEqual('age', 30)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `age` <= ?', $result['query']);
-        $this->assertEquals([30], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `age` <= ?', $result->query);
+        $this->assertEquals([30], $result->bindings);
     }
 
     public function testPrewhereGreaterThan(): void
@@ -515,8 +515,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::greaterThan('score', 50)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `score` > ?', $result['query']);
-        $this->assertEquals([50], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `score` > ?', $result->query);
+        $this->assertEquals([50], $result->bindings);
     }
 
     public function testPrewhereGreaterThanEqual(): void
@@ -526,8 +526,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::greaterThanEqual('score', 50)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `score` >= ?', $result['query']);
-        $this->assertEquals([50], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `score` >= ?', $result->query);
+        $this->assertEquals([50], $result->bindings);
     }
 
     public function testPrewhereBetween(): void
@@ -537,8 +537,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::between('age', 18, 65)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `age` BETWEEN ? AND ?', $result['query']);
-        $this->assertEquals([18, 65], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `age` BETWEEN ? AND ?', $result->query);
+        $this->assertEquals([18, 65], $result->bindings);
     }
 
     public function testPrewhereNotBetween(): void
@@ -548,8 +548,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::notBetween('age', 0, 17)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `age` NOT BETWEEN ? AND ?', $result['query']);
-        $this->assertEquals([0, 17], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `age` NOT BETWEEN ? AND ?', $result->query);
+        $this->assertEquals([0, 17], $result->bindings);
     }
 
     public function testPrewhereStartsWith(): void
@@ -559,8 +559,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::startsWith('path', '/api')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `path` LIKE ?', $result['query']);
-        $this->assertEquals(['/api%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `path` LIKE ?', $result->query);
+        $this->assertEquals(['/api%'], $result->bindings);
     }
 
     public function testPrewhereNotStartsWith(): void
@@ -570,8 +570,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::notStartsWith('path', '/admin')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `path` NOT LIKE ?', $result['query']);
-        $this->assertEquals(['/admin%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `path` NOT LIKE ?', $result->query);
+        $this->assertEquals(['/admin%'], $result->bindings);
     }
 
     public function testPrewhereEndsWith(): void
@@ -581,8 +581,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::endsWith('file', '.csv')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `file` LIKE ?', $result['query']);
-        $this->assertEquals(['%.csv'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `file` LIKE ?', $result->query);
+        $this->assertEquals(['%.csv'], $result->bindings);
     }
 
     public function testPrewhereNotEndsWith(): void
@@ -592,8 +592,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::notEndsWith('file', '.tmp')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `file` NOT LIKE ?', $result['query']);
-        $this->assertEquals(['%.tmp'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `file` NOT LIKE ?', $result->query);
+        $this->assertEquals(['%.tmp'], $result->bindings);
     }
 
     public function testPrewhereContainsSingle(): void
@@ -603,8 +603,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::contains('name', ['foo'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `name` LIKE ?', $result['query']);
-        $this->assertEquals(['%foo%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `name` LIKE ?', $result->query);
+        $this->assertEquals(['%foo%'], $result->bindings);
     }
 
     public function testPrewhereContainsMultiple(): void
@@ -614,8 +614,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::contains('name', ['foo', 'bar'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE (`name` LIKE ? OR `name` LIKE ?)', $result['query']);
-        $this->assertEquals(['%foo%', '%bar%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE (`name` LIKE ? OR `name` LIKE ?)', $result->query);
+        $this->assertEquals(['%foo%', '%bar%'], $result->bindings);
     }
 
     public function testPrewhereContainsAny(): void
@@ -625,8 +625,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::containsAny('tag', ['a', 'b', 'c'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `tag` IN (?, ?, ?)', $result['query']);
-        $this->assertEquals(['a', 'b', 'c'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `tag` IN (?, ?, ?)', $result->query);
+        $this->assertEquals(['a', 'b', 'c'], $result->bindings);
     }
 
     public function testPrewhereContainsAll(): void
@@ -636,8 +636,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::containsAll('tag', ['x', 'y'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE (`tag` LIKE ? AND `tag` LIKE ?)', $result['query']);
-        $this->assertEquals(['%x%', '%y%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE (`tag` LIKE ? AND `tag` LIKE ?)', $result->query);
+        $this->assertEquals(['%x%', '%y%'], $result->bindings);
     }
 
     public function testPrewhereNotContainsSingle(): void
@@ -647,8 +647,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::notContains('name', ['bad'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `name` NOT LIKE ?', $result['query']);
-        $this->assertEquals(['%bad%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `name` NOT LIKE ?', $result->query);
+        $this->assertEquals(['%bad%'], $result->bindings);
     }
 
     public function testPrewhereNotContainsMultiple(): void
@@ -658,8 +658,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::notContains('name', ['bad', 'ugly'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE (`name` NOT LIKE ? AND `name` NOT LIKE ?)', $result['query']);
-        $this->assertEquals(['%bad%', '%ugly%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE (`name` NOT LIKE ? AND `name` NOT LIKE ?)', $result->query);
+        $this->assertEquals(['%bad%', '%ugly%'], $result->bindings);
     }
 
     public function testPrewhereIsNull(): void
@@ -669,8 +669,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::isNull('deleted_at')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `deleted_at` IS NULL', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `deleted_at` IS NULL', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testPrewhereIsNotNull(): void
@@ -680,8 +680,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::isNotNull('email')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `email` IS NOT NULL', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `email` IS NOT NULL', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testPrewhereExists(): void
@@ -691,7 +691,7 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::exists(['col_a', 'col_b'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE (`col_a` IS NOT NULL AND `col_b` IS NOT NULL)', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE (`col_a` IS NOT NULL AND `col_b` IS NOT NULL)', $result->query);
     }
 
     public function testPrewhereNotExists(): void
@@ -701,7 +701,7 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::notExists(['col_a'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE (`col_a` IS NULL)', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE (`col_a` IS NULL)', $result->query);
     }
 
     public function testPrewhereRegex(): void
@@ -711,8 +711,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::regex('path', '^/api')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE match(`path`, ?)', $result['query']);
-        $this->assertEquals(['^/api'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE match(`path`, ?)', $result->query);
+        $this->assertEquals(['^/api'], $result->bindings);
     }
 
     public function testPrewhereAndLogical(): void
@@ -725,8 +725,8 @@ class ClickHouseTest extends TestCase
             ])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE (`a` IN (?) AND `b` IN (?))', $result['query']);
-        $this->assertEquals([1, 2], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE (`a` IN (?) AND `b` IN (?))', $result->query);
+        $this->assertEquals([1, 2], $result->bindings);
     }
 
     public function testPrewhereOrLogical(): void
@@ -739,8 +739,8 @@ class ClickHouseTest extends TestCase
             ])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE (`a` IN (?) OR `b` IN (?))', $result['query']);
-        $this->assertEquals([1, 2], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE (`a` IN (?) OR `b` IN (?))', $result->query);
+        $this->assertEquals([1, 2], $result->bindings);
     }
 
     public function testPrewhereNestedAndOr(): void
@@ -756,8 +756,8 @@ class ClickHouseTest extends TestCase
             ])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE ((`x` IN (?) OR `y` IN (?)) AND `z` > ?)', $result['query']);
-        $this->assertEquals([1, 2, 0], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE ((`x` IN (?) OR `y` IN (?)) AND `z` > ?)', $result->query);
+        $this->assertEquals([1, 2, 0], $result->bindings);
     }
 
     public function testPrewhereRawExpression(): void
@@ -767,8 +767,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::raw('toDate(created) > ?', ['2024-01-01'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE toDate(created) > ?', $result['query']);
-        $this->assertEquals(['2024-01-01'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE toDate(created) > ?', $result->query);
+        $this->assertEquals(['2024-01-01'], $result->bindings);
     }
 
     public function testPrewhereMultipleCallsAdditive(): void
@@ -779,8 +779,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('b', [2])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `a` IN (?) AND `b` IN (?)', $result['query']);
-        $this->assertEquals([1, 2], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `a` IN (?) AND `b` IN (?)', $result->query);
+        $this->assertEquals([1, 2], $result->bindings);
     }
 
     public function testPrewhereWithWhereFinal(): void
@@ -794,7 +794,7 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` FINAL PREWHERE `type` IN (?) WHERE `count` > ?',
-            $result['query']
+            $result->query
         );
     }
 
@@ -809,7 +809,7 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` SAMPLE 0.5 PREWHERE `type` IN (?) WHERE `count` > ?',
-            $result['query']
+            $result->query
         );
     }
 
@@ -825,9 +825,9 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` FINAL SAMPLE 0.3 PREWHERE `type` IN (?) WHERE `count` > ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['click', 5], $result['bindings']);
+        $this->assertEquals(['click', 5], $result->bindings);
     }
 
     public function testPrewhereWithGroupBy(): void
@@ -839,8 +839,8 @@ class ClickHouseTest extends TestCase
             ->groupBy(['type'])
             ->build();
 
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result['query']);
-        $this->assertStringContainsString('GROUP BY `type`', $result['query']);
+        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
+        $this->assertStringContainsString('GROUP BY `type`', $result->query);
     }
 
     public function testPrewhereWithHaving(): void
@@ -853,8 +853,8 @@ class ClickHouseTest extends TestCase
             ->having([Query::greaterThan('total', 10)])
             ->build();
 
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result['query']);
-        $this->assertStringContainsString('HAVING `total` > ?', $result['query']);
+        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
+        $this->assertStringContainsString('HAVING `total` > ?', $result->query);
     }
 
     public function testPrewhereWithOrderBy(): void
@@ -867,7 +867,7 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` PREWHERE `type` IN (?) ORDER BY `name` ASC',
-            $result['query']
+            $result->query
         );
     }
 
@@ -882,9 +882,9 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` PREWHERE `type` IN (?) LIMIT ? OFFSET ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['click', 10, 20], $result['bindings']);
+        $this->assertEquals(['click', 10, 20], $result->bindings);
     }
 
     public function testPrewhereWithUnion(): void
@@ -896,8 +896,8 @@ class ClickHouseTest extends TestCase
             ->union($other)
             ->build();
 
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result['query']);
-        $this->assertStringContainsString('UNION (SELECT', $result['query']);
+        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
+        $this->assertStringContainsString('UNION (SELECT', $result->query);
     }
 
     public function testPrewhereWithDistinct(): void
@@ -909,8 +909,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('type', ['click'])])
             ->build();
 
-        $this->assertStringContainsString('SELECT DISTINCT', $result['query']);
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result['query']);
+        $this->assertStringContainsString('SELECT DISTINCT', $result->query);
+        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testPrewhereWithAggregations(): void
@@ -921,8 +921,8 @@ class ClickHouseTest extends TestCase
             ->sum('amount', 'total_amount')
             ->build();
 
-        $this->assertStringContainsString('SUM(`amount`) AS `total_amount`', $result['query']);
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result['query']);
+        $this->assertStringContainsString('SUM(`amount`) AS `total_amount`', $result->query);
+        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testPrewhereBindingOrderWithProvider(): void
@@ -939,7 +939,7 @@ class ClickHouseTest extends TestCase
             })
             ->build();
 
-        $this->assertEquals(['click', 5, 't1'], $result['bindings']);
+        $this->assertEquals(['click', 5, 't1'], $result->bindings);
     }
 
     public function testPrewhereBindingOrderWithCursor(): void
@@ -953,9 +953,9 @@ class ClickHouseTest extends TestCase
             ->build();
 
         // prewhere, where filter, cursor
-        $this->assertEquals('click', $result['bindings'][0]);
-        $this->assertEquals(5, $result['bindings'][1]);
-        $this->assertEquals('abc123', $result['bindings'][2]);
+        $this->assertEquals('click', $result->bindings[0]);
+        $this->assertEquals(5, $result->bindings[1]);
+        $this->assertEquals('abc123', $result->bindings[2]);
     }
 
     public function testPrewhereBindingOrderComplex(): void
@@ -982,10 +982,10 @@ class ClickHouseTest extends TestCase
             ->build();
 
         // prewhere, filter, provider, cursor, having, limit, offset, union
-        $this->assertEquals('click', $result['bindings'][0]);
-        $this->assertEquals(5, $result['bindings'][1]);
-        $this->assertEquals('t1', $result['bindings'][2]);
-        $this->assertEquals('cur1', $result['bindings'][3]);
+        $this->assertEquals('click', $result->bindings[0]);
+        $this->assertEquals(5, $result->bindings[1]);
+        $this->assertEquals('t1', $result->bindings[2]);
+        $this->assertEquals('cur1', $result->bindings[3]);
     }
 
     public function testPrewhereWithAttributeResolver(): void
@@ -998,8 +998,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('$id', ['abc'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `_uid` IN (?)', $result['query']);
-        $this->assertEquals(['abc'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE `_uid` IN (?)', $result->query);
+        $this->assertEquals(['abc'], $result->bindings);
     }
 
     public function testPrewhereOnlyNoWhere(): void
@@ -1009,9 +1009,9 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::greaterThan('ts', 100)])
             ->build();
 
-        $this->assertStringContainsString('PREWHERE', $result['query']);
+        $this->assertStringContainsString('PREWHERE', $result->query);
         // "PREWHERE" contains "WHERE" as a substring, so we check there is no standalone WHERE clause
-        $withoutPrewhere = str_replace('PREWHERE', '', $result['query']);
+        $withoutPrewhere = str_replace('PREWHERE', '', $result->query);
         $this->assertStringNotContainsString('WHERE', $withoutPrewhere);
     }
 
@@ -1023,8 +1023,8 @@ class ClickHouseTest extends TestCase
             ->filter([])
             ->build();
 
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $withoutPrewhere = str_replace('PREWHERE', '', $result['query']);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $withoutPrewhere = str_replace('PREWHERE', '', $result->query);
         $this->assertStringNotContainsString('WHERE', $withoutPrewhere);
     }
 
@@ -1037,7 +1037,7 @@ class ClickHouseTest extends TestCase
             ->filter([Query::greaterThan('age', 18)])
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $joinPos = strpos($query, 'JOIN');
         $prewherePos = strpos($query, 'PREWHERE');
         $wherePos = strpos($query, 'WHERE');
@@ -1059,9 +1059,9 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` PREWHERE `a` IN (?) AND `b` > ? AND `c` < ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([1, 2, 3], $result['bindings']);
+        $this->assertEquals([1, 2, 3], $result->bindings);
     }
 
     public function testPrewhereResetClearsPrewhereQueries(): void
@@ -1074,7 +1074,7 @@ class ClickHouseTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('events')->build();
-        $this->assertStringNotContainsString('PREWHERE', $result['query']);
+        $this->assertStringNotContainsString('PREWHERE', $result->query);
     }
 
     public function testPrewhereInToRawSqlOutput(): void
@@ -1103,7 +1103,7 @@ class ClickHouseTest extends TestCase
             ->select(['name', 'ts'])
             ->build();
 
-        $this->assertEquals('SELECT `name`, `ts` FROM `events` FINAL', $result['query']);
+        $this->assertEquals('SELECT `name`, `ts` FROM `events` FINAL', $result->query);
     }
 
     public function testFinalWithJoins(): void
@@ -1114,8 +1114,8 @@ class ClickHouseTest extends TestCase
             ->join('users', 'events.uid', 'users.id')
             ->build();
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result['query']);
-        $this->assertStringContainsString('JOIN `users`', $result['query']);
+        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
+        $this->assertStringContainsString('JOIN `users`', $result->query);
     }
 
     public function testFinalWithAggregations(): void
@@ -1126,8 +1126,8 @@ class ClickHouseTest extends TestCase
             ->count('*', 'total')
             ->build();
 
-        $this->assertStringContainsString('COUNT(*) AS `total`', $result['query']);
-        $this->assertStringContainsString('FROM `events` FINAL', $result['query']);
+        $this->assertStringContainsString('COUNT(*) AS `total`', $result->query);
+        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
     }
 
     public function testFinalWithGroupByHaving(): void
@@ -1140,9 +1140,9 @@ class ClickHouseTest extends TestCase
             ->having([Query::greaterThan('cnt', 5)])
             ->build();
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result['query']);
-        $this->assertStringContainsString('GROUP BY `type`', $result['query']);
-        $this->assertStringContainsString('HAVING `cnt` > ?', $result['query']);
+        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
+        $this->assertStringContainsString('GROUP BY `type`', $result->query);
+        $this->assertStringContainsString('HAVING `cnt` > ?', $result->query);
     }
 
     public function testFinalWithDistinct(): void
@@ -1154,7 +1154,7 @@ class ClickHouseTest extends TestCase
             ->select(['user_id'])
             ->build();
 
-        $this->assertEquals('SELECT DISTINCT `user_id` FROM `events` FINAL', $result['query']);
+        $this->assertEquals('SELECT DISTINCT `user_id` FROM `events` FINAL', $result->query);
     }
 
     public function testFinalWithSort(): void
@@ -1166,7 +1166,7 @@ class ClickHouseTest extends TestCase
             ->sortDesc('ts')
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` FINAL ORDER BY `name` ASC, `ts` DESC', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` FINAL ORDER BY `name` ASC, `ts` DESC', $result->query);
     }
 
     public function testFinalWithLimitOffset(): void
@@ -1178,8 +1178,8 @@ class ClickHouseTest extends TestCase
             ->offset(20)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` FINAL LIMIT ? OFFSET ?', $result['query']);
-        $this->assertEquals([10, 20], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` FINAL LIMIT ? OFFSET ?', $result->query);
+        $this->assertEquals([10, 20], $result->bindings);
     }
 
     public function testFinalWithCursor(): void
@@ -1191,8 +1191,8 @@ class ClickHouseTest extends TestCase
             ->sortAsc('_cursor')
             ->build();
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result['query']);
-        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
+        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
+        $this->assertStringContainsString('`_cursor` > ?', $result->query);
     }
 
     public function testFinalWithUnion(): void
@@ -1204,8 +1204,8 @@ class ClickHouseTest extends TestCase
             ->union($other)
             ->build();
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result['query']);
-        $this->assertStringContainsString('UNION (SELECT', $result['query']);
+        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
+        $this->assertStringContainsString('UNION (SELECT', $result->query);
     }
 
     public function testFinalWithPrewhere(): void
@@ -1216,7 +1216,7 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('type', ['click'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` FINAL PREWHERE `type` IN (?)', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` FINAL PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testFinalWithSampleAlone(): void
@@ -1227,7 +1227,7 @@ class ClickHouseTest extends TestCase
             ->sample(0.25)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` FINAL SAMPLE 0.25', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` FINAL SAMPLE 0.25', $result->query);
     }
 
     public function testFinalWithPrewhereSample(): void
@@ -1239,7 +1239,7 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('type', ['click'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` FINAL SAMPLE 0.5 PREWHERE `type` IN (?)', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` FINAL SAMPLE 0.5 PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testFinalFullPipeline(): void
@@ -1256,7 +1256,7 @@ class ClickHouseTest extends TestCase
             ->offset(5)
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $this->assertStringContainsString('SELECT `name`', $query);
         $this->assertStringContainsString('FROM `events` FINAL SAMPLE 0.1', $query);
         $this->assertStringContainsString('PREWHERE', $query);
@@ -1275,9 +1275,9 @@ class ClickHouseTest extends TestCase
             ->final()
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` FINAL', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` FINAL', $result->query);
         // Ensure FINAL appears only once
-        $this->assertEquals(1, substr_count($result['query'], 'FINAL'));
+        $this->assertEquals(1, substr_count($result->query, 'FINAL'));
     }
 
     public function testFinalInToRawSql(): void
@@ -1299,7 +1299,7 @@ class ClickHouseTest extends TestCase
             ->join('users', 'events.uid', 'users.id')
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $finalPos = strpos($query, 'FINAL');
         $joinPos = strpos($query, 'JOIN');
 
@@ -1320,8 +1320,8 @@ class ClickHouseTest extends TestCase
             ->filter([Query::equal('status', ['active'])])
             ->build();
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result['query']);
-        $this->assertStringContainsString('`col_status`', $result['query']);
+        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
+        $this->assertStringContainsString('`col_status`', $result->query);
     }
 
     public function testFinalWithConditionProvider(): void
@@ -1337,8 +1337,8 @@ class ClickHouseTest extends TestCase
             })
             ->build();
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result['query']);
-        $this->assertStringContainsString('deleted = ?', $result['query']);
+        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
+        $this->assertStringContainsString('deleted = ?', $result->query);
     }
 
     public function testFinalResetClearsFlag(): void
@@ -1350,7 +1350,7 @@ class ClickHouseTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('events')->build();
-        $this->assertStringNotContainsString('FINAL', $result['query']);
+        $this->assertStringNotContainsString('FINAL', $result->query);
     }
 
     public function testFinalWithWhenConditional(): void
@@ -1360,14 +1360,14 @@ class ClickHouseTest extends TestCase
             ->when(true, fn (Builder $b) => $b->final())
             ->build();
 
-        $this->assertStringContainsString('FINAL', $result['query']);
+        $this->assertStringContainsString('FINAL', $result->query);
 
         $result2 = (new Builder())
             ->from('events')
             ->when(false, fn (Builder $b) => $b->final())
             ->build();
 
-        $this->assertStringNotContainsString('FINAL', $result2['query']);
+        $this->assertStringNotContainsString('FINAL', $result2->query);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -1377,25 +1377,25 @@ class ClickHouseTest extends TestCase
     public function testSample10Percent(): void
     {
         $result = (new Builder())->from('events')->sample(0.1)->build();
-        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.1', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.1', $result->query);
     }
 
     public function testSample50Percent(): void
     {
         $result = (new Builder())->from('events')->sample(0.5)->build();
-        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.5', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.5', $result->query);
     }
 
     public function testSample1Percent(): void
     {
         $result = (new Builder())->from('events')->sample(0.01)->build();
-        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.01', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.01', $result->query);
     }
 
     public function testSample99Percent(): void
     {
         $result = (new Builder())->from('events')->sample(0.99)->build();
-        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.99', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.99', $result->query);
     }
 
     public function testSampleWithFilters(): void
@@ -1406,7 +1406,7 @@ class ClickHouseTest extends TestCase
             ->filter([Query::equal('status', ['active'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.2 WHERE `status` IN (?)', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.2 WHERE `status` IN (?)', $result->query);
     }
 
     public function testSampleWithJoins(): void
@@ -1417,8 +1417,8 @@ class ClickHouseTest extends TestCase
             ->join('users', 'events.uid', 'users.id')
             ->build();
 
-        $this->assertStringContainsString('SAMPLE 0.3', $result['query']);
-        $this->assertStringContainsString('JOIN `users`', $result['query']);
+        $this->assertStringContainsString('SAMPLE 0.3', $result->query);
+        $this->assertStringContainsString('JOIN `users`', $result->query);
     }
 
     public function testSampleWithAggregations(): void
@@ -1429,8 +1429,8 @@ class ClickHouseTest extends TestCase
             ->count('*', 'cnt')
             ->build();
 
-        $this->assertStringContainsString('SAMPLE 0.1', $result['query']);
-        $this->assertStringContainsString('COUNT(*)', $result['query']);
+        $this->assertStringContainsString('SAMPLE 0.1', $result->query);
+        $this->assertStringContainsString('COUNT(*)', $result->query);
     }
 
     public function testSampleWithGroupByHaving(): void
@@ -1443,9 +1443,9 @@ class ClickHouseTest extends TestCase
             ->having([Query::greaterThan('cnt', 2)])
             ->build();
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
-        $this->assertStringContainsString('GROUP BY', $result['query']);
-        $this->assertStringContainsString('HAVING', $result['query']);
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertStringContainsString('GROUP BY', $result->query);
+        $this->assertStringContainsString('HAVING', $result->query);
     }
 
     public function testSampleWithDistinct(): void
@@ -1457,8 +1457,8 @@ class ClickHouseTest extends TestCase
             ->select(['user_id'])
             ->build();
 
-        $this->assertStringContainsString('SELECT DISTINCT', $result['query']);
-        $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
+        $this->assertStringContainsString('SELECT DISTINCT', $result->query);
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
     }
 
     public function testSampleWithSort(): void
@@ -1469,7 +1469,7 @@ class ClickHouseTest extends TestCase
             ->sortDesc('ts')
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.5 ORDER BY `ts` DESC', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.5 ORDER BY `ts` DESC', $result->query);
     }
 
     public function testSampleWithLimitOffset(): void
@@ -1481,7 +1481,7 @@ class ClickHouseTest extends TestCase
             ->offset(20)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.5 LIMIT ? OFFSET ?', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.5 LIMIT ? OFFSET ?', $result->query);
     }
 
     public function testSampleWithCursor(): void
@@ -1493,8 +1493,8 @@ class ClickHouseTest extends TestCase
             ->sortAsc('_cursor')
             ->build();
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
-        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertStringContainsString('`_cursor` > ?', $result->query);
     }
 
     public function testSampleWithUnion(): void
@@ -1506,8 +1506,8 @@ class ClickHouseTest extends TestCase
             ->union($other)
             ->build();
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
-        $this->assertStringContainsString('UNION', $result['query']);
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertStringContainsString('UNION', $result->query);
     }
 
     public function testSampleWithPrewhere(): void
@@ -1518,7 +1518,7 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('type', ['click'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.1 PREWHERE `type` IN (?)', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.1 PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testSampleWithFinalKeyword(): void
@@ -1529,7 +1529,7 @@ class ClickHouseTest extends TestCase
             ->sample(0.1)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` FINAL SAMPLE 0.1', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` FINAL SAMPLE 0.1', $result->query);
     }
 
     public function testSampleWithFinalPrewhere(): void
@@ -1541,7 +1541,7 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('t', ['a'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` FINAL SAMPLE 0.2 PREWHERE `t` IN (?)', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` FINAL SAMPLE 0.2 PREWHERE `t` IN (?)', $result->query);
     }
 
     public function testSampleFullPipeline(): void
@@ -1555,7 +1555,7 @@ class ClickHouseTest extends TestCase
             ->limit(10)
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $this->assertStringContainsString('SAMPLE 0.1', $query);
         $this->assertStringContainsString('SELECT `name`', $query);
         $this->assertStringContainsString('WHERE `count` > ?', $query);
@@ -1581,7 +1581,7 @@ class ClickHouseTest extends TestCase
             ->join('users', 'events.uid', 'users.id')
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $samplePos = strpos($query, 'SAMPLE');
         $joinPos = strpos($query, 'JOIN');
         $finalPos = strpos($query, 'FINAL');
@@ -1597,7 +1597,7 @@ class ClickHouseTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('events')->build();
-        $this->assertStringNotContainsString('SAMPLE', $result['query']);
+        $this->assertStringNotContainsString('SAMPLE', $result->query);
     }
 
     public function testSampleWithWhenConditional(): void
@@ -1607,14 +1607,14 @@ class ClickHouseTest extends TestCase
             ->when(true, fn (Builder $b) => $b->sample(0.5))
             ->build();
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
 
         $result2 = (new Builder())
             ->from('events')
             ->when(false, fn (Builder $b) => $b->sample(0.5))
             ->build();
 
-        $this->assertStringNotContainsString('SAMPLE', $result2['query']);
+        $this->assertStringNotContainsString('SAMPLE', $result2->query);
     }
 
     public function testSampleCalledMultipleTimesLastWins(): void
@@ -1626,7 +1626,7 @@ class ClickHouseTest extends TestCase
             ->sample(0.9)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.9', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.9', $result->query);
     }
 
     public function testSampleWithAttributeResolver(): void
@@ -1643,8 +1643,8 @@ class ClickHouseTest extends TestCase
             ->filter([Query::equal('col', ['v'])])
             ->build();
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
-        $this->assertStringContainsString('`r_col`', $result['query']);
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertStringContainsString('`r_col`', $result->query);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -1658,8 +1658,8 @@ class ClickHouseTest extends TestCase
             ->filter([Query::regex('msg', 'error|warn')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `logs` WHERE match(`msg`, ?)', $result['query']);
-        $this->assertEquals(['error|warn'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `logs` WHERE match(`msg`, ?)', $result->query);
+        $this->assertEquals(['error|warn'], $result->bindings);
     }
 
     public function testRegexWithEmptyPattern(): void
@@ -1669,8 +1669,8 @@ class ClickHouseTest extends TestCase
             ->filter([Query::regex('msg', '')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `logs` WHERE match(`msg`, ?)', $result['query']);
-        $this->assertEquals([''], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `logs` WHERE match(`msg`, ?)', $result->query);
+        $this->assertEquals([''], $result->bindings);
     }
 
     public function testRegexWithSpecialChars(): void
@@ -1682,7 +1682,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         // Bindings preserve the pattern exactly as provided
-        $this->assertEquals([$pattern], $result['bindings']);
+        $this->assertEquals([$pattern], $result->bindings);
     }
 
     public function testRegexWithVeryLongPattern(): void
@@ -1693,8 +1693,8 @@ class ClickHouseTest extends TestCase
             ->filter([Query::regex('msg', $longPattern)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `logs` WHERE match(`msg`, ?)', $result['query']);
-        $this->assertEquals([$longPattern], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `logs` WHERE match(`msg`, ?)', $result->query);
+        $this->assertEquals([$longPattern], $result->bindings);
     }
 
     public function testRegexCombinedWithOtherFilters(): void
@@ -1709,9 +1709,9 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `logs` WHERE match(`path`, ?) AND `status` IN (?)',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['^/api', 200], $result['bindings']);
+        $this->assertEquals(['^/api', 200], $result->bindings);
     }
 
     public function testRegexInPrewhere(): void
@@ -1721,8 +1721,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::regex('path', '^/api')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `logs` PREWHERE match(`path`, ?)', $result['query']);
-        $this->assertEquals(['^/api'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `logs` PREWHERE match(`path`, ?)', $result->query);
+        $this->assertEquals(['^/api'], $result->bindings);
     }
 
     public function testRegexInPrewhereAndWhere(): void
@@ -1735,9 +1735,9 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `logs` PREWHERE match(`path`, ?) WHERE match(`msg`, ?)',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['^/api', 'err'], $result['bindings']);
+        $this->assertEquals(['^/api', 'err'], $result->bindings);
     }
 
     public function testRegexWithAttributeResolver(): void
@@ -1753,7 +1753,7 @@ class ClickHouseTest extends TestCase
             ->filter([Query::regex('msg', 'test')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `logs` WHERE match(`col_msg`, ?)', $result['query']);
+        $this->assertEquals('SELECT * FROM `logs` WHERE match(`col_msg`, ?)', $result->query);
     }
 
     public function testRegexBindingPreserved(): void
@@ -1764,7 +1764,7 @@ class ClickHouseTest extends TestCase
             ->filter([Query::regex('msg', $pattern)])
             ->build();
 
-        $this->assertEquals([$pattern], $result['bindings']);
+        $this->assertEquals([$pattern], $result->bindings);
     }
 
     public function testMultipleRegexFilters(): void
@@ -1779,7 +1779,7 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `logs` WHERE match(`path`, ?) AND match(`msg`, ?)',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1795,7 +1795,7 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `logs` WHERE (match(`path`, ?) AND `status` > ?)',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1811,7 +1811,7 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `logs` WHERE (match(`path`, ?) OR match(`path`, ?))',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1828,8 +1828,8 @@ class ClickHouseTest extends TestCase
             ])])
             ->build();
 
-        $this->assertStringContainsString('match(`path`, ?)', $result['query']);
-        $this->assertStringContainsString('`status` IN (?)', $result['query']);
+        $this->assertStringContainsString('match(`path`, ?)', $result->query);
+        $this->assertStringContainsString('`status` IN (?)', $result->query);
     }
 
     public function testRegexWithFinal(): void
@@ -1840,8 +1840,8 @@ class ClickHouseTest extends TestCase
             ->filter([Query::regex('path', '^/api')])
             ->build();
 
-        $this->assertStringContainsString('FROM `logs` FINAL', $result['query']);
-        $this->assertStringContainsString('match(`path`, ?)', $result['query']);
+        $this->assertStringContainsString('FROM `logs` FINAL', $result->query);
+        $this->assertStringContainsString('match(`path`, ?)', $result->query);
     }
 
     public function testRegexWithSample(): void
@@ -1852,8 +1852,8 @@ class ClickHouseTest extends TestCase
             ->filter([Query::regex('path', '^/api')])
             ->build();
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
-        $this->assertStringContainsString('match(`path`, ?)', $result['query']);
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertStringContainsString('match(`path`, ?)', $result->query);
     }
 
     public function testRegexInToRawSql(): void
@@ -1876,8 +1876,8 @@ class ClickHouseTest extends TestCase
             ])
             ->build();
 
-        $this->assertStringContainsString('match(`path`, ?)', $result['query']);
-        $this->assertStringContainsString('`msg` LIKE ?', $result['query']);
+        $this->assertStringContainsString('match(`path`, ?)', $result->query);
+        $this->assertStringContainsString('`msg` LIKE ?', $result->query);
     }
 
     public function testRegexCombinedWithStartsWith(): void
@@ -1890,8 +1890,8 @@ class ClickHouseTest extends TestCase
             ])
             ->build();
 
-        $this->assertStringContainsString('match(`path`, ?)', $result['query']);
-        $this->assertStringContainsString('`msg` LIKE ?', $result['query']);
+        $this->assertStringContainsString('match(`path`, ?)', $result->query);
+        $this->assertStringContainsString('`msg` LIKE ?', $result->query);
     }
 
     public function testRegexPrewhereWithRegexWhere(): void
@@ -1902,9 +1902,9 @@ class ClickHouseTest extends TestCase
             ->filter([Query::regex('msg', 'error')])
             ->build();
 
-        $this->assertStringContainsString('PREWHERE match(`path`, ?)', $result['query']);
-        $this->assertStringContainsString('WHERE match(`msg`, ?)', $result['query']);
-        $this->assertEquals(['^/api', 'error'], $result['bindings']);
+        $this->assertStringContainsString('PREWHERE match(`path`, ?)', $result->query);
+        $this->assertStringContainsString('WHERE match(`msg`, ?)', $result->query);
+        $this->assertEquals(['^/api', 'error'], $result->bindings);
     }
 
     public function testRegexCombinedWithPrewhereContainsRegex(): void
@@ -1918,7 +1918,7 @@ class ClickHouseTest extends TestCase
             ->filter([Query::regex('msg', 'timeout')])
             ->build();
 
-        $this->assertEquals(['^/api', 'error', 'timeout'], $result['bindings']);
+        $this->assertEquals(['^/api', 'error', 'timeout'], $result->bindings);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -2052,8 +2052,8 @@ class ClickHouseTest extends TestCase
             ->sortRandom()
             ->build();
 
-        $this->assertStringContainsString('rand()', $result['query']);
-        $this->assertStringNotContainsString('RAND()', $result['query']);
+        $this->assertStringContainsString('rand()', $result->query);
+        $this->assertStringNotContainsString('RAND()', $result->query);
     }
 
     public function testRandomSortCombinedWithAsc(): void
@@ -2064,7 +2064,7 @@ class ClickHouseTest extends TestCase
             ->sortRandom()
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` ORDER BY `name` ASC, rand()', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` ORDER BY `name` ASC, rand()', $result->query);
     }
 
     public function testRandomSortCombinedWithDesc(): void
@@ -2075,7 +2075,7 @@ class ClickHouseTest extends TestCase
             ->sortRandom()
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` ORDER BY `ts` DESC, rand()', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` ORDER BY `ts` DESC, rand()', $result->query);
     }
 
     public function testRandomSortCombinedWithAscAndDesc(): void
@@ -2087,7 +2087,7 @@ class ClickHouseTest extends TestCase
             ->sortRandom()
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` ORDER BY `name` ASC, `ts` DESC, rand()', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` ORDER BY `name` ASC, `ts` DESC, rand()', $result->query);
     }
 
     public function testRandomSortWithFinal(): void
@@ -2098,7 +2098,7 @@ class ClickHouseTest extends TestCase
             ->sortRandom()
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` FINAL ORDER BY rand()', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` FINAL ORDER BY rand()', $result->query);
     }
 
     public function testRandomSortWithSample(): void
@@ -2109,7 +2109,7 @@ class ClickHouseTest extends TestCase
             ->sortRandom()
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.5 ORDER BY rand()', $result['query']);
+        $this->assertEquals('SELECT * FROM `events` SAMPLE 0.5 ORDER BY rand()', $result->query);
     }
 
     public function testRandomSortWithPrewhere(): void
@@ -2122,7 +2122,7 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` PREWHERE `type` IN (?) ORDER BY rand()',
-            $result['query']
+            $result->query
         );
     }
 
@@ -2134,8 +2134,8 @@ class ClickHouseTest extends TestCase
             ->limit(10)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` ORDER BY rand() LIMIT ?', $result['query']);
-        $this->assertEquals([10], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` ORDER BY rand() LIMIT ?', $result->query);
+        $this->assertEquals([10], $result->bindings);
     }
 
     public function testRandomSortWithFiltersAndJoins(): void
@@ -2147,9 +2147,9 @@ class ClickHouseTest extends TestCase
             ->sortRandom()
             ->build();
 
-        $this->assertStringContainsString('JOIN `users`', $result['query']);
-        $this->assertStringContainsString('WHERE `status` IN (?)', $result['query']);
-        $this->assertStringContainsString('ORDER BY rand()', $result['query']);
+        $this->assertStringContainsString('JOIN `users`', $result->query);
+        $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
+        $this->assertStringContainsString('ORDER BY rand()', $result->query);
     }
 
     public function testRandomSortAlone(): void
@@ -2159,8 +2159,8 @@ class ClickHouseTest extends TestCase
             ->sortRandom()
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` ORDER BY rand()', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `events` ORDER BY rand()', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -2170,160 +2170,160 @@ class ClickHouseTest extends TestCase
     public function testFilterEqualSingleValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::equal('a', ['x'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?)', $result['query']);
-        $this->assertEquals(['x'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?)', $result->query);
+        $this->assertEquals(['x'], $result->bindings);
     }
 
     public function testFilterEqualMultipleValues(): void
     {
         $result = (new Builder())->from('t')->filter([Query::equal('a', ['x', 'y', 'z'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?, ?, ?)', $result['query']);
-        $this->assertEquals(['x', 'y', 'z'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?, ?, ?)', $result->query);
+        $this->assertEquals(['x', 'y', 'z'], $result->bindings);
     }
 
     public function testFilterNotEqualSingleValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notEqual('a', 'x')])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` != ?', $result['query']);
-        $this->assertEquals(['x'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` != ?', $result->query);
+        $this->assertEquals(['x'], $result->bindings);
     }
 
     public function testFilterNotEqualMultipleValues(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notEqual('a', ['x', 'y'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` NOT IN (?, ?)', $result['query']);
-        $this->assertEquals(['x', 'y'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` NOT IN (?, ?)', $result->query);
+        $this->assertEquals(['x', 'y'], $result->bindings);
     }
 
     public function testFilterLessThanValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::lessThan('a', 10)])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` < ?', $result['query']);
-        $this->assertEquals([10], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` < ?', $result->query);
+        $this->assertEquals([10], $result->bindings);
     }
 
     public function testFilterLessThanEqualValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::lessThanEqual('a', 10)])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` <= ?', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` <= ?', $result->query);
     }
 
     public function testFilterGreaterThanValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::greaterThan('a', 10)])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` > ?', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` > ?', $result->query);
     }
 
     public function testFilterGreaterThanEqualValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::greaterThanEqual('a', 10)])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` >= ?', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` >= ?', $result->query);
     }
 
     public function testFilterBetweenValues(): void
     {
         $result = (new Builder())->from('t')->filter([Query::between('a', 1, 10)])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` BETWEEN ? AND ?', $result['query']);
-        $this->assertEquals([1, 10], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` BETWEEN ? AND ?', $result->query);
+        $this->assertEquals([1, 10], $result->bindings);
     }
 
     public function testFilterNotBetweenValues(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notBetween('a', 1, 10)])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` NOT BETWEEN ? AND ?', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` NOT BETWEEN ? AND ?', $result->query);
     }
 
     public function testFilterStartsWithValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::startsWith('a', 'foo')])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` LIKE ?', $result['query']);
-        $this->assertEquals(['foo%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` LIKE ?', $result->query);
+        $this->assertEquals(['foo%'], $result->bindings);
     }
 
     public function testFilterNotStartsWithValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notStartsWith('a', 'foo')])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` NOT LIKE ?', $result['query']);
-        $this->assertEquals(['foo%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` NOT LIKE ?', $result->query);
+        $this->assertEquals(['foo%'], $result->bindings);
     }
 
     public function testFilterEndsWithValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::endsWith('a', 'bar')])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` LIKE ?', $result['query']);
-        $this->assertEquals(['%bar'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` LIKE ?', $result->query);
+        $this->assertEquals(['%bar'], $result->bindings);
     }
 
     public function testFilterNotEndsWithValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notEndsWith('a', 'bar')])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` NOT LIKE ?', $result['query']);
-        $this->assertEquals(['%bar'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` NOT LIKE ?', $result->query);
+        $this->assertEquals(['%bar'], $result->bindings);
     }
 
     public function testFilterContainsSingleValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::contains('a', ['foo'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` LIKE ?', $result['query']);
-        $this->assertEquals(['%foo%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` LIKE ?', $result->query);
+        $this->assertEquals(['%foo%'], $result->bindings);
     }
 
     public function testFilterContainsMultipleValues(): void
     {
         $result = (new Builder())->from('t')->filter([Query::contains('a', ['foo', 'bar'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` LIKE ? OR `a` LIKE ?)', $result['query']);
-        $this->assertEquals(['%foo%', '%bar%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`a` LIKE ? OR `a` LIKE ?)', $result->query);
+        $this->assertEquals(['%foo%', '%bar%'], $result->bindings);
     }
 
     public function testFilterContainsAnyValues(): void
     {
         $result = (new Builder())->from('t')->filter([Query::containsAny('a', ['x', 'y'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?, ?)', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?, ?)', $result->query);
     }
 
     public function testFilterContainsAllValues(): void
     {
         $result = (new Builder())->from('t')->filter([Query::containsAll('a', ['x', 'y'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` LIKE ? AND `a` LIKE ?)', $result['query']);
-        $this->assertEquals(['%x%', '%y%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`a` LIKE ? AND `a` LIKE ?)', $result->query);
+        $this->assertEquals(['%x%', '%y%'], $result->bindings);
     }
 
     public function testFilterNotContainsSingleValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notContains('a', ['foo'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` NOT LIKE ?', $result['query']);
-        $this->assertEquals(['%foo%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` NOT LIKE ?', $result->query);
+        $this->assertEquals(['%foo%'], $result->bindings);
     }
 
     public function testFilterNotContainsMultipleValues(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notContains('a', ['foo', 'bar'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` NOT LIKE ? AND `a` NOT LIKE ?)', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`a` NOT LIKE ? AND `a` NOT LIKE ?)', $result->query);
     }
 
     public function testFilterIsNullValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::isNull('a')])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` IS NULL', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` IS NULL', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testFilterIsNotNullValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::isNotNull('a')])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` IS NOT NULL', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` IS NOT NULL', $result->query);
     }
 
     public function testFilterExistsValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::exists(['a', 'b'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IS NOT NULL AND `b` IS NOT NULL)', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IS NOT NULL AND `b` IS NOT NULL)', $result->query);
     }
 
     public function testFilterNotExistsValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notExists(['a', 'b'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IS NULL AND `b` IS NULL)', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IS NULL AND `b` IS NULL)', $result->query);
     }
 
     public function testFilterAndLogical(): void
@@ -2332,7 +2332,7 @@ class ClickHouseTest extends TestCase
             Query::and([Query::equal('a', [1]), Query::equal('b', [2])]),
         ])->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?) AND `b` IN (?))', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?) AND `b` IN (?))', $result->query);
     }
 
     public function testFilterOrLogical(): void
@@ -2341,14 +2341,14 @@ class ClickHouseTest extends TestCase
             Query::or([Query::equal('a', [1]), Query::equal('b', [2])]),
         ])->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?) OR `b` IN (?))', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?) OR `b` IN (?))', $result->query);
     }
 
     public function testFilterRaw(): void
     {
         $result = (new Builder())->from('t')->filter([Query::raw('x > ? AND y < ?', [1, 2])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE x > ? AND y < ?', $result['query']);
-        $this->assertEquals([1, 2], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE x > ? AND y < ?', $result->query);
+        $this->assertEquals([1, 2], $result->bindings);
     }
 
     public function testFilterDeeplyNestedLogical(): void
@@ -2366,26 +2366,26 @@ class ClickHouseTest extends TestCase
             ]),
         ])->build();
 
-        $this->assertStringContainsString('(`a` IN (?) OR (`b` > ? AND `c` < ?))', $result['query']);
-        $this->assertStringContainsString('`d` IN (?)', $result['query']);
+        $this->assertStringContainsString('(`a` IN (?) OR (`b` > ? AND `c` < ?))', $result->query);
+        $this->assertStringContainsString('`d` IN (?)', $result->query);
     }
 
     public function testFilterWithFloats(): void
     {
         $result = (new Builder())->from('t')->filter([Query::greaterThan('price', 9.99)])->build();
-        $this->assertEquals([9.99], $result['bindings']);
+        $this->assertEquals([9.99], $result->bindings);
     }
 
     public function testFilterWithNegativeNumbers(): void
     {
         $result = (new Builder())->from('t')->filter([Query::greaterThan('temp', -40)])->build();
-        $this->assertEquals([-40], $result['bindings']);
+        $this->assertEquals([-40], $result->bindings);
     }
 
     public function testFilterWithEmptyStrings(): void
     {
         $result = (new Builder())->from('t')->filter([Query::equal('name', [''])])->build();
-        $this->assertEquals([''], $result['bindings']);
+        $this->assertEquals([''], $result->bindings);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -2400,7 +2400,7 @@ class ClickHouseTest extends TestCase
             ->count('*', 'total')
             ->build();
 
-        $this->assertEquals('SELECT COUNT(*) AS `total` FROM `events` FINAL', $result['query']);
+        $this->assertEquals('SELECT COUNT(*) AS `total` FROM `events` FINAL', $result->query);
     }
 
     public function testAggregationSumWithSample(): void
@@ -2411,7 +2411,7 @@ class ClickHouseTest extends TestCase
             ->sum('amount', 'total_amount')
             ->build();
 
-        $this->assertEquals('SELECT SUM(`amount`) AS `total_amount` FROM `events` SAMPLE 0.1', $result['query']);
+        $this->assertEquals('SELECT SUM(`amount`) AS `total_amount` FROM `events` SAMPLE 0.1', $result->query);
     }
 
     public function testAggregationAvgWithPrewhere(): void
@@ -2422,8 +2422,8 @@ class ClickHouseTest extends TestCase
             ->avg('price', 'avg_price')
             ->build();
 
-        $this->assertStringContainsString('AVG(`price`) AS `avg_price`', $result['query']);
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result['query']);
+        $this->assertStringContainsString('AVG(`price`) AS `avg_price`', $result->query);
+        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testAggregationMinWithPrewhereWhere(): void
@@ -2435,9 +2435,9 @@ class ClickHouseTest extends TestCase
             ->min('price', 'min_price')
             ->build();
 
-        $this->assertStringContainsString('MIN(`price`) AS `min_price`', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('WHERE', $result['query']);
+        $this->assertStringContainsString('MIN(`price`) AS `min_price`', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('WHERE', $result->query);
     }
 
     public function testAggregationMaxWithAllClickHouseFeatures(): void
@@ -2450,9 +2450,9 @@ class ClickHouseTest extends TestCase
             ->max('price', 'max_price')
             ->build();
 
-        $this->assertStringContainsString('MAX(`price`) AS `max_price`', $result['query']);
-        $this->assertStringContainsString('FINAL SAMPLE 0.5', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
+        $this->assertStringContainsString('MAX(`price`) AS `max_price`', $result->query);
+        $this->assertStringContainsString('FINAL SAMPLE 0.5', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
     }
 
     public function testMultipleAggregationsWithPrewhereGroupByHaving(): void
@@ -2466,11 +2466,11 @@ class ClickHouseTest extends TestCase
             ->having([Query::greaterThan('cnt', 10)])
             ->build();
 
-        $this->assertStringContainsString('COUNT(*) AS `cnt`', $result['query']);
-        $this->assertStringContainsString('SUM(`amount`) AS `total`', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('GROUP BY `region`', $result['query']);
-        $this->assertStringContainsString('HAVING `cnt` > ?', $result['query']);
+        $this->assertStringContainsString('COUNT(*) AS `cnt`', $result->query);
+        $this->assertStringContainsString('SUM(`amount`) AS `total`', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('GROUP BY `region`', $result->query);
+        $this->assertStringContainsString('HAVING `cnt` > ?', $result->query);
     }
 
     public function testAggregationWithJoinFinal(): void
@@ -2482,9 +2482,9 @@ class ClickHouseTest extends TestCase
             ->count('*', 'total')
             ->build();
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result['query']);
-        $this->assertStringContainsString('JOIN `users`', $result['query']);
-        $this->assertStringContainsString('COUNT(*)', $result['query']);
+        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
+        $this->assertStringContainsString('JOIN `users`', $result->query);
+        $this->assertStringContainsString('COUNT(*)', $result->query);
     }
 
     public function testAggregationWithDistinctSample(): void
@@ -2496,8 +2496,8 @@ class ClickHouseTest extends TestCase
             ->count('user_id', 'unique_users')
             ->build();
 
-        $this->assertStringContainsString('SELECT DISTINCT', $result['query']);
-        $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
+        $this->assertStringContainsString('SELECT DISTINCT', $result->query);
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
     }
 
     public function testAggregationWithAliasPrewhere(): void
@@ -2508,8 +2508,8 @@ class ClickHouseTest extends TestCase
             ->count('*', 'click_count')
             ->build();
 
-        $this->assertStringContainsString('COUNT(*) AS `click_count`', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
+        $this->assertStringContainsString('COUNT(*) AS `click_count`', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
     }
 
     public function testAggregationWithoutAliasFinal(): void
@@ -2520,9 +2520,9 @@ class ClickHouseTest extends TestCase
             ->count('*')
             ->build();
 
-        $this->assertStringContainsString('COUNT(*)', $result['query']);
-        $this->assertStringNotContainsString(' AS ', $result['query']);
-        $this->assertStringContainsString('FINAL', $result['query']);
+        $this->assertStringContainsString('COUNT(*)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+        $this->assertStringContainsString('FINAL', $result->query);
     }
 
     public function testCountStarAllClickHouseFeatures(): void
@@ -2535,9 +2535,9 @@ class ClickHouseTest extends TestCase
             ->count('*', 'total')
             ->build();
 
-        $this->assertStringContainsString('COUNT(*) AS `total`', $result['query']);
-        $this->assertStringContainsString('FINAL SAMPLE 0.5', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
+        $this->assertStringContainsString('COUNT(*) AS `total`', $result->query);
+        $this->assertStringContainsString('FINAL SAMPLE 0.5', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
     }
 
     public function testAggregationAllFeaturesUnion(): void
@@ -2552,8 +2552,8 @@ class ClickHouseTest extends TestCase
             ->union($other)
             ->build();
 
-        $this->assertStringContainsString('UNION', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
+        $this->assertStringContainsString('UNION', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
     }
 
     public function testAggregationAttributeResolverPrewhere(): void
@@ -2567,7 +2567,7 @@ class ClickHouseTest extends TestCase
             ->sum('amt', 'total')
             ->build();
 
-        $this->assertStringContainsString('SUM(`amount_cents`)', $result['query']);
+        $this->assertStringContainsString('SUM(`amount_cents`)', $result->query);
     }
 
     public function testAggregationConditionProviderPrewhere(): void
@@ -2584,8 +2584,8 @@ class ClickHouseTest extends TestCase
             ->count('*', 'cnt')
             ->build();
 
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('tenant = ?', $result['query']);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('tenant = ?', $result->query);
     }
 
     public function testGroupByHavingPrewhereFinal(): void
@@ -2599,7 +2599,7 @@ class ClickHouseTest extends TestCase
             ->having([Query::greaterThan('cnt', 5)])
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $this->assertStringContainsString('FINAL', $query);
         $this->assertStringContainsString('PREWHERE', $query);
         $this->assertStringContainsString('GROUP BY', $query);
@@ -2620,7 +2620,7 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` FINAL JOIN `users` ON `events`.`uid` = `users`.`id`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -2634,7 +2634,7 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `events` SAMPLE 0.5 JOIN `users` ON `events`.`uid` = `users`.`id`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -2646,8 +2646,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('type', ['click'])])
             ->build();
 
-        $this->assertStringContainsString('JOIN `users`', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
+        $this->assertStringContainsString('JOIN `users`', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
     }
 
     public function testJoinWithPrewhereWhere(): void
@@ -2659,9 +2659,9 @@ class ClickHouseTest extends TestCase
             ->filter([Query::greaterThan('users.age', 18)])
             ->build();
 
-        $this->assertStringContainsString('JOIN', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('WHERE', $result['query']);
+        $this->assertStringContainsString('JOIN', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('WHERE', $result->query);
     }
 
     public function testJoinAllClickHouseFeatures(): void
@@ -2675,7 +2675,7 @@ class ClickHouseTest extends TestCase
             ->filter([Query::greaterThan('users.age', 18)])
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $this->assertStringContainsString('FINAL SAMPLE 0.1', $query);
         $this->assertStringContainsString('JOIN', $query);
         $this->assertStringContainsString('PREWHERE', $query);
@@ -2690,8 +2690,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('type', ['click'])])
             ->build();
 
-        $this->assertStringContainsString('LEFT JOIN `users`', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
+        $this->assertStringContainsString('LEFT JOIN `users`', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
     }
 
     public function testRightJoinWithPrewhere(): void
@@ -2702,8 +2702,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('type', ['click'])])
             ->build();
 
-        $this->assertStringContainsString('RIGHT JOIN `users`', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
+        $this->assertStringContainsString('RIGHT JOIN `users`', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
     }
 
     public function testCrossJoinWithFinal(): void
@@ -2714,8 +2714,8 @@ class ClickHouseTest extends TestCase
             ->crossJoin('config')
             ->build();
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result['query']);
-        $this->assertStringContainsString('CROSS JOIN `config`', $result['query']);
+        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
+        $this->assertStringContainsString('CROSS JOIN `config`', $result->query);
     }
 
     public function testMultipleJoinsWithPrewhere(): void
@@ -2727,9 +2727,9 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('type', ['click'])])
             ->build();
 
-        $this->assertStringContainsString('JOIN `users`', $result['query']);
-        $this->assertStringContainsString('LEFT JOIN `sessions`', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
+        $this->assertStringContainsString('JOIN `users`', $result->query);
+        $this->assertStringContainsString('LEFT JOIN `sessions`', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
     }
 
     public function testJoinAggregationPrewhereGroupBy(): void
@@ -2742,9 +2742,9 @@ class ClickHouseTest extends TestCase
             ->groupBy(['users.country'])
             ->build();
 
-        $this->assertStringContainsString('JOIN', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('GROUP BY', $result['query']);
+        $this->assertStringContainsString('JOIN', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('GROUP BY', $result->query);
     }
 
     public function testJoinPrewhereBindingOrder(): void
@@ -2756,7 +2756,7 @@ class ClickHouseTest extends TestCase
             ->filter([Query::greaterThan('users.age', 18)])
             ->build();
 
-        $this->assertEquals(['click', 18], $result['bindings']);
+        $this->assertEquals(['click', 18], $result->bindings);
     }
 
     public function testJoinAttributeResolverPrewhere(): void
@@ -2770,7 +2770,7 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('uid', ['abc'])])
             ->build();
 
-        $this->assertStringContainsString('PREWHERE `user_id` IN (?)', $result['query']);
+        $this->assertStringContainsString('PREWHERE `user_id` IN (?)', $result->query);
     }
 
     public function testJoinConditionProviderPrewhere(): void
@@ -2787,8 +2787,8 @@ class ClickHouseTest extends TestCase
             })
             ->build();
 
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('tenant = ?', $result['query']);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('tenant = ?', $result->query);
     }
 
     public function testJoinPrewhereUnion(): void
@@ -2801,9 +2801,9 @@ class ClickHouseTest extends TestCase
             ->union($other)
             ->build();
 
-        $this->assertStringContainsString('JOIN', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('UNION', $result['query']);
+        $this->assertStringContainsString('JOIN', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('UNION', $result->query);
     }
 
     public function testJoinClauseOrdering(): void
@@ -2817,7 +2817,7 @@ class ClickHouseTest extends TestCase
             ->filter([Query::greaterThan('age', 18)])
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
 
         $fromPos = strpos($query, 'FROM');
         $finalPos = strpos($query, 'FINAL');
@@ -2846,8 +2846,8 @@ class ClickHouseTest extends TestCase
             ->union($other)
             ->build();
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result['query']);
-        $this->assertStringContainsString('UNION (SELECT * FROM `archive`)', $result['query']);
+        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
+        $this->assertStringContainsString('UNION (SELECT * FROM `archive`)', $result->query);
     }
 
     public function testUnionMainHasSample(): void
@@ -2859,8 +2859,8 @@ class ClickHouseTest extends TestCase
             ->union($other)
             ->build();
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
-        $this->assertStringContainsString('UNION', $result['query']);
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertStringContainsString('UNION', $result->query);
     }
 
     public function testUnionMainHasPrewhere(): void
@@ -2872,8 +2872,8 @@ class ClickHouseTest extends TestCase
             ->union($other)
             ->build();
 
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('UNION', $result['query']);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('UNION', $result->query);
     }
 
     public function testUnionMainHasAllClickHouseFeatures(): void
@@ -2888,9 +2888,9 @@ class ClickHouseTest extends TestCase
             ->union($other)
             ->build();
 
-        $this->assertStringContainsString('FINAL SAMPLE 0.1', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('UNION', $result['query']);
+        $this->assertStringContainsString('FINAL SAMPLE 0.1', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('UNION', $result->query);
     }
 
     public function testUnionAllWithPrewhere(): void
@@ -2902,8 +2902,8 @@ class ClickHouseTest extends TestCase
             ->unionAll($other)
             ->build();
 
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('UNION ALL', $result['query']);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('UNION ALL', $result->query);
     }
 
     public function testUnionBindingOrderWithPrewhere(): void
@@ -2917,7 +2917,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         // prewhere, where, union
-        $this->assertEquals(['click', 2024, 2023], $result['bindings']);
+        $this->assertEquals(['click', 2024, 2023], $result->bindings);
     }
 
     public function testMultipleUnionsWithPrewhere(): void
@@ -2931,8 +2931,8 @@ class ClickHouseTest extends TestCase
             ->union($other2)
             ->build();
 
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertEquals(2, substr_count($result['query'], 'UNION'));
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertEquals(2, substr_count($result->query, 'UNION'));
     }
 
     public function testUnionJoinPrewhere(): void
@@ -2945,9 +2945,9 @@ class ClickHouseTest extends TestCase
             ->union($other)
             ->build();
 
-        $this->assertStringContainsString('JOIN', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('UNION', $result['query']);
+        $this->assertStringContainsString('JOIN', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('UNION', $result->query);
     }
 
     public function testUnionAggregationPrewhereFinal(): void
@@ -2961,10 +2961,10 @@ class ClickHouseTest extends TestCase
             ->union($other)
             ->build();
 
-        $this->assertStringContainsString('FINAL', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('COUNT(*)', $result['query']);
-        $this->assertStringContainsString('UNION', $result['query']);
+        $this->assertStringContainsString('FINAL', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('COUNT(*)', $result->query);
+        $this->assertStringContainsString('UNION', $result->query);
     }
 
     public function testUnionWithComplexMainQuery(): void
@@ -2982,7 +2982,7 @@ class ClickHouseTest extends TestCase
             ->union($other)
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $this->assertStringContainsString('SELECT `name`, `count`', $query);
         $this->assertStringContainsString('FINAL SAMPLE 0.1', $query);
         $this->assertStringContainsString('PREWHERE', $query);
@@ -3187,7 +3187,7 @@ class ClickHouseTest extends TestCase
         $builder->reset();
         $result = $builder->from('events')->build();
 
-        $this->assertStringNotContainsString('PREWHERE', $result['query']);
+        $this->assertStringNotContainsString('PREWHERE', $result->query);
     }
 
     public function testResetClearsFinalState(): void
@@ -3197,7 +3197,7 @@ class ClickHouseTest extends TestCase
         $builder->reset();
         $result = $builder->from('events')->build();
 
-        $this->assertStringNotContainsString('FINAL', $result['query']);
+        $this->assertStringNotContainsString('FINAL', $result->query);
     }
 
     public function testResetClearsSampleState(): void
@@ -3207,7 +3207,7 @@ class ClickHouseTest extends TestCase
         $builder->reset();
         $result = $builder->from('events')->build();
 
-        $this->assertStringNotContainsString('SAMPLE', $result['query']);
+        $this->assertStringNotContainsString('SAMPLE', $result->query);
     }
 
     public function testResetClearsAllThreeTogether(): void
@@ -3221,7 +3221,7 @@ class ClickHouseTest extends TestCase
         $builder->reset();
         $result = $builder->from('events')->build();
 
-        $this->assertEquals('SELECT * FROM `events`', $result['query']);
+        $this->assertEquals('SELECT * FROM `events`', $result->query);
     }
 
     public function testResetPreservesAttributeResolver(): void
@@ -3240,7 +3240,7 @@ class ClickHouseTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('events')->filter([Query::equal('col', ['v'])])->build();
-        $this->assertStringContainsString('`r_col`', $result['query']);
+        $this->assertStringContainsString('`r_col`', $result->query);
     }
 
     public function testResetPreservesConditionProviders(): void
@@ -3258,7 +3258,7 @@ class ClickHouseTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('events')->build();
-        $this->assertStringContainsString('tenant = ?', $result['query']);
+        $this->assertStringContainsString('tenant = ?', $result->query);
     }
 
     public function testResetClearsTable(): void
@@ -3268,8 +3268,8 @@ class ClickHouseTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('logs')->build();
-        $this->assertStringContainsString('FROM `logs`', $result['query']);
-        $this->assertStringNotContainsString('events', $result['query']);
+        $this->assertStringContainsString('FROM `logs`', $result->query);
+        $this->assertStringNotContainsString('events', $result->query);
     }
 
     public function testResetClearsFilters(): void
@@ -3279,7 +3279,7 @@ class ClickHouseTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('events')->build();
-        $this->assertStringNotContainsString('WHERE', $result['query']);
+        $this->assertStringNotContainsString('WHERE', $result->query);
     }
 
     public function testResetClearsUnions(): void
@@ -3290,7 +3290,7 @@ class ClickHouseTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('events')->build();
-        $this->assertStringNotContainsString('UNION', $result['query']);
+        $this->assertStringNotContainsString('UNION', $result->query);
     }
 
     public function testResetClearsBindings(): void
@@ -3300,7 +3300,7 @@ class ClickHouseTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('events')->build();
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testBuildAfterResetMinimalOutput(): void
@@ -3317,8 +3317,8 @@ class ClickHouseTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('t')->build();
-        $this->assertEquals('SELECT * FROM `t`', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testResetRebuildWithPrewhere(): void
@@ -3328,8 +3328,8 @@ class ClickHouseTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('events')->prewhere([Query::equal('x', [1])])->build();
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringNotContainsString('FINAL', $result['query']);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringNotContainsString('FINAL', $result->query);
     }
 
     public function testResetRebuildWithFinal(): void
@@ -3339,8 +3339,8 @@ class ClickHouseTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('events')->final()->build();
-        $this->assertStringContainsString('FINAL', $result['query']);
-        $this->assertStringNotContainsString('PREWHERE', $result['query']);
+        $this->assertStringContainsString('FINAL', $result->query);
+        $this->assertStringNotContainsString('PREWHERE', $result->query);
     }
 
     public function testResetRebuildWithSample(): void
@@ -3350,8 +3350,8 @@ class ClickHouseTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('events')->sample(0.5)->build();
-        $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
-        $this->assertStringNotContainsString('FINAL', $result['query']);
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertStringNotContainsString('FINAL', $result->query);
     }
 
     public function testMultipleResets(): void
@@ -3366,8 +3366,8 @@ class ClickHouseTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('d')->build();
-        $this->assertEquals('SELECT * FROM `d`', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `d`', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -3381,7 +3381,7 @@ class ClickHouseTest extends TestCase
             ->when(true, fn (Builder $b) => $b->prewhere([Query::equal('type', ['click'])]))
             ->build();
 
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result['query']);
+        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testWhenFalseDoesNotAddPrewhere(): void
@@ -3391,7 +3391,7 @@ class ClickHouseTest extends TestCase
             ->when(false, fn (Builder $b) => $b->prewhere([Query::equal('type', ['click'])]))
             ->build();
 
-        $this->assertStringNotContainsString('PREWHERE', $result['query']);
+        $this->assertStringNotContainsString('PREWHERE', $result->query);
     }
 
     public function testWhenTrueAddsFinal(): void
@@ -3401,7 +3401,7 @@ class ClickHouseTest extends TestCase
             ->when(true, fn (Builder $b) => $b->final())
             ->build();
 
-        $this->assertStringContainsString('FINAL', $result['query']);
+        $this->assertStringContainsString('FINAL', $result->query);
     }
 
     public function testWhenFalseDoesNotAddFinal(): void
@@ -3411,7 +3411,7 @@ class ClickHouseTest extends TestCase
             ->when(false, fn (Builder $b) => $b->final())
             ->build();
 
-        $this->assertStringNotContainsString('FINAL', $result['query']);
+        $this->assertStringNotContainsString('FINAL', $result->query);
     }
 
     public function testWhenTrueAddsSample(): void
@@ -3421,7 +3421,7 @@ class ClickHouseTest extends TestCase
             ->when(true, fn (Builder $b) => $b->sample(0.5))
             ->build();
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
     }
 
     public function testWhenWithBothPrewhereAndFilter(): void
@@ -3436,8 +3436,8 @@ class ClickHouseTest extends TestCase
             )
             ->build();
 
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('WHERE', $result['query']);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('WHERE', $result->query);
     }
 
     public function testWhenNestedWithClickHouseFeatures(): void
@@ -3452,7 +3452,7 @@ class ClickHouseTest extends TestCase
             )
             ->build();
 
-        $this->assertStringContainsString('FINAL SAMPLE 0.5', $result['query']);
+        $this->assertStringContainsString('FINAL SAMPLE 0.5', $result->query);
     }
 
     public function testWhenChainedMultipleTimesWithClickHouseFeatures(): void
@@ -3464,8 +3464,8 @@ class ClickHouseTest extends TestCase
             ->when(true, fn (Builder $b) => $b->prewhere([Query::equal('type', ['click'])]))
             ->build();
 
-        $this->assertStringContainsString('FINAL SAMPLE 0.5', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
+        $this->assertStringContainsString('FINAL SAMPLE 0.5', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
     }
 
     public function testWhenAddsJoinAndPrewhere(): void
@@ -3480,8 +3480,8 @@ class ClickHouseTest extends TestCase
             )
             ->build();
 
-        $this->assertStringContainsString('JOIN', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
+        $this->assertStringContainsString('JOIN', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
     }
 
     public function testWhenCombinedWithRegularWhen(): void
@@ -3492,8 +3492,8 @@ class ClickHouseTest extends TestCase
             ->when(true, fn (Builder $b) => $b->filter([Query::equal('status', ['active'])]))
             ->build();
 
-        $this->assertStringContainsString('FINAL', $result['query']);
-        $this->assertStringContainsString('WHERE `status` IN (?)', $result['query']);
+        $this->assertStringContainsString('FINAL', $result->query);
+        $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -3513,8 +3513,8 @@ class ClickHouseTest extends TestCase
             })
             ->build();
 
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('deleted = ?', $result['query']);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('deleted = ?', $result->query);
     }
 
     public function testProviderWithFinal(): void
@@ -3530,8 +3530,8 @@ class ClickHouseTest extends TestCase
             })
             ->build();
 
-        $this->assertStringContainsString('FINAL', $result['query']);
-        $this->assertStringContainsString('deleted = ?', $result['query']);
+        $this->assertStringContainsString('FINAL', $result->query);
+        $this->assertStringContainsString('deleted = ?', $result->query);
     }
 
     public function testProviderWithSample(): void
@@ -3547,8 +3547,8 @@ class ClickHouseTest extends TestCase
             })
             ->build();
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
-        $this->assertStringContainsString('deleted = ?', $result['query']);
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertStringContainsString('deleted = ?', $result->query);
     }
 
     public function testProviderPrewhereWhereBindingOrder(): void
@@ -3566,7 +3566,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         // prewhere, filter, provider
-        $this->assertEquals(['click', 5, 't1'], $result['bindings']);
+        $this->assertEquals(['click', 5, 't1'], $result->bindings);
     }
 
     public function testMultipleProvidersPrewhereBindingOrder(): void
@@ -3588,7 +3588,7 @@ class ClickHouseTest extends TestCase
             })
             ->build();
 
-        $this->assertEquals(['click', 't1', 'o1'], $result['bindings']);
+        $this->assertEquals(['click', 't1', 'o1'], $result->bindings);
     }
 
     public function testProviderPrewhereCursorLimitBindingOrder(): void
@@ -3608,10 +3608,10 @@ class ClickHouseTest extends TestCase
             ->build();
 
         // prewhere, provider, cursor, limit
-        $this->assertEquals('click', $result['bindings'][0]);
-        $this->assertEquals('t1', $result['bindings'][1]);
-        $this->assertEquals('cur1', $result['bindings'][2]);
-        $this->assertEquals(10, $result['bindings'][3]);
+        $this->assertEquals('click', $result->bindings[0]);
+        $this->assertEquals('t1', $result->bindings[1]);
+        $this->assertEquals('cur1', $result->bindings[2]);
+        $this->assertEquals(10, $result->bindings[3]);
     }
 
     public function testProviderAllClickHouseFeatures(): void
@@ -3630,9 +3630,9 @@ class ClickHouseTest extends TestCase
             })
             ->build();
 
-        $this->assertStringContainsString('FINAL SAMPLE 0.1', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('tenant = ?', $result['query']);
+        $this->assertStringContainsString('FINAL SAMPLE 0.1', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('tenant = ?', $result->query);
     }
 
     public function testProviderPrewhereAggregation(): void
@@ -3649,9 +3649,9 @@ class ClickHouseTest extends TestCase
             ->count('*', 'cnt')
             ->build();
 
-        $this->assertStringContainsString('COUNT(*)', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('tenant = ?', $result['query']);
+        $this->assertStringContainsString('COUNT(*)', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('tenant = ?', $result->query);
     }
 
     public function testProviderJoinsPrewhere(): void
@@ -3668,9 +3668,9 @@ class ClickHouseTest extends TestCase
             })
             ->build();
 
-        $this->assertStringContainsString('JOIN', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('tenant = ?', $result['query']);
+        $this->assertStringContainsString('JOIN', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('tenant = ?', $result->query);
     }
 
     public function testProviderReferencesTableNameFinal(): void
@@ -3686,8 +3686,8 @@ class ClickHouseTest extends TestCase
             })
             ->build();
 
-        $this->assertStringContainsString('events.deleted = ?', $result['query']);
-        $this->assertStringContainsString('FINAL', $result['query']);
+        $this->assertStringContainsString('events.deleted = ?', $result->query);
+        $this->assertStringContainsString('FINAL', $result->query);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -3703,8 +3703,8 @@ class ClickHouseTest extends TestCase
             ->sortAsc('_cursor')
             ->build();
 
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('`_cursor` > ?', $result->query);
     }
 
     public function testCursorBeforeWithPrewhere(): void
@@ -3716,8 +3716,8 @@ class ClickHouseTest extends TestCase
             ->sortAsc('_cursor')
             ->build();
 
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('`_cursor` < ?', $result['query']);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('`_cursor` < ?', $result->query);
     }
 
     public function testCursorPrewhereWhere(): void
@@ -3730,9 +3730,9 @@ class ClickHouseTest extends TestCase
             ->sortAsc('_cursor')
             ->build();
 
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('WHERE', $result['query']);
-        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('WHERE', $result->query);
+        $this->assertStringContainsString('`_cursor` > ?', $result->query);
     }
 
     public function testCursorWithFinal(): void
@@ -3744,8 +3744,8 @@ class ClickHouseTest extends TestCase
             ->sortAsc('_cursor')
             ->build();
 
-        $this->assertStringContainsString('FINAL', $result['query']);
-        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
+        $this->assertStringContainsString('FINAL', $result->query);
+        $this->assertStringContainsString('`_cursor` > ?', $result->query);
     }
 
     public function testCursorWithSample(): void
@@ -3757,8 +3757,8 @@ class ClickHouseTest extends TestCase
             ->sortAsc('_cursor')
             ->build();
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
-        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertStringContainsString('`_cursor` > ?', $result->query);
     }
 
     public function testCursorPrewhereBindingOrder(): void
@@ -3770,8 +3770,8 @@ class ClickHouseTest extends TestCase
             ->sortAsc('_cursor')
             ->build();
 
-        $this->assertEquals('click', $result['bindings'][0]);
-        $this->assertEquals('cur1', $result['bindings'][1]);
+        $this->assertEquals('click', $result->bindings[0]);
+        $this->assertEquals('cur1', $result->bindings[1]);
     }
 
     public function testCursorPrewhereProviderBindingOrder(): void
@@ -3789,9 +3789,9 @@ class ClickHouseTest extends TestCase
             ->sortAsc('_cursor')
             ->build();
 
-        $this->assertEquals('click', $result['bindings'][0]);
-        $this->assertEquals('t1', $result['bindings'][1]);
-        $this->assertEquals('cur1', $result['bindings'][2]);
+        $this->assertEquals('click', $result->bindings[0]);
+        $this->assertEquals('t1', $result->bindings[1]);
+        $this->assertEquals('cur1', $result->bindings[2]);
     }
 
     public function testCursorFullClickHousePipeline(): void
@@ -3807,7 +3807,7 @@ class ClickHouseTest extends TestCase
             ->limit(10)
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $this->assertStringContainsString('FINAL SAMPLE 0.1', $query);
         $this->assertStringContainsString('PREWHERE', $query);
         $this->assertStringContainsString('WHERE', $query);
@@ -3827,10 +3827,10 @@ class ClickHouseTest extends TestCase
             ->page(2, 25)
             ->build();
 
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('LIMIT ?', $result['query']);
-        $this->assertStringContainsString('OFFSET ?', $result['query']);
-        $this->assertEquals(['click', 25, 25], $result['bindings']);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertStringContainsString('OFFSET ?', $result->query);
+        $this->assertEquals(['click', 25, 25], $result->bindings);
     }
 
     public function testPageWithFinal(): void
@@ -3841,10 +3841,10 @@ class ClickHouseTest extends TestCase
             ->page(3, 10)
             ->build();
 
-        $this->assertStringContainsString('FINAL', $result['query']);
-        $this->assertStringContainsString('LIMIT ?', $result['query']);
-        $this->assertStringContainsString('OFFSET ?', $result['query']);
-        $this->assertEquals([10, 20], $result['bindings']);
+        $this->assertStringContainsString('FINAL', $result->query);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertStringContainsString('OFFSET ?', $result->query);
+        $this->assertEquals([10, 20], $result->bindings);
     }
 
     public function testPageWithSample(): void
@@ -3855,8 +3855,8 @@ class ClickHouseTest extends TestCase
             ->page(1, 50)
             ->build();
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
-        $this->assertEquals([50, 0], $result['bindings']);
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertEquals([50, 0], $result->bindings);
     }
 
     public function testPageWithAllClickHouseFeatures(): void
@@ -3869,10 +3869,10 @@ class ClickHouseTest extends TestCase
             ->page(2, 10)
             ->build();
 
-        $this->assertStringContainsString('FINAL SAMPLE 0.1', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('LIMIT', $result['query']);
-        $this->assertStringContainsString('OFFSET', $result['query']);
+        $this->assertStringContainsString('FINAL SAMPLE 0.1', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('LIMIT', $result->query);
+        $this->assertStringContainsString('OFFSET', $result->query);
     }
 
     public function testPageWithComplexClickHouseQuery(): void
@@ -3887,7 +3887,7 @@ class ClickHouseTest extends TestCase
             ->page(5, 20)
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $this->assertStringContainsString('FINAL', $query);
         $this->assertStringContainsString('SAMPLE', $query);
         $this->assertStringContainsString('PREWHERE', $query);
@@ -3925,7 +3925,7 @@ class ClickHouseTest extends TestCase
             ->offset(20)
             ->build();
 
-        $this->assertNotEmpty($result['query']);
+        $this->assertNotEmpty($result->query);
     }
 
     public function testChainingOrderDoesNotMatterForOutput(): void
@@ -3946,7 +3946,7 @@ class ClickHouseTest extends TestCase
             ->final()
             ->build();
 
-        $this->assertEquals($result1['query'], $result2['query']);
+        $this->assertEquals($result1->query, $result2->query);
     }
 
     public function testSameComplexQueryDifferentOrders(): void
@@ -3971,7 +3971,7 @@ class ClickHouseTest extends TestCase
             ->final()
             ->build();
 
-        $this->assertEquals($result1['query'], $result2['query']);
+        $this->assertEquals($result1->query, $result2->query);
     }
 
     public function testFluentResetThenRebuild(): void
@@ -3987,8 +3987,8 @@ class ClickHouseTest extends TestCase
             ->sample(0.5)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `logs` SAMPLE 0.5', $result['query']);
-        $this->assertStringNotContainsString('FINAL', $result['query']);
+        $this->assertEquals('SELECT * FROM `logs` SAMPLE 0.5', $result->query);
+        $this->assertStringNotContainsString('FINAL', $result->query);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -4013,7 +4013,7 @@ class ClickHouseTest extends TestCase
             ->offset(10)
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
 
         $selectPos = strpos($query, 'SELECT');
         $fromPos = strpos($query, 'FROM');
@@ -4049,7 +4049,7 @@ class ClickHouseTest extends TestCase
             ->join('users', 'events.uid', 'users.id')
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $tablePos = strpos($query, '`events`');
         $finalPos = strpos($query, 'FINAL');
         $joinPos = strpos($query, 'JOIN');
@@ -4067,7 +4067,7 @@ class ClickHouseTest extends TestCase
             ->join('users', 'events.uid', 'users.id')
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $finalPos = strpos($query, 'FINAL');
         $samplePos = strpos($query, 'SAMPLE');
         $joinPos = strpos($query, 'JOIN');
@@ -4085,7 +4085,7 @@ class ClickHouseTest extends TestCase
             ->filter([Query::greaterThan('count', 0)])
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $joinPos = strpos($query, 'JOIN');
         $prewherePos = strpos($query, 'PREWHERE');
         $wherePos = strpos($query, 'WHERE');
@@ -4103,7 +4103,7 @@ class ClickHouseTest extends TestCase
             ->groupBy(['type'])
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $prewherePos = strpos($query, 'PREWHERE');
         $groupByPos = strpos($query, 'GROUP BY');
 
@@ -4118,7 +4118,7 @@ class ClickHouseTest extends TestCase
             ->sortDesc('ts')
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $prewherePos = strpos($query, 'PREWHERE');
         $orderByPos = strpos($query, 'ORDER BY');
 
@@ -4133,7 +4133,7 @@ class ClickHouseTest extends TestCase
             ->limit(10)
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $prewherePos = strpos($query, 'PREWHERE');
         $limitPos = strpos($query, 'LIMIT');
 
@@ -4149,7 +4149,7 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('type', ['click'])])
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $finalPos = strpos($query, 'FINAL');
         $samplePos = strpos($query, 'SAMPLE');
         $prewherePos = strpos($query, 'PREWHERE');
@@ -4168,7 +4168,7 @@ class ClickHouseTest extends TestCase
             ->having([Query::greaterThan('cnt', 5)])
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $wherePos = strpos($query, 'WHERE');
         $havingPos = strpos($query, 'HAVING');
 
@@ -4196,7 +4196,7 @@ class ClickHouseTest extends TestCase
             ->union($other)
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
 
         // All elements present
         $this->assertStringContainsString('SELECT DISTINCT', $query);
@@ -4229,10 +4229,10 @@ class ClickHouseTest extends TestCase
             ])
             ->build();
 
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('WHERE `status` IN (?)', $result['query']);
-        $this->assertStringContainsString('ORDER BY', $result['query']);
-        $this->assertStringContainsString('LIMIT', $result['query']);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
+        $this->assertStringContainsString('ORDER BY', $result->query);
+        $this->assertStringContainsString('LIMIT', $result->query);
     }
 
     public function testQueriesMethodWithFinal(): void
@@ -4246,8 +4246,8 @@ class ClickHouseTest extends TestCase
             ])
             ->build();
 
-        $this->assertStringContainsString('FINAL', $result['query']);
-        $this->assertStringContainsString('WHERE `status` IN (?)', $result['query']);
+        $this->assertStringContainsString('FINAL', $result->query);
+        $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
     }
 
     public function testQueriesMethodWithSample(): void
@@ -4260,8 +4260,8 @@ class ClickHouseTest extends TestCase
             ])
             ->build();
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
-        $this->assertStringContainsString('WHERE', $result['query']);
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertStringContainsString('WHERE', $result->query);
     }
 
     public function testQueriesMethodWithAllClickHouseFeatures(): void
@@ -4278,10 +4278,10 @@ class ClickHouseTest extends TestCase
             ])
             ->build();
 
-        $this->assertStringContainsString('FINAL SAMPLE 0.1', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('WHERE', $result['query']);
-        $this->assertStringContainsString('ORDER BY', $result['query']);
+        $this->assertStringContainsString('FINAL SAMPLE 0.1', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('WHERE', $result->query);
+        $this->assertStringContainsString('ORDER BY', $result->query);
     }
 
     public function testQueriesComparedToFluentApiSameSql(): void
@@ -4302,8 +4302,8 @@ class ClickHouseTest extends TestCase
             ])
             ->build();
 
-        $this->assertEquals($resultA['query'], $resultB['query']);
-        $this->assertEquals($resultA['bindings'], $resultB['bindings']);
+        $this->assertEquals($resultA->query, $resultB->query);
+        $this->assertEquals($resultA->bindings, $resultB->bindings);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -4317,7 +4317,7 @@ class ClickHouseTest extends TestCase
             ->final()
             ->build();
 
-        $this->assertStringContainsString('FINAL', $result['query']);
+        $this->assertStringContainsString('FINAL', $result->query);
     }
 
     public function testEmptyTableNameWithSample(): void
@@ -4327,7 +4327,7 @@ class ClickHouseTest extends TestCase
             ->sample(0.5)
             ->build();
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result['query']);
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
     }
 
     public function testPrewhereWithEmptyFilterValues(): void
@@ -4337,7 +4337,7 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('type', [])])
             ->build();
 
-        $this->assertStringContainsString('PREWHERE', $result['query']);
+        $this->assertStringContainsString('PREWHERE', $result->query);
     }
 
     public function testVeryLongTableNameWithFinalSample(): void
@@ -4349,8 +4349,8 @@ class ClickHouseTest extends TestCase
             ->sample(0.1)
             ->build();
 
-        $this->assertStringContainsString('`' . $longName . '`', $result['query']);
-        $this->assertStringContainsString('FINAL SAMPLE 0.1', $result['query']);
+        $this->assertStringContainsString('`' . $longName . '`', $result->query);
+        $this->assertStringContainsString('FINAL SAMPLE 0.1', $result->query);
     }
 
     public function testMultipleBuildsConsistentOutput(): void
@@ -4366,10 +4366,10 @@ class ClickHouseTest extends TestCase
         $result2 = $builder->build();
         $result3 = $builder->build();
 
-        $this->assertEquals($result1['query'], $result2['query']);
-        $this->assertEquals($result2['query'], $result3['query']);
-        $this->assertEquals($result1['bindings'], $result2['bindings']);
-        $this->assertEquals($result2['bindings'], $result3['bindings']);
+        $this->assertEquals($result1->query, $result2->query);
+        $this->assertEquals($result2->query, $result3->query);
+        $this->assertEquals($result1->bindings, $result2->bindings);
+        $this->assertEquals($result2->bindings, $result3->bindings);
     }
 
     public function testBuildResetsBindingsButNotClickHouseState(): void
@@ -4384,12 +4384,12 @@ class ClickHouseTest extends TestCase
         $result2 = $builder->build();
 
         // ClickHouse state persists
-        $this->assertStringContainsString('FINAL', $result2['query']);
-        $this->assertStringContainsString('SAMPLE', $result2['query']);
-        $this->assertStringContainsString('PREWHERE', $result2['query']);
+        $this->assertStringContainsString('FINAL', $result2->query);
+        $this->assertStringContainsString('SAMPLE', $result2->query);
+        $this->assertStringContainsString('PREWHERE', $result2->query);
 
         // Bindings are consistent
-        $this->assertEquals($result1['bindings'], $result2['bindings']);
+        $this->assertEquals($result1->bindings, $result2->bindings);
     }
 
     public function testSampleWithAllBindingTypes(): void
@@ -4417,8 +4417,8 @@ class ClickHouseTest extends TestCase
             ->build();
 
         // Verify all binding types present
-        $this->assertNotEmpty($result['bindings']);
-        $this->assertGreaterThan(5, count($result['bindings']));
+        $this->assertNotEmpty($result->bindings);
+        $this->assertGreaterThan(5, count($result->bindings));
     }
 
     public function testPrewhereAppearsCorrectlyWithoutJoins(): void
@@ -4429,7 +4429,7 @@ class ClickHouseTest extends TestCase
             ->filter([Query::greaterThan('count', 5)])
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $this->assertStringContainsString('PREWHERE', $query);
         $this->assertStringContainsString('WHERE', $query);
 
@@ -4447,7 +4447,7 @@ class ClickHouseTest extends TestCase
             ->filter([Query::greaterThan('count', 5)])
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $joinPos = strpos($query, 'JOIN');
         $prewherePos = strpos($query, 'PREWHERE');
         $wherePos = strpos($query, 'WHERE');
@@ -4466,7 +4466,7 @@ class ClickHouseTest extends TestCase
             ->leftJoin('sessions', 'events.sid', 'sessions.id')
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $this->assertStringContainsString('FROM `events` FINAL SAMPLE 0.1', $query);
         $this->assertStringContainsString('JOIN `users`', $query);
         $this->assertStringContainsString('LEFT JOIN `sessions`', $query);
@@ -4608,7 +4608,7 @@ class ClickHouseTest extends TestCase
     public function testSampleVerySmall(): void
     {
         $result = (new Builder())->from('t')->sample(0.001)->build();
-        $this->assertStringContainsString('SAMPLE 0.001', $result['query']);
+        $this->assertStringContainsString('SAMPLE 0.001', $result->query);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -4762,10 +4762,10 @@ class ClickHouseTest extends TestCase
             ->filter([Query::greaterThan('count', 5)])
             ->union($sub)
             ->build();
-        $this->assertStringContainsString('FROM `events` FINAL', $result['query']);
-        $this->assertStringContainsString('PREWHERE', $result['query']);
-        $this->assertStringContainsString('UNION', $result['query']);
-        $this->assertStringContainsString('FROM `archive` FINAL SAMPLE 0.5', $result['query']);
+        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('UNION', $result->query);
+        $this->assertStringContainsString('FROM `archive` FINAL SAMPLE 0.5', $result->query);
     }
 
     public function testUnionAllBothWithFinal(): void
@@ -4774,8 +4774,8 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())->from('a')->final()
             ->unionAll($sub)
             ->build();
-        $this->assertStringContainsString('FROM `a` FINAL', $result['query']);
-        $this->assertStringContainsString('UNION ALL (SELECT * FROM `b` FINAL)', $result['query']);
+        $this->assertStringContainsString('FROM `a` FINAL', $result->query);
+        $this->assertStringContainsString('UNION ALL (SELECT * FROM `b` FINAL)', $result->query);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -4792,7 +4792,7 @@ class ClickHouseTest extends TestCase
             ->having([Query::greaterThan('total', 10)])
             ->build();
         // Binding order: prewhere, filter, having
-        $this->assertEquals(['click', 5, 10], $result['bindings']);
+        $this->assertEquals(['click', 5, 10], $result->bindings);
     }
 
     public function testPrewhereBindingOrderWithProviderAndCursor(): void
@@ -4809,7 +4809,7 @@ class ClickHouseTest extends TestCase
             ->sortAsc('_cursor')
             ->build();
         // Binding order: prewhere, filter(none), provider, cursor
-        $this->assertEquals(['click', 't1', 'abc'], $result['bindings']);
+        $this->assertEquals(['click', 't1', 'abc'], $result->bindings);
     }
 
     public function testPrewhereMultipleFiltersBindingOrder(): void
@@ -4823,7 +4823,7 @@ class ClickHouseTest extends TestCase
             ->limit(10)
             ->build();
         // prewhere bindings first, then filter, then limit
-        $this->assertEquals(['a', 3, 30, 10], $result['bindings']);
+        $this->assertEquals(['a', 3, 30, 10], $result->bindings);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -4856,7 +4856,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertEquals(
             'SELECT * FROM `events` FINAL SAMPLE 0.1 LEFT JOIN `users` ON `events`.`uid` = `users`.`id`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -4866,8 +4866,8 @@ class ClickHouseTest extends TestCase
             ->final()
             ->rightJoin('users', 'events.uid', 'users.id')
             ->build();
-        $this->assertStringContainsString('FROM `events` FINAL', $result['query']);
-        $this->assertStringContainsString('RIGHT JOIN', $result['query']);
+        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
+        $this->assertStringContainsString('RIGHT JOIN', $result->query);
     }
 
     public function testCrossJoinWithPrewhereFeature(): void
@@ -4876,9 +4876,9 @@ class ClickHouseTest extends TestCase
             ->crossJoin('colors')
             ->prewhere([Query::equal('type', ['a'])])
             ->build();
-        $this->assertStringContainsString('CROSS JOIN `colors`', $result['query']);
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result['query']);
-        $this->assertEquals(['a'], $result['bindings']);
+        $this->assertStringContainsString('CROSS JOIN `colors`', $result->query);
+        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
+        $this->assertEquals(['a'], $result->bindings);
     }
 
     public function testJoinWithNonDefaultOperator(): void
@@ -4886,7 +4886,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())->from('t')
             ->join('other', 'a', 'b', '!=')
             ->build();
-        $this->assertStringContainsString('JOIN `other` ON `a` != `b`', $result['query']);
+        $this->assertStringContainsString('JOIN `other` ON `a` != `b`', $result->query);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -4904,7 +4904,7 @@ class ClickHouseTest extends TestCase
                 }
             })
             ->build();
-        $query = $result['query'];
+        $query = $result->query;
         $prewherePos = strpos($query, 'PREWHERE');
         $wherePos = strpos($query, 'WHERE');
         // Provider should be in WHERE which comes after PREWHERE
@@ -4924,8 +4924,8 @@ class ClickHouseTest extends TestCase
                 }
             })
             ->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE _deleted = ?', $result['query']);
-        $this->assertEquals([0], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE _deleted = ?', $result->query);
+        $this->assertEquals([0], $result->bindings);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -4935,22 +4935,22 @@ class ClickHouseTest extends TestCase
     public function testPageZero(): void
     {
         $result = (new Builder())->from('t')->page(0, 10)->build();
-        $this->assertStringContainsString('LIMIT ?', $result['query']);
-        $this->assertStringContainsString('OFFSET ?', $result['query']);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertStringContainsString('OFFSET ?', $result->query);
         // page 0 -> offset clamped to 0
-        $this->assertEquals([10, 0], $result['bindings']);
+        $this->assertEquals([10, 0], $result->bindings);
     }
 
     public function testPageNegative(): void
     {
         $result = (new Builder())->from('t')->page(-1, 10)->build();
-        $this->assertEquals([10, 0], $result['bindings']);
+        $this->assertEquals([10, 0], $result->bindings);
     }
 
     public function testPageLargeNumber(): void
     {
         $result = (new Builder())->from('t')->page(1000000, 25)->build();
-        $this->assertEquals([25, 24999975], $result['bindings']);
+        $this->assertEquals([25, 24999975], $result->bindings);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -4960,7 +4960,7 @@ class ClickHouseTest extends TestCase
     public function testBuildWithoutFrom(): void
     {
         $result = (new Builder())->filter([Query::equal('x', [1])])->build();
-        $this->assertStringContainsString('FROM ``', $result['query']);
+        $this->assertStringContainsString('FROM ``', $result->query);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -5040,9 +5040,9 @@ class ClickHouseTest extends TestCase
                 Query::lessThan('total', 100),
             ])
             ->build();
-        $this->assertStringContainsString('HAVING `total` > ? AND `total` < ?', $result['query']);
-        $this->assertContains(5, $result['bindings']);
-        $this->assertContains(100, $result['bindings']);
+        $this->assertStringContainsString('HAVING `total` > ? AND `total` < ?', $result->query);
+        $this->assertContains(5, $result->bindings);
+        $this->assertContains(100, $result->bindings);
     }
 
     public function testHavingWithOrLogic(): void
@@ -5055,7 +5055,7 @@ class ClickHouseTest extends TestCase
                 Query::lessThan('total', 5),
             ])])
             ->build();
-        $this->assertStringContainsString('HAVING (`total` > ? OR `total` < ?)', $result['query']);
+        $this->assertStringContainsString('HAVING (`total` > ? OR `total` < ?)', $result->query);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -5075,11 +5075,11 @@ class ClickHouseTest extends TestCase
         $builder->reset()->from('other');
         $result = $builder->build();
 
-        $this->assertEquals('SELECT * FROM `other`', $result['query']);
-        $this->assertEquals([], $result['bindings']);
-        $this->assertStringNotContainsString('FINAL', $result['query']);
-        $this->assertStringNotContainsString('SAMPLE', $result['query']);
-        $this->assertStringNotContainsString('PREWHERE', $result['query']);
+        $this->assertEquals('SELECT * FROM `other`', $result->query);
+        $this->assertEquals([], $result->bindings);
+        $this->assertStringNotContainsString('FINAL', $result->query);
+        $this->assertStringNotContainsString('SAMPLE', $result->query);
+        $this->assertStringNotContainsString('PREWHERE', $result->query);
     }
 
     public function testResetFollowedByUnion(): void
@@ -5089,9 +5089,9 @@ class ClickHouseTest extends TestCase
             ->union((new Builder())->from('old'));
         $builder->reset()->from('b');
         $result = $builder->build();
-        $this->assertEquals('SELECT * FROM `b`', $result['query']);
-        $this->assertStringNotContainsString('UNION', $result['query']);
-        $this->assertStringNotContainsString('FINAL', $result['query']);
+        $this->assertEquals('SELECT * FROM `b`', $result->query);
+        $this->assertStringNotContainsString('UNION', $result->query);
+        $this->assertStringNotContainsString('FINAL', $result->query);
     }
 
     public function testConditionProviderPersistsAfterReset(): void
@@ -5108,9 +5108,9 @@ class ClickHouseTest extends TestCase
         $builder->build();
         $builder->reset()->from('other');
         $result = $builder->build();
-        $this->assertStringContainsString('FROM `other`', $result['query']);
-        $this->assertStringNotContainsString('FINAL', $result['query']);
-        $this->assertStringContainsString('_tenant = ?', $result['query']);
+        $this->assertStringContainsString('FROM `other`', $result->query);
+        $this->assertStringNotContainsString('FINAL', $result->query);
+        $this->assertStringContainsString('_tenant = ?', $result->query);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -5129,9 +5129,9 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertEquals(
             'SELECT * FROM `events` FINAL SAMPLE 0.1 PREWHERE `event_type` IN (?) WHERE `amount` > ? ORDER BY `amount` DESC LIMIT ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['purchase', 100, 50], $result['bindings']);
+        $this->assertEquals(['purchase', 100, 50], $result->bindings);
     }
 
     public function testKitchenSinkExactSql(): void
@@ -5156,9 +5156,9 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertEquals(
             '(SELECT DISTINCT COUNT(*) AS `total`, `event_type` FROM `events` FINAL SAMPLE 0.1 JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `event_type` IN (?) WHERE `amount` > ? GROUP BY `event_type` HAVING `total` > ? ORDER BY `total` DESC LIMIT ? OFFSET ?) UNION (SELECT * FROM `archive` FINAL WHERE `status` IN (?))',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['purchase', 100, 5, 50, 10, 'closed'], $result['bindings']);
+        $this->assertEquals(['purchase', 100, 5, 50, 10, 'closed'], $result->bindings);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -5222,53 +5222,53 @@ class ClickHouseTest extends TestCase
     public function testBindingTypesPreservedInt(): void
     {
         $result = (new Builder())->from('t')->filter([Query::greaterThan('age', 18)])->build();
-        $this->assertSame([18], $result['bindings']);
+        $this->assertSame([18], $result->bindings);
     }
 
     public function testBindingTypesPreservedFloat(): void
     {
         $result = (new Builder())->from('t')->filter([Query::greaterThan('score', 9.5)])->build();
-        $this->assertSame([9.5], $result['bindings']);
+        $this->assertSame([9.5], $result->bindings);
     }
 
     public function testBindingTypesPreservedBool(): void
     {
         $result = (new Builder())->from('t')->filter([Query::equal('active', [true])])->build();
-        $this->assertSame([true], $result['bindings']);
+        $this->assertSame([true], $result->bindings);
     }
 
     public function testBindingTypesPreservedNull(): void
     {
         $result = (new Builder())->from('t')->filter([Query::equal('val', [null])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `val` IS NULL', $result['query']);
-        $this->assertSame([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `val` IS NULL', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testEqualWithNullAndNonNull(): void
     {
         $result = (new Builder())->from('t')->filter([Query::equal('col', ['a', null])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`col` IN (?) OR `col` IS NULL)', $result['query']);
-        $this->assertSame(['a'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`col` IN (?) OR `col` IS NULL)', $result->query);
+        $this->assertSame(['a'], $result->bindings);
     }
 
     public function testNotEqualWithNullOnly(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notEqual('col', [null])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `col` IS NOT NULL', $result['query']);
-        $this->assertSame([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `col` IS NOT NULL', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testNotEqualWithNullAndNonNull(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notEqual('col', ['a', 'b', null])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`col` NOT IN (?, ?) AND `col` IS NOT NULL)', $result['query']);
-        $this->assertSame(['a', 'b'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`col` NOT IN (?, ?) AND `col` IS NOT NULL)', $result->query);
+        $this->assertSame(['a', 'b'], $result->bindings);
     }
 
     public function testBindingTypesPreservedString(): void
     {
         $result = (new Builder())->from('t')->filter([Query::equal('name', ['hello'])])->build();
-        $this->assertSame(['hello'], $result['bindings']);
+        $this->assertSame(['hello'], $result->bindings);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -5283,8 +5283,8 @@ class ClickHouseTest extends TestCase
                 Query::raw('custom_func(y) > ?', [5]),
             ])])
             ->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`x` > ? AND custom_func(y) > ?)', $result['query']);
-        $this->assertEquals([1, 5], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`x` > ? AND custom_func(y) > ?)', $result->query);
+        $this->assertEquals([1, 5], $result->bindings);
     }
 
     public function testRawInsideLogicalOr(): void
@@ -5295,8 +5295,8 @@ class ClickHouseTest extends TestCase
                 Query::raw('b IS NOT NULL', []),
             ])])
             ->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?) OR b IS NOT NULL)', $result['query']);
-        $this->assertEquals([1], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?) OR b IS NOT NULL)', $result->query);
+        $this->assertEquals([1], $result->bindings);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -5306,23 +5306,23 @@ class ClickHouseTest extends TestCase
     public function testNegativeLimit(): void
     {
         $result = (new Builder())->from('t')->limit(-1)->build();
-        $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result['query']);
-        $this->assertEquals([-1], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result->query);
+        $this->assertEquals([-1], $result->bindings);
     }
 
     public function testNegativeOffset(): void
     {
         // OFFSET without LIMIT is suppressed
         $result = (new Builder())->from('t')->offset(-5)->build();
-        $this->assertEquals('SELECT * FROM `t`', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testLimitZero(): void
     {
         $result = (new Builder())->from('t')->limit(0)->build();
-        $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result['query']);
-        $this->assertEquals([0], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result->query);
+        $this->assertEquals([0], $result->bindings);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -5332,20 +5332,20 @@ class ClickHouseTest extends TestCase
     public function testMultipleLimitsFirstWins(): void
     {
         $result = (new Builder())->from('t')->limit(10)->limit(20)->build();
-        $this->assertEquals([10], $result['bindings']);
+        $this->assertEquals([10], $result->bindings);
     }
 
     public function testMultipleOffsetsFirstWins(): void
     {
         // OFFSET without LIMIT is suppressed
         $result = (new Builder())->from('t')->offset(5)->offset(50)->build();
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testCursorAfterAndBeforeFirstWins(): void
     {
         $result = (new Builder())->from('t')->cursorAfter('a')->cursorBefore('b')->sortAsc('_cursor')->build();
-        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` > ?', $result->query);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -5356,6 +5356,6 @@ class ClickHouseTest extends TestCase
     {
         $other = (new Builder())->from('b');
         $result = (new Builder())->from('a')->distinct()->union($other)->build();
-        $this->assertEquals('(SELECT DISTINCT * FROM `a`) UNION (SELECT * FROM `b`)', $result['query']);
+        $this->assertEquals('(SELECT DISTINCT * FROM `a`) UNION (SELECT * FROM `b`)', $result->query);
     }
 }

@@ -3,262 +3,15 @@
 namespace Utopia\Query;
 
 use JsonException;
+use Utopia\Query\Builder\GroupedQueries;
 use Utopia\Query\Exception as QueryException;
 
 /** @phpstan-consistent-constructor */
 class Query
 {
-    // Filter methods
-    public const TYPE_EQUAL = 'equal';
-
-    public const TYPE_NOT_EQUAL = 'notEqual';
-
-    public const TYPE_LESSER = 'lessThan';
-
-    public const TYPE_LESSER_EQUAL = 'lessThanEqual';
-
-    public const TYPE_GREATER = 'greaterThan';
-
-    public const TYPE_GREATER_EQUAL = 'greaterThanEqual';
-
-    public const TYPE_CONTAINS = 'contains';
-
-    public const TYPE_CONTAINS_ANY = 'containsAny';
-
-    public const TYPE_NOT_CONTAINS = 'notContains';
-
-    public const TYPE_SEARCH = 'search';
-
-    public const TYPE_NOT_SEARCH = 'notSearch';
-
-    public const TYPE_IS_NULL = 'isNull';
-
-    public const TYPE_IS_NOT_NULL = 'isNotNull';
-
-    public const TYPE_BETWEEN = 'between';
-
-    public const TYPE_NOT_BETWEEN = 'notBetween';
-
-    public const TYPE_STARTS_WITH = 'startsWith';
-
-    public const TYPE_NOT_STARTS_WITH = 'notStartsWith';
-
-    public const TYPE_ENDS_WITH = 'endsWith';
-
-    public const TYPE_NOT_ENDS_WITH = 'notEndsWith';
-
-    public const TYPE_REGEX = 'regex';
-
-    public const TYPE_EXISTS = 'exists';
-
-    public const TYPE_NOT_EXISTS = 'notExists';
-
-    // Spatial methods
-    public const TYPE_CROSSES = 'crosses';
-
-    public const TYPE_NOT_CROSSES = 'notCrosses';
-
-    public const TYPE_DISTANCE_EQUAL = 'distanceEqual';
-
-    public const TYPE_DISTANCE_NOT_EQUAL = 'distanceNotEqual';
-
-    public const TYPE_DISTANCE_GREATER_THAN = 'distanceGreaterThan';
-
-    public const TYPE_DISTANCE_LESS_THAN = 'distanceLessThan';
-
-    public const TYPE_INTERSECTS = 'intersects';
-
-    public const TYPE_NOT_INTERSECTS = 'notIntersects';
-
-    public const TYPE_OVERLAPS = 'overlaps';
-
-    public const TYPE_NOT_OVERLAPS = 'notOverlaps';
-
-    public const TYPE_TOUCHES = 'touches';
-
-    public const TYPE_NOT_TOUCHES = 'notTouches';
-
-    // Vector query methods
-    public const TYPE_VECTOR_DOT = 'vectorDot';
-
-    public const TYPE_VECTOR_COSINE = 'vectorCosine';
-
-    public const TYPE_VECTOR_EUCLIDEAN = 'vectorEuclidean';
-
-    public const TYPE_SELECT = 'select';
-
-    // Order methods
-    public const TYPE_ORDER_DESC = 'orderDesc';
-
-    public const TYPE_ORDER_ASC = 'orderAsc';
-
-    public const TYPE_ORDER_RANDOM = 'orderRandom';
-
-    // Pagination methods
-    public const TYPE_LIMIT = 'limit';
-
-    public const TYPE_OFFSET = 'offset';
-
-    public const TYPE_CURSOR_AFTER = 'cursorAfter';
-
-    public const TYPE_CURSOR_BEFORE = 'cursorBefore';
-
-    // Logical methods
-    public const TYPE_AND = 'and';
-
-    public const TYPE_OR = 'or';
-
-    public const TYPE_CONTAINS_ALL = 'containsAll';
-
-    public const TYPE_ELEM_MATCH = 'elemMatch';
-
-    // Aggregation methods
-    public const TYPE_COUNT = 'count';
-
-    public const TYPE_SUM = 'sum';
-
-    public const TYPE_AVG = 'avg';
-
-    public const TYPE_MIN = 'min';
-
-    public const TYPE_MAX = 'max';
-
-    public const TYPE_GROUP_BY = 'groupBy';
-
-    public const TYPE_HAVING = 'having';
-
-    // Distinct
-    public const TYPE_DISTINCT = 'distinct';
-
-    // Join methods
-    public const TYPE_JOIN = 'join';
-
-    public const TYPE_LEFT_JOIN = 'leftJoin';
-
-    public const TYPE_RIGHT_JOIN = 'rightJoin';
-
-    public const TYPE_CROSS_JOIN = 'crossJoin';
-
-    // Union
-    public const TYPE_UNION = 'union';
-
-    public const TYPE_UNION_ALL = 'unionAll';
-
-    // Raw
-    public const TYPE_RAW = 'raw';
-
     public const DEFAULT_ALIAS = 'main';
 
-    // Order direction constants (inlined from Database)
-    public const ORDER_ASC = 'ASC';
-
-    public const ORDER_DESC = 'DESC';
-
-    public const ORDER_RANDOM = 'RANDOM';
-
-    // Cursor direction constants (inlined from Database)
-    public const CURSOR_AFTER = 'after';
-
-    public const CURSOR_BEFORE = 'before';
-
-    public const TYPES = [
-        self::TYPE_EQUAL,
-        self::TYPE_NOT_EQUAL,
-        self::TYPE_LESSER,
-        self::TYPE_LESSER_EQUAL,
-        self::TYPE_GREATER,
-        self::TYPE_GREATER_EQUAL,
-        self::TYPE_CONTAINS,
-        self::TYPE_CONTAINS_ANY,
-        self::TYPE_NOT_CONTAINS,
-        self::TYPE_SEARCH,
-        self::TYPE_NOT_SEARCH,
-        self::TYPE_IS_NULL,
-        self::TYPE_IS_NOT_NULL,
-        self::TYPE_BETWEEN,
-        self::TYPE_NOT_BETWEEN,
-        self::TYPE_STARTS_WITH,
-        self::TYPE_NOT_STARTS_WITH,
-        self::TYPE_ENDS_WITH,
-        self::TYPE_NOT_ENDS_WITH,
-        self::TYPE_CROSSES,
-        self::TYPE_NOT_CROSSES,
-        self::TYPE_DISTANCE_EQUAL,
-        self::TYPE_DISTANCE_NOT_EQUAL,
-        self::TYPE_DISTANCE_GREATER_THAN,
-        self::TYPE_DISTANCE_LESS_THAN,
-        self::TYPE_INTERSECTS,
-        self::TYPE_NOT_INTERSECTS,
-        self::TYPE_OVERLAPS,
-        self::TYPE_NOT_OVERLAPS,
-        self::TYPE_TOUCHES,
-        self::TYPE_NOT_TOUCHES,
-        self::TYPE_VECTOR_DOT,
-        self::TYPE_VECTOR_COSINE,
-        self::TYPE_VECTOR_EUCLIDEAN,
-        self::TYPE_EXISTS,
-        self::TYPE_NOT_EXISTS,
-        self::TYPE_SELECT,
-        self::TYPE_ORDER_DESC,
-        self::TYPE_ORDER_ASC,
-        self::TYPE_ORDER_RANDOM,
-        self::TYPE_LIMIT,
-        self::TYPE_OFFSET,
-        self::TYPE_CURSOR_AFTER,
-        self::TYPE_CURSOR_BEFORE,
-        self::TYPE_AND,
-        self::TYPE_OR,
-        self::TYPE_CONTAINS_ALL,
-        self::TYPE_ELEM_MATCH,
-        self::TYPE_REGEX,
-        self::TYPE_COUNT,
-        self::TYPE_SUM,
-        self::TYPE_AVG,
-        self::TYPE_MIN,
-        self::TYPE_MAX,
-        self::TYPE_GROUP_BY,
-        self::TYPE_HAVING,
-        self::TYPE_DISTINCT,
-        self::TYPE_JOIN,
-        self::TYPE_LEFT_JOIN,
-        self::TYPE_RIGHT_JOIN,
-        self::TYPE_CROSS_JOIN,
-        self::TYPE_UNION,
-        self::TYPE_UNION_ALL,
-        self::TYPE_RAW,
-    ];
-
-    public const AGGREGATE_TYPES = [
-        self::TYPE_COUNT,
-        self::TYPE_SUM,
-        self::TYPE_AVG,
-        self::TYPE_MIN,
-        self::TYPE_MAX,
-    ];
-
-    public const JOIN_TYPES = [
-        self::TYPE_JOIN,
-        self::TYPE_LEFT_JOIN,
-        self::TYPE_RIGHT_JOIN,
-        self::TYPE_CROSS_JOIN,
-    ];
-
-    public const VECTOR_TYPES = [
-        self::TYPE_VECTOR_DOT,
-        self::TYPE_VECTOR_COSINE,
-        self::TYPE_VECTOR_EUCLIDEAN,
-    ];
-
-    protected const LOGICAL_TYPES = [
-        self::TYPE_AND,
-        self::TYPE_OR,
-        self::TYPE_ELEM_MATCH,
-        self::TYPE_HAVING,
-        self::TYPE_UNION,
-        self::TYPE_UNION_ALL,
-    ];
-
-    protected string $method = '';
+    protected Method $method;
 
     protected string $attribute = '';
 
@@ -276,9 +29,9 @@ class Query
      *
      * @param  array<mixed>  $values
      */
-    public function __construct(string $method, string $attribute = '', array $values = [])
+    public function __construct(Method|string $method, string $attribute = '', array $values = [])
     {
-        $this->method = $method;
+        $this->method = $method instanceof Method ? $method : Method::from($method);
         $this->attribute = $attribute;
         $this->values = $values;
     }
@@ -292,7 +45,7 @@ class Query
         }
     }
 
-    public function getMethod(): string
+    public function getMethod(): Method
     {
         return $this->method;
     }
@@ -318,9 +71,9 @@ class Query
     /**
      * Sets method
      */
-    public function setMethod(string $method): static
+    public function setMethod(Method|string $method): static
     {
-        $this->method = $method;
+        $this->method = $method instanceof Method ? $method : Method::from($method);
 
         return $this;
     }
@@ -362,73 +115,7 @@ class Query
      */
     public static function isMethod(string $value): bool
     {
-        return match ($value) {
-            self::TYPE_EQUAL,
-            self::TYPE_NOT_EQUAL,
-            self::TYPE_LESSER,
-            self::TYPE_LESSER_EQUAL,
-            self::TYPE_GREATER,
-            self::TYPE_GREATER_EQUAL,
-            self::TYPE_CONTAINS,
-            self::TYPE_CONTAINS_ANY,
-            self::TYPE_NOT_CONTAINS,
-            self::TYPE_SEARCH,
-            self::TYPE_NOT_SEARCH,
-            self::TYPE_ORDER_ASC,
-            self::TYPE_ORDER_DESC,
-            self::TYPE_ORDER_RANDOM,
-            self::TYPE_LIMIT,
-            self::TYPE_OFFSET,
-            self::TYPE_CURSOR_AFTER,
-            self::TYPE_CURSOR_BEFORE,
-            self::TYPE_IS_NULL,
-            self::TYPE_IS_NOT_NULL,
-            self::TYPE_BETWEEN,
-            self::TYPE_NOT_BETWEEN,
-            self::TYPE_STARTS_WITH,
-            self::TYPE_NOT_STARTS_WITH,
-            self::TYPE_ENDS_WITH,
-            self::TYPE_NOT_ENDS_WITH,
-            self::TYPE_CROSSES,
-            self::TYPE_NOT_CROSSES,
-            self::TYPE_DISTANCE_EQUAL,
-            self::TYPE_DISTANCE_NOT_EQUAL,
-            self::TYPE_DISTANCE_GREATER_THAN,
-            self::TYPE_DISTANCE_LESS_THAN,
-            self::TYPE_INTERSECTS,
-            self::TYPE_NOT_INTERSECTS,
-            self::TYPE_OVERLAPS,
-            self::TYPE_NOT_OVERLAPS,
-            self::TYPE_TOUCHES,
-            self::TYPE_NOT_TOUCHES,
-            self::TYPE_OR,
-            self::TYPE_AND,
-            self::TYPE_CONTAINS_ALL,
-            self::TYPE_ELEM_MATCH,
-            self::TYPE_SELECT,
-            self::TYPE_VECTOR_DOT,
-            self::TYPE_VECTOR_COSINE,
-            self::TYPE_VECTOR_EUCLIDEAN,
-            self::TYPE_EXISTS,
-            self::TYPE_NOT_EXISTS,
-            self::TYPE_REGEX,
-            self::TYPE_COUNT,
-            self::TYPE_SUM,
-            self::TYPE_AVG,
-            self::TYPE_MIN,
-            self::TYPE_MAX,
-            self::TYPE_GROUP_BY,
-            self::TYPE_HAVING,
-            self::TYPE_DISTINCT,
-            self::TYPE_JOIN,
-            self::TYPE_LEFT_JOIN,
-            self::TYPE_RIGHT_JOIN,
-            self::TYPE_CROSS_JOIN,
-            self::TYPE_UNION,
-            self::TYPE_UNION_ALL,
-            self::TYPE_RAW => true,
-            default => false,
-        };
+        return Method::tryFrom($value) !== null;
     }
 
     /**
@@ -436,21 +123,7 @@ class Query
      */
     public function isSpatialQuery(): bool
     {
-        return match ($this->method) {
-            self::TYPE_CROSSES,
-            self::TYPE_NOT_CROSSES,
-            self::TYPE_DISTANCE_EQUAL,
-            self::TYPE_DISTANCE_NOT_EQUAL,
-            self::TYPE_DISTANCE_GREATER_THAN,
-            self::TYPE_DISTANCE_LESS_THAN,
-            self::TYPE_INTERSECTS,
-            self::TYPE_NOT_INTERSECTS,
-            self::TYPE_OVERLAPS,
-            self::TYPE_NOT_OVERLAPS,
-            self::TYPE_TOUCHES,
-            self::TYPE_NOT_TOUCHES => true,
-            default => false,
-        };
+        return $this->method->isSpatial();
     }
 
     /**
@@ -503,14 +176,16 @@ class Query
             throw new QueryException('Invalid query values. Must be an array, got '.\gettype($values));
         }
 
-        if (\in_array($method, self::LOGICAL_TYPES, true)) {
+        $methodEnum = Method::from($method);
+
+        if ($methodEnum->isNested()) {
             foreach ($values as $index => $value) {
                 /** @var array<string, mixed> $value */
                 $values[$index] = static::parseQuery($value);
             }
         }
 
-        return new static($method, $attribute, $values);
+        return new static($methodEnum, $attribute, $values);
     }
 
     /**
@@ -537,13 +212,13 @@ class Query
      */
     public function toArray(): array
     {
-        $array = ['method' => $this->method];
+        $array = ['method' => $this->method->value];
 
         if (! empty($this->attribute)) {
             $array['attribute'] = $this->attribute;
         }
 
-        if (\in_array($this->method, self::LOGICAL_TYPES, true)) {
+        if ($this->method->isNested()) {
             foreach ($this->values as $index => $value) {
                 /** @var Query $value */
                 $array['values'][$index] = $value->toArray();
@@ -564,33 +239,33 @@ class Query
     public function compile(Compiler $compiler): string
     {
         return match ($this->method) {
-            self::TYPE_ORDER_ASC,
-            self::TYPE_ORDER_DESC,
-            self::TYPE_ORDER_RANDOM => $compiler->compileOrder($this),
+            Method::OrderAsc,
+            Method::OrderDesc,
+            Method::OrderRandom => $compiler->compileOrder($this),
 
-            self::TYPE_LIMIT => $compiler->compileLimit($this),
+            Method::Limit => $compiler->compileLimit($this),
 
-            self::TYPE_OFFSET => $compiler->compileOffset($this),
+            Method::Offset => $compiler->compileOffset($this),
 
-            self::TYPE_CURSOR_AFTER,
-            self::TYPE_CURSOR_BEFORE => $compiler->compileCursor($this),
+            Method::CursorAfter,
+            Method::CursorBefore => $compiler->compileCursor($this),
 
-            self::TYPE_SELECT => $compiler->compileSelect($this),
+            Method::Select => $compiler->compileSelect($this),
 
-            self::TYPE_COUNT,
-            self::TYPE_SUM,
-            self::TYPE_AVG,
-            self::TYPE_MIN,
-            self::TYPE_MAX => $compiler->compileAggregate($this),
+            Method::Count,
+            Method::Sum,
+            Method::Avg,
+            Method::Min,
+            Method::Max => $compiler->compileAggregate($this),
 
-            self::TYPE_GROUP_BY => $compiler->compileGroupBy($this),
+            Method::GroupBy => $compiler->compileGroupBy($this),
 
-            self::TYPE_JOIN,
-            self::TYPE_LEFT_JOIN,
-            self::TYPE_RIGHT_JOIN,
-            self::TYPE_CROSS_JOIN => $compiler->compileJoin($this),
+            Method::Join,
+            Method::LeftJoin,
+            Method::RightJoin,
+            Method::CrossJoin => $compiler->compileJoin($this),
 
-            self::TYPE_HAVING => $compiler->compileFilter($this),
+            Method::Having => $compiler->compileFilter($this),
 
             default => $compiler->compileFilter($this),
         };
@@ -615,7 +290,7 @@ class Query
      */
     public static function equal(string $attribute, array $values): static
     {
-        return new static(self::TYPE_EQUAL, $attribute, $values);
+        return new static(Method::Equal, $attribute, $values);
     }
 
     /**
@@ -630,7 +305,7 @@ class Query
             $value = [$value];
         }
 
-        return new static(self::TYPE_NOT_EQUAL, $attribute, $value);
+        return new static(Method::NotEqual, $attribute, $value);
     }
 
     /**
@@ -638,7 +313,7 @@ class Query
      */
     public static function lessThan(string $attribute, string|int|float|bool $value): static
     {
-        return new static(self::TYPE_LESSER, $attribute, [$value]);
+        return new static(Method::LessThan, $attribute, [$value]);
     }
 
     /**
@@ -646,7 +321,7 @@ class Query
      */
     public static function lessThanEqual(string $attribute, string|int|float|bool $value): static
     {
-        return new static(self::TYPE_LESSER_EQUAL, $attribute, [$value]);
+        return new static(Method::LessThanEqual, $attribute, [$value]);
     }
 
     /**
@@ -654,7 +329,7 @@ class Query
      */
     public static function greaterThan(string $attribute, string|int|float|bool $value): static
     {
-        return new static(self::TYPE_GREATER, $attribute, [$value]);
+        return new static(Method::GreaterThan, $attribute, [$value]);
     }
 
     /**
@@ -662,7 +337,7 @@ class Query
      */
     public static function greaterThanEqual(string $attribute, string|int|float|bool $value): static
     {
-        return new static(self::TYPE_GREATER_EQUAL, $attribute, [$value]);
+        return new static(Method::GreaterThanEqual, $attribute, [$value]);
     }
 
     /**
@@ -674,7 +349,7 @@ class Query
      */
     public static function contains(string $attribute, array $values): static
     {
-        return new static(self::TYPE_CONTAINS, $attribute, $values);
+        return new static(Method::Contains, $attribute, $values);
     }
 
     /**
@@ -685,7 +360,7 @@ class Query
      */
     public static function containsAny(string $attribute, array $values): static
     {
-        return new static(self::TYPE_CONTAINS_ANY, $attribute, $values);
+        return new static(Method::ContainsAny, $attribute, $values);
     }
 
     /**
@@ -695,7 +370,7 @@ class Query
      */
     public static function notContains(string $attribute, array $values): static
     {
-        return new static(self::TYPE_NOT_CONTAINS, $attribute, $values);
+        return new static(Method::NotContains, $attribute, $values);
     }
 
     /**
@@ -703,7 +378,7 @@ class Query
      */
     public static function between(string $attribute, string|int|float|bool $start, string|int|float|bool $end): static
     {
-        return new static(self::TYPE_BETWEEN, $attribute, [$start, $end]);
+        return new static(Method::Between, $attribute, [$start, $end]);
     }
 
     /**
@@ -711,7 +386,7 @@ class Query
      */
     public static function notBetween(string $attribute, string|int|float|bool $start, string|int|float|bool $end): static
     {
-        return new static(self::TYPE_NOT_BETWEEN, $attribute, [$start, $end]);
+        return new static(Method::NotBetween, $attribute, [$start, $end]);
     }
 
     /**
@@ -719,7 +394,7 @@ class Query
      */
     public static function search(string $attribute, string $value): static
     {
-        return new static(self::TYPE_SEARCH, $attribute, [$value]);
+        return new static(Method::Search, $attribute, [$value]);
     }
 
     /**
@@ -727,7 +402,7 @@ class Query
      */
     public static function notSearch(string $attribute, string $value): static
     {
-        return new static(self::TYPE_NOT_SEARCH, $attribute, [$value]);
+        return new static(Method::NotSearch, $attribute, [$value]);
     }
 
     /**
@@ -737,7 +412,7 @@ class Query
      */
     public static function select(array $attributes): static
     {
-        return new static(self::TYPE_SELECT, values: $attributes);
+        return new static(Method::Select, values: $attributes);
     }
 
     /**
@@ -745,7 +420,7 @@ class Query
      */
     public static function orderDesc(string $attribute = ''): static
     {
-        return new static(self::TYPE_ORDER_DESC, $attribute);
+        return new static(Method::OrderDesc, $attribute);
     }
 
     /**
@@ -753,7 +428,7 @@ class Query
      */
     public static function orderAsc(string $attribute = ''): static
     {
-        return new static(self::TYPE_ORDER_ASC, $attribute);
+        return new static(Method::OrderAsc, $attribute);
     }
 
     /**
@@ -761,7 +436,7 @@ class Query
      */
     public static function orderRandom(): static
     {
-        return new static(self::TYPE_ORDER_RANDOM);
+        return new static(Method::OrderRandom);
     }
 
     /**
@@ -769,7 +444,7 @@ class Query
      */
     public static function limit(int $value): static
     {
-        return new static(self::TYPE_LIMIT, values: [$value]);
+        return new static(Method::Limit, values: [$value]);
     }
 
     /**
@@ -777,7 +452,7 @@ class Query
      */
     public static function offset(int $value): static
     {
-        return new static(self::TYPE_OFFSET, values: [$value]);
+        return new static(Method::Offset, values: [$value]);
     }
 
     /**
@@ -785,7 +460,7 @@ class Query
      */
     public static function cursorAfter(mixed $value): static
     {
-        return new static(self::TYPE_CURSOR_AFTER, values: [$value]);
+        return new static(Method::CursorAfter, values: [$value]);
     }
 
     /**
@@ -793,7 +468,7 @@ class Query
      */
     public static function cursorBefore(mixed $value): static
     {
-        return new static(self::TYPE_CURSOR_BEFORE, values: [$value]);
+        return new static(Method::CursorBefore, values: [$value]);
     }
 
     /**
@@ -801,7 +476,7 @@ class Query
      */
     public static function isNull(string $attribute): static
     {
-        return new static(self::TYPE_IS_NULL, $attribute);
+        return new static(Method::IsNull, $attribute);
     }
 
     /**
@@ -809,27 +484,27 @@ class Query
      */
     public static function isNotNull(string $attribute): static
     {
-        return new static(self::TYPE_IS_NOT_NULL, $attribute);
+        return new static(Method::IsNotNull, $attribute);
     }
 
     public static function startsWith(string $attribute, string $value): static
     {
-        return new static(self::TYPE_STARTS_WITH, $attribute, [$value]);
+        return new static(Method::StartsWith, $attribute, [$value]);
     }
 
     public static function notStartsWith(string $attribute, string $value): static
     {
-        return new static(self::TYPE_NOT_STARTS_WITH, $attribute, [$value]);
+        return new static(Method::NotStartsWith, $attribute, [$value]);
     }
 
     public static function endsWith(string $attribute, string $value): static
     {
-        return new static(self::TYPE_ENDS_WITH, $attribute, [$value]);
+        return new static(Method::EndsWith, $attribute, [$value]);
     }
 
     public static function notEndsWith(string $attribute, string $value): static
     {
-        return new static(self::TYPE_NOT_ENDS_WITH, $attribute, [$value]);
+        return new static(Method::NotEndsWith, $attribute, [$value]);
     }
 
     /**
@@ -885,7 +560,7 @@ class Query
      */
     public static function or(array $queries): static
     {
-        return new static(self::TYPE_OR, '', $queries);
+        return new static(Method::Or, '', $queries);
     }
 
     /**
@@ -893,7 +568,7 @@ class Query
      */
     public static function and(array $queries): static
     {
-        return new static(self::TYPE_AND, '', $queries);
+        return new static(Method::And, '', $queries);
     }
 
     /**
@@ -901,14 +576,14 @@ class Query
      */
     public static function containsAll(string $attribute, array $values): static
     {
-        return new static(self::TYPE_CONTAINS_ALL, $attribute, $values);
+        return new static(Method::ContainsAll, $attribute, $values);
     }
 
     /**
      * Filters $queries for $types
      *
      * @param  array<static>  $queries
-     * @param  array<string>  $types
+     * @param  array<Method>  $types
      * @return array<static>
      */
     public static function getByType(array $queries, array $types, bool $clone = true): array
@@ -933,8 +608,8 @@ class Query
         return self::getByType(
             $queries,
             [
-                Query::TYPE_CURSOR_AFTER,
-                Query::TYPE_CURSOR_BEFORE,
+                Method::CursorAfter,
+                Method::CursorBefore,
             ],
             $clone
         );
@@ -944,24 +619,8 @@ class Query
      * Iterates through queries and groups them by type
      *
      * @param  array<mixed>  $queries
-     * @return array{
-     *     filters: list<Query>,
-     *     selections: list<Query>,
-     *     aggregations: list<Query>,
-     *     groupBy: list<string>,
-     *     having: list<Query>,
-     *     distinct: bool,
-     *     joins: list<Query>,
-     *     unions: list<Query>,
-     *     limit: int|null,
-     *     offset: int|null,
-     *     orderAttributes: array<string>,
-     *     orderTypes: array<string>,
-     *     cursor: mixed,
-     *     cursorDirection: string|null
-     * }
      */
-    public static function groupByType(array $queries): array
+    public static function groupByType(array $queries): GroupedQueries
     {
         $filters = [];
         $selections = [];
@@ -988,21 +647,21 @@ class Query
             $values = $query->getValues();
 
             switch ($method) {
-                case Query::TYPE_ORDER_ASC:
-                case Query::TYPE_ORDER_DESC:
-                case Query::TYPE_ORDER_RANDOM:
+                case Method::OrderAsc:
+                case Method::OrderDesc:
+                case Method::OrderRandom:
                     if (! empty($attribute)) {
                         $orderAttributes[] = $attribute;
                     }
 
                     $orderTypes[] = match ($method) {
-                        Query::TYPE_ORDER_ASC => self::ORDER_ASC,
-                        Query::TYPE_ORDER_DESC => self::ORDER_DESC,
-                        Query::TYPE_ORDER_RANDOM => self::ORDER_RANDOM,
+                        Method::OrderAsc => OrderDirection::Asc,
+                        Method::OrderDesc => OrderDirection::Desc,
+                        Method::OrderRandom => OrderDirection::Random,
                     };
 
                     break;
-                case Query::TYPE_LIMIT:
+                case Method::Limit:
                     // Keep the 1st limit encountered and ignore the rest
                     if ($limit !== null) {
                         break;
@@ -1010,7 +669,7 @@ class Query
 
                     $limit = isset($values[0]) && \is_numeric($values[0]) ? \intval($values[0]) : $limit;
                     break;
-                case Query::TYPE_OFFSET:
+                case Method::Offset:
                     // Keep the 1st offset encountered and ignore the rest
                     if ($offset !== null) {
                         break;
@@ -1018,53 +677,53 @@ class Query
 
                     $offset = isset($values[0]) && \is_numeric($values[0]) ? \intval($values[0]) : $offset;
                     break;
-                case Query::TYPE_CURSOR_AFTER:
-                case Query::TYPE_CURSOR_BEFORE:
+                case Method::CursorAfter:
+                case Method::CursorBefore:
                     // Keep the 1st cursor encountered and ignore the rest
                     if ($cursor !== null) {
                         break;
                     }
 
                     $cursor = $values[0] ?? $limit;
-                    $cursorDirection = $method === Query::TYPE_CURSOR_AFTER ? self::CURSOR_AFTER : self::CURSOR_BEFORE;
+                    $cursorDirection = $method === Method::CursorAfter ? CursorDirection::After : CursorDirection::Before;
                     break;
 
-                case Query::TYPE_SELECT:
+                case Method::Select:
                     $selections[] = clone $query;
                     break;
 
-                case Query::TYPE_COUNT:
-                case Query::TYPE_SUM:
-                case Query::TYPE_AVG:
-                case Query::TYPE_MIN:
-                case Query::TYPE_MAX:
+                case Method::Count:
+                case Method::Sum:
+                case Method::Avg:
+                case Method::Min:
+                case Method::Max:
                     $aggregations[] = clone $query;
                     break;
 
-                case Query::TYPE_GROUP_BY:
+                case Method::GroupBy:
                     /** @var array<string> $values */
                     foreach ($values as $col) {
                         $groupBy[] = $col;
                     }
                     break;
 
-                case Query::TYPE_HAVING:
+                case Method::Having:
                     $having[] = clone $query;
                     break;
 
-                case Query::TYPE_DISTINCT:
+                case Method::Distinct:
                     $distinct = true;
                     break;
 
-                case Query::TYPE_JOIN:
-                case Query::TYPE_LEFT_JOIN:
-                case Query::TYPE_RIGHT_JOIN:
-                case Query::TYPE_CROSS_JOIN:
+                case Method::Join:
+                case Method::LeftJoin:
+                case Method::RightJoin:
+                case Method::CrossJoin:
                     $joins[] = clone $query;
                     break;
 
-                case Query::TYPE_UNION:
-                case Query::TYPE_UNION_ALL:
+                case Method::Union:
+                case Method::UnionAll:
                     $unions[] = clone $query;
                     break;
 
@@ -1074,22 +733,22 @@ class Query
             }
         }
 
-        return [
-            'filters' => $filters,
-            'selections' => $selections,
-            'aggregations' => $aggregations,
-            'groupBy' => $groupBy,
-            'having' => $having,
-            'distinct' => $distinct,
-            'joins' => $joins,
-            'unions' => $unions,
-            'limit' => $limit,
-            'offset' => $offset,
-            'orderAttributes' => $orderAttributes,
-            'orderTypes' => $orderTypes,
-            'cursor' => $cursor,
-            'cursorDirection' => $cursorDirection,
-        ];
+        return new GroupedQueries(
+            filters: $filters,
+            selections: $selections,
+            aggregations: $aggregations,
+            groupBy: $groupBy,
+            having: $having,
+            distinct: $distinct,
+            joins: $joins,
+            unions: $unions,
+            limit: $limit,
+            offset: $offset,
+            orderAttributes: $orderAttributes,
+            orderTypes: $orderTypes,
+            cursor: $cursor,
+            cursorDirection: $cursorDirection,
+        );
     }
 
     /**
@@ -1097,11 +756,7 @@ class Query
      */
     public function isNested(): bool
     {
-        if (\in_array($this->getMethod(), self::LOGICAL_TYPES, true)) {
-            return true;
-        }
-
-        return false;
+        return $this->method->isNested();
     }
 
     public function onArray(): bool
@@ -1133,7 +788,7 @@ class Query
      */
     public static function distanceEqual(string $attribute, array $values, int|float $distance, bool $meters = false): static
     {
-        return new static(self::TYPE_DISTANCE_EQUAL, $attribute, [[$values, $distance, $meters]]);
+        return new static(Method::DistanceEqual, $attribute, [[$values, $distance, $meters]]);
     }
 
     /**
@@ -1143,7 +798,7 @@ class Query
      */
     public static function distanceNotEqual(string $attribute, array $values, int|float $distance, bool $meters = false): static
     {
-        return new static(self::TYPE_DISTANCE_NOT_EQUAL, $attribute, [[$values, $distance, $meters]]);
+        return new static(Method::DistanceNotEqual, $attribute, [[$values, $distance, $meters]]);
     }
 
     /**
@@ -1153,7 +808,7 @@ class Query
      */
     public static function distanceGreaterThan(string $attribute, array $values, int|float $distance, bool $meters = false): static
     {
-        return new static(self::TYPE_DISTANCE_GREATER_THAN, $attribute, [[$values, $distance, $meters]]);
+        return new static(Method::DistanceGreaterThan, $attribute, [[$values, $distance, $meters]]);
     }
 
     /**
@@ -1163,7 +818,7 @@ class Query
      */
     public static function distanceLessThan(string $attribute, array $values, int|float $distance, bool $meters = false): static
     {
-        return new static(self::TYPE_DISTANCE_LESS_THAN, $attribute, [[$values, $distance, $meters]]);
+        return new static(Method::DistanceLessThan, $attribute, [[$values, $distance, $meters]]);
     }
 
     /**
@@ -1173,7 +828,7 @@ class Query
      */
     public static function intersects(string $attribute, array $values): static
     {
-        return new static(self::TYPE_INTERSECTS, $attribute, [$values]);
+        return new static(Method::Intersects, $attribute, [$values]);
     }
 
     /**
@@ -1183,7 +838,7 @@ class Query
      */
     public static function notIntersects(string $attribute, array $values): static
     {
-        return new static(self::TYPE_NOT_INTERSECTS, $attribute, [$values]);
+        return new static(Method::NotIntersects, $attribute, [$values]);
     }
 
     /**
@@ -1193,7 +848,7 @@ class Query
      */
     public static function crosses(string $attribute, array $values): static
     {
-        return new static(self::TYPE_CROSSES, $attribute, [$values]);
+        return new static(Method::Crosses, $attribute, [$values]);
     }
 
     /**
@@ -1203,7 +858,7 @@ class Query
      */
     public static function notCrosses(string $attribute, array $values): static
     {
-        return new static(self::TYPE_NOT_CROSSES, $attribute, [$values]);
+        return new static(Method::NotCrosses, $attribute, [$values]);
     }
 
     /**
@@ -1213,7 +868,7 @@ class Query
      */
     public static function overlaps(string $attribute, array $values): static
     {
-        return new static(self::TYPE_OVERLAPS, $attribute, [$values]);
+        return new static(Method::Overlaps, $attribute, [$values]);
     }
 
     /**
@@ -1223,7 +878,7 @@ class Query
      */
     public static function notOverlaps(string $attribute, array $values): static
     {
-        return new static(self::TYPE_NOT_OVERLAPS, $attribute, [$values]);
+        return new static(Method::NotOverlaps, $attribute, [$values]);
     }
 
     /**
@@ -1233,7 +888,7 @@ class Query
      */
     public static function touches(string $attribute, array $values): static
     {
-        return new static(self::TYPE_TOUCHES, $attribute, [$values]);
+        return new static(Method::Touches, $attribute, [$values]);
     }
 
     /**
@@ -1243,7 +898,7 @@ class Query
      */
     public static function notTouches(string $attribute, array $values): static
     {
-        return new static(self::TYPE_NOT_TOUCHES, $attribute, [$values]);
+        return new static(Method::NotTouches, $attribute, [$values]);
     }
 
     /**
@@ -1253,7 +908,7 @@ class Query
      */
     public static function vectorDot(string $attribute, array $vector): static
     {
-        return new static(self::TYPE_VECTOR_DOT, $attribute, [$vector]);
+        return new static(Method::VectorDot, $attribute, [$vector]);
     }
 
     /**
@@ -1263,7 +918,7 @@ class Query
      */
     public static function vectorCosine(string $attribute, array $vector): static
     {
-        return new static(self::TYPE_VECTOR_COSINE, $attribute, [$vector]);
+        return new static(Method::VectorCosine, $attribute, [$vector]);
     }
 
     /**
@@ -1273,7 +928,7 @@ class Query
      */
     public static function vectorEuclidean(string $attribute, array $vector): static
     {
-        return new static(self::TYPE_VECTOR_EUCLIDEAN, $attribute, [$vector]);
+        return new static(Method::VectorEuclidean, $attribute, [$vector]);
     }
 
     /**
@@ -1281,7 +936,7 @@ class Query
      */
     public static function regex(string $attribute, string $pattern): static
     {
-        return new static(self::TYPE_REGEX, $attribute, [$pattern]);
+        return new static(Method::Regex, $attribute, [$pattern]);
     }
 
     /**
@@ -1291,7 +946,7 @@ class Query
      */
     public static function exists(array $attributes): static
     {
-        return new static(self::TYPE_EXISTS, '', $attributes);
+        return new static(Method::Exists, '', $attributes);
     }
 
     /**
@@ -1301,7 +956,7 @@ class Query
      */
     public static function notExists(string|int|float|bool|array $attribute): static
     {
-        return new static(self::TYPE_NOT_EXISTS, '', is_array($attribute) ? $attribute : [$attribute]);
+        return new static(Method::NotExists, '', is_array($attribute) ? $attribute : [$attribute]);
     }
 
     /**
@@ -1309,34 +964,34 @@ class Query
      */
     public static function elemMatch(string $attribute, array $queries): static
     {
-        return new static(self::TYPE_ELEM_MATCH, $attribute, $queries);
+        return new static(Method::ElemMatch, $attribute, $queries);
     }
 
     // Aggregation factory methods
 
     public static function count(string $attribute = '*', string $alias = ''): static
     {
-        return new static(self::TYPE_COUNT, $attribute, $alias !== '' ? [$alias] : []);
+        return new static(Method::Count, $attribute, $alias !== '' ? [$alias] : []);
     }
 
     public static function sum(string $attribute, string $alias = ''): static
     {
-        return new static(self::TYPE_SUM, $attribute, $alias !== '' ? [$alias] : []);
+        return new static(Method::Sum, $attribute, $alias !== '' ? [$alias] : []);
     }
 
     public static function avg(string $attribute, string $alias = ''): static
     {
-        return new static(self::TYPE_AVG, $attribute, $alias !== '' ? [$alias] : []);
+        return new static(Method::Avg, $attribute, $alias !== '' ? [$alias] : []);
     }
 
     public static function min(string $attribute, string $alias = ''): static
     {
-        return new static(self::TYPE_MIN, $attribute, $alias !== '' ? [$alias] : []);
+        return new static(Method::Min, $attribute, $alias !== '' ? [$alias] : []);
     }
 
     public static function max(string $attribute, string $alias = ''): static
     {
-        return new static(self::TYPE_MAX, $attribute, $alias !== '' ? [$alias] : []);
+        return new static(Method::Max, $attribute, $alias !== '' ? [$alias] : []);
     }
 
     /**
@@ -1344,7 +999,7 @@ class Query
      */
     public static function groupBy(array $attributes): static
     {
-        return new static(self::TYPE_GROUP_BY, '', $attributes);
+        return new static(Method::GroupBy, '', $attributes);
     }
 
     /**
@@ -1352,34 +1007,34 @@ class Query
      */
     public static function having(array $queries): static
     {
-        return new static(self::TYPE_HAVING, '', $queries);
+        return new static(Method::Having, '', $queries);
     }
 
     public static function distinct(): static
     {
-        return new static(self::TYPE_DISTINCT);
+        return new static(Method::Distinct);
     }
 
     // Join factory methods
 
     public static function join(string $table, string $left, string $right, string $operator = '='): static
     {
-        return new static(self::TYPE_JOIN, $table, [$left, $operator, $right]);
+        return new static(Method::Join, $table, [$left, $operator, $right]);
     }
 
     public static function leftJoin(string $table, string $left, string $right, string $operator = '='): static
     {
-        return new static(self::TYPE_LEFT_JOIN, $table, [$left, $operator, $right]);
+        return new static(Method::LeftJoin, $table, [$left, $operator, $right]);
     }
 
     public static function rightJoin(string $table, string $left, string $right, string $operator = '='): static
     {
-        return new static(self::TYPE_RIGHT_JOIN, $table, [$left, $operator, $right]);
+        return new static(Method::RightJoin, $table, [$left, $operator, $right]);
     }
 
     public static function crossJoin(string $table): static
     {
-        return new static(self::TYPE_CROSS_JOIN, $table);
+        return new static(Method::CrossJoin, $table);
     }
 
     // Union factory methods
@@ -1389,7 +1044,7 @@ class Query
      */
     public static function union(array $queries): static
     {
-        return new static(self::TYPE_UNION, '', $queries);
+        return new static(Method::Union, '', $queries);
     }
 
     /**
@@ -1397,7 +1052,7 @@ class Query
      */
     public static function unionAll(array $queries): static
     {
-        return new static(self::TYPE_UNION_ALL, '', $queries);
+        return new static(Method::UnionAll, '', $queries);
     }
 
     // Raw factory method
@@ -1407,7 +1062,7 @@ class Query
      */
     public static function raw(string $sql, array $bindings = []): static
     {
-        return new static(self::TYPE_RAW, $sql, $bindings);
+        return new static(Method::Raw, $sql, $bindings);
     }
 
     // Convenience: page
@@ -1437,10 +1092,10 @@ class Query
     public static function merge(array $queriesA, array $queriesB): array
     {
         $singularTypes = [
-            self::TYPE_LIMIT,
-            self::TYPE_OFFSET,
-            self::TYPE_CURSOR_AFTER,
-            self::TYPE_CURSOR_BEFORE,
+            Method::Limit,
+            Method::Offset,
+            Method::CursorAfter,
+            Method::CursorBefore,
         ];
 
         $result = $queriesA;
@@ -1504,22 +1159,22 @@ class Query
     {
         $errors = [];
         $skipTypes = [
-            self::TYPE_LIMIT,
-            self::TYPE_OFFSET,
-            self::TYPE_CURSOR_AFTER,
-            self::TYPE_CURSOR_BEFORE,
-            self::TYPE_ORDER_RANDOM,
-            self::TYPE_DISTINCT,
-            self::TYPE_SELECT,
-            self::TYPE_EXISTS,
-            self::TYPE_NOT_EXISTS,
+            Method::Limit,
+            Method::Offset,
+            Method::CursorAfter,
+            Method::CursorBefore,
+            Method::OrderRandom,
+            Method::Distinct,
+            Method::Select,
+            Method::Exists,
+            Method::NotExists,
         ];
 
         foreach ($queries as $query) {
             $method = $query->getMethod();
 
             // Recursively validate nested queries
-            if (\in_array($method, self::LOGICAL_TYPES, true)) {
+            if ($method->isNested()) {
                 /** @var array<static> $nested */
                 $nested = $query->getValues();
                 $errors = \array_merge($errors, static::validate($nested, $allowedAttributes));
@@ -1532,12 +1187,12 @@ class Query
             }
 
             // GROUP_BY stores attributes in values
-            if ($method === self::TYPE_GROUP_BY) {
+            if ($method === Method::GroupBy) {
                 /** @var array<string> $columns */
                 $columns = $query->getValues();
                 foreach ($columns as $col) {
                     if (! \in_array($col, $allowedAttributes, true)) {
-                        $errors[] = "Invalid attribute \"{$col}\" used in {$method}";
+                        $errors[] = "Invalid attribute \"{$col}\" used in {$method->value}";
                     }
                 }
 
@@ -1551,7 +1206,7 @@ class Query
             }
 
             if (! \in_array($attribute, $allowedAttributes, true)) {
-                $errors[] = "Invalid attribute \"{$attribute}\" used in {$method}";
+                $errors[] = "Invalid attribute \"{$attribute}\" used in {$method->value}";
             }
         }
 

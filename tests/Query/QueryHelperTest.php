@@ -3,6 +3,9 @@
 namespace Tests\Query;
 
 use PHPUnit\Framework\TestCase;
+use Utopia\Query\CursorDirection;
+use Utopia\Query\Method;
+use Utopia\Query\OrderDirection;
 use Utopia\Query\Query;
 
 class QueryHelperTest extends TestCase
@@ -106,7 +109,7 @@ class QueryHelperTest extends TestCase
         $clonedValues = $cloned->getValues();
         $this->assertInstanceOf(Query::class, $clonedValues[0]);
         $this->assertNotSame($inner, $clonedValues[0]);
-        $this->assertEquals('equal', $clonedValues[0]->getMethod());
+        $this->assertSame(Method::Equal, $clonedValues[0]->getMethod());
     }
 
     public function testClonePreservesNonQueryValues(): void
@@ -125,10 +128,10 @@ class QueryHelperTest extends TestCase
             Query::offset(5),
         ];
 
-        $filters = Query::getByType($queries, [Query::TYPE_EQUAL, Query::TYPE_GREATER]);
+        $filters = Query::getByType($queries, [Method::Equal, Method::GreaterThan]);
         $this->assertCount(2, $filters);
-        $this->assertEquals('equal', $filters[0]->getMethod());
-        $this->assertEquals('greaterThan', $filters[1]->getMethod());
+        $this->assertSame(Method::Equal, $filters[0]->getMethod());
+        $this->assertSame(Method::GreaterThan, $filters[1]->getMethod());
     }
 
     public function testGetByTypeClone(): void
@@ -136,7 +139,7 @@ class QueryHelperTest extends TestCase
         $original = Query::equal('name', ['John']);
         $queries = [$original];
 
-        $result = Query::getByType($queries, [Query::TYPE_EQUAL], true);
+        $result = Query::getByType($queries, [Method::Equal], true);
         $this->assertNotSame($original, $result[0]);
     }
 
@@ -145,14 +148,14 @@ class QueryHelperTest extends TestCase
         $original = Query::equal('name', ['John']);
         $queries = [$original];
 
-        $result = Query::getByType($queries, [Query::TYPE_EQUAL], false);
+        $result = Query::getByType($queries, [Method::Equal], false);
         $this->assertSame($original, $result[0]);
     }
 
     public function testGetByTypeEmpty(): void
     {
         $queries = [Query::equal('x', [1])];
-        $result = Query::getByType($queries, [Query::TYPE_LIMIT]);
+        $result = Query::getByType($queries, [Method::Limit]);
         $this->assertCount(0, $result);
     }
 
@@ -167,8 +170,8 @@ class QueryHelperTest extends TestCase
 
         $cursors = Query::getCursorQueries($queries);
         $this->assertCount(2, $cursors);
-        $this->assertEquals(Query::TYPE_CURSOR_AFTER, $cursors[0]->getMethod());
-        $this->assertEquals(Query::TYPE_CURSOR_BEFORE, $cursors[1]->getMethod());
+        $this->assertSame(Method::CursorAfter, $cursors[0]->getMethod());
+        $this->assertSame(Method::CursorBefore, $cursors[1]->getMethod());
     }
 
     public function testGetCursorQueriesNone(): void
@@ -193,21 +196,21 @@ class QueryHelperTest extends TestCase
 
         $grouped = Query::groupByType($queries);
 
-        $this->assertCount(2, $grouped['filters']);
-        $this->assertEquals('equal', $grouped['filters'][0]->getMethod());
-        $this->assertEquals('greaterThan', $grouped['filters'][1]->getMethod());
+        $this->assertCount(2, $grouped->filters);
+        $this->assertSame(Method::Equal, $grouped->filters[0]->getMethod());
+        $this->assertSame(Method::GreaterThan, $grouped->filters[1]->getMethod());
 
-        $this->assertCount(1, $grouped['selections']);
-        $this->assertEquals('select', $grouped['selections'][0]->getMethod());
+        $this->assertCount(1, $grouped->selections);
+        $this->assertSame(Method::Select, $grouped->selections[0]->getMethod());
 
-        $this->assertEquals(25, $grouped['limit']);
-        $this->assertEquals(10, $grouped['offset']);
+        $this->assertEquals(25, $grouped->limit);
+        $this->assertEquals(10, $grouped->offset);
 
-        $this->assertEquals(['name', 'age'], $grouped['orderAttributes']);
-        $this->assertEquals([Query::ORDER_ASC, Query::ORDER_DESC], $grouped['orderTypes']);
+        $this->assertEquals(['name', 'age'], $grouped->orderAttributes);
+        $this->assertEquals([OrderDirection::Asc, OrderDirection::Desc], $grouped->orderTypes);
 
-        $this->assertEquals('doc123', $grouped['cursor']);
-        $this->assertEquals(Query::CURSOR_AFTER, $grouped['cursorDirection']);
+        $this->assertEquals('doc123', $grouped->cursor);
+        $this->assertSame(CursorDirection::After, $grouped->cursorDirection);
     }
 
     public function testGroupByTypeFirstLimitWins(): void
@@ -218,7 +221,7 @@ class QueryHelperTest extends TestCase
         ];
 
         $grouped = Query::groupByType($queries);
-        $this->assertEquals(10, $grouped['limit']);
+        $this->assertEquals(10, $grouped->limit);
     }
 
     public function testGroupByTypeFirstOffsetWins(): void
@@ -229,7 +232,7 @@ class QueryHelperTest extends TestCase
         ];
 
         $grouped = Query::groupByType($queries);
-        $this->assertEquals(5, $grouped['offset']);
+        $this->assertEquals(5, $grouped->offset);
     }
 
     public function testGroupByTypeFirstCursorWins(): void
@@ -240,8 +243,8 @@ class QueryHelperTest extends TestCase
         ];
 
         $grouped = Query::groupByType($queries);
-        $this->assertEquals('first', $grouped['cursor']);
-        $this->assertEquals(Query::CURSOR_AFTER, $grouped['cursorDirection']);
+        $this->assertEquals('first', $grouped->cursor);
+        $this->assertSame(CursorDirection::After, $grouped->cursorDirection);
     }
 
     public function testGroupByTypeCursorBefore(): void
@@ -251,35 +254,35 @@ class QueryHelperTest extends TestCase
         ];
 
         $grouped = Query::groupByType($queries);
-        $this->assertEquals('doc456', $grouped['cursor']);
-        $this->assertEquals(Query::CURSOR_BEFORE, $grouped['cursorDirection']);
+        $this->assertEquals('doc456', $grouped->cursor);
+        $this->assertSame(CursorDirection::Before, $grouped->cursorDirection);
     }
 
     public function testGroupByTypeEmpty(): void
     {
         $grouped = Query::groupByType([]);
-        $this->assertEquals([], $grouped['filters']);
-        $this->assertEquals([], $grouped['selections']);
-        $this->assertNull($grouped['limit']);
-        $this->assertNull($grouped['offset']);
-        $this->assertEquals([], $grouped['orderAttributes']);
-        $this->assertEquals([], $grouped['orderTypes']);
-        $this->assertNull($grouped['cursor']);
-        $this->assertNull($grouped['cursorDirection']);
+        $this->assertEquals([], $grouped->filters);
+        $this->assertEquals([], $grouped->selections);
+        $this->assertNull($grouped->limit);
+        $this->assertNull($grouped->offset);
+        $this->assertEquals([], $grouped->orderAttributes);
+        $this->assertEquals([], $grouped->orderTypes);
+        $this->assertNull($grouped->cursor);
+        $this->assertNull($grouped->cursorDirection);
     }
 
     public function testGroupByTypeOrderRandom(): void
     {
         $queries = [Query::orderRandom()];
         $grouped = Query::groupByType($queries);
-        $this->assertEquals([Query::ORDER_RANDOM], $grouped['orderTypes']);
-        $this->assertEquals([], $grouped['orderAttributes']);
+        $this->assertEquals([OrderDirection::Random], $grouped->orderTypes);
+        $this->assertEquals([], $grouped->orderAttributes);
     }
 
     public function testGroupByTypeSkipsNonQueryInstances(): void
     {
         $grouped = Query::groupByType(['not a query', null, 42]);
-        $this->assertEquals([], $grouped['filters']);
+        $this->assertEquals([], $grouped->filters);
     }
 
     // ── groupByType with new types ──
@@ -295,37 +298,37 @@ class QueryHelperTest extends TestCase
         ];
 
         $grouped = Query::groupByType($queries);
-        $this->assertCount(5, $grouped['aggregations']);
-        $this->assertEquals(Query::TYPE_COUNT, $grouped['aggregations'][0]->getMethod());
-        $this->assertEquals(Query::TYPE_MAX, $grouped['aggregations'][4]->getMethod());
+        $this->assertCount(5, $grouped->aggregations);
+        $this->assertSame(Method::Count, $grouped->aggregations[0]->getMethod());
+        $this->assertSame(Method::Max, $grouped->aggregations[4]->getMethod());
     }
 
     public function testGroupByTypeGroupBy(): void
     {
         $queries = [Query::groupBy(['status', 'country'])];
         $grouped = Query::groupByType($queries);
-        $this->assertEquals(['status', 'country'], $grouped['groupBy']);
+        $this->assertEquals(['status', 'country'], $grouped->groupBy);
     }
 
     public function testGroupByTypeHaving(): void
     {
         $queries = [Query::having([Query::greaterThan('total', 5)])];
         $grouped = Query::groupByType($queries);
-        $this->assertCount(1, $grouped['having']);
-        $this->assertEquals(Query::TYPE_HAVING, $grouped['having'][0]->getMethod());
+        $this->assertCount(1, $grouped->having);
+        $this->assertSame(Method::Having, $grouped->having[0]->getMethod());
     }
 
     public function testGroupByTypeDistinct(): void
     {
         $queries = [Query::distinct()];
         $grouped = Query::groupByType($queries);
-        $this->assertTrue($grouped['distinct']);
+        $this->assertTrue($grouped->distinct);
     }
 
     public function testGroupByTypeDistinctDefaultFalse(): void
     {
         $grouped = Query::groupByType([]);
-        $this->assertFalse($grouped['distinct']);
+        $this->assertFalse($grouped->distinct);
     }
 
     public function testGroupByTypeJoins(): void
@@ -336,9 +339,9 @@ class QueryHelperTest extends TestCase
             Query::crossJoin('colors'),
         ];
         $grouped = Query::groupByType($queries);
-        $this->assertCount(3, $grouped['joins']);
-        $this->assertEquals(Query::TYPE_JOIN, $grouped['joins'][0]->getMethod());
-        $this->assertEquals(Query::TYPE_CROSS_JOIN, $grouped['joins'][2]->getMethod());
+        $this->assertCount(3, $grouped->joins);
+        $this->assertSame(Method::Join, $grouped->joins[0]->getMethod());
+        $this->assertSame(Method::CrossJoin, $grouped->joins[2]->getMethod());
     }
 
     public function testGroupByTypeUnions(): void
@@ -348,7 +351,7 @@ class QueryHelperTest extends TestCase
             Query::unionAll([Query::equal('y', [2])]),
         ];
         $grouped = Query::groupByType($queries);
-        $this->assertCount(2, $grouped['unions']);
+        $this->assertCount(2, $grouped->unions);
     }
 
     // ── merge() ──
@@ -360,8 +363,8 @@ class QueryHelperTest extends TestCase
 
         $result = Query::merge($a, $b);
         $this->assertCount(2, $result);
-        $this->assertEquals('equal', $result[0]->getMethod());
-        $this->assertEquals('greaterThan', $result[1]->getMethod());
+        $this->assertSame(Method::Equal, $result[0]->getMethod());
+        $this->assertSame(Method::GreaterThan, $result[1]->getMethod());
     }
 
     public function testMergeLimitOverrides(): void
@@ -382,7 +385,7 @@ class QueryHelperTest extends TestCase
         $result = Query::merge($a, $b);
         $this->assertCount(2, $result);
         // equal stays, offset replaced
-        $this->assertEquals('equal', $result[0]->getMethod());
+        $this->assertSame(Method::Equal, $result[0]->getMethod());
         $this->assertEquals(100, $result[1]->getValue());
     }
 
@@ -406,7 +409,7 @@ class QueryHelperTest extends TestCase
 
         $result = Query::diff($a, $b);
         $this->assertCount(1, $result);
-        $this->assertEquals('greaterThan', $result[0]->getMethod());
+        $this->assertSame(Method::GreaterThan, $result[0]->getMethod());
     }
 
     public function testDiffEmpty(): void
@@ -493,9 +496,9 @@ class QueryHelperTest extends TestCase
     {
         $result = Query::page(3, 10);
         $this->assertCount(2, $result);
-        $this->assertEquals(Query::TYPE_LIMIT, $result[0]->getMethod());
+        $this->assertSame(Method::Limit, $result[0]->getMethod());
         $this->assertEquals(10, $result[0]->getValue());
-        $this->assertEquals(Query::TYPE_OFFSET, $result[1]->getMethod());
+        $this->assertSame(Method::Offset, $result[1]->getMethod());
         $this->assertEquals(20, $result[1]->getValue());
     }
 
@@ -545,17 +548,17 @@ class QueryHelperTest extends TestCase
 
         $grouped = Query::groupByType($queries);
 
-        $this->assertCount(1, $grouped['filters']);
-        $this->assertCount(1, $grouped['selections']);
-        $this->assertCount(2, $grouped['aggregations']);
-        $this->assertEquals(['status'], $grouped['groupBy']);
-        $this->assertCount(1, $grouped['having']);
-        $this->assertTrue($grouped['distinct']);
-        $this->assertCount(1, $grouped['joins']);
-        $this->assertCount(1, $grouped['unions']);
-        $this->assertEquals(10, $grouped['limit']);
-        $this->assertEquals(5, $grouped['offset']);
-        $this->assertEquals(['name'], $grouped['orderAttributes']);
+        $this->assertCount(1, $grouped->filters);
+        $this->assertCount(1, $grouped->selections);
+        $this->assertCount(2, $grouped->aggregations);
+        $this->assertEquals(['status'], $grouped->groupBy);
+        $this->assertCount(1, $grouped->having);
+        $this->assertTrue($grouped->distinct);
+        $this->assertCount(1, $grouped->joins);
+        $this->assertCount(1, $grouped->unions);
+        $this->assertEquals(10, $grouped->limit);
+        $this->assertEquals(5, $grouped->offset);
+        $this->assertEquals(['name'], $grouped->orderAttributes);
     }
 
     public function testGroupByTypeMultipleGroupByMerges(): void
@@ -565,7 +568,7 @@ class QueryHelperTest extends TestCase
             Query::groupBy(['c']),
         ];
         $grouped = Query::groupByType($queries);
-        $this->assertEquals(['a', 'b', 'c'], $grouped['groupBy']);
+        $this->assertEquals(['a', 'b', 'c'], $grouped->groupBy);
     }
 
     public function testGroupByTypeMultipleDistinct(): void
@@ -575,7 +578,7 @@ class QueryHelperTest extends TestCase
             Query::distinct(),
         ];
         $grouped = Query::groupByType($queries);
-        $this->assertTrue($grouped['distinct']);
+        $this->assertTrue($grouped->distinct);
     }
 
     public function testGroupByTypeMultipleHaving(): void
@@ -585,26 +588,26 @@ class QueryHelperTest extends TestCase
             Query::having([Query::lessThan('y', 100)]),
         ];
         $grouped = Query::groupByType($queries);
-        $this->assertCount(2, $grouped['having']);
+        $this->assertCount(2, $grouped->having);
     }
 
     public function testGroupByTypeRawGoesToFilters(): void
     {
         $queries = [Query::raw('1 = 1')];
         $grouped = Query::groupByType($queries);
-        $this->assertCount(1, $grouped['filters']);
-        $this->assertEquals(Query::TYPE_RAW, $grouped['filters'][0]->getMethod());
+        $this->assertCount(1, $grouped->filters);
+        $this->assertSame(Method::Raw, $grouped->filters[0]->getMethod());
     }
 
     public function testGroupByTypeEmptyNewKeys(): void
     {
         $grouped = Query::groupByType([]);
-        $this->assertEquals([], $grouped['aggregations']);
-        $this->assertEquals([], $grouped['groupBy']);
-        $this->assertEquals([], $grouped['having']);
-        $this->assertFalse($grouped['distinct']);
-        $this->assertEquals([], $grouped['joins']);
-        $this->assertEquals([], $grouped['unions']);
+        $this->assertEquals([], $grouped->aggregations);
+        $this->assertEquals([], $grouped->groupBy);
+        $this->assertEquals([], $grouped->having);
+        $this->assertFalse($grouped->distinct);
+        $this->assertEquals([], $grouped->joins);
+        $this->assertEquals([], $grouped->unions);
     }
 
     // ── merge() additional edge cases ──
@@ -644,8 +647,8 @@ class QueryHelperTest extends TestCase
         $result = Query::merge($a, $b);
         // Both should be overridden
         $this->assertCount(2, $result);
-        $limits = array_filter($result, fn (Query $q) => $q->getMethod() === Query::TYPE_LIMIT);
-        $offsets = array_filter($result, fn (Query $q) => $q->getMethod() === Query::TYPE_OFFSET);
+        $limits = array_filter($result, fn (Query $q) => $q->getMethod() === Method::Limit);
+        $offsets = array_filter($result, fn (Query $q) => $q->getMethod() === Method::Offset);
         $this->assertEquals(50, array_values($limits)[0]->getValue());
         $this->assertEquals(100, array_values($offsets)[0]->getValue());
     }
@@ -699,7 +702,7 @@ class QueryHelperTest extends TestCase
         $b = [$shared1, $shared2];
         $result = Query::diff($a, $b);
         $this->assertCount(1, $result);
-        $this->assertEquals('greaterThan', $result[0]->getMethod());
+        $this->assertSame(Method::GreaterThan, $result[0]->getMethod());
     }
 
     public function testDiffByValueNotReference(): void
@@ -725,7 +728,7 @@ class QueryHelperTest extends TestCase
         $b = [$nested];
         $result = Query::diff($a, $b);
         $this->assertCount(1, $result);
-        $this->assertEquals('limit', $result[0]->getMethod());
+        $this->assertSame(Method::Limit, $result[0]->getMethod());
     }
 
     // ── validate() additional edge cases ──
@@ -879,13 +882,15 @@ class QueryHelperTest extends TestCase
             Query::groupBy(['status']),
         ];
 
-        $aggs = Query::getByType($queries, Query::AGGREGATE_TYPES);
+        $aggTypes = array_values(array_filter(Method::cases(), fn (Method $m) => $m->isAggregate()));
+        $aggs = Query::getByType($queries, $aggTypes);
         $this->assertCount(2, $aggs);
 
-        $joins = Query::getByType($queries, Query::JOIN_TYPES);
+        $joinTypes = array_values(array_filter(Method::cases(), fn (Method $m) => $m->isJoin()));
+        $joins = Query::getByType($queries, $joinTypes);
         $this->assertCount(1, $joins);
 
-        $distinct = Query::getByType($queries, [Query::TYPE_DISTINCT]);
+        $distinct = Query::getByType($queries, [Method::Distinct]);
         $this->assertCount(1, $distinct);
     }
 }

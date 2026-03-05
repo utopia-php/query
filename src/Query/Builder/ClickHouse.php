@@ -72,14 +72,9 @@ class ClickHouse extends BaseBuilder
     protected function wrapIdentifier(string $identifier): string
     {
         $segments = \explode('.', $identifier);
-        $wrapped = \array_map(function (string $segment): string {
-            if ($segment === '*') {
-                return '*';
-            }
-            $escaped = \str_replace('`', '``', $segment);
-
-            return '`' . $escaped . '`';
-        }, $segments);
+        $wrapped = \array_map(fn (string $segment): string => $segment === '*'
+            ? '*'
+            : '`' . \str_replace('`', '``', $segment) . '`', $segments);
 
         return \implode('.', $wrapped);
     }
@@ -132,9 +127,8 @@ class ClickHouse extends BaseBuilder
 
     /**
      * @param  array<string>  $parts
-     * @param  array<string, mixed>  $grouped
      */
-    protected function buildAfterJoins(array &$parts, array $grouped): void
+    protected function buildAfterJoins(array &$parts, GroupedQueries $grouped): void
     {
         if (! empty($this->prewhereQueries)) {
             $clauses = [];

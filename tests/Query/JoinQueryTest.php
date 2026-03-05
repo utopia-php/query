@@ -3,6 +3,7 @@
 namespace Tests\Query;
 
 use PHPUnit\Framework\TestCase;
+use Utopia\Query\Method;
 use Utopia\Query\Query;
 
 class JoinQueryTest extends TestCase
@@ -10,7 +11,7 @@ class JoinQueryTest extends TestCase
     public function testJoin(): void
     {
         $query = Query::join('orders', 'users.id', 'orders.user_id');
-        $this->assertEquals(Query::TYPE_JOIN, $query->getMethod());
+        $this->assertSame(Method::Join, $query->getMethod());
         $this->assertEquals('orders', $query->getAttribute());
         $this->assertEquals(['users.id', '=', 'orders.user_id'], $query->getValues());
     }
@@ -24,7 +25,7 @@ class JoinQueryTest extends TestCase
     public function testLeftJoin(): void
     {
         $query = Query::leftJoin('profiles', 'users.id', 'profiles.user_id');
-        $this->assertEquals(Query::TYPE_LEFT_JOIN, $query->getMethod());
+        $this->assertSame(Method::LeftJoin, $query->getMethod());
         $this->assertEquals('profiles', $query->getAttribute());
         $this->assertEquals(['users.id', '=', 'profiles.user_id'], $query->getValues());
     }
@@ -32,25 +33,26 @@ class JoinQueryTest extends TestCase
     public function testRightJoin(): void
     {
         $query = Query::rightJoin('orders', 'users.id', 'orders.user_id');
-        $this->assertEquals(Query::TYPE_RIGHT_JOIN, $query->getMethod());
+        $this->assertSame(Method::RightJoin, $query->getMethod());
         $this->assertEquals('orders', $query->getAttribute());
     }
 
     public function testCrossJoin(): void
     {
         $query = Query::crossJoin('colors');
-        $this->assertEquals(Query::TYPE_CROSS_JOIN, $query->getMethod());
+        $this->assertSame(Method::CrossJoin, $query->getMethod());
         $this->assertEquals('colors', $query->getAttribute());
         $this->assertEquals([], $query->getValues());
     }
 
-    public function testJoinTypesConstant(): void
+    public function testJoinMethodsAreJoin(): void
     {
-        $this->assertContains(Query::TYPE_JOIN, Query::JOIN_TYPES);
-        $this->assertContains(Query::TYPE_LEFT_JOIN, Query::JOIN_TYPES);
-        $this->assertContains(Query::TYPE_RIGHT_JOIN, Query::JOIN_TYPES);
-        $this->assertContains(Query::TYPE_CROSS_JOIN, Query::JOIN_TYPES);
-        $this->assertCount(4, Query::JOIN_TYPES);
+        $this->assertTrue(Method::Join->isJoin());
+        $this->assertTrue(Method::LeftJoin->isJoin());
+        $this->assertTrue(Method::RightJoin->isJoin());
+        $this->assertTrue(Method::CrossJoin->isJoin());
+        $joinMethods = array_filter(Method::cases(), fn (Method $m) => $m->isJoin());
+        $this->assertCount(4, $joinMethods);
     }
 
     // ── Edge cases ──

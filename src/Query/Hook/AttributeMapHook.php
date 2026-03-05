@@ -2,10 +2,10 @@
 
 namespace Utopia\Query\Hook;
 
-class AttributeMapHook implements AttributeHook
+readonly class AttributeMapHook implements AttributeHook
 {
     /** @param array<string, string> $map */
-    public function __construct(protected array $map)
+    public function __construct(public array $map)
     {
     }
 

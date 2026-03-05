@@ -3,6 +3,7 @@
 namespace Tests\Query;
 
 use PHPUnit\Framework\TestCase;
+use Utopia\Query\Method;
 use Utopia\Query\Query;
 
 class AggregationQueryTest extends TestCase
@@ -10,7 +11,7 @@ class AggregationQueryTest extends TestCase
     public function testCountDefaultAttribute(): void
     {
         $query = Query::count();
-        $this->assertEquals(Query::TYPE_COUNT, $query->getMethod());
+        $this->assertSame(Method::Count, $query->getMethod());
         $this->assertEquals('*', $query->getAttribute());
         $this->assertEquals([], $query->getValues());
     }
@@ -18,7 +19,7 @@ class AggregationQueryTest extends TestCase
     public function testCountWithAttribute(): void
     {
         $query = Query::count('id');
-        $this->assertEquals(Query::TYPE_COUNT, $query->getMethod());
+        $this->assertSame(Method::Count, $query->getMethod());
         $this->assertEquals('id', $query->getAttribute());
         $this->assertEquals([], $query->getValues());
     }
@@ -34,7 +35,7 @@ class AggregationQueryTest extends TestCase
     public function testSum(): void
     {
         $query = Query::sum('price');
-        $this->assertEquals(Query::TYPE_SUM, $query->getMethod());
+        $this->assertSame(Method::Sum, $query->getMethod());
         $this->assertEquals('price', $query->getAttribute());
         $this->assertEquals([], $query->getValues());
     }
@@ -48,28 +49,28 @@ class AggregationQueryTest extends TestCase
     public function testAvg(): void
     {
         $query = Query::avg('score');
-        $this->assertEquals(Query::TYPE_AVG, $query->getMethod());
+        $this->assertSame(Method::Avg, $query->getMethod());
         $this->assertEquals('score', $query->getAttribute());
     }
 
     public function testMin(): void
     {
         $query = Query::min('price');
-        $this->assertEquals(Query::TYPE_MIN, $query->getMethod());
+        $this->assertSame(Method::Min, $query->getMethod());
         $this->assertEquals('price', $query->getAttribute());
     }
 
     public function testMax(): void
     {
         $query = Query::max('price');
-        $this->assertEquals(Query::TYPE_MAX, $query->getMethod());
+        $this->assertSame(Method::Max, $query->getMethod());
         $this->assertEquals('price', $query->getAttribute());
     }
 
     public function testGroupBy(): void
     {
         $query = Query::groupBy(['status', 'country']);
-        $this->assertEquals(Query::TYPE_GROUP_BY, $query->getMethod());
+        $this->assertSame(Method::GroupBy, $query->getMethod());
         $this->assertEquals('', $query->getAttribute());
         $this->assertEquals(['status', 'country'], $query->getValues());
     }
@@ -80,19 +81,20 @@ class AggregationQueryTest extends TestCase
             Query::greaterThan('count', 5),
         ];
         $query = Query::having($inner);
-        $this->assertEquals(Query::TYPE_HAVING, $query->getMethod());
+        $this->assertSame(Method::Having, $query->getMethod());
         $this->assertCount(1, $query->getValues());
         $this->assertInstanceOf(Query::class, $query->getValues()[0]);
     }
 
-    public function testAggregateTypesConstant(): void
+    public function testAggregateMethodsAreAggregate(): void
     {
-        $this->assertContains(Query::TYPE_COUNT, Query::AGGREGATE_TYPES);
-        $this->assertContains(Query::TYPE_SUM, Query::AGGREGATE_TYPES);
-        $this->assertContains(Query::TYPE_AVG, Query::AGGREGATE_TYPES);
-        $this->assertContains(Query::TYPE_MIN, Query::AGGREGATE_TYPES);
-        $this->assertContains(Query::TYPE_MAX, Query::AGGREGATE_TYPES);
-        $this->assertCount(5, Query::AGGREGATE_TYPES);
+        $this->assertTrue(Method::Count->isAggregate());
+        $this->assertTrue(Method::Sum->isAggregate());
+        $this->assertTrue(Method::Avg->isAggregate());
+        $this->assertTrue(Method::Min->isAggregate());
+        $this->assertTrue(Method::Max->isAggregate());
+        $aggMethods = array_filter(Method::cases(), fn (Method $m) => $m->isAggregate());
+        $this->assertCount(5, $aggMethods);
     }
 
     // ── Edge cases ──
@@ -132,7 +134,7 @@ class AggregationQueryTest extends TestCase
     public function testGroupByEmpty(): void
     {
         $query = Query::groupBy([]);
-        $this->assertEquals(Query::TYPE_GROUP_BY, $query->getMethod());
+        $this->assertSame(Method::GroupBy, $query->getMethod());
         $this->assertEquals([], $query->getValues());
     }
 
@@ -158,7 +160,7 @@ class AggregationQueryTest extends TestCase
     public function testHavingEmpty(): void
     {
         $query = Query::having([]);
-        $this->assertEquals(Query::TYPE_HAVING, $query->getMethod());
+        $this->assertSame(Method::Having, $query->getMethod());
         $this->assertEquals([], $query->getValues());
     }
 

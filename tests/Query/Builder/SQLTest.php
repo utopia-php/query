@@ -3,9 +3,9 @@
 namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
+use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\SQL as Builder;
 use Utopia\Query\Compiler;
-use Utopia\Query\Condition;
 use Utopia\Query\Hook\AttributeMapHook;
 use Utopia\Query\Hook\FilterHook;
 use Utopia\Query\Query;
@@ -48,9 +48,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT `name`, `email` FROM `users` WHERE `status` IN (?) AND `age` > ? ORDER BY `name` ASC LIMIT ? OFFSET ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['active', 18, 25, 0], $result['bindings']);
+        $this->assertEquals(['active', 18, 25, 0], $result->bindings);
     }
 
     // ── Batch mode ──
@@ -71,9 +71,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT `name`, `email` FROM `users` WHERE `status` IN (?) AND `age` > ? ORDER BY `name` ASC LIMIT ? OFFSET ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['active', 18, 25, 0], $result['bindings']);
+        $this->assertEquals(['active', 18, 25, 0], $result->bindings);
     }
 
     // ── Filter types ──
@@ -85,8 +85,8 @@ class SQLTest extends TestCase
             ->filter([Query::equal('status', ['active', 'pending'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `status` IN (?, ?)', $result['query']);
-        $this->assertEquals(['active', 'pending'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `status` IN (?, ?)', $result->query);
+        $this->assertEquals(['active', 'pending'], $result->bindings);
     }
 
     public function testNotEqualSingle(): void
@@ -96,8 +96,8 @@ class SQLTest extends TestCase
             ->filter([Query::notEqual('role', 'guest')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `role` != ?', $result['query']);
-        $this->assertEquals(['guest'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `role` != ?', $result->query);
+        $this->assertEquals(['guest'], $result->bindings);
     }
 
     public function testNotEqualMultiple(): void
@@ -107,8 +107,8 @@ class SQLTest extends TestCase
             ->filter([Query::notEqual('role', ['guest', 'banned'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `role` NOT IN (?, ?)', $result['query']);
-        $this->assertEquals(['guest', 'banned'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `role` NOT IN (?, ?)', $result->query);
+        $this->assertEquals(['guest', 'banned'], $result->bindings);
     }
 
     public function testLessThan(): void
@@ -118,8 +118,8 @@ class SQLTest extends TestCase
             ->filter([Query::lessThan('price', 100)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `price` < ?', $result['query']);
-        $this->assertEquals([100], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `price` < ?', $result->query);
+        $this->assertEquals([100], $result->bindings);
     }
 
     public function testLessThanEqual(): void
@@ -129,8 +129,8 @@ class SQLTest extends TestCase
             ->filter([Query::lessThanEqual('price', 100)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `price` <= ?', $result['query']);
-        $this->assertEquals([100], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `price` <= ?', $result->query);
+        $this->assertEquals([100], $result->bindings);
     }
 
     public function testGreaterThan(): void
@@ -140,8 +140,8 @@ class SQLTest extends TestCase
             ->filter([Query::greaterThan('age', 18)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `age` > ?', $result['query']);
-        $this->assertEquals([18], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `age` > ?', $result->query);
+        $this->assertEquals([18], $result->bindings);
     }
 
     public function testGreaterThanEqual(): void
@@ -151,8 +151,8 @@ class SQLTest extends TestCase
             ->filter([Query::greaterThanEqual('score', 90)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `score` >= ?', $result['query']);
-        $this->assertEquals([90], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `score` >= ?', $result->query);
+        $this->assertEquals([90], $result->bindings);
     }
 
     public function testBetween(): void
@@ -162,8 +162,8 @@ class SQLTest extends TestCase
             ->filter([Query::between('age', 18, 65)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `age` BETWEEN ? AND ?', $result['query']);
-        $this->assertEquals([18, 65], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `age` BETWEEN ? AND ?', $result->query);
+        $this->assertEquals([18, 65], $result->bindings);
     }
 
     public function testNotBetween(): void
@@ -173,8 +173,8 @@ class SQLTest extends TestCase
             ->filter([Query::notBetween('age', 18, 65)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `age` NOT BETWEEN ? AND ?', $result['query']);
-        $this->assertEquals([18, 65], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `age` NOT BETWEEN ? AND ?', $result->query);
+        $this->assertEquals([18, 65], $result->bindings);
     }
 
     public function testStartsWith(): void
@@ -184,8 +184,8 @@ class SQLTest extends TestCase
             ->filter([Query::startsWith('name', 'Jo')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `name` LIKE ?', $result['query']);
-        $this->assertEquals(['Jo%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `name` LIKE ?', $result->query);
+        $this->assertEquals(['Jo%'], $result->bindings);
     }
 
     public function testNotStartsWith(): void
@@ -195,8 +195,8 @@ class SQLTest extends TestCase
             ->filter([Query::notStartsWith('name', 'Jo')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `name` NOT LIKE ?', $result['query']);
-        $this->assertEquals(['Jo%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `name` NOT LIKE ?', $result->query);
+        $this->assertEquals(['Jo%'], $result->bindings);
     }
 
     public function testEndsWith(): void
@@ -206,8 +206,8 @@ class SQLTest extends TestCase
             ->filter([Query::endsWith('email', '.com')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `email` LIKE ?', $result['query']);
-        $this->assertEquals(['%.com'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `email` LIKE ?', $result->query);
+        $this->assertEquals(['%.com'], $result->bindings);
     }
 
     public function testNotEndsWith(): void
@@ -217,8 +217,8 @@ class SQLTest extends TestCase
             ->filter([Query::notEndsWith('email', '.com')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `email` NOT LIKE ?', $result['query']);
-        $this->assertEquals(['%.com'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `email` NOT LIKE ?', $result->query);
+        $this->assertEquals(['%.com'], $result->bindings);
     }
 
     public function testContainsSingle(): void
@@ -228,8 +228,8 @@ class SQLTest extends TestCase
             ->filter([Query::contains('bio', ['php'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `bio` LIKE ?', $result['query']);
-        $this->assertEquals(['%php%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `bio` LIKE ?', $result->query);
+        $this->assertEquals(['%php%'], $result->bindings);
     }
 
     public function testContainsMultiple(): void
@@ -239,8 +239,8 @@ class SQLTest extends TestCase
             ->filter([Query::contains('bio', ['php', 'js'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`bio` LIKE ? OR `bio` LIKE ?)', $result['query']);
-        $this->assertEquals(['%php%', '%js%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`bio` LIKE ? OR `bio` LIKE ?)', $result->query);
+        $this->assertEquals(['%php%', '%js%'], $result->bindings);
     }
 
     public function testContainsAny(): void
@@ -250,8 +250,8 @@ class SQLTest extends TestCase
             ->filter([Query::containsAny('tags', ['a', 'b'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `tags` IN (?, ?)', $result['query']);
-        $this->assertEquals(['a', 'b'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `tags` IN (?, ?)', $result->query);
+        $this->assertEquals(['a', 'b'], $result->bindings);
     }
 
     public function testContainsAll(): void
@@ -261,8 +261,8 @@ class SQLTest extends TestCase
             ->filter([Query::containsAll('perms', ['read', 'write'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`perms` LIKE ? AND `perms` LIKE ?)', $result['query']);
-        $this->assertEquals(['%read%', '%write%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`perms` LIKE ? AND `perms` LIKE ?)', $result->query);
+        $this->assertEquals(['%read%', '%write%'], $result->bindings);
     }
 
     public function testNotContainsSingle(): void
@@ -272,8 +272,8 @@ class SQLTest extends TestCase
             ->filter([Query::notContains('bio', ['php'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `bio` NOT LIKE ?', $result['query']);
-        $this->assertEquals(['%php%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `bio` NOT LIKE ?', $result->query);
+        $this->assertEquals(['%php%'], $result->bindings);
     }
 
     public function testNotContainsMultiple(): void
@@ -283,8 +283,8 @@ class SQLTest extends TestCase
             ->filter([Query::notContains('bio', ['php', 'js'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`bio` NOT LIKE ? AND `bio` NOT LIKE ?)', $result['query']);
-        $this->assertEquals(['%php%', '%js%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`bio` NOT LIKE ? AND `bio` NOT LIKE ?)', $result->query);
+        $this->assertEquals(['%php%', '%js%'], $result->bindings);
     }
 
     public function testSearch(): void
@@ -294,8 +294,8 @@ class SQLTest extends TestCase
             ->filter([Query::search('content', 'hello')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(?)', $result['query']);
-        $this->assertEquals(['hello'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(?)', $result->query);
+        $this->assertEquals(['hello'], $result->bindings);
     }
 
     public function testNotSearch(): void
@@ -305,8 +305,8 @@ class SQLTest extends TestCase
             ->filter([Query::notSearch('content', 'hello')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE NOT (MATCH(`content`) AGAINST(?))', $result['query']);
-        $this->assertEquals(['hello'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE NOT (MATCH(`content`) AGAINST(?))', $result->query);
+        $this->assertEquals(['hello'], $result->bindings);
     }
 
     public function testRegex(): void
@@ -316,8 +316,8 @@ class SQLTest extends TestCase
             ->filter([Query::regex('slug', '^[a-z]+$')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `slug` REGEXP ?', $result['query']);
-        $this->assertEquals(['^[a-z]+$'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `slug` REGEXP ?', $result->query);
+        $this->assertEquals(['^[a-z]+$'], $result->bindings);
     }
 
     public function testIsNull(): void
@@ -327,8 +327,8 @@ class SQLTest extends TestCase
             ->filter([Query::isNull('deleted')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `deleted` IS NULL', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `deleted` IS NULL', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testIsNotNull(): void
@@ -338,8 +338,8 @@ class SQLTest extends TestCase
             ->filter([Query::isNotNull('verified')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `verified` IS NOT NULL', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `verified` IS NOT NULL', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testExists(): void
@@ -349,8 +349,8 @@ class SQLTest extends TestCase
             ->filter([Query::exists(['name', 'email'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`name` IS NOT NULL AND `email` IS NOT NULL)', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`name` IS NOT NULL AND `email` IS NOT NULL)', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testNotExists(): void
@@ -360,8 +360,8 @@ class SQLTest extends TestCase
             ->filter([Query::notExists(['legacy'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`legacy` IS NULL)', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`legacy` IS NULL)', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     // ── Logical / nested ──
@@ -378,8 +378,8 @@ class SQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`age` > ? AND `status` IN (?))', $result['query']);
-        $this->assertEquals([18, 'active'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`age` > ? AND `status` IN (?))', $result->query);
+        $this->assertEquals([18, 'active'], $result->bindings);
     }
 
     public function testOrLogical(): void
@@ -394,8 +394,8 @@ class SQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`role` IN (?) OR `role` IN (?))', $result['query']);
-        $this->assertEquals(['admin', 'mod'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`role` IN (?) OR `role` IN (?))', $result->query);
+        $this->assertEquals(['admin', 'mod'], $result->bindings);
     }
 
     public function testDeeplyNested(): void
@@ -415,9 +415,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE (`age` > ? AND (`role` IN (?) OR `role` IN (?)))',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([18, 'admin', 'mod'], $result['bindings']);
+        $this->assertEquals([18, 'admin', 'mod'], $result->bindings);
     }
 
     // ── Sort ──
@@ -429,7 +429,7 @@ class SQLTest extends TestCase
             ->sortAsc('name')
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY `name` ASC', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` ORDER BY `name` ASC', $result->query);
     }
 
     public function testSortDesc(): void
@@ -439,7 +439,7 @@ class SQLTest extends TestCase
             ->sortDesc('score')
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY `score` DESC', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` ORDER BY `score` DESC', $result->query);
     }
 
     public function testSortRandom(): void
@@ -449,7 +449,7 @@ class SQLTest extends TestCase
             ->sortRandom()
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY RAND()', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` ORDER BY RAND()', $result->query);
     }
 
     public function testMultipleSorts(): void
@@ -460,7 +460,7 @@ class SQLTest extends TestCase
             ->sortDesc('age')
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY `name` ASC, `age` DESC', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` ORDER BY `name` ASC, `age` DESC', $result->query);
     }
 
     // ── Pagination ──
@@ -472,8 +472,8 @@ class SQLTest extends TestCase
             ->limit(10)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result['query']);
-        $this->assertEquals([10], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result->query);
+        $this->assertEquals([10], $result->bindings);
     }
 
     public function testOffsetOnly(): void
@@ -484,8 +484,8 @@ class SQLTest extends TestCase
             ->offset(50)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t`', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testCursorAfter(): void
@@ -495,8 +495,8 @@ class SQLTest extends TestCase
             ->cursorAfter('abc123')
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `_cursor` > ?', $result['query']);
-        $this->assertEquals(['abc123'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `_cursor` > ?', $result->query);
+        $this->assertEquals(['abc123'], $result->bindings);
     }
 
     public function testCursorBefore(): void
@@ -506,8 +506,8 @@ class SQLTest extends TestCase
             ->cursorBefore('xyz789')
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `_cursor` < ?', $result['query']);
-        $this->assertEquals(['xyz789'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `_cursor` < ?', $result->query);
+        $this->assertEquals(['xyz789'], $result->bindings);
     }
 
     // ── Combined full query ──
@@ -529,9 +529,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT `id`, `name` FROM `users` WHERE `status` IN (?) AND `age` > ? ORDER BY `name` ASC, `age` DESC LIMIT ? OFFSET ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['active', 18, 25, 10], $result['bindings']);
+        $this->assertEquals(['active', 18, 25, 10], $result->bindings);
     }
 
     // ── Multiple filter() calls (additive) ──
@@ -544,8 +544,8 @@ class SQLTest extends TestCase
             ->filter([Query::equal('b', [2])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?) AND `b` IN (?)', $result['query']);
-        $this->assertEquals([1, 2], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?) AND `b` IN (?)', $result->query);
+        $this->assertEquals([1, 2], $result->bindings);
     }
 
     // ── Reset ──
@@ -567,8 +567,8 @@ class SQLTest extends TestCase
             ->filter([Query::greaterThan('total', 100)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `orders` WHERE `total` > ?', $result['query']);
-        $this->assertEquals([100], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `orders` WHERE `total` > ?', $result->query);
+        $this->assertEquals([100], $result->bindings);
     }
 
     // ── Extension points ──
@@ -587,9 +587,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `users` WHERE `_uid` IN (?) ORDER BY `_createdAt` ASC',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['abc'], $result['bindings']);
+        $this->assertEquals(['abc'], $result->bindings);
     }
 
     public function testMultipleAttributeHooksChain(): void
@@ -611,7 +611,7 @@ class SQLTest extends TestCase
         // First hook maps name→full_name, second prepends col_
         $this->assertEquals(
             'SELECT * FROM `t` WHERE `col_full_name` IN (?)',
-            $result['query']
+            $result->query
         );
     }
 
@@ -640,9 +640,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `users` WHERE `_uid` IN (?) AND _tenant = ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['abc', 't1'], $result['bindings']);
+        $this->assertEquals(['abc', 't1'], $result->bindings);
     }
 
     public function testWrapChar(): void
@@ -656,7 +656,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT "name" FROM "users" WHERE "status" IN (?)',
-            $result['query']
+            $result->query
         );
     }
 
@@ -679,9 +679,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             "SELECT * FROM `users` WHERE `status` IN (?) AND _uid IN (SELECT _document FROM users_perms WHERE _type = 'read')",
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['active'], $result['bindings']);
+        $this->assertEquals(['active'], $result->bindings);
     }
 
     public function testConditionProviderWithBindings(): void
@@ -701,10 +701,10 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `docs` WHERE `status` IN (?) AND _tenant = ?',
-            $result['query']
+            $result->query
         );
         // filter bindings first, then hook bindings
-        $this->assertEquals(['active', 'tenant_abc'], $result['bindings']);
+        $this->assertEquals(['active', 'tenant_abc'], $result->bindings);
     }
 
     public function testBindingOrderingWithProviderAndCursor(): void
@@ -726,7 +726,7 @@ class SQLTest extends TestCase
             ->build();
 
         // binding order: filter, hook, cursor, limit, offset
-        $this->assertEquals(['active', 't1', 'cursor_val', 10, 5], $result['bindings']);
+        $this->assertEquals(['active', 't1', 'cursor_val', 10, 5], $result->bindings);
     }
 
     // ── Select with no columns defaults to * ──
@@ -737,7 +737,7 @@ class SQLTest extends TestCase
             ->from('t')
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t`', $result['query']);
+        $this->assertEquals('SELECT * FROM `t`', $result->query);
     }
 
     // ── Aggregations ──
@@ -749,8 +749,8 @@ class SQLTest extends TestCase
             ->count()
             ->build();
 
-        $this->assertEquals('SELECT COUNT(*) FROM `t`', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT COUNT(*) FROM `t`', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testCountWithAlias(): void
@@ -760,7 +760,7 @@ class SQLTest extends TestCase
             ->count('*', 'total')
             ->build();
 
-        $this->assertEquals('SELECT COUNT(*) AS `total` FROM `t`', $result['query']);
+        $this->assertEquals('SELECT COUNT(*) AS `total` FROM `t`', $result->query);
     }
 
     public function testSumColumn(): void
@@ -770,7 +770,7 @@ class SQLTest extends TestCase
             ->sum('price', 'total_price')
             ->build();
 
-        $this->assertEquals('SELECT SUM(`price`) AS `total_price` FROM `orders`', $result['query']);
+        $this->assertEquals('SELECT SUM(`price`) AS `total_price` FROM `orders`', $result->query);
     }
 
     public function testAvgColumn(): void
@@ -780,7 +780,7 @@ class SQLTest extends TestCase
             ->avg('score')
             ->build();
 
-        $this->assertEquals('SELECT AVG(`score`) FROM `t`', $result['query']);
+        $this->assertEquals('SELECT AVG(`score`) FROM `t`', $result->query);
     }
 
     public function testMinColumn(): void
@@ -790,7 +790,7 @@ class SQLTest extends TestCase
             ->min('price')
             ->build();
 
-        $this->assertEquals('SELECT MIN(`price`) FROM `t`', $result['query']);
+        $this->assertEquals('SELECT MIN(`price`) FROM `t`', $result->query);
     }
 
     public function testMaxColumn(): void
@@ -800,7 +800,7 @@ class SQLTest extends TestCase
             ->max('price')
             ->build();
 
-        $this->assertEquals('SELECT MAX(`price`) FROM `t`', $result['query']);
+        $this->assertEquals('SELECT MAX(`price`) FROM `t`', $result->query);
     }
 
     public function testAggregationWithSelection(): void
@@ -814,7 +814,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT COUNT(*) AS `total`, `status` FROM `orders` GROUP BY `status`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -830,7 +830,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT COUNT(*) AS `total` FROM `orders` GROUP BY `status`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -844,7 +844,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT COUNT(*) AS `total` FROM `orders` GROUP BY `status`, `country`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -861,9 +861,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT COUNT(*) AS `total` FROM `orders` GROUP BY `status` HAVING `total` > ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([5], $result['bindings']);
+        $this->assertEquals([5], $result->bindings);
     }
 
     // ── Distinct ──
@@ -876,7 +876,7 @@ class SQLTest extends TestCase
             ->select(['status'])
             ->build();
 
-        $this->assertEquals('SELECT DISTINCT `status` FROM `t`', $result['query']);
+        $this->assertEquals('SELECT DISTINCT `status` FROM `t`', $result->query);
     }
 
     public function testDistinctStar(): void
@@ -886,7 +886,7 @@ class SQLTest extends TestCase
             ->distinct()
             ->build();
 
-        $this->assertEquals('SELECT DISTINCT * FROM `t`', $result['query']);
+        $this->assertEquals('SELECT DISTINCT * FROM `t`', $result->query);
     }
 
     // ── Joins ──
@@ -900,7 +900,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -913,7 +913,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `users` LEFT JOIN `profiles` ON `users`.`id` = `profiles`.`user_id`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -926,7 +926,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `users` RIGHT JOIN `orders` ON `users`.`id` = `orders`.`user_id`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -939,7 +939,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `sizes` CROSS JOIN `colors`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -953,9 +953,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` WHERE `orders`.`total` > ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([100], $result['bindings']);
+        $this->assertEquals([100], $result->bindings);
     }
 
     // ── Raw ──
@@ -967,8 +967,8 @@ class SQLTest extends TestCase
             ->filter([Query::raw('score > ? AND score < ?', [10, 100])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE score > ? AND score < ?', $result['query']);
-        $this->assertEquals([10, 100], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE score > ? AND score < ?', $result->query);
+        $this->assertEquals([10, 100], $result->bindings);
     }
 
     public function testRawFilterNoBindings(): void
@@ -978,8 +978,8 @@ class SQLTest extends TestCase
             ->filter([Query::raw('1 = 1')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE 1 = 1', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE 1 = 1', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     // ── Union ──
@@ -995,9 +995,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             '(SELECT * FROM `users` WHERE `status` IN (?)) UNION (SELECT * FROM `admins` WHERE `role` IN (?))',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['active', 'admin'], $result['bindings']);
+        $this->assertEquals(['active', 'admin'], $result->bindings);
     }
 
     public function testUnionAll(): void
@@ -1010,7 +1010,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             '(SELECT * FROM `current`) UNION ALL (SELECT * FROM `archive`)',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1023,8 +1023,8 @@ class SQLTest extends TestCase
             ->when(true, fn (Builder $b) => $b->filter([Query::equal('status', ['active'])]))
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `status` IN (?)', $result['query']);
-        $this->assertEquals(['active'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `status` IN (?)', $result->query);
+        $this->assertEquals(['active'], $result->bindings);
     }
 
     public function testWhenFalse(): void
@@ -1034,8 +1034,8 @@ class SQLTest extends TestCase
             ->when(false, fn (Builder $b) => $b->filter([Query::equal('status', ['active'])]))
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t`', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     // ── page() ──
@@ -1047,8 +1047,8 @@ class SQLTest extends TestCase
             ->page(3, 10)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` LIMIT ? OFFSET ?', $result['query']);
-        $this->assertEquals([10, 20], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
+        $this->assertEquals([10, 20], $result->bindings);
     }
 
     public function testPageDefaultPerPage(): void
@@ -1058,8 +1058,8 @@ class SQLTest extends TestCase
             ->page(1)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` LIMIT ? OFFSET ?', $result['query']);
-        $this->assertEquals([25, 0], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
+        $this->assertEquals([25, 0], $result->bindings);
     }
 
     // ── toRawSql() ──
@@ -1106,9 +1106,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT COUNT(*) AS `order_count`, SUM(`total`) AS `total_amount`, `users`.`name` FROM `orders` JOIN `users` ON `orders`.`user_id` = `users`.`id` GROUP BY `users`.`name` HAVING `order_count` > ? ORDER BY `total_amount` DESC LIMIT ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([5, 10], $result['bindings']);
+        $this->assertEquals([5, 10], $result->bindings);
     }
 
     // ── Reset clears unions ──
@@ -1125,7 +1125,7 @@ class SQLTest extends TestCase
 
         $result = $builder->from('fresh')->build();
 
-        $this->assertEquals('SELECT * FROM `fresh`', $result['query']);
+        $this->assertEquals('SELECT * FROM `fresh`', $result->query);
     }
 
     // ══════════════════════════════════════════
@@ -1141,7 +1141,7 @@ class SQLTest extends TestCase
             ->count('id')
             ->build();
 
-        $this->assertEquals('SELECT COUNT(`id`) FROM `t`', $result['query']);
+        $this->assertEquals('SELECT COUNT(`id`) FROM `t`', $result->query);
     }
 
     public function testCountWithEmptyStringAttribute(): void
@@ -1151,7 +1151,7 @@ class SQLTest extends TestCase
             ->count('')
             ->build();
 
-        $this->assertEquals('SELECT COUNT(*) FROM `t`', $result['query']);
+        $this->assertEquals('SELECT COUNT(*) FROM `t`', $result->query);
     }
 
     public function testMultipleAggregations(): void
@@ -1167,9 +1167,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT COUNT(*) AS `cnt`, SUM(`price`) AS `total`, AVG(`score`) AS `avg_score`, MIN(`age`) AS `youngest`, MAX(`age`) AS `oldest` FROM `t`',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testAggregationWithoutGroupBy(): void
@@ -1179,7 +1179,7 @@ class SQLTest extends TestCase
             ->sum('total', 'grand_total')
             ->build();
 
-        $this->assertEquals('SELECT SUM(`total`) AS `grand_total` FROM `orders`', $result['query']);
+        $this->assertEquals('SELECT SUM(`total`) AS `grand_total` FROM `orders`', $result->query);
     }
 
     public function testAggregationWithFilter(): void
@@ -1192,9 +1192,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT COUNT(*) AS `total` FROM `orders` WHERE `status` IN (?)',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['completed'], $result['bindings']);
+        $this->assertEquals(['completed'], $result->bindings);
     }
 
     public function testAggregationWithoutAlias(): void
@@ -1205,7 +1205,7 @@ class SQLTest extends TestCase
             ->sum('price')
             ->build();
 
-        $this->assertEquals('SELECT COUNT(*), SUM(`price`) FROM `t`', $result['query']);
+        $this->assertEquals('SELECT COUNT(*), SUM(`price`) FROM `t`', $result->query);
     }
 
     // ── Group By edge cases ──
@@ -1217,7 +1217,7 @@ class SQLTest extends TestCase
             ->groupBy([])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t`', $result['query']);
+        $this->assertEquals('SELECT * FROM `t`', $result->query);
     }
 
     public function testMultipleGroupByCalls(): void
@@ -1230,9 +1230,9 @@ class SQLTest extends TestCase
             ->build();
 
         // Both groupBy calls should merge since groupByType merges values
-        $this->assertStringContainsString('GROUP BY', $result['query']);
-        $this->assertStringContainsString('`status`', $result['query']);
-        $this->assertStringContainsString('`country`', $result['query']);
+        $this->assertStringContainsString('GROUP BY', $result->query);
+        $this->assertStringContainsString('`status`', $result->query);
+        $this->assertStringContainsString('`country`', $result->query);
     }
 
     // ── Having edge cases ──
@@ -1246,7 +1246,7 @@ class SQLTest extends TestCase
             ->having([])
             ->build();
 
-        $this->assertStringNotContainsString('HAVING', $result['query']);
+        $this->assertStringNotContainsString('HAVING', $result->query);
     }
 
     public function testHavingMultipleConditions(): void
@@ -1264,9 +1264,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT COUNT(*) AS `total`, SUM(`price`) AS `sum_price` FROM `t` GROUP BY `status` HAVING `total` > ? AND `sum_price` < ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([5, 1000], $result['bindings']);
+        $this->assertEquals([5, 1000], $result->bindings);
     }
 
     public function testHavingWithLogicalOr(): void
@@ -1283,8 +1283,8 @@ class SQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertStringContainsString('HAVING (`total` > ? OR `total` < ?)', $result['query']);
-        $this->assertEquals([10, 2], $result['bindings']);
+        $this->assertStringContainsString('HAVING (`total` > ? OR `total` < ?)', $result->query);
+        $this->assertEquals([10, 2], $result->bindings);
     }
 
     public function testHavingWithoutGroupBy(): void
@@ -1296,8 +1296,8 @@ class SQLTest extends TestCase
             ->having([Query::greaterThan('total', 0)])
             ->build();
 
-        $this->assertStringContainsString('HAVING', $result['query']);
-        $this->assertStringNotContainsString('GROUP BY', $result['query']);
+        $this->assertStringContainsString('HAVING', $result->query);
+        $this->assertStringNotContainsString('GROUP BY', $result->query);
     }
 
     public function testMultipleHavingCalls(): void
@@ -1310,8 +1310,8 @@ class SQLTest extends TestCase
             ->having([Query::lessThan('total', 100)])
             ->build();
 
-        $this->assertStringContainsString('HAVING `total` > ? AND `total` < ?', $result['query']);
-        $this->assertEquals([1, 100], $result['bindings']);
+        $this->assertStringContainsString('HAVING `total` > ? AND `total` < ?', $result->query);
+        $this->assertEquals([1, 100], $result->bindings);
     }
 
     // ── Distinct edge cases ──
@@ -1324,7 +1324,7 @@ class SQLTest extends TestCase
             ->count('*', 'total')
             ->build();
 
-        $this->assertEquals('SELECT DISTINCT COUNT(*) AS `total` FROM `t`', $result['query']);
+        $this->assertEquals('SELECT DISTINCT COUNT(*) AS `total` FROM `t`', $result->query);
     }
 
     public function testDistinctMultipleCalls(): void
@@ -1336,7 +1336,7 @@ class SQLTest extends TestCase
             ->distinct()
             ->build();
 
-        $this->assertEquals('SELECT DISTINCT * FROM `t`', $result['query']);
+        $this->assertEquals('SELECT DISTINCT * FROM `t`', $result->query);
     }
 
     public function testDistinctWithJoin(): void
@@ -1350,7 +1350,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT DISTINCT `users`.`name` FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1366,7 +1366,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT DISTINCT `status` FROM `t` WHERE `status` IS NOT NULL ORDER BY `status` ASC',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1383,7 +1383,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` LEFT JOIN `profiles` ON `users`.`id` = `profiles`.`user_id` RIGHT JOIN `departments` ON `users`.`dept_id` = `departments`.`id`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1398,7 +1398,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT COUNT(*) AS `order_count` FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` GROUP BY `users`.`name`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1415,9 +1415,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` WHERE `orders`.`total` > ? ORDER BY `orders`.`total` DESC LIMIT ? OFFSET ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([50, 10, 20], $result['bindings']);
+        $this->assertEquals([50, 10, 20], $result->bindings);
     }
 
     public function testJoinWithCustomOperator(): void
@@ -1429,7 +1429,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `a` JOIN `b` ON `a`.`val` != `b`.`val`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1443,7 +1443,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `sizes` CROSS JOIN `colors` LEFT JOIN `inventory` ON `sizes`.`id` = `inventory`.`size_id`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1456,8 +1456,8 @@ class SQLTest extends TestCase
             ->filter([Query::raw('a = ? AND b = ? AND c = ?', ['str', 42, 3.14])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE a = ? AND b = ? AND c = ?', $result['query']);
-        $this->assertEquals(['str', 42, 3.14], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE a = ? AND b = ? AND c = ?', $result->query);
+        $this->assertEquals(['str', 42, 3.14], $result->bindings);
     }
 
     public function testRawCombinedWithRegularFilters(): void
@@ -1472,9 +1472,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE `status` IN (?) AND custom_func(col) > ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['active', 10], $result['bindings']);
+        $this->assertEquals(['active', 10], $result->bindings);
     }
 
     public function testRawWithEmptySql(): void
@@ -1485,7 +1485,7 @@ class SQLTest extends TestCase
             ->build();
 
         // Empty raw SQL still appears as a WHERE clause
-        $this->assertStringContainsString('WHERE', $result['query']);
+        $this->assertStringContainsString('WHERE', $result->query);
     }
 
     // ── Union edge cases ──
@@ -1503,7 +1503,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             '(SELECT * FROM `users`) UNION (SELECT * FROM `admins`) UNION (SELECT * FROM `mods`)',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1520,7 +1520,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             '(SELECT * FROM `users`) UNION (SELECT * FROM `admins`) UNION ALL (SELECT * FROM `mods`)',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1538,9 +1538,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             '(SELECT * FROM `users` WHERE `status` IN (?)) UNION (SELECT * FROM `admins` WHERE `level` IN (?)) UNION ALL (SELECT * FROM `mods` WHERE `score` > ?)',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['active', 1, 50], $result['bindings']);
+        $this->assertEquals(['active', 1, 50], $result->bindings);
     }
 
     public function testUnionWithAggregation(): void
@@ -1555,7 +1555,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             '(SELECT COUNT(*) AS `total` FROM `orders_2024`) UNION ALL (SELECT COUNT(*) AS `total` FROM `orders_2023`)',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1570,7 +1570,7 @@ class SQLTest extends TestCase
             })
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?)', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?)', $result->query);
     }
 
     public function testWhenMultipleCalls(): void
@@ -1582,8 +1582,8 @@ class SQLTest extends TestCase
             ->when(true, fn (Builder $b) => $b->filter([Query::equal('c', [3])]))
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?) AND `c` IN (?)', $result['query']);
-        $this->assertEquals([1, 3], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?) AND `c` IN (?)', $result->query);
+        $this->assertEquals([1, 3], $result->bindings);
     }
 
     // ── page() edge cases ──
@@ -1596,7 +1596,7 @@ class SQLTest extends TestCase
             ->build();
 
         // page 0 → offset clamped to 0
-        $this->assertEquals([10, 0], $result['bindings']);
+        $this->assertEquals([10, 0], $result->bindings);
     }
 
     public function testPageOnePerPage(): void
@@ -1606,8 +1606,8 @@ class SQLTest extends TestCase
             ->page(5, 1)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` LIMIT ? OFFSET ?', $result['query']);
-        $this->assertEquals([1, 4], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
+        $this->assertEquals([1, 4], $result->bindings);
     }
 
     public function testPageLargeValues(): void
@@ -1617,7 +1617,7 @@ class SQLTest extends TestCase
             ->page(1000, 100)
             ->build();
 
-        $this->assertEquals([100, 99900], $result['bindings']);
+        $this->assertEquals([100, 99900], $result->bindings);
     }
 
     // ── toRawSql() edge cases ──
@@ -1677,12 +1677,8 @@ class SQLTest extends TestCase
 
     public function testCompileFilterUnsupportedType(): void
     {
-        $builder = new Builder();
-        $query = new Query('totallyInvalid', 'x', [1]);
-
-        $this->expectException(\Utopia\Query\Exception::class);
-        $this->expectExceptionMessage('Unsupported filter type: totallyInvalid');
-        $builder->compileFilter($query);
+        $this->expectException(\ValueError::class);
+        new Query('totallyInvalid', 'x', [1]);
     }
 
     public function testCompileOrderUnsupportedType(): void
@@ -1729,7 +1725,7 @@ class SQLTest extends TestCase
             ->build();
 
         // Order: filter bindings, hook bindings, cursor, limit, offset
-        $this->assertEquals(['x', 5, 'tenant1', 'cursor_abc', 10, 20], $result['bindings']);
+        $this->assertEquals(['x', 5, 'tenant1', 'cursor_abc', 10, 20], $result->bindings);
     }
 
     public function testBindingOrderMultipleProviders(): void
@@ -1754,7 +1750,7 @@ class SQLTest extends TestCase
             ->filter([Query::equal('a', ['x'])])
             ->build();
 
-        $this->assertEquals(['x', 'v1', 'v2'], $result['bindings']);
+        $this->assertEquals(['x', 'v1', 'v2'], $result->bindings);
     }
 
     public function testBindingOrderHavingAfterFilters(): void
@@ -1769,7 +1765,7 @@ class SQLTest extends TestCase
             ->build();
 
         // Filter bindings, then having bindings, then limit
-        $this->assertEquals(['active', 5, 10], $result['bindings']);
+        $this->assertEquals(['active', 5, 10], $result->bindings);
     }
 
     public function testBindingOrderUnionAppendedLast(): void
@@ -1784,7 +1780,7 @@ class SQLTest extends TestCase
             ->build();
 
         // Main filter, main limit, then union bindings
-        $this->assertEquals(['b', 5, 'y'], $result['bindings']);
+        $this->assertEquals(['b', 5, 'y'], $result->bindings);
     }
 
     public function testBindingOrderComplexMixed(): void
@@ -1812,7 +1808,7 @@ class SQLTest extends TestCase
             ->build();
 
         // filter, hook, cursor, having, limit, offset, union
-        $this->assertEquals(['paid', 'org1', 'cur1', 1, 10, 5, 2023], $result['bindings']);
+        $this->assertEquals(['paid', 'org1', 'cur1', 1, 10, 5, 2023], $result->bindings);
     }
 
     // ── Attribute resolver with new features ──
@@ -1825,7 +1821,7 @@ class SQLTest extends TestCase
             ->sum('$price', 'total')
             ->build();
 
-        $this->assertEquals('SELECT SUM(`_price`) AS `total` FROM `t`', $result['query']);
+        $this->assertEquals('SELECT SUM(`_price`) AS `total` FROM `t`', $result->query);
     }
 
     public function testAttributeResolverWithGroupBy(): void
@@ -1839,7 +1835,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT COUNT(*) AS `total` FROM `t` GROUP BY `_status`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1856,7 +1852,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` JOIN `other` ON `_uid` = `_ref`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1870,7 +1866,7 @@ class SQLTest extends TestCase
             ->having([Query::greaterThan('$total', 5)])
             ->build();
 
-        $this->assertStringContainsString('HAVING `_total` > ?', $result['query']);
+        $this->assertStringContainsString('HAVING `_total` > ?', $result->query);
     }
 
     // ── Wrap char with new features ──
@@ -1885,7 +1881,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM "users" JOIN "orders" ON "users"."id" = "orders"."uid"',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1900,7 +1896,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT COUNT("id") AS "total" FROM "t" GROUP BY "status"',
-            $result['query']
+            $result->query
         );
     }
 
@@ -1913,7 +1909,7 @@ class SQLTest extends TestCase
             ->filter([Query::equal('status', ['active'])])
             ->build();
 
-        $this->assertEquals('SELECT name FROM t WHERE status IN (?)', $result['query']);
+        $this->assertEquals('SELECT name FROM t WHERE status IN (?)', $result->query);
     }
 
     // ── Condition provider with new features ──
@@ -1936,9 +1932,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` WHERE `orders`.`total` > ? AND users.org_id = ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([100, 'org1'], $result['bindings']);
+        $this->assertEquals([100, 'org1'], $result->bindings);
     }
 
     public function testConditionProviderWithAggregation(): void
@@ -1957,8 +1953,8 @@ class SQLTest extends TestCase
             ->groupBy(['status'])
             ->build();
 
-        $this->assertStringContainsString('WHERE org_id = ?', $result['query']);
-        $this->assertEquals(['org1'], $result['bindings']);
+        $this->assertStringContainsString('WHERE org_id = ?', $result->query);
+        $this->assertEquals(['org1'], $result->bindings);
     }
 
     // ── Multiple build() calls ──
@@ -1973,8 +1969,8 @@ class SQLTest extends TestCase
         $result1 = $builder->build();
         $result2 = $builder->build();
 
-        $this->assertEquals($result1['query'], $result2['query']);
-        $this->assertEquals($result1['bindings'], $result2['bindings']);
+        $this->assertEquals($result1->query, $result2->query);
+        $this->assertEquals($result1->bindings, $result2->bindings);
     }
 
     // ── Reset behavior ──
@@ -1999,7 +1995,7 @@ class SQLTest extends TestCase
 
         // wrapChar and hooks should persist since reset() only clears queries/bindings/table/unions
         $result = $builder->from('t2')->filter([Query::equal('y', [2])])->build();
-        $this->assertEquals('SELECT * FROM "t2" WHERE "_y" IN (?)', $result['query']);
+        $this->assertEquals('SELECT * FROM "t2" WHERE "_y" IN (?)', $result->query);
     }
 
     // ── Empty query ──
@@ -2007,7 +2003,7 @@ class SQLTest extends TestCase
     public function testEmptyBuilderNoFrom(): void
     {
         $result = (new Builder())->from('')->build();
-        $this->assertEquals('SELECT * FROM ``', $result['query']);
+        $this->assertEquals('SELECT * FROM ``', $result->query);
     }
 
     // ── Cursor with other pagination ──
@@ -2023,9 +2019,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE `_cursor` > ? LIMIT ? OFFSET ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['abc', 10, 5], $result['bindings']);
+        $this->assertEquals(['abc', 10, 5], $result->bindings);
     }
 
     public function testCursorWithPage(): void
@@ -2037,8 +2033,8 @@ class SQLTest extends TestCase
             ->build();
 
         // Cursor + limit from page + offset from page; first limit/offset wins
-        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
-        $this->assertStringContainsString('LIMIT ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` > ?', $result->query);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
     }
 
     // ── Full kitchen sink ──
@@ -2074,23 +2070,23 @@ class SQLTest extends TestCase
             ->build();
 
         // Verify structural elements
-        $this->assertStringContainsString('SELECT DISTINCT', $result['query']);
-        $this->assertStringContainsString('COUNT(*) AS `cnt`', $result['query']);
-        $this->assertStringContainsString('SUM(`total`) AS `sum_total`', $result['query']);
-        $this->assertStringContainsString('`status`', $result['query']);
-        $this->assertStringContainsString('FROM `orders`', $result['query']);
-        $this->assertStringContainsString('JOIN `users`', $result['query']);
-        $this->assertStringContainsString('LEFT JOIN `coupons`', $result['query']);
-        $this->assertStringContainsString('WHERE', $result['query']);
-        $this->assertStringContainsString('GROUP BY `status`', $result['query']);
-        $this->assertStringContainsString('HAVING `cnt` > ?', $result['query']);
-        $this->assertStringContainsString('ORDER BY `sum_total` DESC', $result['query']);
-        $this->assertStringContainsString('LIMIT ?', $result['query']);
-        $this->assertStringContainsString('OFFSET ?', $result['query']);
-        $this->assertStringContainsString('UNION', $result['query']);
+        $this->assertStringContainsString('SELECT DISTINCT', $result->query);
+        $this->assertStringContainsString('COUNT(*) AS `cnt`', $result->query);
+        $this->assertStringContainsString('SUM(`total`) AS `sum_total`', $result->query);
+        $this->assertStringContainsString('`status`', $result->query);
+        $this->assertStringContainsString('FROM `orders`', $result->query);
+        $this->assertStringContainsString('JOIN `users`', $result->query);
+        $this->assertStringContainsString('LEFT JOIN `coupons`', $result->query);
+        $this->assertStringContainsString('WHERE', $result->query);
+        $this->assertStringContainsString('GROUP BY `status`', $result->query);
+        $this->assertStringContainsString('HAVING `cnt` > ?', $result->query);
+        $this->assertStringContainsString('ORDER BY `sum_total` DESC', $result->query);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertStringContainsString('OFFSET ?', $result->query);
+        $this->assertStringContainsString('UNION', $result->query);
 
         // Verify SQL clause ordering
-        $query = $result['query'];
+        $query = $result->query;
         $this->assertLessThan(strpos($query, 'FROM'), strpos($query, 'SELECT'));
         $this->assertLessThan(strpos($query, 'JOIN'), (int) strpos($query, 'FROM'));
         $this->assertLessThan(strpos($query, 'WHERE'), (int) strpos($query, 'JOIN'));
@@ -2111,7 +2107,7 @@ class SQLTest extends TestCase
             ->filter([])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t`', $result['query']);
+        $this->assertEquals('SELECT * FROM `t`', $result->query);
     }
 
     public function testSelectEmptyArray(): void
@@ -2122,7 +2118,7 @@ class SQLTest extends TestCase
             ->build();
 
         // Empty select produces empty column list
-        $this->assertEquals('SELECT  FROM `t`', $result['query']);
+        $this->assertEquals('SELECT  FROM `t`', $result->query);
     }
 
     // ── Limit/offset edge values ──
@@ -2134,8 +2130,8 @@ class SQLTest extends TestCase
             ->limit(0)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result['query']);
-        $this->assertEquals([0], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result->query);
+        $this->assertEquals([0], $result->bindings);
     }
 
     public function testOffsetZero(): void
@@ -2146,8 +2142,8 @@ class SQLTest extends TestCase
             ->build();
 
         // OFFSET without LIMIT is suppressed
-        $this->assertEquals('SELECT * FROM `t`', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     // ── Fluent chaining returns same instance ──
@@ -2207,8 +2203,8 @@ class SQLTest extends TestCase
             ->filter([Query::regex('slug', '')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `slug` REGEXP ?', $result['query']);
-        $this->assertEquals([''], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `slug` REGEXP ?', $result->query);
+        $this->assertEquals([''], $result->bindings);
     }
 
     public function testRegexWithDotChar(): void
@@ -2218,8 +2214,8 @@ class SQLTest extends TestCase
             ->filter([Query::regex('name', 'a.b')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `name` REGEXP ?', $result['query']);
-        $this->assertEquals(['a.b'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `name` REGEXP ?', $result->query);
+        $this->assertEquals(['a.b'], $result->bindings);
     }
 
     public function testRegexWithStarChar(): void
@@ -2229,7 +2225,7 @@ class SQLTest extends TestCase
             ->filter([Query::regex('name', 'a*b')])
             ->build();
 
-        $this->assertEquals(['a*b'], $result['bindings']);
+        $this->assertEquals(['a*b'], $result->bindings);
     }
 
     public function testRegexWithPlusChar(): void
@@ -2239,7 +2235,7 @@ class SQLTest extends TestCase
             ->filter([Query::regex('name', 'a+')])
             ->build();
 
-        $this->assertEquals(['a+'], $result['bindings']);
+        $this->assertEquals(['a+'], $result->bindings);
     }
 
     public function testRegexWithQuestionMarkChar(): void
@@ -2249,7 +2245,7 @@ class SQLTest extends TestCase
             ->filter([Query::regex('name', 'colou?r')])
             ->build();
 
-        $this->assertEquals(['colou?r'], $result['bindings']);
+        $this->assertEquals(['colou?r'], $result->bindings);
     }
 
     public function testRegexWithCaretAndDollar(): void
@@ -2259,7 +2255,7 @@ class SQLTest extends TestCase
             ->filter([Query::regex('code', '^[A-Z]+$')])
             ->build();
 
-        $this->assertEquals(['^[A-Z]+$'], $result['bindings']);
+        $this->assertEquals(['^[A-Z]+$'], $result->bindings);
     }
 
     public function testRegexWithPipeChar(): void
@@ -2269,7 +2265,7 @@ class SQLTest extends TestCase
             ->filter([Query::regex('color', 'red|blue|green')])
             ->build();
 
-        $this->assertEquals(['red|blue|green'], $result['bindings']);
+        $this->assertEquals(['red|blue|green'], $result->bindings);
     }
 
     public function testRegexWithBackslash(): void
@@ -2279,7 +2275,7 @@ class SQLTest extends TestCase
             ->filter([Query::regex('path', '\\\\server\\\\share')])
             ->build();
 
-        $this->assertEquals(['\\\\server\\\\share'], $result['bindings']);
+        $this->assertEquals(['\\\\server\\\\share'], $result->bindings);
     }
 
     public function testRegexWithBracketsAndBraces(): void
@@ -2289,7 +2285,7 @@ class SQLTest extends TestCase
             ->filter([Query::regex('zip', '[0-9]{5}')])
             ->build();
 
-        $this->assertEquals('[0-9]{5}', $result['bindings'][0]);
+        $this->assertEquals('[0-9]{5}', $result->bindings[0]);
     }
 
     public function testRegexWithParentheses(): void
@@ -2299,7 +2295,7 @@ class SQLTest extends TestCase
             ->filter([Query::regex('phone', '(\\+1)?[0-9]{10}')])
             ->build();
 
-        $this->assertEquals(['(\\+1)?[0-9]{10}'], $result['bindings']);
+        $this->assertEquals(['(\\+1)?[0-9]{10}'], $result->bindings);
     }
 
     public function testRegexCombinedWithOtherFilters(): void
@@ -2315,9 +2311,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE `status` IN (?) AND `slug` REGEXP ? AND `age` > ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['active', '^[a-z-]+$', 18], $result['bindings']);
+        $this->assertEquals(['active', '^[a-z-]+$', 18], $result->bindings);
     }
 
     public function testRegexWithAttributeResolver(): void
@@ -2330,8 +2326,8 @@ class SQLTest extends TestCase
             ->filter([Query::regex('$slug', '^test')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `_slug` REGEXP ?', $result['query']);
-        $this->assertEquals(['^test'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `_slug` REGEXP ?', $result->query);
+        $this->assertEquals(['^test'], $result->bindings);
     }
 
     public function testRegexWithDifferentWrapChar(): void
@@ -2342,7 +2338,7 @@ class SQLTest extends TestCase
             ->filter([Query::regex('slug', '^[a-z]+$')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM "t" WHERE "slug" REGEXP ?', $result['query']);
+        $this->assertEquals('SELECT * FROM "t" WHERE "slug" REGEXP ?', $result->query);
     }
 
     public function testRegexStandaloneCompileFilter(): void
@@ -2363,7 +2359,7 @@ class SQLTest extends TestCase
             ->filter([Query::regex('email', $pattern)])
             ->build();
 
-        $this->assertSame($pattern, $result['bindings'][0]);
+        $this->assertSame($pattern, $result->bindings[0]);
     }
 
     public function testRegexWithVeryLongPattern(): void
@@ -2374,8 +2370,8 @@ class SQLTest extends TestCase
             ->filter([Query::regex('col', $pattern)])
             ->build();
 
-        $this->assertEquals($pattern, $result['bindings'][0]);
-        $this->assertStringContainsString('REGEXP ?', $result['query']);
+        $this->assertEquals($pattern, $result->bindings[0]);
+        $this->assertStringContainsString('REGEXP ?', $result->query);
     }
 
     public function testMultipleRegexFilters(): void
@@ -2390,9 +2386,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE `name` REGEXP ? AND `email` REGEXP ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['^A', '@test\\.com$'], $result['bindings']);
+        $this->assertEquals(['^A', '@test\\.com$'], $result->bindings);
     }
 
     public function testRegexInAndLogicalGroup(): void
@@ -2409,9 +2405,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE (`slug` REGEXP ? AND `status` IN (?))',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['^[a-z]+$', 'active'], $result['bindings']);
+        $this->assertEquals(['^[a-z]+$', 'active'], $result->bindings);
     }
 
     public function testRegexInOrLogicalGroup(): void
@@ -2428,9 +2424,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE (`name` REGEXP ? OR `name` REGEXP ?)',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['^Admin', '^Mod'], $result['bindings']);
+        $this->assertEquals(['^Admin', '^Mod'], $result->bindings);
     }
 
     // ══════════════════════════════════════════
@@ -2444,8 +2440,8 @@ class SQLTest extends TestCase
             ->filter([Query::search('content', '')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(?)', $result['query']);
-        $this->assertEquals([''], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(?)', $result->query);
+        $this->assertEquals([''], $result->bindings);
     }
 
     public function testSearchWithSpecialCharacters(): void
@@ -2455,7 +2451,7 @@ class SQLTest extends TestCase
             ->filter([Query::search('body', 'hello "world" +required -excluded')])
             ->build();
 
-        $this->assertEquals(['hello "world" +required -excluded'], $result['bindings']);
+        $this->assertEquals(['hello "world" +required -excluded'], $result->bindings);
     }
 
     public function testSearchCombinedWithOtherFilters(): void
@@ -2471,9 +2467,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(?) AND `status` IN (?) AND `views` > ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['hello', 'published', 100], $result['bindings']);
+        $this->assertEquals(['hello', 'published', 100], $result->bindings);
     }
 
     public function testNotSearchCombinedWithOtherFilters(): void
@@ -2488,9 +2484,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE NOT (MATCH(`content`) AGAINST(?)) AND `status` IN (?)',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['spam', 'published'], $result['bindings']);
+        $this->assertEquals(['spam', 'published'], $result->bindings);
     }
 
     public function testSearchWithAttributeResolver(): void
@@ -2503,7 +2499,7 @@ class SQLTest extends TestCase
             ->filter([Query::search('$body', 'hello')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE MATCH(`_body`) AGAINST(?)', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE MATCH(`_body`) AGAINST(?)', $result->query);
     }
 
     public function testSearchWithDifferentWrapChar(): void
@@ -2514,7 +2510,7 @@ class SQLTest extends TestCase
             ->filter([Query::search('content', 'hello')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM "t" WHERE MATCH("content") AGAINST(?)', $result['query']);
+        $this->assertEquals('SELECT * FROM "t" WHERE MATCH("content") AGAINST(?)', $result->query);
     }
 
     public function testSearchStandaloneCompileFilter(): void
@@ -2545,7 +2541,7 @@ class SQLTest extends TestCase
             ->filter([Query::search('content', $searchTerm)])
             ->build();
 
-        $this->assertSame($searchTerm, $result['bindings'][0]);
+        $this->assertSame($searchTerm, $result->bindings[0]);
     }
 
     public function testSearchWithVeryLongText(): void
@@ -2556,7 +2552,7 @@ class SQLTest extends TestCase
             ->filter([Query::search('content', $longText)])
             ->build();
 
-        $this->assertEquals($longText, $result['bindings'][0]);
+        $this->assertEquals($longText, $result->bindings[0]);
     }
 
     public function testMultipleSearchFilters(): void
@@ -2571,9 +2567,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE MATCH(`title`) AGAINST(?) AND MATCH(`body`) AGAINST(?)',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['hello', 'world'], $result['bindings']);
+        $this->assertEquals(['hello', 'world'], $result->bindings);
     }
 
     public function testSearchInAndLogicalGroup(): void
@@ -2590,7 +2586,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE (MATCH(`content`) AGAINST(?) AND `status` IN (?))',
-            $result['query']
+            $result->query
         );
     }
 
@@ -2608,9 +2604,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE (MATCH(`title`) AGAINST(?) OR MATCH(`body`) AGAINST(?))',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['hello', 'hello'], $result['bindings']);
+        $this->assertEquals(['hello', 'hello'], $result->bindings);
     }
 
     public function testSearchAndRegexCombined(): void
@@ -2625,9 +2621,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(?) AND `slug` REGEXP ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['hello world', '^[a-z-]+$'], $result['bindings']);
+        $this->assertEquals(['hello world', '^[a-z-]+$'], $result->bindings);
     }
 
     public function testNotSearchStandalone(): void
@@ -2637,8 +2633,8 @@ class SQLTest extends TestCase
             ->filter([Query::notSearch('content', 'spam')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE NOT (MATCH(`content`) AGAINST(?))', $result['query']);
-        $this->assertEquals(['spam'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE NOT (MATCH(`content`) AGAINST(?))', $result->query);
+        $this->assertEquals(['spam'], $result->bindings);
     }
 
     // ══════════════════════════════════════════
@@ -2665,7 +2661,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` ORDER BY `name` ASC, RAND(), `age` DESC',
-            $result['query']
+            $result->query
         );
     }
 
@@ -2679,9 +2675,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE `status` IN (?) ORDER BY RAND()',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['active'], $result['bindings']);
+        $this->assertEquals(['active'], $result->bindings);
     }
 
     public function testRandomSortWithLimit(): void
@@ -2692,8 +2688,8 @@ class SQLTest extends TestCase
             ->limit(5)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY RAND() LIMIT ?', $result['query']);
-        $this->assertEquals([5], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` ORDER BY RAND() LIMIT ?', $result->query);
+        $this->assertEquals([5], $result->bindings);
     }
 
     public function testRandomSortWithAggregation(): void
@@ -2705,8 +2701,8 @@ class SQLTest extends TestCase
             ->sortRandom()
             ->build();
 
-        $this->assertStringContainsString('ORDER BY RAND()', $result['query']);
-        $this->assertStringContainsString('COUNT(*) AS `total`', $result['query']);
+        $this->assertStringContainsString('ORDER BY RAND()', $result->query);
+        $this->assertStringContainsString('COUNT(*) AS `total`', $result->query);
     }
 
     public function testRandomSortWithJoins(): void
@@ -2717,8 +2713,8 @@ class SQLTest extends TestCase
             ->sortRandom()
             ->build();
 
-        $this->assertStringContainsString('JOIN `orders`', $result['query']);
-        $this->assertStringContainsString('ORDER BY RAND()', $result['query']);
+        $this->assertStringContainsString('JOIN `orders`', $result->query);
+        $this->assertStringContainsString('ORDER BY RAND()', $result->query);
     }
 
     public function testRandomSortWithDistinct(): void
@@ -2732,7 +2728,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT DISTINCT `status` FROM `t` ORDER BY RAND()',
-            $result['query']
+            $result->query
         );
     }
 
@@ -2746,8 +2742,8 @@ class SQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY RAND() LIMIT ?', $result['query']);
-        $this->assertEquals([10], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` ORDER BY RAND() LIMIT ?', $result->query);
+        $this->assertEquals([10], $result->bindings);
     }
 
     public function testRandomSortWithAttributeResolver(): void
@@ -2763,7 +2759,7 @@ class SQLTest extends TestCase
             ->sortRandom()
             ->build();
 
-        $this->assertStringContainsString('ORDER BY RAND()', $result['query']);
+        $this->assertStringContainsString('ORDER BY RAND()', $result->query);
     }
 
     public function testMultipleRandomSorts(): void
@@ -2774,7 +2770,7 @@ class SQLTest extends TestCase
             ->sortRandom()
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY RAND(), RAND()', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` ORDER BY RAND(), RAND()', $result->query);
     }
 
     public function testRandomSortWithOffset(): void
@@ -2786,8 +2782,8 @@ class SQLTest extends TestCase
             ->offset(5)
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY RAND() LIMIT ? OFFSET ?', $result['query']);
-        $this->assertEquals([10, 5], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` ORDER BY RAND() LIMIT ? OFFSET ?', $result->query);
+        $this->assertEquals([10, 5], $result->bindings);
     }
 
     // ══════════════════════════════════════════
@@ -2802,7 +2798,7 @@ class SQLTest extends TestCase
             ->select(['name'])
             ->build();
 
-        $this->assertEquals("SELECT 'name' FROM 't'", $result['query']);
+        $this->assertEquals("SELECT 'name' FROM 't'", $result->query);
     }
 
     public function testWrapCharSquareBracket(): void
@@ -2813,7 +2809,7 @@ class SQLTest extends TestCase
             ->select(['name'])
             ->build();
 
-        $this->assertEquals('SELECT [name[ FROM [t[', $result['query']);
+        $this->assertEquals('SELECT [name[ FROM [t[', $result->query);
     }
 
     public function testWrapCharUnicode(): void
@@ -2824,7 +2820,7 @@ class SQLTest extends TestCase
             ->select(['name'])
             ->build();
 
-        $this->assertEquals("SELECT \xC2\xABname\xC2\xAB FROM \xC2\xABt\xC2\xAB", $result['query']);
+        $this->assertEquals("SELECT \xC2\xABname\xC2\xAB FROM \xC2\xABt\xC2\xAB", $result->query);
     }
 
     public function testWrapCharAffectsSelect(): void
@@ -2835,7 +2831,7 @@ class SQLTest extends TestCase
             ->select(['a', 'b', 'c'])
             ->build();
 
-        $this->assertEquals('SELECT "a", "b", "c" FROM "t"', $result['query']);
+        $this->assertEquals('SELECT "a", "b", "c" FROM "t"', $result->query);
     }
 
     public function testWrapCharAffectsFrom(): void
@@ -2845,7 +2841,7 @@ class SQLTest extends TestCase
             ->from('my_table')
             ->build();
 
-        $this->assertEquals('SELECT * FROM "my_table"', $result['query']);
+        $this->assertEquals('SELECT * FROM "my_table"', $result->query);
     }
 
     public function testWrapCharAffectsFilter(): void
@@ -2856,7 +2852,7 @@ class SQLTest extends TestCase
             ->filter([Query::equal('col', [1])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM "t" WHERE "col" IN (?)', $result['query']);
+        $this->assertEquals('SELECT * FROM "t" WHERE "col" IN (?)', $result->query);
     }
 
     public function testWrapCharAffectsSort(): void
@@ -2868,7 +2864,7 @@ class SQLTest extends TestCase
             ->sortDesc('age')
             ->build();
 
-        $this->assertEquals('SELECT * FROM "t" ORDER BY "name" ASC, "age" DESC', $result['query']);
+        $this->assertEquals('SELECT * FROM "t" ORDER BY "name" ASC, "age" DESC', $result->query);
     }
 
     public function testWrapCharAffectsJoin(): void
@@ -2881,7 +2877,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM "users" JOIN "orders" ON "users"."id" = "orders"."uid"',
-            $result['query']
+            $result->query
         );
     }
 
@@ -2895,7 +2891,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM "users" LEFT JOIN "profiles" ON "users"."id" = "profiles"."uid"',
-            $result['query']
+            $result->query
         );
     }
 
@@ -2909,7 +2905,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM "users" RIGHT JOIN "orders" ON "users"."id" = "orders"."uid"',
-            $result['query']
+            $result->query
         );
     }
 
@@ -2921,7 +2917,7 @@ class SQLTest extends TestCase
             ->crossJoin('b')
             ->build();
 
-        $this->assertEquals('SELECT * FROM "a" CROSS JOIN "b"', $result['query']);
+        $this->assertEquals('SELECT * FROM "a" CROSS JOIN "b"', $result->query);
     }
 
     public function testWrapCharAffectsAggregation(): void
@@ -2932,7 +2928,7 @@ class SQLTest extends TestCase
             ->sum('price', 'total')
             ->build();
 
-        $this->assertEquals('SELECT SUM("price") AS "total" FROM "t"', $result['query']);
+        $this->assertEquals('SELECT SUM("price") AS "total" FROM "t"', $result->query);
     }
 
     public function testWrapCharAffectsGroupBy(): void
@@ -2946,7 +2942,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT COUNT(*) AS "cnt" FROM "t" GROUP BY "status", "country"',
-            $result['query']
+            $result->query
         );
     }
 
@@ -2960,7 +2956,7 @@ class SQLTest extends TestCase
             ->having([Query::greaterThan('cnt', 5)])
             ->build();
 
-        $this->assertStringContainsString('HAVING "cnt" > ?', $result['query']);
+        $this->assertStringContainsString('HAVING "cnt" > ?', $result->query);
     }
 
     public function testWrapCharAffectsDistinct(): void
@@ -2972,7 +2968,7 @@ class SQLTest extends TestCase
             ->select(['status'])
             ->build();
 
-        $this->assertEquals('SELECT DISTINCT "status" FROM "t"', $result['query']);
+        $this->assertEquals('SELECT DISTINCT "status" FROM "t"', $result->query);
     }
 
     public function testWrapCharAffectsRegex(): void
@@ -2983,7 +2979,7 @@ class SQLTest extends TestCase
             ->filter([Query::regex('slug', '^test')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM "t" WHERE "slug" REGEXP ?', $result['query']);
+        $this->assertEquals('SELECT * FROM "t" WHERE "slug" REGEXP ?', $result->query);
     }
 
     public function testWrapCharAffectsSearch(): void
@@ -2994,7 +2990,7 @@ class SQLTest extends TestCase
             ->filter([Query::search('body', 'hello')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM "t" WHERE MATCH("body") AGAINST(?)', $result['query']);
+        $this->assertEquals('SELECT * FROM "t" WHERE MATCH("body") AGAINST(?)', $result->query);
     }
 
     public function testWrapCharEmptyForSelect(): void
@@ -3005,7 +3001,7 @@ class SQLTest extends TestCase
             ->select(['a', 'b'])
             ->build();
 
-        $this->assertEquals('SELECT a, b FROM t', $result['query']);
+        $this->assertEquals('SELECT a, b FROM t', $result->query);
     }
 
     public function testWrapCharEmptyForFilter(): void
@@ -3016,7 +3012,7 @@ class SQLTest extends TestCase
             ->filter([Query::greaterThan('age', 18)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM t WHERE age > ?', $result['query']);
+        $this->assertEquals('SELECT * FROM t WHERE age > ?', $result->query);
     }
 
     public function testWrapCharEmptyForSort(): void
@@ -3027,7 +3023,7 @@ class SQLTest extends TestCase
             ->sortAsc('name')
             ->build();
 
-        $this->assertEquals('SELECT * FROM t ORDER BY name ASC', $result['query']);
+        $this->assertEquals('SELECT * FROM t ORDER BY name ASC', $result->query);
     }
 
     public function testWrapCharEmptyForJoin(): void
@@ -3038,7 +3034,7 @@ class SQLTest extends TestCase
             ->join('orders', 'users.id', 'orders.uid')
             ->build();
 
-        $this->assertEquals('SELECT * FROM users JOIN orders ON users.id = orders.uid', $result['query']);
+        $this->assertEquals('SELECT * FROM users JOIN orders ON users.id = orders.uid', $result->query);
     }
 
     public function testWrapCharEmptyForAggregation(): void
@@ -3049,7 +3045,7 @@ class SQLTest extends TestCase
             ->count('id', 'total')
             ->build();
 
-        $this->assertEquals('SELECT COUNT(id) AS total FROM t', $result['query']);
+        $this->assertEquals('SELECT COUNT(id) AS total FROM t', $result->query);
     }
 
     public function testWrapCharEmptyForGroupBy(): void
@@ -3061,7 +3057,7 @@ class SQLTest extends TestCase
             ->groupBy(['status'])
             ->build();
 
-        $this->assertEquals('SELECT COUNT(*) AS cnt FROM t GROUP BY status', $result['query']);
+        $this->assertEquals('SELECT COUNT(*) AS cnt FROM t GROUP BY status', $result->query);
     }
 
     public function testWrapCharEmptyForDistinct(): void
@@ -3073,7 +3069,7 @@ class SQLTest extends TestCase
             ->select(['name'])
             ->build();
 
-        $this->assertEquals('SELECT DISTINCT name FROM t', $result['query']);
+        $this->assertEquals('SELECT DISTINCT name FROM t', $result->query);
     }
 
     public function testWrapCharDoubleQuoteForSelect(): void
@@ -3084,7 +3080,7 @@ class SQLTest extends TestCase
             ->select(['x', 'y'])
             ->build();
 
-        $this->assertEquals('SELECT "x", "y" FROM "t"', $result['query']);
+        $this->assertEquals('SELECT "x", "y" FROM "t"', $result->query);
     }
 
     public function testWrapCharDoubleQuoteForIsNull(): void
@@ -3095,7 +3091,7 @@ class SQLTest extends TestCase
             ->filter([Query::isNull('deleted')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM "t" WHERE "deleted" IS NULL', $result['query']);
+        $this->assertEquals('SELECT * FROM "t" WHERE "deleted" IS NULL', $result->query);
     }
 
     public function testWrapCharCalledMultipleTimesLastWins(): void
@@ -3108,7 +3104,7 @@ class SQLTest extends TestCase
             ->select(['name'])
             ->build();
 
-        $this->assertEquals('SELECT `name` FROM `t`', $result['query']);
+        $this->assertEquals('SELECT `name` FROM `t`', $result->query);
     }
 
     public function testWrapCharDoesNotAffectRawExpressions(): void
@@ -3119,7 +3115,7 @@ class SQLTest extends TestCase
             ->filter([Query::raw('custom_func(col) > ?', [10])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM "t" WHERE custom_func(col) > ?', $result['query']);
+        $this->assertEquals('SELECT * FROM "t" WHERE custom_func(col) > ?', $result->query);
     }
 
     public function testWrapCharPersistsAcrossMultipleBuilds(): void
@@ -3132,8 +3128,8 @@ class SQLTest extends TestCase
         $result1 = $builder->build();
         $result2 = $builder->build();
 
-        $this->assertEquals('SELECT "name" FROM "t"', $result1['query']);
-        $this->assertEquals('SELECT "name" FROM "t"', $result2['query']);
+        $this->assertEquals('SELECT "name" FROM "t"', $result1->query);
+        $this->assertEquals('SELECT "name" FROM "t"', $result2->query);
     }
 
     public function testWrapCharWithConditionProviderNotWrapped(): void
@@ -3149,8 +3145,8 @@ class SQLTest extends TestCase
             })
             ->build();
 
-        $this->assertStringContainsString('WHERE raw_condition = 1', $result['query']);
-        $this->assertStringContainsString('FROM "t"', $result['query']);
+        $this->assertStringContainsString('WHERE raw_condition = 1', $result->query);
+        $this->assertStringContainsString('FROM "t"', $result->query);
     }
 
     public function testWrapCharEmptyForRegex(): void
@@ -3161,7 +3157,7 @@ class SQLTest extends TestCase
             ->filter([Query::regex('slug', '^test')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM t WHERE slug REGEXP ?', $result['query']);
+        $this->assertEquals('SELECT * FROM t WHERE slug REGEXP ?', $result->query);
     }
 
     public function testWrapCharEmptyForSearch(): void
@@ -3172,7 +3168,7 @@ class SQLTest extends TestCase
             ->filter([Query::search('body', 'hello')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM t WHERE MATCH(body) AGAINST(?)', $result['query']);
+        $this->assertEquals('SELECT * FROM t WHERE MATCH(body) AGAINST(?)', $result->query);
     }
 
     public function testWrapCharEmptyForHaving(): void
@@ -3185,7 +3181,7 @@ class SQLTest extends TestCase
             ->having([Query::greaterThan('cnt', 5)])
             ->build();
 
-        $this->assertStringContainsString('HAVING cnt > ?', $result['query']);
+        $this->assertStringContainsString('HAVING cnt > ?', $result->query);
     }
 
     // ══════════════════════════════════════════
@@ -3568,8 +3564,8 @@ class SQLTest extends TestCase
             ->filter([Query::equal('status', ['active'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `status` IN (?)', $result['query']);
-        $this->assertEquals(['active'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `status` IN (?)', $result->query);
+        $this->assertEquals(['active'], $result->bindings);
     }
 
     public function testEqualWithManyValues(): void
@@ -3581,8 +3577,8 @@ class SQLTest extends TestCase
             ->build();
 
         $placeholders = implode(', ', array_fill(0, 10, '?'));
-        $this->assertEquals("SELECT * FROM `t` WHERE `id` IN ({$placeholders})", $result['query']);
-        $this->assertEquals($values, $result['bindings']);
+        $this->assertEquals("SELECT * FROM `t` WHERE `id` IN ({$placeholders})", $result->query);
+        $this->assertEquals($values, $result->bindings);
     }
 
     public function testEqualWithEmptyArray(): void
@@ -3592,8 +3588,8 @@ class SQLTest extends TestCase
             ->filter([Query::equal('id', [])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE 1 = 0', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE 1 = 0', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testNotEqualWithExactlyTwoValues(): void
@@ -3603,8 +3599,8 @@ class SQLTest extends TestCase
             ->filter([Query::notEqual('role', ['guest', 'banned'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `role` NOT IN (?, ?)', $result['query']);
-        $this->assertEquals(['guest', 'banned'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `role` NOT IN (?, ?)', $result->query);
+        $this->assertEquals(['guest', 'banned'], $result->bindings);
     }
 
     public function testBetweenWithSameMinAndMax(): void
@@ -3614,8 +3610,8 @@ class SQLTest extends TestCase
             ->filter([Query::between('age', 25, 25)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `age` BETWEEN ? AND ?', $result['query']);
-        $this->assertEquals([25, 25], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `age` BETWEEN ? AND ?', $result->query);
+        $this->assertEquals([25, 25], $result->bindings);
     }
 
     public function testStartsWithEmptyString(): void
@@ -3625,8 +3621,8 @@ class SQLTest extends TestCase
             ->filter([Query::startsWith('name', '')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `name` LIKE ?', $result['query']);
-        $this->assertEquals(['%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `name` LIKE ?', $result->query);
+        $this->assertEquals(['%'], $result->bindings);
     }
 
     public function testEndsWithEmptyString(): void
@@ -3636,8 +3632,8 @@ class SQLTest extends TestCase
             ->filter([Query::endsWith('name', '')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `name` LIKE ?', $result['query']);
-        $this->assertEquals(['%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `name` LIKE ?', $result->query);
+        $this->assertEquals(['%'], $result->bindings);
     }
 
     public function testContainsWithSingleEmptyString(): void
@@ -3647,8 +3643,8 @@ class SQLTest extends TestCase
             ->filter([Query::contains('bio', [''])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `bio` LIKE ?', $result['query']);
-        $this->assertEquals(['%%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `bio` LIKE ?', $result->query);
+        $this->assertEquals(['%%'], $result->bindings);
     }
 
     public function testContainsWithManyValues(): void
@@ -3658,8 +3654,8 @@ class SQLTest extends TestCase
             ->filter([Query::contains('bio', ['a', 'b', 'c', 'd', 'e'])])
             ->build();
 
-        $this->assertStringContainsString('(`bio` LIKE ? OR `bio` LIKE ? OR `bio` LIKE ? OR `bio` LIKE ? OR `bio` LIKE ?)', $result['query']);
-        $this->assertEquals(['%a%', '%b%', '%c%', '%d%', '%e%'], $result['bindings']);
+        $this->assertStringContainsString('(`bio` LIKE ? OR `bio` LIKE ? OR `bio` LIKE ? OR `bio` LIKE ? OR `bio` LIKE ?)', $result->query);
+        $this->assertEquals(['%a%', '%b%', '%c%', '%d%', '%e%'], $result->bindings);
     }
 
     public function testContainsAllWithSingleValue(): void
@@ -3669,8 +3665,8 @@ class SQLTest extends TestCase
             ->filter([Query::containsAll('perms', ['read'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`perms` LIKE ?)', $result['query']);
-        $this->assertEquals(['%read%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`perms` LIKE ?)', $result->query);
+        $this->assertEquals(['%read%'], $result->bindings);
     }
 
     public function testNotContainsWithEmptyStringValue(): void
@@ -3680,8 +3676,8 @@ class SQLTest extends TestCase
             ->filter([Query::notContains('bio', [''])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `bio` NOT LIKE ?', $result['query']);
-        $this->assertEquals(['%%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `bio` NOT LIKE ?', $result->query);
+        $this->assertEquals(['%%'], $result->bindings);
     }
 
     public function testComparisonWithFloatValues(): void
@@ -3691,8 +3687,8 @@ class SQLTest extends TestCase
             ->filter([Query::greaterThan('price', 9.99)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `price` > ?', $result['query']);
-        $this->assertEquals([9.99], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `price` > ?', $result->query);
+        $this->assertEquals([9.99], $result->bindings);
     }
 
     public function testComparisonWithNegativeValues(): void
@@ -3702,8 +3698,8 @@ class SQLTest extends TestCase
             ->filter([Query::lessThan('balance', -100)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `balance` < ?', $result['query']);
-        $this->assertEquals([-100], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `balance` < ?', $result->query);
+        $this->assertEquals([-100], $result->bindings);
     }
 
     public function testComparisonWithZero(): void
@@ -3713,8 +3709,8 @@ class SQLTest extends TestCase
             ->filter([Query::greaterThanEqual('score', 0)])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `score` >= ?', $result['query']);
-        $this->assertEquals([0], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `score` >= ?', $result->query);
+        $this->assertEquals([0], $result->bindings);
     }
 
     public function testComparisonWithVeryLargeInteger(): void
@@ -3724,7 +3720,7 @@ class SQLTest extends TestCase
             ->filter([Query::lessThan('id', 9999999999999)])
             ->build();
 
-        $this->assertEquals([9999999999999], $result['bindings']);
+        $this->assertEquals([9999999999999], $result->bindings);
     }
 
     public function testComparisonWithStringValues(): void
@@ -3734,8 +3730,8 @@ class SQLTest extends TestCase
             ->filter([Query::greaterThan('name', 'M')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `name` > ?', $result['query']);
-        $this->assertEquals(['M'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `name` > ?', $result->query);
+        $this->assertEquals(['M'], $result->bindings);
     }
 
     public function testBetweenWithStringValues(): void
@@ -3745,8 +3741,8 @@ class SQLTest extends TestCase
             ->filter([Query::between('created_at', '2024-01-01', '2024-12-31')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `created_at` BETWEEN ? AND ?', $result['query']);
-        $this->assertEquals(['2024-01-01', '2024-12-31'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `created_at` BETWEEN ? AND ?', $result->query);
+        $this->assertEquals(['2024-01-01', '2024-12-31'], $result->bindings);
     }
 
     public function testIsNullCombinedWithIsNotNullOnDifferentColumns(): void
@@ -3761,9 +3757,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE `deleted_at` IS NULL AND `verified_at` IS NOT NULL',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testMultipleIsNullFilters(): void
@@ -3779,7 +3775,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE `a` IS NULL AND `b` IS NULL AND `c` IS NULL',
-            $result['query']
+            $result->query
         );
     }
 
@@ -3790,7 +3786,7 @@ class SQLTest extends TestCase
             ->filter([Query::exists(['name'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`name` IS NOT NULL)', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`name` IS NOT NULL)', $result->query);
     }
 
     public function testExistsWithManyAttributes(): void
@@ -3802,7 +3798,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE (`a` IS NOT NULL AND `b` IS NOT NULL AND `c` IS NOT NULL AND `d` IS NOT NULL)',
-            $result['query']
+            $result->query
         );
     }
 
@@ -3815,7 +3811,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE (`a` IS NULL AND `b` IS NULL AND `c` IS NULL)',
-            $result['query']
+            $result->query
         );
     }
 
@@ -3830,8 +3826,8 @@ class SQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?))', $result['query']);
-        $this->assertEquals([1], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?))', $result->query);
+        $this->assertEquals([1], $result->bindings);
     }
 
     public function testOrWithSingleSubQuery(): void
@@ -3845,8 +3841,8 @@ class SQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?))', $result['query']);
-        $this->assertEquals([1], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?))', $result->query);
+        $this->assertEquals([1], $result->bindings);
     }
 
     public function testAndWithManySubQueries(): void
@@ -3866,9 +3862,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE (`a` IN (?) AND `b` IN (?) AND `c` IN (?) AND `d` IN (?) AND `e` IN (?))',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([1, 2, 3, 4, 5], $result['bindings']);
+        $this->assertEquals([1, 2, 3, 4, 5], $result->bindings);
     }
 
     public function testOrWithManySubQueries(): void
@@ -3888,7 +3884,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE (`a` IN (?) OR `b` IN (?) OR `c` IN (?) OR `d` IN (?) OR `e` IN (?))',
-            $result['query']
+            $result->query
         );
     }
 
@@ -3912,9 +3908,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE (((`a` IN (?) AND `b` IN (?)) OR `c` IN (?)) AND `d` IN (?))',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([1, 2, 3, 4], $result['bindings']);
+        $this->assertEquals([1, 2, 3, 4], $result->bindings);
     }
 
     public function testRawWithManyBindings(): void
@@ -3926,8 +3922,8 @@ class SQLTest extends TestCase
             ->filter([Query::raw($placeholders, $bindings)])
             ->build();
 
-        $this->assertEquals("SELECT * FROM `t` WHERE {$placeholders}", $result['query']);
-        $this->assertEquals($bindings, $result['bindings']);
+        $this->assertEquals("SELECT * FROM `t` WHERE {$placeholders}", $result->query);
+        $this->assertEquals($bindings, $result->bindings);
     }
 
     public function testFilterWithDotsInAttributeName(): void
@@ -3937,7 +3933,7 @@ class SQLTest extends TestCase
             ->filter([Query::equal('table.column', ['value'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `table`.`column` IN (?)', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `table`.`column` IN (?)', $result->query);
     }
 
     public function testFilterWithUnderscoresInAttributeName(): void
@@ -3947,7 +3943,7 @@ class SQLTest extends TestCase
             ->filter([Query::equal('my_column_name', ['value'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `my_column_name` IN (?)', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `my_column_name` IN (?)', $result->query);
     }
 
     public function testFilterWithNumericAttributeName(): void
@@ -3957,7 +3953,7 @@ class SQLTest extends TestCase
             ->filter([Query::equal('123', ['value'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `123` IN (?)', $result['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `123` IN (?)', $result->query);
     }
 
     // ══════════════════════════════════════════
@@ -3967,66 +3963,66 @@ class SQLTest extends TestCase
     public function testCountWithoutAliasNoAsClause(): void
     {
         $result = (new Builder())->from('t')->count()->build();
-        $this->assertEquals('SELECT COUNT(*) FROM `t`', $result['query']);
-        $this->assertStringNotContainsString(' AS ', $result['query']);
+        $this->assertEquals('SELECT COUNT(*) FROM `t`', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
     public function testSumWithoutAliasNoAsClause(): void
     {
         $result = (new Builder())->from('t')->sum('price')->build();
-        $this->assertEquals('SELECT SUM(`price`) FROM `t`', $result['query']);
-        $this->assertStringNotContainsString(' AS ', $result['query']);
+        $this->assertEquals('SELECT SUM(`price`) FROM `t`', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
     public function testAvgWithoutAliasNoAsClause(): void
     {
         $result = (new Builder())->from('t')->avg('score')->build();
-        $this->assertEquals('SELECT AVG(`score`) FROM `t`', $result['query']);
-        $this->assertStringNotContainsString(' AS ', $result['query']);
+        $this->assertEquals('SELECT AVG(`score`) FROM `t`', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
     public function testMinWithoutAliasNoAsClause(): void
     {
         $result = (new Builder())->from('t')->min('price')->build();
-        $this->assertEquals('SELECT MIN(`price`) FROM `t`', $result['query']);
-        $this->assertStringNotContainsString(' AS ', $result['query']);
+        $this->assertEquals('SELECT MIN(`price`) FROM `t`', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
     public function testMaxWithoutAliasNoAsClause(): void
     {
         $result = (new Builder())->from('t')->max('price')->build();
-        $this->assertEquals('SELECT MAX(`price`) FROM `t`', $result['query']);
-        $this->assertStringNotContainsString(' AS ', $result['query']);
+        $this->assertEquals('SELECT MAX(`price`) FROM `t`', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
     public function testCountWithAlias2(): void
     {
         $result = (new Builder())->from('t')->count('*', 'cnt')->build();
-        $this->assertStringContainsString('AS `cnt`', $result['query']);
+        $this->assertStringContainsString('AS `cnt`', $result->query);
     }
 
     public function testSumWithAlias(): void
     {
         $result = (new Builder())->from('t')->sum('price', 'total')->build();
-        $this->assertStringContainsString('AS `total`', $result['query']);
+        $this->assertStringContainsString('AS `total`', $result->query);
     }
 
     public function testAvgWithAlias(): void
     {
         $result = (new Builder())->from('t')->avg('score', 'avg_s')->build();
-        $this->assertStringContainsString('AS `avg_s`', $result['query']);
+        $this->assertStringContainsString('AS `avg_s`', $result->query);
     }
 
     public function testMinWithAlias(): void
     {
         $result = (new Builder())->from('t')->min('price', 'lowest')->build();
-        $this->assertStringContainsString('AS `lowest`', $result['query']);
+        $this->assertStringContainsString('AS `lowest`', $result->query);
     }
 
     public function testMaxWithAlias(): void
     {
         $result = (new Builder())->from('t')->max('price', 'highest')->build();
-        $this->assertStringContainsString('AS `highest`', $result['query']);
+        $this->assertStringContainsString('AS `highest`', $result->query);
     }
 
     public function testMultipleSameAggregationType(): void
@@ -4039,7 +4035,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT COUNT(`id`) AS `count_id`, COUNT(*) AS `count_all` FROM `t`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -4052,9 +4048,9 @@ class SQLTest extends TestCase
             ->select(['category'])
             ->build();
 
-        $this->assertStringContainsString('COUNT(*) AS `total`', $result['query']);
-        $this->assertStringContainsString('SUM(`price`) AS `price_sum`', $result['query']);
-        $this->assertStringContainsString('`category`', $result['query']);
+        $this->assertStringContainsString('COUNT(*) AS `total`', $result->query);
+        $this->assertStringContainsString('SUM(`price`) AS `price_sum`', $result->query);
+        $this->assertStringContainsString('`category`', $result->query);
     }
 
     public function testAggregationFilterSortLimitCombined(): void
@@ -4068,12 +4064,12 @@ class SQLTest extends TestCase
             ->limit(5)
             ->build();
 
-        $this->assertStringContainsString('COUNT(*) AS `cnt`', $result['query']);
-        $this->assertStringContainsString('WHERE `status` IN (?)', $result['query']);
-        $this->assertStringContainsString('GROUP BY `category`', $result['query']);
-        $this->assertStringContainsString('ORDER BY `cnt` DESC', $result['query']);
-        $this->assertStringContainsString('LIMIT ?', $result['query']);
-        $this->assertEquals(['paid', 5], $result['bindings']);
+        $this->assertStringContainsString('COUNT(*) AS `cnt`', $result->query);
+        $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
+        $this->assertStringContainsString('GROUP BY `category`', $result->query);
+        $this->assertStringContainsString('ORDER BY `cnt` DESC', $result->query);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertEquals(['paid', 5], $result->bindings);
     }
 
     public function testAggregationJoinGroupByHavingSortLimitFullPipeline(): void
@@ -4092,16 +4088,16 @@ class SQLTest extends TestCase
             ->offset(10)
             ->build();
 
-        $this->assertStringContainsString('COUNT(*) AS `cnt`', $result['query']);
-        $this->assertStringContainsString('SUM(`total`) AS `revenue`', $result['query']);
-        $this->assertStringContainsString('JOIN `users`', $result['query']);
-        $this->assertStringContainsString('WHERE `orders`.`total` > ?', $result['query']);
-        $this->assertStringContainsString('GROUP BY `users`.`name`', $result['query']);
-        $this->assertStringContainsString('HAVING `cnt` > ?', $result['query']);
-        $this->assertStringContainsString('ORDER BY `revenue` DESC', $result['query']);
-        $this->assertStringContainsString('LIMIT ?', $result['query']);
-        $this->assertStringContainsString('OFFSET ?', $result['query']);
-        $this->assertEquals([0, 2, 20, 10], $result['bindings']);
+        $this->assertStringContainsString('COUNT(*) AS `cnt`', $result->query);
+        $this->assertStringContainsString('SUM(`total`) AS `revenue`', $result->query);
+        $this->assertStringContainsString('JOIN `users`', $result->query);
+        $this->assertStringContainsString('WHERE `orders`.`total` > ?', $result->query);
+        $this->assertStringContainsString('GROUP BY `users`.`name`', $result->query);
+        $this->assertStringContainsString('HAVING `cnt` > ?', $result->query);
+        $this->assertStringContainsString('ORDER BY `revenue` DESC', $result->query);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertStringContainsString('OFFSET ?', $result->query);
+        $this->assertEquals([0, 2, 20, 10], $result->bindings);
     }
 
     public function testAggregationWithAttributeResolver(): void
@@ -4114,7 +4110,7 @@ class SQLTest extends TestCase
             ->sum('$amount', 'total')
             ->build();
 
-        $this->assertEquals('SELECT SUM(`_amount`) AS `total` FROM `t`', $result['query']);
+        $this->assertEquals('SELECT SUM(`_amount`) AS `total` FROM `t`', $result->query);
     }
 
     public function testAggregationWithWrapChar(): void
@@ -4125,7 +4121,7 @@ class SQLTest extends TestCase
             ->avg('score', 'average')
             ->build();
 
-        $this->assertEquals('SELECT AVG("score") AS "average" FROM "t"', $result['query']);
+        $this->assertEquals('SELECT AVG("score") AS "average" FROM "t"', $result->query);
     }
 
     public function testMinMaxWithStringColumns(): void
@@ -4138,7 +4134,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT MIN(`name`) AS `first_name`, MAX(`name`) AS `last_name` FROM `t`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -4155,7 +4151,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `employees` JOIN `employees` ON `employees`.`manager_id` = `employees`.`id`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -4169,8 +4165,8 @@ class SQLTest extends TestCase
             ->join($longTable, $longLeft, $longRight)
             ->build();
 
-        $this->assertStringContainsString("JOIN `{$longTable}`", $result['query']);
-        $this->assertStringContainsString("ON `{$longLeft}` = `{$longRight}`", $result['query']);
+        $this->assertStringContainsString("JOIN `{$longTable}`", $result->query);
+        $this->assertStringContainsString("ON `{$longLeft}` = `{$longRight}`", $result->query);
     }
 
     public function testJoinFilterSortLimitOffsetCombined(): void
@@ -4187,12 +4183,12 @@ class SQLTest extends TestCase
             ->offset(50)
             ->build();
 
-        $this->assertStringContainsString('JOIN `orders`', $result['query']);
-        $this->assertStringContainsString('WHERE `orders`.`status` IN (?) AND `orders`.`total` > ?', $result['query']);
-        $this->assertStringContainsString('ORDER BY `orders`.`total` DESC', $result['query']);
-        $this->assertStringContainsString('LIMIT ?', $result['query']);
-        $this->assertStringContainsString('OFFSET ?', $result['query']);
-        $this->assertEquals(['paid', 100, 25, 50], $result['bindings']);
+        $this->assertStringContainsString('JOIN `orders`', $result->query);
+        $this->assertStringContainsString('WHERE `orders`.`status` IN (?) AND `orders`.`total` > ?', $result->query);
+        $this->assertStringContainsString('ORDER BY `orders`.`total` DESC', $result->query);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertStringContainsString('OFFSET ?', $result->query);
+        $this->assertEquals(['paid', 100, 25, 50], $result->bindings);
     }
 
     public function testJoinAggregationGroupByHavingCombined(): void
@@ -4205,11 +4201,11 @@ class SQLTest extends TestCase
             ->having([Query::greaterThan('cnt', 3)])
             ->build();
 
-        $this->assertStringContainsString('COUNT(*) AS `cnt`', $result['query']);
-        $this->assertStringContainsString('JOIN `users`', $result['query']);
-        $this->assertStringContainsString('GROUP BY `users`.`name`', $result['query']);
-        $this->assertStringContainsString('HAVING `cnt` > ?', $result['query']);
-        $this->assertEquals([3], $result['bindings']);
+        $this->assertStringContainsString('COUNT(*) AS `cnt`', $result->query);
+        $this->assertStringContainsString('JOIN `users`', $result->query);
+        $this->assertStringContainsString('GROUP BY `users`.`name`', $result->query);
+        $this->assertStringContainsString('HAVING `cnt` > ?', $result->query);
+        $this->assertEquals([3], $result->bindings);
     }
 
     public function testJoinWithDistinct(): void
@@ -4221,8 +4217,8 @@ class SQLTest extends TestCase
             ->join('orders', 'users.id', 'orders.user_id')
             ->build();
 
-        $this->assertStringContainsString('SELECT DISTINCT `users`.`name`', $result['query']);
-        $this->assertStringContainsString('JOIN `orders`', $result['query']);
+        $this->assertStringContainsString('SELECT DISTINCT `users`.`name`', $result->query);
+        $this->assertStringContainsString('JOIN `orders`', $result->query);
     }
 
     public function testJoinWithUnion(): void
@@ -4237,9 +4233,9 @@ class SQLTest extends TestCase
             ->union($sub)
             ->build();
 
-        $this->assertStringContainsString('JOIN `orders`', $result['query']);
-        $this->assertStringContainsString('UNION', $result['query']);
-        $this->assertStringContainsString('JOIN `archived_orders`', $result['query']);
+        $this->assertStringContainsString('JOIN `orders`', $result->query);
+        $this->assertStringContainsString('UNION', $result->query);
+        $this->assertStringContainsString('JOIN `archived_orders`', $result->query);
     }
 
     public function testFourJoins(): void
@@ -4252,10 +4248,10 @@ class SQLTest extends TestCase
             ->crossJoin('promotions')
             ->build();
 
-        $this->assertStringContainsString('JOIN `users`', $result['query']);
-        $this->assertStringContainsString('LEFT JOIN `products`', $result['query']);
-        $this->assertStringContainsString('RIGHT JOIN `categories`', $result['query']);
-        $this->assertStringContainsString('CROSS JOIN `promotions`', $result['query']);
+        $this->assertStringContainsString('JOIN `users`', $result->query);
+        $this->assertStringContainsString('LEFT JOIN `products`', $result->query);
+        $this->assertStringContainsString('RIGHT JOIN `categories`', $result->query);
+        $this->assertStringContainsString('CROSS JOIN `promotions`', $result->query);
     }
 
     public function testJoinWithAttributeResolverOnJoinColumns(): void
@@ -4271,7 +4267,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` JOIN `other` ON `_uid` = `_ref_id`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -4283,8 +4279,8 @@ class SQLTest extends TestCase
             ->filter([Query::equal('sizes.active', [true])])
             ->build();
 
-        $this->assertStringContainsString('CROSS JOIN `colors`', $result['query']);
-        $this->assertStringContainsString('WHERE `sizes`.`active` IN (?)', $result['query']);
+        $this->assertStringContainsString('CROSS JOIN `colors`', $result->query);
+        $this->assertStringContainsString('WHERE `sizes`.`active` IN (?)', $result->query);
     }
 
     public function testCrossJoinFollowedByRegularJoin(): void
@@ -4297,7 +4293,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `a` CROSS JOIN `b` JOIN `c` ON `a`.`id` = `c`.`a_id`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -4313,10 +4309,10 @@ class SQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertStringContainsString('JOIN `orders`', $result['query']);
-        $this->assertStringContainsString('LEFT JOIN `profiles`', $result['query']);
-        $this->assertStringContainsString('`orders`.`total` > ?', $result['query']);
-        $this->assertStringContainsString('`profiles`.`avatar` IS NOT NULL', $result['query']);
+        $this->assertStringContainsString('JOIN `orders`', $result->query);
+        $this->assertStringContainsString('LEFT JOIN `profiles`', $result->query);
+        $this->assertStringContainsString('`orders`.`total` > ?', $result->query);
+        $this->assertStringContainsString('`profiles`.`avatar` IS NOT NULL', $result->query);
     }
 
     public function testJoinWithCustomOperatorLessThan(): void
@@ -4328,7 +4324,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `a` JOIN `b` ON `a`.`start` < `b`.`end`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -4343,7 +4339,7 @@ class SQLTest extends TestCase
             ->join('t6', 't5.id', 't6.t5_id')
             ->build();
 
-        $query = $result['query'];
+        $query = $result->query;
         $this->assertEquals(5, substr_count($query, 'JOIN'));
     }
 
@@ -4366,7 +4362,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             '(SELECT * FROM `main`) UNION (SELECT * FROM `a`) UNION (SELECT * FROM `b`) UNION (SELECT * FROM `c`)',
-            $result['query']
+            $result->query
         );
     }
 
@@ -4385,7 +4381,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             '(SELECT * FROM `main`) UNION ALL (SELECT * FROM `a`) UNION ALL (SELECT * FROM `b`) UNION ALL (SELECT * FROM `c`)',
-            $result['query']
+            $result->query
         );
     }
 
@@ -4404,7 +4400,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             '(SELECT * FROM `main`) UNION (SELECT * FROM `a`) UNION ALL (SELECT * FROM `b`) UNION (SELECT * FROM `c`)',
-            $result['query']
+            $result->query
         );
     }
 
@@ -4421,7 +4417,7 @@ class SQLTest extends TestCase
 
         $this->assertStringContainsString(
             'UNION (SELECT * FROM `archived_users` JOIN `archived_orders`',
-            $result['query']
+            $result->query
         );
     }
 
@@ -4439,7 +4435,7 @@ class SQLTest extends TestCase
             ->union($sub)
             ->build();
 
-        $this->assertStringContainsString('UNION (SELECT COUNT(*) AS `cnt` FROM `orders_2023` GROUP BY `status`)', $result['query']);
+        $this->assertStringContainsString('UNION (SELECT COUNT(*) AS `cnt` FROM `orders_2023` GROUP BY `status`)', $result->query);
     }
 
     public function testUnionWhereSubQueryHasSortAndLimit(): void
@@ -4454,7 +4450,7 @@ class SQLTest extends TestCase
             ->union($sub)
             ->build();
 
-        $this->assertStringContainsString('UNION (SELECT * FROM `archive` ORDER BY `created_at` DESC LIMIT ?)', $result['query']);
+        $this->assertStringContainsString('UNION (SELECT * FROM `archive` ORDER BY `created_at` DESC LIMIT ?)', $result->query);
     }
 
     public function testUnionWithConditionProviders(): void
@@ -4479,9 +4475,9 @@ class SQLTest extends TestCase
             ->union($sub)
             ->build();
 
-        $this->assertStringContainsString('WHERE org = ?', $result['query']);
-        $this->assertStringContainsString('UNION (SELECT * FROM `other` WHERE org = ?)', $result['query']);
-        $this->assertEquals(['org1', 'org2'], $result['bindings']);
+        $this->assertStringContainsString('WHERE org = ?', $result->query);
+        $this->assertStringContainsString('UNION (SELECT * FROM `other` WHERE org = ?)', $result->query);
+        $this->assertEquals(['org1', 'org2'], $result->bindings);
     }
 
     public function testUnionBindingOrderWithComplexSubQueries(): void
@@ -4498,7 +4494,7 @@ class SQLTest extends TestCase
             ->union($sub)
             ->build();
 
-        $this->assertEquals(['active', 10, 2023, 5], $result['bindings']);
+        $this->assertEquals(['active', 10, 2023, 5], $result->bindings);
     }
 
     public function testUnionWithDistinct(): void
@@ -4515,8 +4511,8 @@ class SQLTest extends TestCase
             ->union($sub)
             ->build();
 
-        $this->assertStringContainsString('SELECT DISTINCT `name` FROM `current`', $result['query']);
-        $this->assertStringContainsString('UNION (SELECT DISTINCT `name` FROM `archive`)', $result['query']);
+        $this->assertStringContainsString('SELECT DISTINCT `name` FROM `current`', $result->query);
+        $this->assertStringContainsString('UNION (SELECT DISTINCT `name` FROM `archive`)', $result->query);
     }
 
     public function testUnionWithWrapChar(): void
@@ -4533,7 +4529,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             '(SELECT * FROM "current") UNION (SELECT * FROM "archive")',
-            $result['query']
+            $result->query
         );
     }
 
@@ -4548,7 +4544,7 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             '(SELECT * FROM `fresh`) UNION (SELECT * FROM `other`)',
-            $result['query']
+            $result->query
         );
     }
 
@@ -4568,7 +4564,7 @@ class SQLTest extends TestCase
             ->unionAll($q2)
             ->build();
 
-        $this->assertEquals(['active', 1, 2, 10, 20], $result['bindings']);
+        $this->assertEquals(['active', 1, 2, 10, 20], $result->bindings);
     }
 
     public function testUnionWithFourSubQueries(): void
@@ -4586,7 +4582,7 @@ class SQLTest extends TestCase
             ->union($q4)
             ->build();
 
-        $this->assertEquals(4, substr_count($result['query'], 'UNION'));
+        $this->assertEquals(4, substr_count($result->query, 'UNION'));
     }
 
     public function testUnionAllWithFilteredSubQueries(): void
@@ -4603,8 +4599,8 @@ class SQLTest extends TestCase
             ->unionAll($q3)
             ->build();
 
-        $this->assertEquals(['paid', 'paid', 'paid', 'paid'], $result['bindings']);
-        $this->assertEquals(3, substr_count($result['query'], 'UNION ALL'));
+        $this->assertEquals(['paid', 'paid', 'paid', 'paid'], $result->bindings);
+        $this->assertEquals(3, substr_count($result->query, 'UNION ALL'));
     }
 
     // ══════════════════════════════════════════
@@ -4803,10 +4799,10 @@ class SQLTest extends TestCase
             })
             ->build();
 
-        $this->assertStringContainsString('WHERE `status` IN (?)', $result['query']);
-        $this->assertStringContainsString('ORDER BY `name` ASC', $result['query']);
-        $this->assertStringContainsString('LIMIT ?', $result['query']);
-        $this->assertEquals(['active', 10], $result['bindings']);
+        $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
+        $this->assertStringContainsString('ORDER BY `name` ASC', $result->query);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertEquals(['active', 10], $result->bindings);
     }
 
     public function testWhenChainedFiveTimes(): void
@@ -4822,9 +4818,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE `a` IN (?) AND `b` IN (?) AND `d` IN (?) AND `e` IN (?)',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([1, 2, 4, 5], $result['bindings']);
+        $this->assertEquals([1, 2, 4, 5], $result->bindings);
     }
 
     public function testWhenInsideWhenThreeLevelsDeep(): void
@@ -4838,8 +4834,8 @@ class SQLTest extends TestCase
             })
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `deep` IN (?)', $result['query']);
-        $this->assertEquals([1], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `deep` IN (?)', $result->query);
+        $this->assertEquals([1], $result->bindings);
     }
 
     public function testWhenThatAddsJoins(): void
@@ -4849,7 +4845,7 @@ class SQLTest extends TestCase
             ->when(true, fn (Builder $b) => $b->join('orders', 'users.id', 'orders.uid'))
             ->build();
 
-        $this->assertStringContainsString('JOIN `orders`', $result['query']);
+        $this->assertStringContainsString('JOIN `orders`', $result->query);
     }
 
     public function testWhenThatAddsAggregations(): void
@@ -4859,8 +4855,8 @@ class SQLTest extends TestCase
             ->when(true, fn (Builder $b) => $b->count('*', 'total')->groupBy(['status']))
             ->build();
 
-        $this->assertStringContainsString('COUNT(*) AS `total`', $result['query']);
-        $this->assertStringContainsString('GROUP BY `status`', $result['query']);
+        $this->assertStringContainsString('COUNT(*) AS `total`', $result->query);
+        $this->assertStringContainsString('GROUP BY `status`', $result->query);
     }
 
     public function testWhenThatAddsUnions(): void
@@ -4872,7 +4868,7 @@ class SQLTest extends TestCase
             ->when(true, fn (Builder $b) => $b->union($sub))
             ->build();
 
-        $this->assertStringContainsString('UNION', $result['query']);
+        $this->assertStringContainsString('UNION', $result->query);
     }
 
     public function testWhenFalseDoesNotAffectFilters(): void
@@ -4882,8 +4878,8 @@ class SQLTest extends TestCase
             ->when(false, fn (Builder $b) => $b->filter([Query::equal('status', ['banned'])]))
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t`', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testWhenFalseDoesNotAffectJoins(): void
@@ -4893,7 +4889,7 @@ class SQLTest extends TestCase
             ->when(false, fn (Builder $b) => $b->join('other', 'a', 'b'))
             ->build();
 
-        $this->assertStringNotContainsString('JOIN', $result['query']);
+        $this->assertStringNotContainsString('JOIN', $result->query);
     }
 
     public function testWhenFalseDoesNotAffectAggregations(): void
@@ -4903,7 +4899,7 @@ class SQLTest extends TestCase
             ->when(false, fn (Builder $b) => $b->count('*', 'total'))
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t`', $result['query']);
+        $this->assertEquals('SELECT * FROM `t`', $result->query);
     }
 
     public function testWhenFalseDoesNotAffectSort(): void
@@ -4913,7 +4909,7 @@ class SQLTest extends TestCase
             ->when(false, fn (Builder $b) => $b->sortAsc('name'))
             ->build();
 
-        $this->assertStringNotContainsString('ORDER BY', $result['query']);
+        $this->assertStringNotContainsString('ORDER BY', $result->query);
     }
 
     // ══════════════════════════════════════════
@@ -4946,9 +4942,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE p1 = ? AND p2 = ? AND p3 = ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals(['v1', 'v2', 'v3'], $result['bindings']);
+        $this->assertEquals(['v1', 'v2', 'v3'], $result->bindings);
     }
 
     public function testProviderReturningEmptyConditionString(): void
@@ -4964,7 +4960,7 @@ class SQLTest extends TestCase
             ->build();
 
         // Empty string still appears as a WHERE clause element
-        $this->assertStringContainsString('WHERE', $result['query']);
+        $this->assertStringContainsString('WHERE', $result->query);
     }
 
     public function testProviderWithManyBindings(): void
@@ -4981,9 +4977,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE a IN (?, ?, ?, ?, ?)',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([1, 2, 3, 4, 5], $result['bindings']);
+        $this->assertEquals([1, 2, 3, 4, 5], $result->bindings);
     }
 
     public function testProviderCombinedWithCursorFilterHaving(): void
@@ -5003,10 +4999,10 @@ class SQLTest extends TestCase
             ->having([Query::greaterThan('cnt', 5)])
             ->build();
 
-        $this->assertStringContainsString('WHERE', $result['query']);
-        $this->assertStringContainsString('HAVING', $result['query']);
+        $this->assertStringContainsString('WHERE', $result->query);
+        $this->assertStringContainsString('HAVING', $result->query);
         // filter, provider, cursor, having
-        $this->assertEquals(['active', 'org1', 'cur1', 5], $result['bindings']);
+        $this->assertEquals(['active', 'org1', 'cur1', 5], $result->bindings);
     }
 
     public function testProviderCombinedWithJoins(): void
@@ -5022,9 +5018,9 @@ class SQLTest extends TestCase
             })
             ->build();
 
-        $this->assertStringContainsString('JOIN `orders`', $result['query']);
-        $this->assertStringContainsString('WHERE tenant = ?', $result['query']);
-        $this->assertEquals(['t1'], $result['bindings']);
+        $this->assertStringContainsString('JOIN `orders`', $result->query);
+        $this->assertStringContainsString('WHERE tenant = ?', $result->query);
+        $this->assertEquals(['t1'], $result->bindings);
     }
 
     public function testProviderCombinedWithUnions(): void
@@ -5042,9 +5038,9 @@ class SQLTest extends TestCase
             ->union($sub)
             ->build();
 
-        $this->assertStringContainsString('WHERE org = ?', $result['query']);
-        $this->assertStringContainsString('UNION', $result['query']);
-        $this->assertEquals(['org1'], $result['bindings']);
+        $this->assertStringContainsString('WHERE org = ?', $result->query);
+        $this->assertStringContainsString('UNION', $result->query);
+        $this->assertEquals(['org1'], $result->bindings);
     }
 
     public function testProviderCombinedWithAggregations(): void
@@ -5061,8 +5057,8 @@ class SQLTest extends TestCase
             ->groupBy(['status'])
             ->build();
 
-        $this->assertStringContainsString('COUNT(*) AS `total`', $result['query']);
-        $this->assertStringContainsString('WHERE org = ?', $result['query']);
+        $this->assertStringContainsString('COUNT(*) AS `total`', $result->query);
+        $this->assertStringContainsString('WHERE org = ?', $result->query);
     }
 
     public function testProviderReferencesTableName(): void
@@ -5077,8 +5073,8 @@ class SQLTest extends TestCase
             })
             ->build();
 
-        $this->assertStringContainsString('users_perms', $result['query']);
-        $this->assertEquals(['read'], $result['bindings']);
+        $this->assertStringContainsString('users_perms', $result->query);
+        $this->assertEquals(['read'], $result->bindings);
     }
 
     public function testProviderWithWrapCharProviderSqlIsLiteral(): void
@@ -5095,8 +5091,8 @@ class SQLTest extends TestCase
             ->build();
 
         // Provider SQL is NOT wrapped - only the FROM clause is
-        $this->assertStringContainsString('FROM "t"', $result['query']);
-        $this->assertStringContainsString('raw_col = ?', $result['query']);
+        $this->assertStringContainsString('FROM "t"', $result->query);
+        $this->assertStringContainsString('raw_col = ?', $result->query);
     }
 
     public function testProviderBindingOrderWithComplexQuery(): void
@@ -5125,7 +5121,7 @@ class SQLTest extends TestCase
             ->build();
 
         // filter, provider1, provider2, cursor, limit, offset
-        $this->assertEquals(['va', 10, 'pv1', 'pv2', 'cur', 5, 10], $result['bindings']);
+        $this->assertEquals(['va', 10, 'pv1', 'pv2', 'cur', 5, 10], $result->bindings);
     }
 
     public function testProviderPreservedAcrossReset(): void
@@ -5143,8 +5139,8 @@ class SQLTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('t2')->build();
-        $this->assertStringContainsString('WHERE org = ?', $result['query']);
-        $this->assertEquals(['org1'], $result['bindings']);
+        $this->assertStringContainsString('WHERE org = ?', $result->query);
+        $this->assertEquals(['org1'], $result->bindings);
     }
 
     public function testFourConditionProviders(): void
@@ -5179,9 +5175,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             'SELECT * FROM `t` WHERE a = ? AND b = ? AND c = ? AND d = ?',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([1, 2, 3, 4], $result['bindings']);
+        $this->assertEquals([1, 2, 3, 4], $result->bindings);
     }
 
     public function testProviderWithNoBindings(): void
@@ -5196,8 +5192,8 @@ class SQLTest extends TestCase
             })
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t` WHERE 1 = 1', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE 1 = 1', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     // ══════════════════════════════════════════
@@ -5220,7 +5216,7 @@ class SQLTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('t2')->filter([Query::equal('y', [2])])->build();
-        $this->assertStringContainsString('`_y`', $result['query']);
+        $this->assertStringContainsString('`_y`', $result->query);
     }
 
     public function testResetPreservesConditionProviders(): void
@@ -5238,8 +5234,8 @@ class SQLTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('t2')->build();
-        $this->assertStringContainsString('org = ?', $result['query']);
-        $this->assertEquals(['org1'], $result['bindings']);
+        $this->assertStringContainsString('org = ?', $result->query);
+        $this->assertEquals(['org1'], $result->bindings);
     }
 
     public function testResetPreservesWrapChar(): void
@@ -5252,7 +5248,7 @@ class SQLTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('t2')->select(['name'])->build();
-        $this->assertEquals('SELECT "name" FROM "t2"', $result['query']);
+        $this->assertEquals('SELECT "name" FROM "t2"', $result->query);
     }
 
     public function testResetClearsPendingQueries(): void
@@ -5267,8 +5263,8 @@ class SQLTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('t2')->build();
-        $this->assertEquals('SELECT * FROM `t2`', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t2`', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testResetClearsBindings(): void
@@ -5282,7 +5278,7 @@ class SQLTest extends TestCase
 
         $builder->reset();
         $result = $builder->from('t2')->build();
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testResetClearsTable(): void
@@ -5292,8 +5288,8 @@ class SQLTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('new_table')->build();
-        $this->assertStringContainsString('`new_table`', $result['query']);
-        $this->assertStringNotContainsString('`old_table`', $result['query']);
+        $this->assertStringContainsString('`new_table`', $result->query);
+        $this->assertStringNotContainsString('`old_table`', $result->query);
     }
 
     public function testResetClearsUnionsAfterBuild(): void
@@ -5304,7 +5300,7 @@ class SQLTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('fresh')->build();
-        $this->assertStringNotContainsString('UNION', $result['query']);
+        $this->assertStringNotContainsString('UNION', $result->query);
     }
 
     public function testBuildAfterResetProducesMinimalQuery(): void
@@ -5321,7 +5317,7 @@ class SQLTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('t')->build();
-        $this->assertEquals('SELECT * FROM `t`', $result['query']);
+        $this->assertEquals('SELECT * FROM `t`', $result->query);
     }
 
     public function testMultipleResetCalls(): void
@@ -5333,7 +5329,7 @@ class SQLTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('t2')->build();
-        $this->assertEquals('SELECT * FROM `t2`', $result['query']);
+        $this->assertEquals('SELECT * FROM `t2`', $result->query);
     }
 
     public function testResetBetweenDifferentQueryTypes(): void
@@ -5343,15 +5339,15 @@ class SQLTest extends TestCase
         // First: aggregation query
         $builder->from('orders')->count('*', 'total')->groupBy(['status']);
         $result1 = $builder->build();
-        $this->assertStringContainsString('COUNT(*)', $result1['query']);
+        $this->assertStringContainsString('COUNT(*)', $result1->query);
 
         $builder->reset();
 
         // Second: simple select query
         $builder->from('users')->select(['name'])->filter([Query::equal('active', [true])]);
         $result2 = $builder->build();
-        $this->assertStringNotContainsString('COUNT', $result2['query']);
-        $this->assertStringContainsString('`name`', $result2['query']);
+        $this->assertStringNotContainsString('COUNT', $result2->query);
+        $this->assertStringContainsString('`name`', $result2->query);
     }
 
     public function testResetAfterUnion(): void
@@ -5362,8 +5358,8 @@ class SQLTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('new')->build();
-        $this->assertEquals('SELECT * FROM `new`', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `new`', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testResetAfterComplexQueryWithAllFeatures(): void
@@ -5388,8 +5384,8 @@ class SQLTest extends TestCase
         $builder->reset();
 
         $result = $builder->from('simple')->build();
-        $this->assertEquals('SELECT * FROM `simple`', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `simple`', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     // ══════════════════════════════════════════
@@ -5407,8 +5403,8 @@ class SQLTest extends TestCase
         $builder->filter([Query::equal('b', [2])]);
         $result2 = $builder->build();
 
-        $this->assertStringNotContainsString('`b`', $result1['query']);
-        $this->assertStringContainsString('`b`', $result2['query']);
+        $this->assertStringNotContainsString('`b`', $result1->query);
+        $this->assertStringContainsString('`b`', $result2->query);
     }
 
     public function testBuildDoesNotMutatePendingQueries(): void
@@ -5421,8 +5417,8 @@ class SQLTest extends TestCase
         $result1 = $builder->build();
         $result2 = $builder->build();
 
-        $this->assertEquals($result1['query'], $result2['query']);
-        $this->assertEquals($result1['bindings'], $result2['bindings']);
+        $this->assertEquals($result1->query, $result2->query);
+        $this->assertEquals($result1->bindings, $result2->bindings);
     }
 
     public function testBuildResetsBindingsEachTime(): void
@@ -5457,8 +5453,8 @@ class SQLTest extends TestCase
         $result2 = $builder->build();
         $result3 = $builder->build();
 
-        $this->assertEquals($result1['bindings'], $result2['bindings']);
-        $this->assertEquals($result2['bindings'], $result3['bindings']);
+        $this->assertEquals($result1->bindings, $result2->bindings);
+        $this->assertEquals($result2->bindings, $result3->bindings);
     }
 
     public function testBuildAfterAddingMoreQueries(): void
@@ -5466,15 +5462,15 @@ class SQLTest extends TestCase
         $builder = (new Builder())->from('t');
 
         $result1 = $builder->build();
-        $this->assertEquals('SELECT * FROM `t`', $result1['query']);
+        $this->assertEquals('SELECT * FROM `t`', $result1->query);
 
         $builder->filter([Query::equal('a', [1])]);
         $result2 = $builder->build();
-        $this->assertStringContainsString('WHERE', $result2['query']);
+        $this->assertStringContainsString('WHERE', $result2->query);
 
         $builder->sortAsc('a');
         $result3 = $builder->build();
-        $this->assertStringContainsString('ORDER BY', $result3['query']);
+        $this->assertStringContainsString('ORDER BY', $result3->query);
     }
 
     public function testBuildWithUnionProducesConsistentResults(): void
@@ -5485,8 +5481,8 @@ class SQLTest extends TestCase
         $result1 = $builder->build();
         $result2 = $builder->build();
 
-        $this->assertEquals($result1['query'], $result2['query']);
-        $this->assertEquals($result1['bindings'], $result2['bindings']);
+        $this->assertEquals($result1->query, $result2->query);
+        $this->assertEquals($result1->bindings, $result2->bindings);
     }
 
     public function testBuildThreeTimesWithIncreasingComplexity(): void
@@ -5494,16 +5490,16 @@ class SQLTest extends TestCase
         $builder = (new Builder())->from('t');
 
         $r1 = $builder->build();
-        $this->assertEquals('SELECT * FROM `t`', $r1['query']);
+        $this->assertEquals('SELECT * FROM `t`', $r1->query);
 
         $builder->filter([Query::equal('a', [1])]);
         $r2 = $builder->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?)', $r2['query']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?)', $r2->query);
 
         $builder->limit(10)->offset(5);
         $r3 = $builder->build();
-        $this->assertStringContainsString('LIMIT ?', $r3['query']);
-        $this->assertStringContainsString('OFFSET ?', $r3['query']);
+        $this->assertStringContainsString('LIMIT ?', $r3->query);
+        $this->assertStringContainsString('OFFSET ?', $r3->query);
     }
 
     public function testBuildBindingsNotAccumulated(): void
@@ -5531,8 +5527,8 @@ class SQLTest extends TestCase
         $r1 = $builder->build();
         $r2 = $builder->build();
 
-        $this->assertEquals([5], $r1['bindings']);
-        $this->assertEquals([5], $r2['bindings']);
+        $this->assertEquals([5], $r1->bindings);
+        $this->assertEquals([5], $r2->bindings);
     }
 
     // ══════════════════════════════════════════
@@ -5550,7 +5546,7 @@ class SQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertEquals(['v1', 10, 1, 100], $result['bindings']);
+        $this->assertEquals(['v1', 10, 1, 100], $result->bindings);
     }
 
     public function testBindingOrderThreeProviders(): void
@@ -5577,7 +5573,7 @@ class SQLTest extends TestCase
             })
             ->build();
 
-        $this->assertEquals(['pv1', 'pv2', 'pv3'], $result['bindings']);
+        $this->assertEquals(['pv1', 'pv2', 'pv3'], $result->bindings);
     }
 
     public function testBindingOrderMultipleUnions(): void
@@ -5594,7 +5590,7 @@ class SQLTest extends TestCase
             ->build();
 
         // main filter, main limit, union1 bindings, union2 bindings
-        $this->assertEquals([3, 5, 1, 2], $result['bindings']);
+        $this->assertEquals([3, 5, 1, 2], $result->bindings);
     }
 
     public function testBindingOrderLogicalAndWithMultipleSubFilters(): void
@@ -5610,7 +5606,7 @@ class SQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertEquals([1, 2, 3], $result['bindings']);
+        $this->assertEquals([1, 2, 3], $result->bindings);
     }
 
     public function testBindingOrderLogicalOrWithMultipleSubFilters(): void
@@ -5626,7 +5622,7 @@ class SQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertEquals([1, 2, 3], $result['bindings']);
+        $this->assertEquals([1, 2, 3], $result->bindings);
     }
 
     public function testBindingOrderNestedAndOr(): void
@@ -5644,7 +5640,7 @@ class SQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertEquals([1, 2, 3], $result['bindings']);
+        $this->assertEquals([1, 2, 3], $result->bindings);
     }
 
     public function testBindingOrderRawMixedWithRegularFilters(): void
@@ -5658,7 +5654,7 @@ class SQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertEquals(['v1', 10, 20], $result['bindings']);
+        $this->assertEquals(['v1', 10, 20], $result->bindings);
     }
 
     public function testBindingOrderAggregationHavingComplexConditions(): void
@@ -5677,7 +5673,7 @@ class SQLTest extends TestCase
             ->build();
 
         // filter, having1, having2, limit
-        $this->assertEquals(['active', 5, 10000, 10], $result['bindings']);
+        $this->assertEquals(['active', 5, 10000, 10], $result->bindings);
     }
 
     public function testBindingOrderFullPipelineWithEverything(): void
@@ -5706,7 +5702,7 @@ class SQLTest extends TestCase
             ->build();
 
         // filter(paid, 0), provider(t1), cursor(cursor_val), having(1), limit(25), offset(50), union(true)
-        $this->assertEquals(['paid', 0, 't1', 'cursor_val', 1, 25, 50, true], $result['bindings']);
+        $this->assertEquals(['paid', 0, 't1', 'cursor_val', 1, 25, 50, true], $result->bindings);
     }
 
     public function testBindingOrderContainsMultipleValues(): void
@@ -5720,7 +5716,7 @@ class SQLTest extends TestCase
             ->build();
 
         // contains produces three LIKE bindings, then equal
-        $this->assertEquals(['%php%', '%js%', '%go%', 'active'], $result['bindings']);
+        $this->assertEquals(['%php%', '%js%', '%go%', 'active'], $result->bindings);
     }
 
     public function testBindingOrderBetweenAndComparisons(): void
@@ -5734,7 +5730,7 @@ class SQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertEquals([18, 65, 50, 100], $result['bindings']);
+        $this->assertEquals([18, 65, 50, 100], $result->bindings);
     }
 
     public function testBindingOrderStartsWithEndsWith(): void
@@ -5747,7 +5743,7 @@ class SQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertEquals(['A%', '%.com'], $result['bindings']);
+        $this->assertEquals(['A%', '%.com'], $result->bindings);
     }
 
     public function testBindingOrderSearchAndRegex(): void
@@ -5760,7 +5756,7 @@ class SQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertEquals(['hello', '^test'], $result['bindings']);
+        $this->assertEquals(['hello', '^test'], $result->bindings);
     }
 
     public function testBindingOrderWithCursorBeforeFilterAndLimit(): void
@@ -5780,7 +5776,7 @@ class SQLTest extends TestCase
             ->build();
 
         // filter, provider, cursor, limit, offset
-        $this->assertEquals(['x', 'org1', 'my_cursor', 10, 0], $result['bindings']);
+        $this->assertEquals(['x', 'org1', 'my_cursor', 10, 0], $result->bindings);
     }
 
     // ══════════════════════════════════════════
@@ -5790,8 +5786,8 @@ class SQLTest extends TestCase
     public function testBuildWithNoFromNoFilters(): void
     {
         $result = (new Builder())->from('')->build();
-        $this->assertEquals('SELECT * FROM ``', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM ``', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testBuildWithOnlyLimit(): void
@@ -5801,8 +5797,8 @@ class SQLTest extends TestCase
             ->limit(10)
             ->build();
 
-        $this->assertStringContainsString('LIMIT ?', $result['query']);
-        $this->assertEquals([10], $result['bindings']);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertEquals([10], $result->bindings);
     }
 
     public function testBuildWithOnlyOffset(): void
@@ -5813,8 +5809,8 @@ class SQLTest extends TestCase
             ->offset(50)
             ->build();
 
-        $this->assertStringNotContainsString('OFFSET ?', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertStringNotContainsString('OFFSET ?', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testBuildWithOnlySort(): void
@@ -5824,7 +5820,7 @@ class SQLTest extends TestCase
             ->sortAsc('name')
             ->build();
 
-        $this->assertStringContainsString('ORDER BY `name` ASC', $result['query']);
+        $this->assertStringContainsString('ORDER BY `name` ASC', $result->query);
     }
 
     public function testBuildWithOnlySelect(): void
@@ -5834,7 +5830,7 @@ class SQLTest extends TestCase
             ->select(['a', 'b'])
             ->build();
 
-        $this->assertStringContainsString('SELECT `a`, `b`', $result['query']);
+        $this->assertStringContainsString('SELECT `a`, `b`', $result->query);
     }
 
     public function testBuildWithOnlyAggregationNoFrom(): void
@@ -5844,7 +5840,7 @@ class SQLTest extends TestCase
             ->count('*', 'total')
             ->build();
 
-        $this->assertStringContainsString('COUNT(*) AS `total`', $result['query']);
+        $this->assertStringContainsString('COUNT(*) AS `total`', $result->query);
     }
 
     public function testBuildWithEmptyFilterArray(): void
@@ -5854,7 +5850,7 @@ class SQLTest extends TestCase
             ->filter([])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `t`', $result['query']);
+        $this->assertEquals('SELECT * FROM `t`', $result->query);
     }
 
     public function testBuildWithEmptySelectArray(): void
@@ -5864,7 +5860,7 @@ class SQLTest extends TestCase
             ->select([])
             ->build();
 
-        $this->assertEquals('SELECT  FROM `t`', $result['query']);
+        $this->assertEquals('SELECT  FROM `t`', $result->query);
     }
 
     public function testBuildWithOnlyHavingNoGroupBy(): void
@@ -5875,8 +5871,8 @@ class SQLTest extends TestCase
             ->having([Query::greaterThan('cnt', 0)])
             ->build();
 
-        $this->assertStringContainsString('HAVING `cnt` > ?', $result['query']);
-        $this->assertStringNotContainsString('GROUP BY', $result['query']);
+        $this->assertStringContainsString('HAVING `cnt` > ?', $result->query);
+        $this->assertStringNotContainsString('GROUP BY', $result->query);
     }
 
     public function testBuildWithOnlyDistinct(): void
@@ -5886,7 +5882,7 @@ class SQLTest extends TestCase
             ->distinct()
             ->build();
 
-        $this->assertEquals('SELECT DISTINCT * FROM `t`', $result['query']);
+        $this->assertEquals('SELECT DISTINCT * FROM `t`', $result->query);
     }
 
     // ══════════════════════════════════════════
@@ -6073,9 +6069,9 @@ class SQLTest extends TestCase
 
         $this->assertEquals(
             '(SELECT DISTINCT COUNT(*) AS `total`, `status` FROM `orders` JOIN `users` ON `orders`.`uid` = `users`.`id` WHERE `amount` > ? GROUP BY `status` HAVING `total` > ? ORDER BY `status` ASC LIMIT ? OFFSET ?) UNION (SELECT * FROM `archive` WHERE `status` IN (?))',
-            $result['query']
+            $result->query
         );
-        $this->assertEquals([100, 5, 10, 20, 'closed'], $result['bindings']);
+        $this->assertEquals([100, 5, 10, 20, 'closed'], $result->bindings);
     }
 
     // ══════════════════════════════════════════
@@ -6086,8 +6082,8 @@ class SQLTest extends TestCase
     {
         $other = (new Builder())->from('b');
         $result = (new Builder())->from('a')->distinct()->union($other)->build();
-        $this->assertEquals('(SELECT DISTINCT * FROM `a`) UNION (SELECT * FROM `b`)', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('(SELECT DISTINCT * FROM `a`) UNION (SELECT * FROM `b`)', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testRawInsideLogicalAnd(): void
@@ -6098,8 +6094,8 @@ class SQLTest extends TestCase
                 Query::raw('custom_func(y) > ?', [5]),
             ])])
             ->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`x` > ? AND custom_func(y) > ?)', $result['query']);
-        $this->assertEquals([1, 5], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`x` > ? AND custom_func(y) > ?)', $result->query);
+        $this->assertEquals([1, 5], $result->bindings);
     }
 
     public function testRawInsideLogicalOr(): void
@@ -6110,8 +6106,8 @@ class SQLTest extends TestCase
                 Query::raw('b IS NOT NULL', []),
             ])])
             ->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?) OR b IS NOT NULL)', $result['query']);
-        $this->assertEquals([1], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?) OR b IS NOT NULL)', $result->query);
+        $this->assertEquals([1], $result->bindings);
     }
 
     public function testAggregationWithCursor(): void
@@ -6120,9 +6116,9 @@ class SQLTest extends TestCase
             ->count('*', 'total')
             ->cursorAfter('abc')
             ->build();
-        $this->assertStringContainsString('COUNT(*)', $result['query']);
-        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
-        $this->assertContains('abc', $result['bindings']);
+        $this->assertStringContainsString('COUNT(*)', $result->query);
+        $this->assertStringContainsString('`_cursor` > ?', $result->query);
+        $this->assertContains('abc', $result->bindings);
     }
 
     public function testGroupBySortCursorUnion(): void
@@ -6135,9 +6131,9 @@ class SQLTest extends TestCase
             ->cursorAfter('xyz')
             ->union($other)
             ->build();
-        $this->assertStringContainsString('GROUP BY', $result['query']);
-        $this->assertStringContainsString('ORDER BY', $result['query']);
-        $this->assertStringContainsString('UNION', $result['query']);
+        $this->assertStringContainsString('GROUP BY', $result->query);
+        $this->assertStringContainsString('ORDER BY', $result->query);
+        $this->assertStringContainsString('UNION', $result->query);
     }
 
     public function testConditionProviderWithNoFilters(): void
@@ -6151,8 +6147,8 @@ class SQLTest extends TestCase
                 }
             })
             ->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE _tenant = ?', $result['query']);
-        $this->assertEquals(['t1'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE _tenant = ?', $result->query);
+        $this->assertEquals(['t1'], $result->bindings);
     }
 
     public function testConditionProviderWithCursorNoFilters(): void
@@ -6167,10 +6163,10 @@ class SQLTest extends TestCase
             })
             ->cursorAfter('abc')
             ->build();
-        $this->assertStringContainsString('_tenant = ?', $result['query']);
-        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
+        $this->assertStringContainsString('_tenant = ?', $result->query);
+        $this->assertStringContainsString('`_cursor` > ?', $result->query);
         // Provider bindings come before cursor bindings
-        $this->assertEquals(['t1', 'abc'], $result['bindings']);
+        $this->assertEquals(['t1', 'abc'], $result->bindings);
     }
 
     public function testConditionProviderWithDistinct(): void
@@ -6185,8 +6181,8 @@ class SQLTest extends TestCase
                 }
             })
             ->build();
-        $this->assertEquals('SELECT DISTINCT * FROM `t` WHERE _tenant = ?', $result['query']);
-        $this->assertEquals(['t1'], $result['bindings']);
+        $this->assertEquals('SELECT DISTINCT * FROM `t` WHERE _tenant = ?', $result->query);
+        $this->assertEquals(['t1'], $result->bindings);
     }
 
     public function testConditionProviderPersistsAfterReset(): void
@@ -6202,9 +6198,9 @@ class SQLTest extends TestCase
         $builder->build();
         $builder->reset()->from('other');
         $result = $builder->build();
-        $this->assertStringContainsString('FROM `other`', $result['query']);
-        $this->assertStringContainsString('_tenant = ?', $result['query']);
-        $this->assertEquals(['t1'], $result['bindings']);
+        $this->assertStringContainsString('FROM `other`', $result->query);
+        $this->assertStringContainsString('_tenant = ?', $result->query);
+        $this->assertEquals(['t1'], $result->bindings);
     }
 
     public function testConditionProviderWithHaving(): void
@@ -6222,10 +6218,10 @@ class SQLTest extends TestCase
             ->having([Query::greaterThan('total', 5)])
             ->build();
         // Provider should be in WHERE, not HAVING
-        $this->assertStringContainsString('WHERE _tenant = ?', $result['query']);
-        $this->assertStringContainsString('HAVING `total` > ?', $result['query']);
+        $this->assertStringContainsString('WHERE _tenant = ?', $result->query);
+        $this->assertStringContainsString('HAVING `total` > ?', $result->query);
         // Provider bindings before having bindings
-        $this->assertEquals(['t1', 5], $result['bindings']);
+        $this->assertEquals(['t1', 5], $result->bindings);
     }
 
     public function testUnionWithConditionProvider(): void
@@ -6243,8 +6239,8 @@ class SQLTest extends TestCase
             ->union($sub)
             ->build();
         // Sub-query should include the condition provider
-        $this->assertStringContainsString('UNION (SELECT * FROM `b` WHERE _deleted = ?)', $result['query']);
-        $this->assertEquals([0], $result['bindings']);
+        $this->assertStringContainsString('UNION (SELECT * FROM `b` WHERE _deleted = ?)', $result->query);
+        $this->assertEquals([0], $result->bindings);
     }
 
     // ══════════════════════════════════════════
@@ -6254,129 +6250,129 @@ class SQLTest extends TestCase
     public function testNegativeLimit(): void
     {
         $result = (new Builder())->from('t')->limit(-1)->build();
-        $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result['query']);
-        $this->assertEquals([-1], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result->query);
+        $this->assertEquals([-1], $result->bindings);
     }
 
     public function testNegativeOffset(): void
     {
         // OFFSET without LIMIT is suppressed
         $result = (new Builder())->from('t')->offset(-5)->build();
-        $this->assertEquals('SELECT * FROM `t`', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testEqualWithNullOnly(): void
     {
         $result = (new Builder())->from('t')->filter([Query::equal('col', [null])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `col` IS NULL', $result['query']);
-        $this->assertSame([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `col` IS NULL', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testEqualWithNullAndNonNull(): void
     {
         $result = (new Builder())->from('t')->filter([Query::equal('col', ['a', null])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`col` IN (?) OR `col` IS NULL)', $result['query']);
-        $this->assertSame(['a'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`col` IN (?) OR `col` IS NULL)', $result->query);
+        $this->assertSame(['a'], $result->bindings);
     }
 
     public function testNotEqualWithNullOnly(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notEqual('col', [null])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `col` IS NOT NULL', $result['query']);
-        $this->assertSame([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `col` IS NOT NULL', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testNotEqualWithNullAndNonNull(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notEqual('col', ['a', null])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`col` != ? AND `col` IS NOT NULL)', $result['query']);
-        $this->assertSame(['a'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`col` != ? AND `col` IS NOT NULL)', $result->query);
+        $this->assertSame(['a'], $result->bindings);
     }
 
     public function testNotEqualWithMultipleNonNullAndNull(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notEqual('col', ['a', 'b', null])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`col` NOT IN (?, ?) AND `col` IS NOT NULL)', $result['query']);
-        $this->assertSame(['a', 'b'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`col` NOT IN (?, ?) AND `col` IS NOT NULL)', $result->query);
+        $this->assertSame(['a', 'b'], $result->bindings);
     }
 
     public function testBetweenReversedMinMax(): void
     {
         $result = (new Builder())->from('t')->filter([Query::between('age', 65, 18)])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `age` BETWEEN ? AND ?', $result['query']);
-        $this->assertEquals([65, 18], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `age` BETWEEN ? AND ?', $result->query);
+        $this->assertEquals([65, 18], $result->bindings);
     }
 
     public function testContainsWithSqlWildcard(): void
     {
         $result = (new Builder())->from('t')->filter([Query::contains('bio', ['100%'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `bio` LIKE ?', $result['query']);
-        $this->assertEquals(['%100\%%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `bio` LIKE ?', $result->query);
+        $this->assertEquals(['%100\%%'], $result->bindings);
     }
 
     public function testStartsWithWithWildcard(): void
     {
         $result = (new Builder())->from('t')->filter([Query::startsWith('name', '%admin')])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `name` LIKE ?', $result['query']);
-        $this->assertEquals(['\%admin%'], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` WHERE `name` LIKE ?', $result->query);
+        $this->assertEquals(['\%admin%'], $result->bindings);
     }
 
     public function testCursorWithNullValue(): void
     {
         // Null cursor value is ignored by groupByType since cursor stays null
         $result = (new Builder())->from('t')->cursorAfter(null)->build();
-        $this->assertStringNotContainsString('_cursor', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertStringNotContainsString('_cursor', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testCursorWithIntegerValue(): void
     {
         $result = (new Builder())->from('t')->cursorAfter(42)->build();
-        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
-        $this->assertSame([42], $result['bindings']);
+        $this->assertStringContainsString('`_cursor` > ?', $result->query);
+        $this->assertSame([42], $result->bindings);
     }
 
     public function testCursorWithFloatValue(): void
     {
         $result = (new Builder())->from('t')->cursorAfter(3.14)->build();
-        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
-        $this->assertSame([3.14], $result['bindings']);
+        $this->assertStringContainsString('`_cursor` > ?', $result->query);
+        $this->assertSame([3.14], $result->bindings);
     }
 
     public function testMultipleLimitsFirstWins(): void
     {
         $result = (new Builder())->from('t')->limit(10)->limit(20)->build();
-        $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result['query']);
-        $this->assertEquals([10], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result->query);
+        $this->assertEquals([10], $result->bindings);
     }
 
     public function testMultipleOffsetsFirstWins(): void
     {
         // OFFSET without LIMIT is suppressed
         $result = (new Builder())->from('t')->offset(5)->offset(50)->build();
-        $this->assertEquals('SELECT * FROM `t`', $result['query']);
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testCursorAfterAndBeforeFirstWins(): void
     {
         $result = (new Builder())->from('t')->cursorAfter('a')->cursorBefore('b')->build();
-        $this->assertStringContainsString('`_cursor` > ?', $result['query']);
-        $this->assertStringNotContainsString('`_cursor` < ?', $result['query']);
+        $this->assertStringContainsString('`_cursor` > ?', $result->query);
+        $this->assertStringNotContainsString('`_cursor` < ?', $result->query);
     }
 
     public function testEmptyTableWithJoin(): void
     {
         $result = (new Builder())->from('')->join('other', 'a', 'b')->build();
-        $this->assertEquals('SELECT * FROM `` JOIN `other` ON `a` = `b`', $result['query']);
+        $this->assertEquals('SELECT * FROM `` JOIN `other` ON `a` = `b`', $result->query);
     }
 
     public function testBuildWithoutFromCall(): void
     {
         $result = (new Builder())->filter([Query::equal('x', [1])])->build();
-        $this->assertStringContainsString('FROM ``', $result['query']);
-        $this->assertStringContainsString('`x` IN (?)', $result['query']);
+        $this->assertStringContainsString('FROM ``', $result->query);
+        $this->assertStringContainsString('`x` IN (?)', $result->query);
     }
 
     // ══════════════════════════════════════════
@@ -6534,7 +6530,7 @@ class SQLTest extends TestCase
             ->from('t')
             ->filter([Query::isNotNull('email')])
             ->build();
-        $this->assertStringContainsString('"email" IS NOT NULL', $result['query']);
+        $this->assertStringContainsString('"email" IS NOT NULL', $result->query);
     }
 
     public function testSetWrapCharWithExists(): void
@@ -6543,8 +6539,8 @@ class SQLTest extends TestCase
             ->from('t')
             ->filter([Query::exists(['a', 'b'])])
             ->build();
-        $this->assertStringContainsString('"a" IS NOT NULL', $result['query']);
-        $this->assertStringContainsString('"b" IS NOT NULL', $result['query']);
+        $this->assertStringContainsString('"a" IS NOT NULL', $result->query);
+        $this->assertStringContainsString('"b" IS NOT NULL', $result->query);
     }
 
     public function testSetWrapCharWithNotExists(): void
@@ -6553,7 +6549,7 @@ class SQLTest extends TestCase
             ->from('t')
             ->filter([Query::notExists('c')])
             ->build();
-        $this->assertStringContainsString('"c" IS NULL', $result['query']);
+        $this->assertStringContainsString('"c" IS NULL', $result->query);
     }
 
     public function testSetWrapCharCursorNotAffected(): void
@@ -6563,7 +6559,7 @@ class SQLTest extends TestCase
             ->cursorAfter('abc')
             ->build();
         // _cursor is now properly wrapped with the configured wrap character
-        $this->assertStringContainsString('"_cursor" > ?', $result['query']);
+        $this->assertStringContainsString('"_cursor" > ?', $result->query);
     }
 
     public function testSetWrapCharWithToRawSql(): void
@@ -6590,8 +6586,8 @@ class SQLTest extends TestCase
             ->union((new Builder())->from('old'));
         $builder->reset()->from('b');
         $result = $builder->build();
-        $this->assertEquals('SELECT * FROM `b`', $result['query']);
-        $this->assertStringNotContainsString('UNION', $result['query']);
+        $this->assertEquals('SELECT * FROM `b`', $result->query);
+        $this->assertStringNotContainsString('UNION', $result->query);
     }
 
     public function testResetClearsBindingsAfterBuild(): void
@@ -6601,7 +6597,7 @@ class SQLTest extends TestCase
         $this->assertNotEmpty($builder->getBindings());
         $builder->reset()->from('t');
         $result = $builder->build();
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals([], $result->bindings);
     }
 
     // ══════════════════════════════════════════
@@ -6611,48 +6607,48 @@ class SQLTest extends TestCase
     public function testSortAscBindingsEmpty(): void
     {
         $result = (new Builder())->from('t')->sortAsc('name')->build();
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testSortDescBindingsEmpty(): void
     {
         $result = (new Builder())->from('t')->sortDesc('name')->build();
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testSortRandomBindingsEmpty(): void
     {
         $result = (new Builder())->from('t')->sortRandom()->build();
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testDistinctBindingsEmpty(): void
     {
         $result = (new Builder())->from('t')->distinct()->build();
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testJoinBindingsEmpty(): void
     {
         $result = (new Builder())->from('t')->join('other', 'a', 'b')->build();
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testCrossJoinBindingsEmpty(): void
     {
         $result = (new Builder())->from('t')->crossJoin('other')->build();
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testGroupByBindingsEmpty(): void
     {
         $result = (new Builder())->from('t')->groupBy(['status'])->build();
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testCountWithAliasBindingsEmpty(): void
     {
         $result = (new Builder())->from('t')->count('*', 'total')->build();
-        $this->assertEquals([], $result['bindings']);
+        $this->assertEquals([], $result->bindings);
     }
 }
