@@ -3,7 +3,7 @@
 namespace Tests\Query;
 
 use PHPUnit\Framework\TestCase;
-use Utopia\Query\Condition;
+use Utopia\Query\Builder\Condition;
 
 class ConditionTest extends TestCase
 {

@@ -20,6 +20,9 @@ composer require utopia-php/query
 
 ```php
 use Utopia\Query\Query;
+use Utopia\Query\Method;
+use Utopia\Query\OrderDirection;
+use Utopia\Query\CursorDirection;
 ```
 
 ### Filter Queries
@@ -138,7 +141,7 @@ $queries = Query::parseQueries([$json1, $json2, $json3]);
 
 ### Grouping Helpers
 
-`groupByType` splits an array of queries into categorized buckets:
+`groupByType` splits an array of queries into a `GroupedQueries` object with typed properties:
 
 ```php
 $queries = [
@@ -153,20 +156,20 @@ $queries = [
 
 $grouped = Query::groupByType($queries);
 
-// $grouped['filters']         — filter Query objects
-// $grouped['selections']      — select Query objects
-// $grouped['limit']           — int|null
-// $grouped['offset']          — int|null
-// $grouped['orderAttributes'] — ['name']
-// $grouped['orderTypes']      — ['ASC']
-// $grouped['cursor']          — 'abc123'
-// $grouped['cursorDirection'] — 'after'
+// $grouped->filters         — filter Query objects
+// $grouped->selections      — select Query objects
+// $grouped->limit           — int|null
+// $grouped->offset          — int|null
+// $grouped->orderAttributes — ['name']
+// $grouped->orderTypes      — [OrderDirection::Asc]
+// $grouped->cursor          — 'abc123'
+// $grouped->cursorDirection — CursorDirection::After
 ```
 
 `getByType` filters queries by one or more method types:
 
 ```php
-$cursors = Query::getByType($queries, [Query::TYPE_CURSOR_AFTER, Query::TYPE_CURSOR_BEFORE]);
+$cursors = Query::getByType($queries, [Method::CursorAfter, Method::CursorBefore]);
 ```
 
 ### Building a Compiler
@@ -176,20 +179,21 @@ This library ships with a `Compiler` interface so you can translate queries into
 ```php
 use Utopia\Query\Compiler;
 use Utopia\Query\Query;
+use Utopia\Query\Method;
 
 class SQLCompiler implements Compiler
 {
     public function compileFilter(Query $query): string
     {
         return match ($query->getMethod()) {
-            Query::TYPE_EQUAL       => $query->getAttribute() . ' IN (' . $this->placeholders($query->getValues()) . ')',
-            Query::TYPE_NOT_EQUAL   => $query->getAttribute() . ' != ?',
-            Query::TYPE_GREATER     => $query->getAttribute() . ' > ?',
-            Query::TYPE_LESSER      => $query->getAttribute() . ' < ?',
-            Query::TYPE_BETWEEN     => $query->getAttribute() . ' BETWEEN ? AND ?',
-            Query::TYPE_IS_NULL     => $query->getAttribute() . ' IS NULL',
-            Query::TYPE_IS_NOT_NULL => $query->getAttribute() . ' IS NOT NULL',
-            Query::TYPE_STARTS_WITH => $query->getAttribute() . " LIKE CONCAT(?, '%')",
+            Method::Equal      => $query->getAttribute() . ' IN (' . $this->placeholders($query->getValues()) . ')',
+            Method::NotEqual   => $query->getAttribute() . ' != ?',
+            Method::GreaterThan => $query->getAttribute() . ' > ?',
+            Method::LessThan   => $query->getAttribute() . ' < ?',
+            Method::Between    => $query->getAttribute() . ' BETWEEN ? AND ?',
+            Method::IsNull     => $query->getAttribute() . ' IS NULL',
+            Method::IsNotNull  => $query->getAttribute() . ' IS NOT NULL',
+            Method::StartsWith => $query->getAttribute() . " LIKE CONCAT(?, '%')",
             // ... handle remaining types
         };
     }
@@ -197,9 +201,9 @@ class SQLCompiler implements Compiler
     public function compileOrder(Query $query): string
     {
         return match ($query->getMethod()) {
-            Query::TYPE_ORDER_ASC    => $query->getAttribute() . ' ASC',
-            Query::TYPE_ORDER_DESC   => $query->getAttribute() . ' DESC',
-            Query::TYPE_ORDER_RANDOM => 'RAND()',
+            Method::OrderAsc    => $query->getAttribute() . ' ASC',
+            Method::OrderDesc   => $query->getAttribute() . ' DESC',
+            Method::OrderRandom => 'RAND()',
         };
     }
 
@@ -249,8 +253,8 @@ class RedisCompiler implements Compiler
     public function compileFilter(Query $query): string
     {
         return match ($query->getMethod()) {
-            Query::TYPE_BETWEEN => $query->getValues()[0] . ' ' . $query->getValues()[1],
-            Query::TYPE_GREATER => '(' . $query->getValue() . ' +inf',
+            Method::Between    => $query->getValues()[0] . ' ' . $query->getValues()[1],
+            Method::GreaterThan => '(' . $query->getValue() . ' +inf',
             // ... handle remaining types
         };
     }
@@ -263,7 +267,7 @@ This is the pattern used by [utopia-php/database](https://github.com/utopia-php/
 
 ### Builder Hierarchy
 
-The library includes a builder system for generating parameterized queries. The abstract `Builder` base class provides the fluent API and query orchestration, while concrete implementations handle dialect-specific compilation:
+The library includes a builder system for generating parameterized queries. The `build()` method returns a `BuildResult` object with `->query` and `->bindings` properties. The abstract `Builder` base class provides the fluent API and query orchestration, while concrete implementations handle dialect-specific compilation:
 
 - `Utopia\Query\Builder\SQL` — MySQL/MariaDB/SQLite (backtick quoting, `REGEXP`, `MATCH() AGAINST()`, `RAND()`)
 - `Utopia\Query\Builder\ClickHouse` — ClickHouse (backtick quoting, `match()`, `rand()`, `PREWHERE`, `FINAL`, `SAMPLE`)
@@ -287,8 +291,8 @@ $result = (new Builder())
     ->offset(0)
     ->build();
 
-$result['query'];    // SELECT `name`, `email` FROM `users` WHERE `status` IN (?) AND `age` > ? ORDER BY `name` ASC LIMIT ? OFFSET ?
-$result['bindings']; // ['active', 18, 25, 0]
+$result->query;    // SELECT `name`, `email` FROM `users` WHERE `status` IN (?) AND `age` > ? ORDER BY `name` ASC LIMIT ? OFFSET ?
+$result->bindings; // ['active', 18, 25, 0]
 ```
 
 **Batch mode** — pass all queries at once:
@@ -314,8 +318,8 @@ $result = (new Builder())
     ->limit(10)
     ->build();
 
-$stmt = $pdo->prepare($result['query']);
-$stmt->execute($result['bindings']);
+$stmt = $pdo->prepare($result->query);
+$stmt->execute($result->bindings);
 $rows = $stmt->fetchAll();
 ```
 
@@ -466,7 +470,7 @@ Built-in hooks:
 Custom hooks implement `FilterHook` or `AttributeHook`:
 
 ```php
-use Utopia\Query\Condition;
+use Utopia\Query\Builder\Condition;
 use Utopia\Query\Hook\FilterHook;
 
 class SoftDeleteHook implements FilterHook

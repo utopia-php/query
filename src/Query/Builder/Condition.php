@@ -1,15 +1,15 @@
 <?php
 
-namespace Utopia\Query;
+namespace Utopia\Query\Builder;
 
-class Condition
+readonly class Condition
 {
     /**
      * @param  list<mixed>  $bindings
      */
     public function __construct(
-        protected string $expression,
-        protected array $bindings = [],
+        public string $expression,
+        public array $bindings = [],
     ) {
     }
 

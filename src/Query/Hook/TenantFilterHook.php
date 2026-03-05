@@ -2,7 +2,7 @@
 
 namespace Utopia\Query\Hook;
 
-use Utopia\Query\Condition;
+use Utopia\Query\Builder\Condition;
 
 class TenantFilterHook implements FilterHook
 {
