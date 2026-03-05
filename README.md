@@ -20,6 +20,9 @@ composer require utopia-php/query
 
 ```php
 use Utopia\Query\Query;
+use Utopia\Query\Method;
+use Utopia\Query\OrderDirection;
+use Utopia\Query\CursorDirection;
 ```
 
 ### Filter Queries
@@ -138,7 +141,7 @@ $queries = Query::parseQueries([$json1, $json2, $json3]);
 
 ### Grouping Helpers
 
-`groupByType` splits an array of queries into categorized buckets:
+`groupByType` splits an array of queries into a `GroupedQueries` object with typed properties:
 
 ```php
 $queries = [
@@ -153,118 +156,420 @@ $queries = [
 
 $grouped = Query::groupByType($queries);
 
-// $grouped['filters']         — filter Query objects
-// $grouped['selections']      — select Query objects
-// $grouped['limit']           — int|null
-// $grouped['offset']          — int|null
-// $grouped['orderAttributes'] — ['name']
-// $grouped['orderTypes']      — ['ASC']
-// $grouped['cursor']          — 'abc123'
-// $grouped['cursorDirection'] — 'after'
+// $grouped->filters         — filter Query objects
+// $grouped->selections      — select Query objects
+// $grouped->limit           — int|null
+// $grouped->offset          — int|null
+// $grouped->orderAttributes — ['name']
+// $grouped->orderTypes      — [OrderDirection::Asc]
+// $grouped->cursor          — 'abc123'
+// $grouped->cursorDirection — CursorDirection::After
 ```
 
 `getByType` filters queries by one or more method types:
 
 ```php
-$cursors = Query::getByType($queries, [Query::TYPE_CURSOR_AFTER, Query::TYPE_CURSOR_BEFORE]);
+$cursors = Query::getByType($queries, [Method::CursorAfter, Method::CursorBefore]);
 ```
 
-### Building an Adapter
+### Building a Compiler
 
-The `Query` object is backend-agnostic — your library decides how to translate it. Use `groupByType` to break queries apart, then map each piece to your target syntax:
+This library ships with a `Compiler` interface so you can translate queries into any backend syntax. Each query delegates to the correct compiler method via `$query->compile($compiler)`:
 
 ```php
+use Utopia\Query\Compiler;
+use Utopia\Query\Query;
+use Utopia\Query\Method;
+
+class SQLCompiler implements Compiler
+{
+    public function compileFilter(Query $query): string
+    {
+        return match ($query->getMethod()) {
+            Method::Equal      => $query->getAttribute() . ' IN (' . $this->placeholders($query->getValues()) . ')',
+            Method::NotEqual   => $query->getAttribute() . ' != ?',
+            Method::GreaterThan => $query->getAttribute() . ' > ?',
+            Method::LessThan   => $query->getAttribute() . ' < ?',
+            Method::Between    => $query->getAttribute() . ' BETWEEN ? AND ?',
+            Method::IsNull     => $query->getAttribute() . ' IS NULL',
+            Method::IsNotNull  => $query->getAttribute() . ' IS NOT NULL',
+            Method::StartsWith => $query->getAttribute() . " LIKE CONCAT(?, '%')",
+            // ... handle remaining types
+        };
+    }
+
+    public function compileOrder(Query $query): string
+    {
+        return match ($query->getMethod()) {
+            Method::OrderAsc    => $query->getAttribute() . ' ASC',
+            Method::OrderDesc   => $query->getAttribute() . ' DESC',
+            Method::OrderRandom => 'RAND()',
+        };
+    }
+
+    public function compileLimit(Query $query): string
+    {
+        return 'LIMIT ' . $query->getValue();
+    }
+
+    public function compileOffset(Query $query): string
+    {
+        return 'OFFSET ' . $query->getValue();
+    }
+
+    public function compileSelect(Query $query): string
+    {
+        return implode(', ', $query->getValues());
+    }
+
+    public function compileCursor(Query $query): string
+    {
+        // Cursor-based pagination is adapter-specific
+        return '';
+    }
+}
+```
+
+Then calling `compile()` on any query routes to the right method automatically:
+
+```php
+$compiler = new SQLCompiler();
+
+$filter = Query::greaterThan('age', 18);
+echo $filter->compile($compiler); // "age > ?"
+
+$order = Query::orderAsc('name');
+echo $order->compile($compiler); // "name ASC"
+
+$limit = Query::limit(25);
+echo $limit->compile($compiler); // "LIMIT 25"
+```
+
+The same interface works for any backend — implement `Compiler` for Redis, MongoDB, Elasticsearch, etc. and every query compiles without changes:
+
+```php
+class RedisCompiler implements Compiler
+{
+    public function compileFilter(Query $query): string
+    {
+        return match ($query->getMethod()) {
+            Method::Between    => $query->getValues()[0] . ' ' . $query->getValues()[1],
+            Method::GreaterThan => '(' . $query->getValue() . ' +inf',
+            // ... handle remaining types
+        };
+    }
+
+    // ... implement remaining methods
+}
+```
+
+This is the pattern used by [utopia-php/database](https://github.com/utopia-php/database) — it implements `Compiler` for each supported database engine, keeping application code fully decoupled from any particular storage backend.
+
+### Builder Hierarchy
+
+The library includes a builder system for generating parameterized queries. The `build()` method returns a `BuildResult` object with `->query` and `->bindings` properties. The abstract `Builder` base class provides the fluent API and query orchestration, while concrete implementations handle dialect-specific compilation:
+
+- `Utopia\Query\Builder\SQL` — MySQL/MariaDB/SQLite (backtick quoting, `REGEXP`, `MATCH() AGAINST()`, `RAND()`)
+- `Utopia\Query\Builder\ClickHouse` — ClickHouse (backtick quoting, `match()`, `rand()`, `PREWHERE`, `FINAL`, `SAMPLE`)
+
+### SQL Builder
+
+```php
+use Utopia\Query\Builder\SQL as Builder;
 use Utopia\Query\Query;
 
-class SQLAdapter
-{
-    /**
-     * @param array<Query> $queries
-     */
-    public function find(string $table, array $queries): array
-    {
-        $grouped = Query::groupByType($queries);
+// Fluent API
+$result = (new Builder())
+    ->select(['name', 'email'])
+    ->from('users')
+    ->filter([
+        Query::equal('status', ['active']),
+        Query::greaterThan('age', 18),
+    ])
+    ->sortAsc('name')
+    ->limit(25)
+    ->offset(0)
+    ->build();
 
-        // SELECT
-        $columns = '*';
-        if (!empty($grouped['selections'])) {
-            $columns = implode(', ', $grouped['selections'][0]->getValues());
-        }
-
-        $sql = "SELECT {$columns} FROM {$table}";
-
-        // WHERE
-        $conditions = [];
-        foreach ($grouped['filters'] as $filter) {
-            $conditions[] = match ($filter->getMethod()) {
-                Query::TYPE_EQUAL        => $filter->getAttribute() . ' IN (' . $this->placeholders($filter->getValues()) . ')',
-                Query::TYPE_NOT_EQUAL    => $filter->getAttribute() . ' != ?',
-                Query::TYPE_GREATER      => $filter->getAttribute() . ' > ?',
-                Query::TYPE_LESSER       => $filter->getAttribute() . ' < ?',
-                Query::TYPE_BETWEEN      => $filter->getAttribute() . ' BETWEEN ? AND ?',
-                Query::TYPE_IS_NULL      => $filter->getAttribute() . ' IS NULL',
-                Query::TYPE_IS_NOT_NULL  => $filter->getAttribute() . ' IS NOT NULL',
-                Query::TYPE_STARTS_WITH  => $filter->getAttribute() . " LIKE CONCAT(?, '%')",
-                // ... handle other types
-            };
-        }
-
-        if (!empty($conditions)) {
-            $sql .= ' WHERE ' . implode(' AND ', $conditions);
-        }
-
-        // ORDER BY
-        foreach ($grouped['orderAttributes'] as $i => $attr) {
-            $sql .= ($i === 0 ? ' ORDER BY ' : ', ') . $attr . ' ' . $grouped['orderTypes'][$i];
-        }
-
-        // LIMIT / OFFSET
-        if ($grouped['limit'] !== null) {
-            $sql .= ' LIMIT ' . $grouped['limit'];
-        }
-        if ($grouped['offset'] !== null) {
-            $sql .= ' OFFSET ' . $grouped['offset'];
-        }
-
-        // Execute $sql with bound parameters ...
-    }
-}
+$result->query;    // SELECT `name`, `email` FROM `users` WHERE `status` IN (?) AND `age` > ? ORDER BY `name` ASC LIMIT ? OFFSET ?
+$result->bindings; // ['active', 18, 25, 0]
 ```
 
-The same pattern works for any backend. A Redis adapter might map filters to sorted-set range commands, an Elasticsearch adapter might build a `bool` query, or a MongoDB adapter might produce a `find()` filter document — the Query objects stay the same regardless:
+**Batch mode** — pass all queries at once:
 
 ```php
-class RedisAdapter
-{
-    /**
-     * @param array<Query> $queries
-     */
-    public function find(string $key, array $queries): array
-    {
-        $grouped = Query::groupByType($queries);
-
-        foreach ($grouped['filters'] as $filter) {
-            match ($filter->getMethod()) {
-                Query::TYPE_BETWEEN => $this->redis->zRangeByScore(
-                    $key,
-                    $filter->getValues()[0],
-                    $filter->getValues()[1],
-                ),
-                Query::TYPE_GREATER => $this->redis->zRangeByScore(
-                    $key,
-                    '(' . $filter->getValue(),
-                    '+inf',
-                ),
-                // ... handle other types
-            };
-        }
-
-        // ...
-    }
-}
+$result = (new Builder())
+    ->from('users')
+    ->queries([
+        Query::select(['name', 'email']),
+        Query::equal('status', ['active']),
+        Query::orderAsc('name'),
+        Query::limit(25),
+    ])
+    ->build();
 ```
 
-This keeps your application code decoupled from any particular storage engine — swap adapters without changing a single query.
+**Using with PDO:**
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->filter([Query::equal('status', ['active'])])
+    ->limit(10)
+    ->build();
+
+$stmt = $pdo->prepare($result->query);
+$stmt->execute($result->bindings);
+$rows = $stmt->fetchAll();
+```
+
+**Aggregations** — count, sum, avg, min, max with optional aliases:
+
+```php
+$result = (new Builder())
+    ->from('orders')
+    ->count('*', 'total')
+    ->sum('price', 'total_price')
+    ->select(['status'])
+    ->groupBy(['status'])
+    ->having([Query::greaterThan('total', 5)])
+    ->build();
+
+// SELECT COUNT(*) AS `total`, SUM(`price`) AS `total_price`, `status`
+//   FROM `orders` GROUP BY `status` HAVING `total` > ?
+```
+
+**Distinct:**
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->distinct()
+    ->select(['country'])
+    ->build();
+
+// SELECT DISTINCT `country` FROM `users`
+```
+
+**Joins** — inner, left, right, and cross joins:
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->join('orders', 'users.id', 'orders.user_id')
+    ->leftJoin('profiles', 'users.id', 'profiles.user_id')
+    ->crossJoin('colors')
+    ->build();
+
+// SELECT * FROM `users`
+//   JOIN `orders` ON `users.id` = `orders.user_id`
+//   LEFT JOIN `profiles` ON `users.id` = `profiles.user_id`
+//   CROSS JOIN `colors`
+```
+
+**Raw expressions:**
+
+```php
+$result = (new Builder())
+    ->from('t')
+    ->filter([Query::raw('score > ? AND score < ?', [10, 100])])
+    ->build();
+
+// SELECT * FROM `t` WHERE score > ? AND score < ?
+// bindings: [10, 100]
+```
+
+**Union:**
+
+```php
+$admins = (new Builder())->from('admins')->filter([Query::equal('role', ['admin'])]);
+$result = (new Builder())
+    ->from('users')
+    ->filter([Query::equal('status', ['active'])])
+    ->union($admins)
+    ->build();
+
+// SELECT * FROM `users` WHERE `status` IN (?)
+//   UNION SELECT * FROM `admins` WHERE `role` IN (?)
+```
+
+**Conditional building** — `when()` applies a callback only when the condition is true:
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->when($filterActive, fn(Builder $b) => $b->filter([Query::equal('status', ['active'])]))
+    ->build();
+```
+
+**Page helper** — page-based pagination:
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->page(3, 10) // page 3, 10 per page → LIMIT 10 OFFSET 20
+    ->build();
+```
+
+**Debug** — `toRawSql()` inlines bindings for inspection (not for execution):
+
+```php
+$sql = (new Builder())
+    ->from('users')
+    ->filter([Query::equal('status', ['active'])])
+    ->limit(10)
+    ->toRawSql();
+
+// SELECT * FROM `users` WHERE `status` IN ('active') LIMIT 10
+```
+
+**Query helpers** — merge, diff, and validate:
+
+```php
+// Merge queries (later limit/offset/cursor overrides earlier)
+$merged = Query::merge($defaultQueries, $userQueries);
+
+// Diff — queries in A not in B
+$unique = Query::diff($queriesA, $queriesB);
+
+// Validate attributes against an allow-list
+$errors = Query::validate($queries, ['name', 'age', 'status']);
+
+// Page helper — returns [limit, offset] queries
+[$limit, $offset] = Query::page(3, 10);
+```
+
+**Hooks** — extend the builder with reusable, testable hook classes for attribute resolution and condition injection:
+
+```php
+use Utopia\Query\Hook\AttributeMapHook;
+use Utopia\Query\Hook\TenantFilterHook;
+use Utopia\Query\Hook\PermissionFilterHook;
+
+$result = (new Builder())
+    ->from('users')
+    ->addHook(new AttributeMapHook([
+        '$id' => '_uid',
+        '$createdAt' => '_createdAt',
+    ]))
+    ->addHook(new TenantFilterHook(['tenant_abc']))
+    ->setWrapChar('"') // PostgreSQL
+    ->filter([Query::equal('status', ['active'])])
+    ->build();
+
+// SELECT * FROM "users" WHERE "status" IN (?) AND _tenant IN (?)
+// bindings: ['active', 'tenant_abc']
+```
+
+Built-in hooks:
+
+- `AttributeMapHook` — maps query attribute names to underlying column names
+- `TenantFilterHook` — injects a tenant ID filter (multi-tenancy)
+- `PermissionFilterHook` — injects a permission subquery filter
+
+Custom hooks implement `FilterHook` or `AttributeHook`:
+
+```php
+use Utopia\Query\Builder\Condition;
+use Utopia\Query\Hook\FilterHook;
+
+class SoftDeleteHook implements FilterHook
+{
+    public function filter(string $table): Condition
+    {
+        return new Condition('deleted_at IS NULL');
+    }
+}
+
+$result = (new Builder())
+    ->from('users')
+    ->addHook(new SoftDeleteHook())
+    ->build();
+
+// SELECT * FROM `users` WHERE deleted_at IS NULL
+```
+
+### ClickHouse Builder
+
+The ClickHouse builder handles ClickHouse-specific SQL dialect differences:
+
+```php
+use Utopia\Query\Builder\ClickHouse as Builder;
+use Utopia\Query\Query;
+```
+
+**FINAL** — force merging of data parts (for ReplacingMergeTree, CollapsingMergeTree, etc.):
+
+```php
+$result = (new Builder())
+    ->from('events')
+    ->final()
+    ->filter([Query::equal('status', ['active'])])
+    ->build();
+
+// SELECT * FROM `events` FINAL WHERE `status` IN (?)
+```
+
+**SAMPLE** — approximate query processing on a fraction of data:
+
+```php
+$result = (new Builder())
+    ->from('events')
+    ->sample(0.1)
+    ->count('*', 'approx_total')
+    ->build();
+
+// SELECT COUNT(*) AS `approx_total` FROM `events` SAMPLE 0.1
+```
+
+**PREWHERE** — filter before reading all columns (major performance optimization for wide tables):
+
+```php
+$result = (new Builder())
+    ->from('events')
+    ->prewhere([Query::equal('event_type', ['click'])])
+    ->filter([Query::greaterThan('count', 5)])
+    ->build();
+
+// SELECT * FROM `events` PREWHERE `event_type` IN (?) WHERE `count` > ?
+```
+
+**Combined** — all ClickHouse features work together:
+
+```php
+$result = (new Builder())
+    ->from('events')
+    ->final()
+    ->sample(0.1)
+    ->prewhere([Query::equal('event_type', ['purchase'])])
+    ->join('users', 'events.user_id', 'users.id')
+    ->filter([Query::greaterThan('events.amount', 100)])
+    ->count('*', 'total')
+    ->groupBy(['users.country'])
+    ->sortDesc('total')
+    ->limit(50)
+    ->build();
+
+// SELECT COUNT(*) AS `total` FROM `events` FINAL SAMPLE 0.1
+//   JOIN `users` ON `events.user_id` = `users.id`
+//   PREWHERE `event_type` IN (?)
+//   WHERE `events.amount` > ?
+//   GROUP BY `users.country`
+//   ORDER BY `total` DESC LIMIT ?
+```
+
+**Regex** — uses ClickHouse's `match()` function instead of `REGEXP`:
+
+```php
+$result = (new Builder())
+    ->from('logs')
+    ->filter([Query::regex('path', '^/api/v[0-9]+')])
+    ->build();
+
+// SELECT * FROM `logs` WHERE match(`path`, ?)
+```
+
+> **Note:** Full-text search (`Query::search()`) is not supported in the ClickHouse builder and will throw an exception. Use `Query::contains()` or a custom full-text index instead.
 
 ## Contributing
 

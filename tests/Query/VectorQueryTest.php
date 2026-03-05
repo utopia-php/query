@@ -3,6 +3,7 @@
 namespace Tests\Query;
 
 use PHPUnit\Framework\TestCase;
+use Utopia\Query\Method;
 use Utopia\Query\Query;
 
 class VectorQueryTest extends TestCase
@@ -11,7 +12,7 @@ class VectorQueryTest extends TestCase
     {
         $vector = [0.1, 0.2, 0.3];
         $query = Query::vectorDot('embedding', $vector);
-        $this->assertEquals(Query::TYPE_VECTOR_DOT, $query->getMethod());
+        $this->assertSame(Method::VectorDot, $query->getMethod());
         $this->assertEquals([$vector], $query->getValues());
     }
 
@@ -19,13 +20,13 @@ class VectorQueryTest extends TestCase
     {
         $vector = [0.1, 0.2, 0.3];
         $query = Query::vectorCosine('embedding', $vector);
-        $this->assertEquals(Query::TYPE_VECTOR_COSINE, $query->getMethod());
+        $this->assertSame(Method::VectorCosine, $query->getMethod());
     }
 
     public function testVectorEuclidean(): void
     {
         $vector = [0.1, 0.2, 0.3];
         $query = Query::vectorEuclidean('embedding', $vector);
-        $this->assertEquals(Query::TYPE_VECTOR_EUCLIDEAN, $query->getMethod());
+        $this->assertSame(Method::VectorEuclidean, $query->getMethod());
     }
 }
