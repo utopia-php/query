@@ -7885,4 +7885,462 @@ class ClickHouseTest extends TestCase
         $this->assertEquals(['purchase', 21, 50], $result->bindings);
         $this->assertBindingCount($result);
     }
+
+    public function testExactAdvancedWhenTrue(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->select(['id', 'name'])
+            ->when(true, fn (Builder $b) => $b->filter([Query::equal('status', ['active'])]))
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `name` FROM `users` WHERE `status` IN (?)',
+            $result->query
+        );
+        $this->assertEquals(['active'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedWhenFalse(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->select(['id', 'name'])
+            ->when(false, fn (Builder $b) => $b->filter([Query::equal('status', ['active'])]))
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `name` FROM `users`',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedExplain(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->select(['id', 'name'])
+            ->filter([Query::equal('status', ['active'])])
+            ->explain();
+
+        $this->assertSame(
+            'EXPLAIN SELECT `id`, `name` FROM `events` WHERE `status` IN (?)',
+            $result->query
+        );
+        $this->assertEquals(['active'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedCursorAfterWithFilters(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->select(['id', 'name'])
+            ->filter([Query::greaterThan('age', 18)])
+            ->cursorAfter('abc123')
+            ->sortDesc('created_at')
+            ->limit(25)
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `name` FROM `events` WHERE `age` > ? AND `_cursor` > ? ORDER BY `created_at` DESC LIMIT ?',
+            $result->query
+        );
+        $this->assertEquals([18, 'abc123', 25], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedCursorBefore(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->select(['id', 'name'])
+            ->cursorBefore('xyz789')
+            ->sortAsc('id')
+            ->limit(10)
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `name` FROM `events` WHERE `_cursor` < ? ORDER BY `id` ASC LIMIT ?',
+            $result->query
+        );
+        $this->assertEquals(['xyz789', 10], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedMultipleCtes(): void
+    {
+        $cteA = (new Builder())
+            ->from('orders')
+            ->select(['customer_id'])
+            ->filter([Query::greaterThan('total', 100)]);
+
+        $cteB = (new Builder())
+            ->from('customers')
+            ->select(['id', 'name'])
+            ->filter([Query::equal('tier', ['gold'])]);
+
+        $result = (new Builder())
+            ->with('a', $cteA)
+            ->with('b', $cteB)
+            ->from('a')
+            ->select(['customer_id'])
+            ->build();
+
+        $this->assertSame(
+            'WITH `a` AS (SELECT `customer_id` FROM `orders` WHERE `total` > ?), `b` AS (SELECT `id`, `name` FROM `customers` WHERE `tier` IN (?)) SELECT `customer_id` FROM `a`',
+            $result->query
+        );
+        $this->assertEquals([100, 'gold'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedMultipleWindowFunctions(): void
+    {
+        $result = (new Builder())
+            ->from('sales')
+            ->select(['employee_id', 'amount'])
+            ->selectWindow('ROW_NUMBER()', 'rn', ['department_id'], ['-amount'])
+            ->selectWindow('SUM(`amount`)', 'running_total', ['department_id'], ['created_at'])
+            ->build();
+
+        $this->assertSame(
+            'SELECT `employee_id`, `amount`, ROW_NUMBER() OVER (PARTITION BY `department_id` ORDER BY `amount` DESC) AS `rn`, SUM(`amount`) OVER (PARTITION BY `department_id` ORDER BY `created_at` ASC) AS `running_total` FROM `sales`',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedUnionWithOrderAndLimit(): void
+    {
+        $archive = (new Builder())
+            ->from('events_archive')
+            ->select(['id', 'name']);
+
+        $result = (new Builder())
+            ->from('events')
+            ->select(['id', 'name'])
+            ->sortAsc('id')
+            ->limit(50)
+            ->union($archive)
+            ->build();
+
+        $this->assertSame(
+            '(SELECT `id`, `name` FROM `events` ORDER BY `id` ASC LIMIT ?) UNION (SELECT `id`, `name` FROM `events_archive`)',
+            $result->query
+        );
+        $this->assertEquals([50], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedDeeplyNestedConditions(): void
+    {
+        $result = (new Builder())
+            ->from('products')
+            ->select(['id', 'name'])
+            ->filter([
+                Query::and([
+                    Query::or([
+                        Query::and([
+                            Query::equal('brand', ['acme']),
+                            Query::greaterThan('price', 50),
+                        ]),
+                        Query::and([
+                            Query::equal('brand', ['globex']),
+                            Query::lessThan('price', 20),
+                        ]),
+                    ]),
+                    Query::equal('in_stock', [true]),
+                ]),
+            ])
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `name` FROM `products` WHERE (((`brand` IN (?) AND `price` > ?) OR (`brand` IN (?) AND `price` < ?)) AND `in_stock` IN (?))',
+            $result->query
+        );
+        $this->assertEquals(['acme', 50, 'globex', 20, true], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedStartsWith(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->select(['id', 'name'])
+            ->filter([Query::startsWith('name', 'John')])
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `name` FROM `users` WHERE startsWith(`name`, ?)',
+            $result->query
+        );
+        $this->assertEquals(['John'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedEndsWith(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->select(['id', 'email'])
+            ->filter([Query::endsWith('email', '@example.com')])
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `email` FROM `users` WHERE endsWith(`email`, ?)',
+            $result->query
+        );
+        $this->assertEquals(['@example.com'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedContainsSingle(): void
+    {
+        $result = (new Builder())
+            ->from('articles')
+            ->select(['id', 'title'])
+            ->filter([Query::contains('title', ['php'])])
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `title` FROM `articles` WHERE position(`title`, ?) > 0',
+            $result->query
+        );
+        $this->assertEquals(['php'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedContainsMultiple(): void
+    {
+        $result = (new Builder())
+            ->from('articles')
+            ->select(['id', 'title'])
+            ->filter([Query::contains('title', ['php', 'laravel'])])
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `title` FROM `articles` WHERE (position(`title`, ?) > 0 OR position(`title`, ?) > 0)',
+            $result->query
+        );
+        $this->assertEquals(['php', 'laravel'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedContainsAll(): void
+    {
+        $result = (new Builder())
+            ->from('articles')
+            ->select(['id', 'title'])
+            ->filter([Query::containsAll('title', ['php', 'laravel'])])
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `title` FROM `articles` WHERE (position(`title`, ?) > 0 AND position(`title`, ?) > 0)',
+            $result->query
+        );
+        $this->assertEquals(['php', 'laravel'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedNotContainsSingle(): void
+    {
+        $result = (new Builder())
+            ->from('articles')
+            ->select(['id', 'title'])
+            ->filter([Query::notContains('title', ['spam'])])
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `title` FROM `articles` WHERE position(`title`, ?) = 0',
+            $result->query
+        );
+        $this->assertEquals(['spam'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedNotContainsMultiple(): void
+    {
+        $result = (new Builder())
+            ->from('articles')
+            ->select(['id', 'title'])
+            ->filter([Query::notContains('title', ['spam', 'junk'])])
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `title` FROM `articles` WHERE (position(`title`, ?) = 0 AND position(`title`, ?) = 0)',
+            $result->query
+        );
+        $this->assertEquals(['spam', 'junk'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedRegex(): void
+    {
+        $result = (new Builder())
+            ->from('logs')
+            ->select(['id', 'message'])
+            ->filter([Query::regex('message', '^ERROR.*timeout$')])
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `message` FROM `logs` WHERE match(`message`, ?)',
+            $result->query
+        );
+        $this->assertEquals(['^ERROR.*timeout$'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedPrewhereMultipleConditions(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->select(['id', 'name'])
+            ->prewhere([
+                Query::equal('event_type', ['click']),
+                Query::greaterThan('timestamp', 1000000),
+            ])
+            ->filter([Query::equal('status', ['active'])])
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `name` FROM `events` PREWHERE `event_type` IN (?) AND `timestamp` > ? WHERE `status` IN (?)',
+            $result->query
+        );
+        $this->assertEquals(['click', 1000000, 'active'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedFinalWithFiltersAndOrder(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->select(['id', 'name'])
+            ->final()
+            ->filter([Query::equal('status', ['active'])])
+            ->sortDesc('created_at')
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `name` FROM `events` FINAL WHERE `status` IN (?) ORDER BY `created_at` DESC',
+            $result->query
+        );
+        $this->assertEquals(['active'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedSampleWithPrewhereAndWhere(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->select(['id', 'name'])
+            ->sample(0.1)
+            ->prewhere([Query::equal('event_type', ['purchase'])])
+            ->filter([Query::greaterThan('amount', 50)])
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `name` FROM `events` SAMPLE 0.1 PREWHERE `event_type` IN (?) WHERE `amount` > ?',
+            $result->query
+        );
+        $this->assertEquals(['purchase', 50], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedSettingsMultiple(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->select(['id', 'name'])
+            ->settings([
+                'max_threads' => '4',
+                'max_memory_usage' => '10000000',
+            ])
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `name` FROM `events` SETTINGS max_threads=4, max_memory_usage=10000000',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedAlterTableUpdateWithSetRaw(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->setRaw('views', '`views` + 1')
+            ->filter([Query::equal('id', [42])])
+            ->update();
+
+        $this->assertSame(
+            'ALTER TABLE `events` UPDATE `views` = `views` + 1 WHERE `id` IN (?)',
+            $result->query
+        );
+        $this->assertEquals([42], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedAlterTableDeleteWithMultipleFilters(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->filter([
+                Query::equal('status', ['deleted']),
+                Query::lessThan('created_at', '2023-01-01'),
+            ])
+            ->delete();
+
+        $this->assertSame(
+            'ALTER TABLE `events` DELETE WHERE `status` IN (?) AND `created_at` < ?',
+            $result->query
+        );
+        $this->assertEquals(['deleted', '2023-01-01'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedEmptyInClause(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->select(['id', 'name'])
+            ->filter([Query::equal('status', [])])
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `name` FROM `users` WHERE 1 = 0',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedResetClearsPrewhereAndFinal(): void
+    {
+        $builder = (new Builder())
+            ->from('events')
+            ->select(['id', 'name'])
+            ->prewhere([Query::equal('event_type', ['click'])])
+            ->final()
+            ->filter([Query::equal('status', ['active'])]);
+
+        $builder->reset();
+
+        $result = $builder
+            ->from('users')
+            ->select(['id', 'email'])
+            ->build();
+
+        $this->assertSame(
+            'SELECT `id`, `email` FROM `users`',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
 }

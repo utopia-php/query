@@ -2954,4 +2954,447 @@ class PostgreSQLTest extends TestCase
         $this->assertEquals([20, 10], $result->bindings);
         $this->assertBindingCount($result);
     }
+
+    public function testExactAdvancedWhenTrue(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->select(['id', 'name'])
+            ->when(true, function (Builder $b) {
+                $b->filter([Query::equal('status', ['active'])]);
+            })
+            ->build();
+
+        $this->assertSame(
+            'SELECT "id", "name" FROM "users" WHERE "status" IN (?)',
+            $result->query
+        );
+        $this->assertEquals(['active'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedWhenFalse(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->select(['id', 'name'])
+            ->when(false, function (Builder $b) {
+                $b->filter([Query::equal('status', ['active'])]);
+            })
+            ->build();
+
+        $this->assertSame(
+            'SELECT "id", "name" FROM "users"',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedExplain(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->select(['id', 'name'])
+            ->filter([Query::equal('status', ['active'])])
+            ->explain();
+
+        $this->assertSame(
+            'EXPLAIN SELECT "id", "name" FROM "users" WHERE "status" IN (?)',
+            $result->query
+        );
+        $this->assertEquals(['active'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedExplainAnalyze(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->select(['id', 'name'])
+            ->filter([Query::greaterThan('age', 18)])
+            ->explain(true);
+
+        $this->assertSame(
+            'EXPLAIN ANALYZE SELECT "id", "name" FROM "users" WHERE "age" > ?',
+            $result->query
+        );
+        $this->assertEquals([18], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedCursorAfterWithFilters(): void
+    {
+        $result = (new Builder())
+            ->from('posts')
+            ->select(['id', 'title'])
+            ->filter([Query::equal('status', ['published'])])
+            ->cursorAfter('abc123')
+            ->limit(10)
+            ->build();
+
+        $this->assertSame(
+            'SELECT "id", "title" FROM "posts" WHERE "status" IN (?) AND "_cursor" > ? LIMIT ?',
+            $result->query
+        );
+        $this->assertEquals(['published', 'abc123', 10], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedMultipleCtes(): void
+    {
+        $cteA = (new Builder())
+            ->from('orders')
+            ->select(['customer_id'])
+            ->filter([Query::greaterThan('total', 100)]);
+
+        $cteB = (new Builder())
+            ->from('customers')
+            ->select(['id', 'name'])
+            ->filter([Query::equal('active', [true])]);
+
+        $result = (new Builder())
+            ->with('a', $cteA)
+            ->with('b', $cteB)
+            ->from('a')
+            ->select(['customer_id'])
+            ->join('b', 'a.customer_id', 'b.id')
+            ->build();
+
+        $this->assertSame(
+            'WITH "a" AS (SELECT "customer_id" FROM "orders" WHERE "total" > ?), "b" AS (SELECT "id", "name" FROM "customers" WHERE "active" IN (?)) SELECT "customer_id" FROM "a" JOIN "b" ON "a"."customer_id" = "b"."id"',
+            $result->query
+        );
+        $this->assertEquals([100, true], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedMultipleWindowFunctions(): void
+    {
+        $result = (new Builder())
+            ->from('employees')
+            ->select(['id', 'name', 'department', 'salary'])
+            ->selectWindow('ROW_NUMBER()', 'row_num', ['department'], ['salary'])
+            ->selectWindow('RANK()', 'salary_rank', ['department'], ['-salary'])
+            ->build();
+
+        $this->assertSame(
+            'SELECT "id", "name", "department", "salary", ROW_NUMBER() OVER (PARTITION BY "department" ORDER BY "salary" ASC) AS "row_num", RANK() OVER (PARTITION BY "department" ORDER BY "salary" DESC) AS "salary_rank" FROM "employees"',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedUnionWithOrderAndLimit(): void
+    {
+        $second = (new Builder())
+            ->from('archived_users')
+            ->select(['id', 'name']);
+
+        $result = (new Builder())
+            ->from('users')
+            ->select(['id', 'name'])
+            ->sortAsc('name')
+            ->limit(50)
+            ->union($second)
+            ->build();
+
+        $this->assertSame(
+            '(SELECT "id", "name" FROM "users" ORDER BY "name" ASC LIMIT ?) UNION (SELECT "id", "name" FROM "archived_users")',
+            $result->query
+        );
+        $this->assertEquals([50], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedDeeplyNestedConditions(): void
+    {
+        $result = (new Builder())
+            ->from('products')
+            ->select(['id', 'name'])
+            ->filter([
+                Query::and([
+                    Query::greaterThan('price', 10),
+                    Query::or([
+                        Query::equal('category', ['electronics']),
+                        Query::and([
+                            Query::equal('brand', ['acme']),
+                            Query::lessThan('stock', 5),
+                        ]),
+                    ]),
+                ]),
+            ])
+            ->build();
+
+        $this->assertSame(
+            'SELECT "id", "name" FROM "products" WHERE ("price" > ? AND ("category" IN (?) OR ("brand" IN (?) AND "stock" < ?)))',
+            $result->query
+        );
+        $this->assertEquals([10, 'electronics', 'acme', 5], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedForUpdateOfWithJoin(): void
+    {
+        $result = (new Builder())
+            ->from('accounts')
+            ->select(['accounts.id', 'accounts.balance', 'users.name'])
+            ->join('users', 'accounts.user_id', 'users.id')
+            ->filter([Query::greaterThan('accounts.balance', 0)])
+            ->forUpdateOf('accounts')
+            ->build();
+
+        $this->assertSame(
+            'SELECT "accounts"."id", "accounts"."balance", "users"."name" FROM "accounts" JOIN "users" ON "accounts"."user_id" = "users"."id" WHERE "accounts"."balance" > ? FOR UPDATE OF "accounts"',
+            $result->query
+        );
+        $this->assertEquals([0], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedForShareOf(): void
+    {
+        $result = (new Builder())
+            ->from('inventory')
+            ->select(['id', 'quantity'])
+            ->filter([Query::equal('warehouse', ['main'])])
+            ->forShareOf('inventory')
+            ->build();
+
+        $this->assertSame(
+            'SELECT "id", "quantity" FROM "inventory" WHERE "warehouse" IN (?) FOR SHARE OF "inventory"',
+            $result->query
+        );
+        $this->assertEquals(['main'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedConflictSetRaw(): void
+    {
+        $result = (new Builder())
+            ->from('counters')
+            ->set(['id' => 'page_views', 'count' => 1])
+            ->onConflict(['id'], ['count'])
+            ->conflictSetRaw('count', '"counters"."count" + EXCLUDED."count"')
+            ->upsert();
+
+        $this->assertSame(
+            'INSERT INTO "counters" ("id", "count") VALUES (?, ?) ON CONFLICT ("id") DO UPDATE SET "count" = "counters"."count" + EXCLUDED."count"',
+            $result->query
+        );
+        $this->assertEquals(['page_views', 1], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedUpsertReturningAll(): void
+    {
+        $result = (new Builder())
+            ->from('settings')
+            ->set(['key' => 'theme', 'value' => 'dark'])
+            ->onConflict(['key'], ['value'])
+            ->returning(['*'])
+            ->upsert();
+
+        $this->assertSame(
+            'INSERT INTO "settings" ("key", "value") VALUES (?, ?) ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value" RETURNING *',
+            $result->query
+        );
+        $this->assertEquals(['theme', 'dark'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedDeleteReturningMultiple(): void
+    {
+        $result = (new Builder())
+            ->from('sessions')
+            ->filter([Query::lessThan('expires_at', '2024-01-01')])
+            ->returning(['id', 'user_id'])
+            ->delete();
+
+        $this->assertSame(
+            'DELETE FROM "sessions" WHERE "expires_at" < ? RETURNING "id", "user_id"',
+            $result->query
+        );
+        $this->assertEquals(['2024-01-01'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedSetJsonAppend(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->setJsonAppend('tags', ['vip'])
+            ->filter([Query::equal('id', [1])])
+            ->update();
+
+        $this->assertSame(
+            'UPDATE "users" SET "tags" = COALESCE("tags", \'[]\'::jsonb) || ?::jsonb WHERE "id" IN (?)',
+            $result->query
+        );
+        $this->assertEquals(['["vip"]', 1], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedSetJsonPrepend(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->setJsonPrepend('tags', ['urgent'])
+            ->filter([Query::equal('id', [2])])
+            ->update();
+
+        $this->assertSame(
+            'UPDATE "users" SET "tags" = ?::jsonb || COALESCE("tags", \'[]\'::jsonb) WHERE "id" IN (?)',
+            $result->query
+        );
+        $this->assertEquals(['["urgent"]', 2], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedSetJsonInsert(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->setJsonInsert('tags', 0, 'first')
+            ->filter([Query::equal('id', [3])])
+            ->update();
+
+        $this->assertSame(
+            'UPDATE "users" SET "tags" = jsonb_insert("tags", \'{0}\', ?::jsonb) WHERE "id" IN (?)',
+            $result->query
+        );
+        $this->assertEquals(['"first"', 3], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedSetJsonRemove(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->setJsonRemove('tags', 'obsolete')
+            ->filter([Query::equal('id', [4])])
+            ->update();
+
+        $this->assertSame(
+            'UPDATE "users" SET "tags" = "tags" - ? WHERE "id" IN (?)',
+            $result->query
+        );
+        $this->assertEquals(['"obsolete"', 4], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedSetJsonIntersect(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->setJsonIntersect('tags', ['a', 'b'])
+            ->filter([Query::equal('id', [5])])
+            ->update();
+
+        $this->assertSame(
+            'UPDATE "users" SET "tags" = (SELECT jsonb_agg(elem) FROM jsonb_array_elements("tags") AS elem WHERE elem <@ ?::jsonb) WHERE "id" IN (?)',
+            $result->query
+        );
+        $this->assertEquals(['["a","b"]', 5], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedSetJsonDiff(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->setJsonDiff('tags', ['x', 'y'])
+            ->filter([Query::equal('id', [6])])
+            ->update();
+
+        $this->assertSame(
+            'UPDATE "users" SET "tags" = (SELECT COALESCE(jsonb_agg(elem), \'[]\'::jsonb) FROM jsonb_array_elements("tags") AS elem WHERE NOT elem <@ ?::jsonb) WHERE "id" IN (?)',
+            $result->query
+        );
+        $this->assertEquals(['["x","y"]', 6], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedSetJsonUnique(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->setJsonUnique('tags')
+            ->filter([Query::equal('id', [7])])
+            ->update();
+
+        $this->assertSame(
+            'UPDATE "users" SET "tags" = (SELECT jsonb_agg(DISTINCT elem) FROM jsonb_array_elements("tags") AS elem) WHERE "id" IN (?)',
+            $result->query
+        );
+        $this->assertEquals([7], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedEmptyInClause(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->select(['id'])
+            ->filter([Query::equal('status', [])])
+            ->build();
+
+        $this->assertSame(
+            'SELECT "id" FROM "users" WHERE 1 = 0',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedEmptyAndGroup(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->select(['id'])
+            ->filter([Query::and([])])
+            ->build();
+
+        $this->assertSame(
+            'SELECT "id" FROM "users" WHERE 1 = 1',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedEmptyOrGroup(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->select(['id'])
+            ->filter([Query::or([])])
+            ->build();
+
+        $this->assertSame(
+            'SELECT "id" FROM "users" WHERE 1 = 0',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAdvancedVectorSearchWithFilters(): void
+    {
+        $result = (new Builder())
+            ->from('documents')
+            ->select(['id', 'title'])
+            ->filter([Query::equal('status', ['published'])])
+            ->orderByVectorDistance('embedding', [0.1, 0.2, 0.3], VectorMetric::Cosine)
+            ->limit(5)
+            ->build();
+
+        $this->assertSame(
+            'SELECT "id", "title" FROM "documents" WHERE "status" IN (?) ORDER BY ("embedding" <=> ?::vector) ASC LIMIT ?',
+            $result->query
+        );
+        $this->assertEquals(['published', '[0.1,0.2,0.3]', 5], $result->bindings);
+        $this->assertBindingCount($result);
+    }
 }
