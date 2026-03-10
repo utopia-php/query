@@ -87,4 +87,50 @@ class SpatialQueryTest extends TestCase
         $query = Query::notTouches('geo', [[0, 0]]);
         $this->assertSame(Method::NotTouches, $query->getMethod());
     }
+
+    public function testCoversFactory(): void
+    {
+        $query = Query::covers('zone', [1.0, 2.0]);
+        $this->assertSame(Method::Covers, $query->getMethod());
+        $this->assertEquals('zone', $query->getAttribute());
+    }
+
+    public function testNotCoversFactory(): void
+    {
+        $query = Query::notCovers('zone', [1.0, 2.0]);
+        $this->assertSame(Method::NotCovers, $query->getMethod());
+    }
+
+    public function testSpatialEqualsFactory(): void
+    {
+        $query = Query::spatialEquals('geom', [3.0, 4.0]);
+        $this->assertSame(Method::SpatialEquals, $query->getMethod());
+        $this->assertEquals([[3.0, 4.0]], $query->getValues());
+    }
+
+    public function testNotSpatialEqualsFactory(): void
+    {
+        $query = Query::notSpatialEquals('geom', [3.0, 4.0]);
+        $this->assertSame(Method::NotSpatialEquals, $query->getMethod());
+    }
+
+    public function testDistanceLessThanWithMeters(): void
+    {
+        $query = Query::distanceLessThan('location', [1.0, 2.0], 500, true);
+        $values = $query->getValues();
+        $this->assertIsArray($values[0]);
+        $this->assertTrue($values[0][2]);
+    }
+
+    public function testIsSpatialQueryTrue(): void
+    {
+        $query = Query::intersects('geo', [[0, 0]]);
+        $this->assertTrue($query->isSpatialQuery());
+    }
+
+    public function testIsSpatialQueryFalseForFilter(): void
+    {
+        $query = Query::equal('x', [1]);
+        $this->assertFalse($query->isSpatialQuery());
+    }
 }

@@ -3,25 +3,85 @@
 namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
+use Utopia\Query\Builder\Case\Builder as CaseBuilder;
 use Utopia\Query\Builder\ClickHouse as Builder;
 use Utopia\Query\Builder\Condition;
+use Utopia\Query\Builder\Feature\Aggregates;
+use Utopia\Query\Builder\Feature\CTEs;
+use Utopia\Query\Builder\Feature\Deletes;
+use Utopia\Query\Builder\Feature\Hooks;
+use Utopia\Query\Builder\Feature\Inserts;
+use Utopia\Query\Builder\Feature\Joins;
+use Utopia\Query\Builder\Feature\Locking;
+use Utopia\Query\Builder\Feature\Selects;
+use Utopia\Query\Builder\Feature\Transactions;
+use Utopia\Query\Builder\Feature\Unions;
+use Utopia\Query\Builder\Feature\Updates;
+use Utopia\Query\Builder\Feature\Upsert;
 use Utopia\Query\Compiler;
 use Utopia\Query\Exception;
-use Utopia\Query\Hook\AttributeMapHook;
-use Utopia\Query\Hook\FilterHook;
+use Utopia\Query\Exception\UnsupportedException;
+use Utopia\Query\Exception\ValidationException;
+use Utopia\Query\Hook\Attribute;
+use Utopia\Query\Hook\Attribute\Map as AttributeMap;
+use Utopia\Query\Hook\Filter;
+use Utopia\Query\Hook\Join\Condition as JoinCondition;
+use Utopia\Query\Hook\Join\Filter as JoinFilter;
+use Utopia\Query\Hook\Join\Placement;
 use Utopia\Query\Query;
 
 class ClickHouseTest extends TestCase
 {
-    // ── Compiler compliance ──
-
     public function testImplementsCompiler(): void
     {
         $builder = new Builder();
         $this->assertInstanceOf(Compiler::class, $builder);
     }
 
-    // ── Basic queries work identically ──
+    public function testImplementsSelects(): void
+    {
+        $this->assertInstanceOf(Selects::class, new Builder());
+    }
+
+    public function testImplementsAggregates(): void
+    {
+        $this->assertInstanceOf(Aggregates::class, new Builder());
+    }
+
+    public function testImplementsJoins(): void
+    {
+        $this->assertInstanceOf(Joins::class, new Builder());
+    }
+
+    public function testImplementsUnions(): void
+    {
+        $this->assertInstanceOf(Unions::class, new Builder());
+    }
+
+    public function testImplementsCTEs(): void
+    {
+        $this->assertInstanceOf(CTEs::class, new Builder());
+    }
+
+    public function testImplementsInserts(): void
+    {
+        $this->assertInstanceOf(Inserts::class, new Builder());
+    }
+
+    public function testImplementsUpdates(): void
+    {
+        $this->assertInstanceOf(Updates::class, new Builder());
+    }
+
+    public function testImplementsDeletes(): void
+    {
+        $this->assertInstanceOf(Deletes::class, new Builder());
+    }
+
+    public function testImplementsHooks(): void
+    {
+        $this->assertInstanceOf(Hooks::class, new Builder());
+    }
 
     public function testBasicSelect(): void
     {
@@ -52,8 +112,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals(['active', 10, 100], $result->bindings);
     }
 
-    // ── ClickHouse-specific: regex uses match() ──
-
     public function testRegexUsesMatchFunction(): void
     {
         $result = (new Builder())
@@ -65,11 +123,9 @@ class ClickHouseTest extends TestCase
         $this->assertEquals(['^/api/v[0-9]+'], $result->bindings);
     }
 
-    // ── ClickHouse-specific: search throws exception ──
-
     public function testSearchThrowsException(): void
     {
-        $this->expectException(Exception::class);
+        $this->expectException(UnsupportedException::class);
         $this->expectExceptionMessage('Full-text search (MATCH AGAINST) is not supported in ClickHouse');
 
         (new Builder())
@@ -80,7 +136,7 @@ class ClickHouseTest extends TestCase
 
     public function testNotSearchThrowsException(): void
     {
-        $this->expectException(Exception::class);
+        $this->expectException(UnsupportedException::class);
         $this->expectExceptionMessage('Full-text search (MATCH AGAINST) is not supported in ClickHouse');
 
         (new Builder())
@@ -88,8 +144,6 @@ class ClickHouseTest extends TestCase
             ->filter([Query::notSearch('content', 'hello')])
             ->build();
     }
-
-    // ── ClickHouse-specific: random ordering uses rand() ──
 
     public function testRandomOrderUsesLowercaseRand(): void
     {
@@ -100,8 +154,6 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals('SELECT * FROM `events` ORDER BY rand()', $result->query);
     }
-
-    // ── FINAL keyword ──
 
     public function testFinalKeyword(): void
     {
@@ -129,8 +181,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals(['active', 10], $result->bindings);
     }
 
-    // ── SAMPLE clause ──
-
     public function testSample(): void
     {
         $result = (new Builder())
@@ -151,8 +201,6 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals('SELECT * FROM `events` FINAL SAMPLE 0.5', $result->query);
     }
-
-    // ── PREWHERE clause ──
 
     public function testPrewhere(): void
     {
@@ -216,8 +264,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals(['click', 18], $result->bindings);
     }
 
-    // ── Combined ClickHouse features ──
-
     public function testFinalSamplePrewhereWhere(): void
     {
         $result = (new Builder())
@@ -237,8 +283,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals(['click', 5, 100], $result->bindings);
     }
 
-    // ── Aggregations work ──
-
     public function testAggregation(): void
     {
         $result = (new Builder())
@@ -256,8 +300,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals([10], $result->bindings);
     }
 
-    // ── Joins work ──
-
     public function testJoin(): void
     {
         $result = (new Builder())
@@ -272,8 +314,6 @@ class ClickHouseTest extends TestCase
         );
     }
 
-    // ── Distinct ──
-
     public function testDistinct(): void
     {
         $result = (new Builder())
@@ -284,8 +324,6 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals('SELECT DISTINCT `user_id` FROM `events`', $result->query);
     }
-
-    // ── Union ──
 
     public function testUnion(): void
     {
@@ -304,8 +342,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals([2024, 2023], $result->bindings);
     }
 
-    // ── toRawSql ──
-
     public function testToRawSql(): void
     {
         $sql = (new Builder())
@@ -320,8 +356,6 @@ class ClickHouseTest extends TestCase
             $sql
         );
     }
-
-    // ── Reset clears ClickHouse state ──
 
     public function testResetClearsClickHouseState(): void
     {
@@ -341,8 +375,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals([], $result->bindings);
     }
 
-    // ── Fluent chaining ──
-
     public function testFluentChainingReturnsSameInstance(): void
     {
         $builder = new Builder();
@@ -358,13 +390,11 @@ class ClickHouseTest extends TestCase
         $this->assertSame($builder, $builder->reset());
     }
 
-    // ── Attribute resolver works ──
-
     public function testAttributeResolver(): void
     {
         $result = (new Builder())
             ->from('events')
-            ->addHook(new AttributeMapHook(['$id' => '_uid']))
+            ->addHook(new AttributeMap(['$id' => '_uid']))
             ->filter([Query::equal('$id', ['abc'])])
             ->build();
 
@@ -374,11 +404,9 @@ class ClickHouseTest extends TestCase
         );
     }
 
-    // ── Condition provider works ──
-
     public function testConditionProvider(): void
     {
-        $hook = new class () implements FilterHook {
+        $hook = new class () implements Filter {
             public function filter(string $table): Condition
             {
                 return new Condition('_tenant = ?', ['t1']);
@@ -398,8 +426,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals(['active', 't1'], $result->bindings);
     }
 
-    // ── Prewhere binding order ──
-
     public function testPrewhereBindingOrder(): void
     {
         $result = (new Builder())
@@ -412,8 +438,6 @@ class ClickHouseTest extends TestCase
         // prewhere bindings come before where bindings
         $this->assertEquals(['click', 5, 10], $result->bindings);
     }
-
-    // ── Combined PREWHERE + WHERE + JOIN + GROUP BY ──
 
     public function testCombinedPrewhereWhereJoinGroupBy(): void
     {
@@ -448,10 +472,7 @@ class ClickHouseTest extends TestCase
         // Verify ordering: PREWHERE before WHERE
         $this->assertLessThan(strpos($query, 'WHERE'), strpos($query, 'PREWHERE'));
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 1. PREWHERE comprehensive (40+ tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testPrewhereEmptyArray(): void
     {
@@ -559,8 +580,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::startsWith('path', '/api')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `path` LIKE ?', $result->query);
-        $this->assertEquals(['/api%'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE startsWith(`path`, ?)', $result->query);
+        $this->assertEquals(['/api'], $result->bindings);
     }
 
     public function testPrewhereNotStartsWith(): void
@@ -570,8 +591,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::notStartsWith('path', '/admin')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `path` NOT LIKE ?', $result->query);
-        $this->assertEquals(['/admin%'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE NOT startsWith(`path`, ?)', $result->query);
+        $this->assertEquals(['/admin'], $result->bindings);
     }
 
     public function testPrewhereEndsWith(): void
@@ -581,8 +602,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::endsWith('file', '.csv')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `file` LIKE ?', $result->query);
-        $this->assertEquals(['%.csv'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE endsWith(`file`, ?)', $result->query);
+        $this->assertEquals(['.csv'], $result->bindings);
     }
 
     public function testPrewhereNotEndsWith(): void
@@ -592,8 +613,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::notEndsWith('file', '.tmp')])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `file` NOT LIKE ?', $result->query);
-        $this->assertEquals(['%.tmp'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE NOT endsWith(`file`, ?)', $result->query);
+        $this->assertEquals(['.tmp'], $result->bindings);
     }
 
     public function testPrewhereContainsSingle(): void
@@ -603,8 +624,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::contains('name', ['foo'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `name` LIKE ?', $result->query);
-        $this->assertEquals(['%foo%'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE position(`name`, ?) > 0', $result->query);
+        $this->assertEquals(['foo'], $result->bindings);
     }
 
     public function testPrewhereContainsMultiple(): void
@@ -614,8 +635,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::contains('name', ['foo', 'bar'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE (`name` LIKE ? OR `name` LIKE ?)', $result->query);
-        $this->assertEquals(['%foo%', '%bar%'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE (position(`name`, ?) > 0 OR position(`name`, ?) > 0)', $result->query);
+        $this->assertEquals(['foo', 'bar'], $result->bindings);
     }
 
     public function testPrewhereContainsAny(): void
@@ -636,8 +657,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::containsAll('tag', ['x', 'y'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE (`tag` LIKE ? AND `tag` LIKE ?)', $result->query);
-        $this->assertEquals(['%x%', '%y%'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE (position(`tag`, ?) > 0 AND position(`tag`, ?) > 0)', $result->query);
+        $this->assertEquals(['x', 'y'], $result->bindings);
     }
 
     public function testPrewhereNotContainsSingle(): void
@@ -647,8 +668,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::notContains('name', ['bad'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `name` NOT LIKE ?', $result->query);
-        $this->assertEquals(['%bad%'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE position(`name`, ?) = 0', $result->query);
+        $this->assertEquals(['bad'], $result->bindings);
     }
 
     public function testPrewhereNotContainsMultiple(): void
@@ -658,8 +679,8 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::notContains('name', ['bad', 'ugly'])])
             ->build();
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE (`name` NOT LIKE ? AND `name` NOT LIKE ?)', $result->query);
-        $this->assertEquals(['%bad%', '%ugly%'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE (position(`name`, ?) = 0 AND position(`name`, ?) = 0)', $result->query);
+        $this->assertEquals(['bad', 'ugly'], $result->bindings);
     }
 
     public function testPrewhereIsNull(): void
@@ -931,7 +952,7 @@ class ClickHouseTest extends TestCase
             ->from('events')
             ->prewhere([Query::equal('type', ['click'])])
             ->filter([Query::greaterThan('count', 5)])
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('tenant_id = ?', ['t1']);
@@ -965,7 +986,7 @@ class ClickHouseTest extends TestCase
             ->from('events')
             ->prewhere([Query::equal('type', ['click'])])
             ->filter([Query::greaterThan('count', 5)])
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('tenant = ?', ['t1']);
@@ -992,7 +1013,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('events')
-            ->addHook(new AttributeMapHook([
+            ->addHook(new AttributeMap([
                 '$id' => '_uid',
             ]))
             ->prewhere([Query::equal('$id', ['abc'])])
@@ -1090,10 +1111,7 @@ class ClickHouseTest extends TestCase
             $sql
         );
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 2. FINAL comprehensive (20+ tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testFinalBasicSelect(): void
     {
@@ -1311,7 +1329,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->final()
-            ->addHook(new class () implements \Utopia\Query\Hook\AttributeHook {
+            ->addHook(new class () implements Attribute {
                 public function resolve(string $attribute): string
                 {
                     return 'col_' . $attribute;
@@ -1329,7 +1347,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->final()
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('deleted = ?', [0]);
@@ -1369,10 +1387,7 @@ class ClickHouseTest extends TestCase
 
         $this->assertStringNotContainsString('FINAL', $result2->query);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 3. SAMPLE comprehensive (23 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testSample10Percent(): void
     {
@@ -1634,7 +1649,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->sample(0.5)
-            ->addHook(new class () implements \Utopia\Query\Hook\AttributeHook {
+            ->addHook(new class () implements Attribute {
                 public function resolve(string $attribute): string
                 {
                     return 'r_' . $attribute;
@@ -1646,10 +1661,7 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('SAMPLE 0.5', $result->query);
         $this->assertStringContainsString('`r_col`', $result->query);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 4. ClickHouse regex: match() function (20 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testRegexBasicPattern(): void
     {
@@ -1744,7 +1756,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('logs')
-            ->addHook(new class () implements \Utopia\Query\Hook\AttributeHook {
+            ->addHook(new class () implements Attribute {
                 public function resolve(string $attribute): string
                 {
                     return 'col_' . $attribute;
@@ -1877,7 +1889,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertStringContainsString('match(`path`, ?)', $result->query);
-        $this->assertStringContainsString('`msg` LIKE ?', $result->query);
+        $this->assertStringContainsString('position(`msg`, ?) > 0', $result->query);
     }
 
     public function testRegexCombinedWithStartsWith(): void
@@ -1891,7 +1903,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertStringContainsString('match(`path`, ?)', $result->query);
-        $this->assertStringContainsString('`msg` LIKE ?', $result->query);
+        $this->assertStringContainsString('startsWith(`msg`, ?)', $result->query);
     }
 
     public function testRegexPrewhereWithRegexWhere(): void
@@ -1920,14 +1932,11 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(['^/api', 'error', 'timeout'], $result->bindings);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 5. Search exception (10 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testSearchThrowsExceptionMessage(): void
     {
-        $this->expectException(Exception::class);
+        $this->expectException(UnsupportedException::class);
         $this->expectExceptionMessage('Full-text search (MATCH AGAINST) is not supported in ClickHouse');
 
         (new Builder())
@@ -1938,7 +1947,7 @@ class ClickHouseTest extends TestCase
 
     public function testNotSearchThrowsExceptionMessage(): void
     {
-        $this->expectException(Exception::class);
+        $this->expectException(UnsupportedException::class);
         $this->expectExceptionMessage('Full-text search (MATCH AGAINST) is not supported in ClickHouse');
 
         (new Builder())
@@ -1962,7 +1971,7 @@ class ClickHouseTest extends TestCase
 
     public function testSearchInLogicalAndThrows(): void
     {
-        $this->expectException(Exception::class);
+        $this->expectException(UnsupportedException::class);
 
         (new Builder())
             ->from('logs')
@@ -1975,7 +1984,7 @@ class ClickHouseTest extends TestCase
 
     public function testSearchInLogicalOrThrows(): void
     {
-        $this->expectException(Exception::class);
+        $this->expectException(UnsupportedException::class);
 
         (new Builder())
             ->from('logs')
@@ -1988,7 +1997,7 @@ class ClickHouseTest extends TestCase
 
     public function testSearchCombinedWithValidFiltersFailsOnSearch(): void
     {
-        $this->expectException(Exception::class);
+        $this->expectException(UnsupportedException::class);
 
         (new Builder())
             ->from('logs')
@@ -2001,7 +2010,7 @@ class ClickHouseTest extends TestCase
 
     public function testSearchInPrewhereThrows(): void
     {
-        $this->expectException(Exception::class);
+        $this->expectException(UnsupportedException::class);
 
         (new Builder())
             ->from('logs')
@@ -2011,7 +2020,7 @@ class ClickHouseTest extends TestCase
 
     public function testNotSearchInPrewhereThrows(): void
     {
-        $this->expectException(Exception::class);
+        $this->expectException(UnsupportedException::class);
 
         (new Builder())
             ->from('logs')
@@ -2021,7 +2030,7 @@ class ClickHouseTest extends TestCase
 
     public function testSearchWithFinalStillThrows(): void
     {
-        $this->expectException(Exception::class);
+        $this->expectException(UnsupportedException::class);
 
         (new Builder())
             ->from('logs')
@@ -2032,7 +2041,7 @@ class ClickHouseTest extends TestCase
 
     public function testSearchWithSampleStillThrows(): void
     {
-        $this->expectException(Exception::class);
+        $this->expectException(UnsupportedException::class);
 
         (new Builder())
             ->from('logs')
@@ -2040,10 +2049,7 @@ class ClickHouseTest extends TestCase
             ->filter([Query::search('content', 'hello')])
             ->build();
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 6. ClickHouse rand() (10 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testRandomSortProducesLowercaseRand(): void
     {
@@ -2162,10 +2168,7 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('SELECT * FROM `events` ORDER BY rand()', $result->query);
         $this->assertEquals([], $result->bindings);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 7. All filter types work correctly (31 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testFilterEqualSingleValue(): void
     {
@@ -2236,43 +2239,43 @@ class ClickHouseTest extends TestCase
     public function testFilterStartsWithValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::startsWith('a', 'foo')])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` LIKE ?', $result->query);
-        $this->assertEquals(['foo%'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `t` WHERE startsWith(`a`, ?)', $result->query);
+        $this->assertEquals(['foo'], $result->bindings);
     }
 
     public function testFilterNotStartsWithValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notStartsWith('a', 'foo')])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` NOT LIKE ?', $result->query);
-        $this->assertEquals(['foo%'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `t` WHERE NOT startsWith(`a`, ?)', $result->query);
+        $this->assertEquals(['foo'], $result->bindings);
     }
 
     public function testFilterEndsWithValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::endsWith('a', 'bar')])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` LIKE ?', $result->query);
-        $this->assertEquals(['%bar'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `t` WHERE endsWith(`a`, ?)', $result->query);
+        $this->assertEquals(['bar'], $result->bindings);
     }
 
     public function testFilterNotEndsWithValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notEndsWith('a', 'bar')])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` NOT LIKE ?', $result->query);
-        $this->assertEquals(['%bar'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `t` WHERE NOT endsWith(`a`, ?)', $result->query);
+        $this->assertEquals(['bar'], $result->bindings);
     }
 
     public function testFilterContainsSingleValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::contains('a', ['foo'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` LIKE ?', $result->query);
-        $this->assertEquals(['%foo%'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `t` WHERE position(`a`, ?) > 0', $result->query);
+        $this->assertEquals(['foo'], $result->bindings);
     }
 
     public function testFilterContainsMultipleValues(): void
     {
         $result = (new Builder())->from('t')->filter([Query::contains('a', ['foo', 'bar'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` LIKE ? OR `a` LIKE ?)', $result->query);
-        $this->assertEquals(['%foo%', '%bar%'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `t` WHERE (position(`a`, ?) > 0 OR position(`a`, ?) > 0)', $result->query);
+        $this->assertEquals(['foo', 'bar'], $result->bindings);
     }
 
     public function testFilterContainsAnyValues(): void
@@ -2284,21 +2287,21 @@ class ClickHouseTest extends TestCase
     public function testFilterContainsAllValues(): void
     {
         $result = (new Builder())->from('t')->filter([Query::containsAll('a', ['x', 'y'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` LIKE ? AND `a` LIKE ?)', $result->query);
-        $this->assertEquals(['%x%', '%y%'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `t` WHERE (position(`a`, ?) > 0 AND position(`a`, ?) > 0)', $result->query);
+        $this->assertEquals(['x', 'y'], $result->bindings);
     }
 
     public function testFilterNotContainsSingleValue(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notContains('a', ['foo'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` NOT LIKE ?', $result->query);
-        $this->assertEquals(['%foo%'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `t` WHERE position(`a`, ?) = 0', $result->query);
+        $this->assertEquals(['foo'], $result->bindings);
     }
 
     public function testFilterNotContainsMultipleValues(): void
     {
         $result = (new Builder())->from('t')->filter([Query::notContains('a', ['foo', 'bar'])])->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` NOT LIKE ? AND `a` NOT LIKE ?)', $result->query);
+        $this->assertEquals('SELECT * FROM `t` WHERE (position(`a`, ?) = 0 AND position(`a`, ?) = 0)', $result->query);
     }
 
     public function testFilterIsNullValue(): void
@@ -2387,10 +2390,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())->from('t')->filter([Query::equal('name', [''])])->build();
         $this->assertEquals([''], $result->bindings);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 8. Aggregation with ClickHouse features (15 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testAggregationCountWithFinal(): void
     {
@@ -2560,7 +2560,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('events')
-            ->addHook(new AttributeMapHook([
+            ->addHook(new AttributeMap([
                 'amt' => 'amount_cents',
             ]))
             ->prewhere([Query::equal('type', ['sale'])])
@@ -2575,7 +2575,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->prewhere([Query::equal('type', ['sale'])])
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('tenant = ?', ['t1']);
@@ -2605,10 +2605,7 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('GROUP BY', $query);
         $this->assertStringContainsString('HAVING', $query);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 9. Join with ClickHouse features (15 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testJoinWithFinalFeature(): void
     {
@@ -2763,7 +2760,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('events')
-            ->addHook(new AttributeMapHook([
+            ->addHook(new AttributeMap([
                 'uid' => 'user_id',
             ]))
             ->join('users', 'events.uid', 'users.id')
@@ -2779,7 +2776,7 @@ class ClickHouseTest extends TestCase
             ->from('events')
             ->join('users', 'events.uid', 'users.id')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('tenant = ?', ['t1']);
@@ -2832,10 +2829,7 @@ class ClickHouseTest extends TestCase
         $this->assertLessThan($prewherePos, $joinPos);
         $this->assertLessThan($wherePos, $prewherePos);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 10. Union with ClickHouse features (10 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testUnionMainHasFinal(): void
     {
@@ -2991,10 +2985,7 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('LIMIT', $query);
         $this->assertStringContainsString('UNION', $query);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 11. toRawSql with ClickHouse features (15 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testToRawSqlWithFinalFeature(): void
     {
@@ -3175,10 +3166,7 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals("SELECT * FROM `logs` WHERE match(`path`, '^/api')", $sql);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 12. Reset comprehensive (15 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testResetClearsPrewhereState(): void
     {
@@ -3226,7 +3214,7 @@ class ClickHouseTest extends TestCase
 
     public function testResetPreservesAttributeResolver(): void
     {
-        $hook = new class () implements \Utopia\Query\Hook\AttributeHook {
+        $hook = new class () implements Attribute {
             public function resolve(string $attribute): string
             {
                 return 'r_' . $attribute;
@@ -3247,7 +3235,7 @@ class ClickHouseTest extends TestCase
     {
         $builder = (new Builder())
             ->from('events')
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('tenant = ?', ['t1']);
@@ -3369,10 +3357,7 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('SELECT * FROM `d`', $result->query);
         $this->assertEquals([], $result->bindings);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 13. when() with ClickHouse features (10 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testWhenTrueAddsPrewhere(): void
     {
@@ -3495,17 +3480,14 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('FINAL', $result->query);
         $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 14. Condition provider with ClickHouse (10 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testProviderWithPrewhere(): void
     {
         $result = (new Builder())
             ->from('events')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('deleted = ?', [0]);
@@ -3522,7 +3504,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->final()
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('deleted = ?', [0]);
@@ -3539,7 +3521,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->sample(0.5)
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('deleted = ?', [0]);
@@ -3557,7 +3539,7 @@ class ClickHouseTest extends TestCase
             ->from('events')
             ->prewhere([Query::equal('type', ['click'])])
             ->filter([Query::greaterThan('count', 5)])
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('tenant = ?', ['t1']);
@@ -3574,13 +3556,13 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('tenant = ?', ['t1']);
                 }
             })
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('org = ?', ['o1']);
@@ -3596,7 +3578,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('tenant = ?', ['t1']);
@@ -3622,7 +3604,7 @@ class ClickHouseTest extends TestCase
             ->sample(0.1)
             ->prewhere([Query::equal('type', ['click'])])
             ->filter([Query::greaterThan('count', 0)])
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('tenant = ?', ['t1']);
@@ -3640,7 +3622,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('tenant = ?', ['t1']);
@@ -3660,7 +3642,7 @@ class ClickHouseTest extends TestCase
             ->from('events')
             ->join('users', 'events.uid', 'users.id')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('tenant = ?', ['t1']);
@@ -3678,7 +3660,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->final()
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition($table . '.deleted = ?', [0]);
@@ -3689,10 +3671,7 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('events.deleted = ?', $result->query);
         $this->assertStringContainsString('FINAL', $result->query);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 15. Cursor with ClickHouse features (8 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testCursorAfterWithPrewhere(): void
     {
@@ -3779,7 +3758,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('tenant = ?', ['t1']);
@@ -3814,10 +3793,7 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('`_cursor` > ?', $query);
         $this->assertStringContainsString('LIMIT', $query);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 16. page() with ClickHouse features (5 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testPageWithPrewhere(): void
     {
@@ -3896,10 +3872,7 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('LIMIT', $query);
         $this->assertStringContainsString('OFFSET', $query);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 17. Fluent chaining comprehensive (5 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testAllClickHouseMethodsReturnSameInstance(): void
     {
@@ -3990,10 +3963,7 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('SELECT * FROM `logs` SAMPLE 0.5', $result->query);
         $this->assertStringNotContainsString('FINAL', $result->query);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 18. SQL clause ordering verification (10 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testClauseOrderSelectFromFinalSampleJoinPrewhereWhereGroupByHavingOrderByLimitOffset(): void
     {
@@ -4212,10 +4182,7 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('OFFSET', $query);
         $this->assertStringContainsString('UNION', $query);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 19. Batch mode with ClickHouse (5 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testQueriesMethodWithPrewhere(): void
     {
@@ -4305,29 +4272,26 @@ class ClickHouseTest extends TestCase
         $this->assertEquals($resultA->query, $resultB->query);
         $this->assertEquals($resultA->bindings, $resultB->bindings);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 20. Edge cases (10 tests)
-    // ══════════════════════════════════════════════════════════════════
 
     public function testEmptyTableNameWithFinal(): void
     {
-        $result = (new Builder())
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('No table specified');
+        (new Builder())
             ->from('')
             ->final()
             ->build();
-
-        $this->assertStringContainsString('FINAL', $result->query);
     }
 
     public function testEmptyTableNameWithSample(): void
     {
-        $result = (new Builder())
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('No table specified');
+        (new Builder())
             ->from('')
             ->sample(0.5)
             ->build();
-
-        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
     }
 
     public function testPrewhereWithEmptyFilterValues(): void
@@ -4399,7 +4363,7 @@ class ClickHouseTest extends TestCase
             ->from('events')
             ->sample(0.1)
             ->prewhere([Query::equal('type', ['click'])])
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('tenant = ?', ['t1']);
@@ -4476,132 +4440,126 @@ class ClickHouseTest extends TestCase
         $joinPos = strpos($query, 'JOIN');
         $this->assertLessThan($joinPos, $finalSamplePos);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 1. Spatial/Vector/ElemMatch Exception Tests
-    // ══════════════════════════════════════════════════════════════════
 
     public function testFilterCrossesThrowsException(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::crosses('attr', [1])])->build();
     }
 
     public function testFilterNotCrossesThrowsException(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::notCrosses('attr', [1])])->build();
     }
 
     public function testFilterDistanceEqualThrowsException(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::distanceEqual('attr', [0, 0], 1)])->build();
     }
 
     public function testFilterDistanceNotEqualThrowsException(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::distanceNotEqual('attr', [0, 0], 1)])->build();
     }
 
     public function testFilterDistanceGreaterThanThrowsException(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::distanceGreaterThan('attr', [0, 0], 1)])->build();
     }
 
     public function testFilterDistanceLessThanThrowsException(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::distanceLessThan('attr', [0, 0], 1)])->build();
     }
 
     public function testFilterIntersectsThrowsException(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::intersects('attr', [1])])->build();
     }
 
     public function testFilterNotIntersectsThrowsException(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::notIntersects('attr', [1])])->build();
     }
 
     public function testFilterOverlapsThrowsException(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::overlaps('attr', [1])])->build();
     }
 
     public function testFilterNotOverlapsThrowsException(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::notOverlaps('attr', [1])])->build();
     }
 
     public function testFilterTouchesThrowsException(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::touches('attr', [1])])->build();
     }
 
     public function testFilterNotTouchesThrowsException(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::notTouches('attr', [1])])->build();
     }
 
     public function testFilterVectorDotThrowsException(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::vectorDot('attr', [1.0, 2.0])])->build();
     }
 
     public function testFilterVectorCosineThrowsException(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::vectorCosine('attr', [1.0, 2.0])])->build();
     }
 
     public function testFilterVectorEuclideanThrowsException(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::vectorEuclidean('attr', [1.0, 2.0])])->build();
     }
 
     public function testFilterElemMatchThrowsException(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::elemMatch('attr', [Query::equal('x', [1])])])->build();
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 2. SAMPLE Boundary Values
-    // ══════════════════════════════════════════════════════════════════
 
     public function testSampleZero(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(ValidationException::class);
         (new Builder())->from('t')->sample(0.0);
     }
 
     public function testSampleOne(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(ValidationException::class);
         (new Builder())->from('t')->sample(1.0);
     }
 
     public function testSampleNegative(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(ValidationException::class);
         (new Builder())->from('t')->sample(-0.5);
     }
 
     public function testSampleGreaterThanOne(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(ValidationException::class);
         (new Builder())->from('t')->sample(2.0);
     }
 
@@ -4610,10 +4568,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())->from('t')->sample(0.001)->build();
         $this->assertStringContainsString('SAMPLE 0.001', $result->query);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 3. Standalone Compiler Method Tests
-    // ══════════════════════════════════════════════════════════════════
 
     public function testCompileFilterStandalone(): void
     {
@@ -4647,7 +4602,7 @@ class ClickHouseTest extends TestCase
     public function testCompileOrderExceptionStandalone(): void
     {
         $builder = new Builder();
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         $builder->compileOrder(Query::limit(10));
     }
 
@@ -4742,13 +4697,10 @@ class ClickHouseTest extends TestCase
     public function testCompileJoinExceptionStandalone(): void
     {
         $builder = new Builder();
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         $builder->compileJoin(Query::equal('x', [1]));
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 4. Union with ClickHouse Features on Both Sides
-    // ══════════════════════════════════════════════════════════════════
 
     public function testUnionBothWithClickHouseFeatures(): void
     {
@@ -4777,10 +4729,7 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('FROM `a` FINAL', $result->query);
         $this->assertStringContainsString('UNION ALL (SELECT * FROM `b` FINAL)', $result->query);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 5. PREWHERE Binding Order Exhaustive Tests
-    // ══════════════════════════════════════════════════════════════════
 
     public function testPrewhereBindingOrderWithFilterAndHaving(): void
     {
@@ -4799,7 +4748,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())->from('t')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('_tenant = ?', ['t1']);
@@ -4825,27 +4774,21 @@ class ClickHouseTest extends TestCase
         // prewhere bindings first, then filter, then limit
         $this->assertEquals(['a', 3, 30, 10], $result->bindings);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 6. Search Exception in PREWHERE Interaction
-    // ══════════════════════════════════════════════════════════════════
 
     public function testSearchInFilterThrowsExceptionWithMessage(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         $this->expectExceptionMessage('Full-text search');
         (new Builder())->from('t')->filter([Query::search('content', 'hello')])->build();
     }
 
     public function testSearchInPrewhereThrowsExceptionWithMessage(): void
     {
-        $this->expectException(\Utopia\Query\Exception::class);
+        $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->prewhere([Query::search('content', 'hello')])->build();
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 7. Join Combinations with FINAL/SAMPLE
-    // ══════════════════════════════════════════════════════════════════
 
     public function testLeftJoinWithFinalAndSample(): void
     {
@@ -4888,16 +4831,13 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertStringContainsString('JOIN `other` ON `a` != `b`', $result->query);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 8. Condition Provider Position Verification
-    // ══════════════════════════════════════════════════════════════════
 
     public function testConditionProviderInWhereNotPrewhere(): void
     {
         $result = (new Builder())->from('t')
             ->prewhere([Query::equal('type', ['click'])])
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('_tenant = ?', ['t1']);
@@ -4917,7 +4857,7 @@ class ClickHouseTest extends TestCase
     public function testConditionProviderWithNoFiltersClickHouse(): void
     {
         $result = (new Builder())->from('t')
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('_deleted = ?', [0]);
@@ -4927,24 +4867,18 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('SELECT * FROM `t` WHERE _deleted = ?', $result->query);
         $this->assertEquals([0], $result->bindings);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 9. Page Boundary Values
-    // ══════════════════════════════════════════════════════════════════
 
     public function testPageZero(): void
     {
-        $result = (new Builder())->from('t')->page(0, 10)->build();
-        $this->assertStringContainsString('LIMIT ?', $result->query);
-        $this->assertStringContainsString('OFFSET ?', $result->query);
-        // page 0 -> offset clamped to 0
-        $this->assertEquals([10, 0], $result->bindings);
+        $this->expectException(ValidationException::class);
+        (new Builder())->from('t')->page(0, 10)->build();
     }
 
     public function testPageNegative(): void
     {
-        $result = (new Builder())->from('t')->page(-1, 10)->build();
-        $this->assertEquals([10, 0], $result->bindings);
+        $this->expectException(ValidationException::class);
+        (new Builder())->from('t')->page(-1, 10)->build();
     }
 
     public function testPageLargeNumber(): void
@@ -4952,20 +4886,15 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())->from('t')->page(1000000, 25)->build();
         $this->assertEquals([25, 24999975], $result->bindings);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 10. Build Without From
-    // ══════════════════════════════════════════════════════════════════
 
     public function testBuildWithoutFrom(): void
     {
-        $result = (new Builder())->filter([Query::equal('x', [1])])->build();
-        $this->assertStringContainsString('FROM ``', $result->query);
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('No table specified');
+        (new Builder())->filter([Query::equal('x', [1])])->build();
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 11. toRawSql Edge Cases for ClickHouse
-    // ══════════════════════════════════════════════════════════════════
 
     public function testToRawSqlWithFinalAndSampleEdge(): void
     {
@@ -5025,10 +4954,7 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('42', $sql);
         $this->assertStringContainsString('9.99', $sql);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 12. Having with Multiple Sub-Queries
-    // ══════════════════════════════════════════════════════════════════
 
     public function testHavingMultipleSubQueries(): void
     {
@@ -5057,10 +4983,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertStringContainsString('HAVING (`total` > ? OR `total` < ?)', $result->query);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 13. Reset Property-by-Property Verification
-    // ══════════════════════════════════════════════════════════════════
 
     public function testResetClearsClickHouseProperties(): void
     {
@@ -5099,7 +5022,7 @@ class ClickHouseTest extends TestCase
         $builder = (new Builder())
             ->from('t')
             ->final()
-            ->addHook(new class () implements FilterHook {
+            ->addHook(new class () implements Filter {
                 public function filter(string $table): Condition
                 {
                     return new Condition('_tenant = ?', ['t1']);
@@ -5112,10 +5035,7 @@ class ClickHouseTest extends TestCase
         $this->assertStringNotContainsString('FINAL', $result->query);
         $this->assertStringContainsString('_tenant = ?', $result->query);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 14. Exact Full SQL Assertions
-    // ══════════════════════════════════════════════════════════════════
 
     public function testFinalSamplePrewhereFilterExactSql(): void
     {
@@ -5160,10 +5080,7 @@ class ClickHouseTest extends TestCase
         );
         $this->assertEquals(['purchase', 100, 5, 50, 10, 'closed'], $result->bindings);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 15. Query::compile() Integration Tests
-    // ══════════════════════════════════════════════════════════════════
 
     public function testQueryCompileFilterViaClickHouse(): void
     {
@@ -5214,10 +5131,7 @@ class ClickHouseTest extends TestCase
         $sql = Query::groupBy(['status'])->compile($builder);
         $this->assertEquals('`status`', $sql);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 16. Binding Type Assertions with assertSame
-    // ══════════════════════════════════════════════════════════════════
 
     public function testBindingTypesPreservedInt(): void
     {
@@ -5270,10 +5184,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())->from('t')->filter([Query::equal('name', ['hello'])])->build();
         $this->assertSame(['hello'], $result->bindings);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 17. Raw Inside Logical Groups
-    // ══════════════════════════════════════════════════════════════════
 
     public function testRawInsideLogicalAnd(): void
     {
@@ -5298,10 +5209,7 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?) OR b IS NOT NULL)', $result->query);
         $this->assertEquals([1], $result->bindings);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 18. Negative/Zero Limit and Offset
-    // ══════════════════════════════════════════════════════════════════
 
     public function testNegativeLimit(): void
     {
@@ -5324,10 +5232,7 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result->query);
         $this->assertEquals([0], $result->bindings);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 19. Multiple Limits/Offsets/Cursors First Wins
-    // ══════════════════════════════════════════════════════════════════
 
     public function testMultipleLimitsFirstWins(): void
     {
@@ -5347,15 +5252,1754 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())->from('t')->cursorAfter('a')->cursorBefore('b')->sortAsc('_cursor')->build();
         $this->assertStringContainsString('`_cursor` > ?', $result->query);
     }
-
-    // ══════════════════════════════════════════════════════════════════
     // 20. Distinct + Union
-    // ══════════════════════════════════════════════════════════════════
 
     public function testDistinctWithUnion(): void
     {
         $other = (new Builder())->from('b');
         $result = (new Builder())->from('a')->distinct()->union($other)->build();
         $this->assertEquals('(SELECT DISTINCT * FROM `a`) UNION (SELECT * FROM `b`)', $result->query);
+    }
+    // DML: INSERT (same as standard SQL)
+
+    public function testInsertSingleRow(): void
+    {
+        $result = (new Builder())
+            ->into('events')
+            ->set(['name' => 'click', 'timestamp' => '2024-01-01'])
+            ->insert();
+
+        $this->assertEquals(
+            'INSERT INTO `events` (`name`, `timestamp`) VALUES (?, ?)',
+            $result->query
+        );
+        $this->assertEquals(['click', '2024-01-01'], $result->bindings);
+    }
+
+    public function testInsertBatch(): void
+    {
+        $result = (new Builder())
+            ->into('events')
+            ->set(['name' => 'click', 'ts' => '2024-01-01'])
+            ->set(['name' => 'view', 'ts' => '2024-01-02'])
+            ->insert();
+
+        $this->assertEquals(
+            'INSERT INTO `events` (`name`, `ts`) VALUES (?, ?), (?, ?)',
+            $result->query
+        );
+        $this->assertEquals(['click', '2024-01-01', 'view', '2024-01-02'], $result->bindings);
+    }
+    // ClickHouse does not implement Upsert
+
+    public function testDoesNotImplementUpsert(): void
+    {
+        $interfaces = \class_implements(Builder::class);
+        $this->assertIsArray($interfaces);
+        $this->assertArrayNotHasKey(Upsert::class, $interfaces);
+    }
+    // DML: UPDATE uses ALTER TABLE ... UPDATE
+
+    public function testUpdateUsesAlterTable(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->set(['status' => 'archived'])
+            ->filter([Query::equal('status', ['old'])])
+            ->update();
+
+        $this->assertEquals(
+            'ALTER TABLE `events` UPDATE `status` = ? WHERE `status` IN (?)',
+            $result->query
+        );
+        $this->assertEquals(['archived', 'old'], $result->bindings);
+    }
+
+    public function testUpdateWithFilterHook(): void
+    {
+        $hook = new class () implements Filter, \Utopia\Query\Hook {
+            public function filter(string $table): Condition
+            {
+                return new Condition('`_tenant` = ?', ['tenant_123']);
+            }
+        };
+
+        $result = (new Builder())
+            ->from('events')
+            ->set(['status' => 'active'])
+            ->filter([Query::equal('id', [1])])
+            ->addHook($hook)
+            ->update();
+
+        $this->assertEquals(
+            'ALTER TABLE `events` UPDATE `status` = ? WHERE `id` IN (?) AND `_tenant` = ?',
+            $result->query
+        );
+        $this->assertEquals(['active', 1, 'tenant_123'], $result->bindings);
+    }
+
+    public function testUpdateWithoutWhereThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('ClickHouse UPDATE requires a WHERE clause');
+
+        (new Builder())
+            ->from('events')
+            ->set(['status' => 'active'])
+            ->update();
+    }
+    // DML: DELETE uses ALTER TABLE ... DELETE
+
+    public function testDeleteUsesAlterTable(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->filter([Query::lessThan('timestamp', '2024-01-01')])
+            ->delete();
+
+        $this->assertEquals(
+            'ALTER TABLE `events` DELETE WHERE `timestamp` < ?',
+            $result->query
+        );
+        $this->assertEquals(['2024-01-01'], $result->bindings);
+    }
+
+    public function testDeleteWithFilterHook(): void
+    {
+        $hook = new class () implements Filter, \Utopia\Query\Hook {
+            public function filter(string $table): Condition
+            {
+                return new Condition('`_tenant` = ?', ['tenant_123']);
+            }
+        };
+
+        $result = (new Builder())
+            ->from('events')
+            ->filter([Query::equal('status', ['deleted'])])
+            ->addHook($hook)
+            ->delete();
+
+        $this->assertEquals(
+            'ALTER TABLE `events` DELETE WHERE `status` IN (?) AND `_tenant` = ?',
+            $result->query
+        );
+        $this->assertEquals(['deleted', 'tenant_123'], $result->bindings);
+    }
+
+    public function testDeleteWithoutWhereThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('ClickHouse DELETE requires a WHERE clause');
+
+        (new Builder())
+            ->from('events')
+            ->delete();
+    }
+    //  INTERSECT / EXCEPT (supported in ClickHouse)
+
+    public function testIntersect(): void
+    {
+        $other = (new Builder())->from('admins');
+        $result = (new Builder())
+            ->from('users')
+            ->intersect($other)
+            ->build();
+
+        $this->assertEquals(
+            '(SELECT * FROM `users`) INTERSECT (SELECT * FROM `admins`)',
+            $result->query
+        );
+    }
+
+    public function testExcept(): void
+    {
+        $other = (new Builder())->from('banned');
+        $result = (new Builder())
+            ->from('users')
+            ->except($other)
+            ->build();
+
+        $this->assertEquals(
+            '(SELECT * FROM `users`) EXCEPT (SELECT * FROM `banned`)',
+            $result->query
+        );
+    }
+    //  Feature interfaces (not implemented)
+
+    public function testDoesNotImplementLocking(): void
+    {
+        $interfaces = \class_implements(Builder::class);
+        $this->assertIsArray($interfaces);
+        $this->assertArrayNotHasKey(Locking::class, $interfaces);
+    }
+
+    public function testDoesNotImplementTransactions(): void
+    {
+        $interfaces = \class_implements(Builder::class);
+        $this->assertIsArray($interfaces);
+        $this->assertArrayNotHasKey(Transactions::class, $interfaces);
+    }
+    //  INSERT...SELECT (supported in ClickHouse)
+
+    public function testInsertSelect(): void
+    {
+        $source = (new Builder())
+            ->from('events')
+            ->select(['name', 'timestamp'])
+            ->filter([Query::equal('type', ['click'])]);
+
+        $result = (new Builder())
+            ->into('archived_events')
+            ->fromSelect(['name', 'timestamp'], $source)
+            ->insertSelect();
+
+        $this->assertEquals(
+            'INSERT INTO `archived_events` (`name`, `timestamp`) SELECT `name`, `timestamp` FROM `events` WHERE `type` IN (?)',
+            $result->query
+        );
+        $this->assertEquals(['click'], $result->bindings);
+    }
+    //  CTEs (supported in ClickHouse)
+
+    public function testCteWith(): void
+    {
+        $cte = (new Builder())
+            ->from('events')
+            ->filter([Query::equal('type', ['click'])]);
+
+        $result = (new Builder())
+            ->with('clicks', $cte)
+            ->from('clicks')
+            ->build();
+
+        $this->assertEquals(
+            'WITH `clicks` AS (SELECT * FROM `events` WHERE `type` IN (?)) SELECT * FROM `clicks`',
+            $result->query
+        );
+        $this->assertEquals(['click'], $result->bindings);
+    }
+    //  setRaw with bindings (ClickHouse)
+
+    public function testSetRawWithBindings(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->setRaw('count', 'count + ?', [1])
+            ->filter([Query::equal('id', [42])])
+            ->update();
+
+        $this->assertEquals(
+            'ALTER TABLE `events` UPDATE `count` = count + ? WHERE `id` IN (?)',
+            $result->query
+        );
+        $this->assertEquals([1, 42], $result->bindings);
+    }
+    //  Hints feature interface
+
+    public function testImplementsHints(): void
+    {
+        $this->assertInstanceOf(\Utopia\Query\Builder\Feature\Hints::class, new Builder());
+    }
+
+    public function testHintAppendsSettings(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->hint('max_threads=4')
+            ->build();
+
+        $this->assertStringContainsString('SETTINGS max_threads=4', $result->query);
+    }
+
+    public function testMultipleHints(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->hint('max_threads=4')
+            ->hint('max_memory_usage=1000000000')
+            ->build();
+
+        $this->assertStringContainsString('SETTINGS max_threads=4, max_memory_usage=1000000000', $result->query);
+    }
+
+    public function testSettingsMethod(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->settings(['max_threads' => '4', 'max_memory_usage' => '1000000000'])
+            ->build();
+
+        $this->assertStringContainsString('SETTINGS max_threads=4, max_memory_usage=1000000000', $result->query);
+    }
+    //  Window functions
+
+    public function testImplementsWindows(): void
+    {
+        $this->assertInstanceOf(\Utopia\Query\Builder\Feature\Windows::class, new Builder());
+    }
+
+    public function testSelectWindowRowNumber(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->selectWindow('ROW_NUMBER()', 'rn', ['user_id'], ['timestamp'])
+            ->build();
+
+        $this->assertStringContainsString('ROW_NUMBER() OVER (PARTITION BY `user_id` ORDER BY `timestamp` ASC) AS `rn`', $result->query);
+    }
+    //  Does NOT implement Spatial/VectorSearch/Json
+
+    public function testDoesNotImplementSpatial(): void
+    {
+        $builder = new Builder();
+        $this->assertNotInstanceOf(\Utopia\Query\Builder\Feature\Spatial::class, $builder); // @phpstan-ignore method.alreadyNarrowedType
+    }
+
+    public function testDoesNotImplementVectorSearch(): void
+    {
+        $builder = new Builder();
+        $this->assertNotInstanceOf(\Utopia\Query\Builder\Feature\VectorSearch::class, $builder); // @phpstan-ignore method.alreadyNarrowedType
+    }
+
+    public function testDoesNotImplementJson(): void
+    {
+        $builder = new Builder();
+        $this->assertNotInstanceOf(\Utopia\Query\Builder\Feature\Json::class, $builder); // @phpstan-ignore method.alreadyNarrowedType
+    }
+    //  Reset clears hints
+
+    public function testResetClearsHints(): void
+    {
+        $builder = (new Builder())
+            ->from('events')
+            ->hint('max_threads=4');
+
+        $builder->reset();
+
+        $result = $builder->from('events')->build();
+        $this->assertStringNotContainsString('SETTINGS', $result->query);
+    }
+
+    // ==================== PREWHERE tests ====================
+
+    public function testPrewhereWithSingleFilter(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->prewhere([Query::equal('status', ['active'])])
+            ->build();
+
+        $this->assertStringContainsString('PREWHERE `status` IN (?)', $result->query);
+        $this->assertEquals(['active'], $result->bindings);
+    }
+
+    public function testPrewhereWithMultipleFilters(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->prewhere([
+                Query::equal('status', ['active']),
+                Query::greaterThan('age', 18),
+            ])
+            ->build();
+
+        $this->assertStringContainsString('PREWHERE `status` IN (?) AND `age` > ?', $result->query);
+        $this->assertEquals(['active', 18], $result->bindings);
+    }
+
+    public function testPrewhereBeforeWhere(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->prewhere([Query::equal('status', ['active'])])
+            ->filter([Query::greaterThan('age', 18)])
+            ->build();
+
+        $prewherePos = strpos($result->query, 'PREWHERE');
+        $wherePos = strpos($result->query, 'WHERE');
+
+        $this->assertNotFalse($prewherePos);
+        $this->assertNotFalse($wherePos);
+        $this->assertLessThan($wherePos, $prewherePos);
+    }
+
+    public function testPrewhereBindingOrderBeforeWhere(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->prewhere([Query::equal('status', ['active'])])
+            ->filter([Query::greaterThan('age', 18)])
+            ->build();
+
+        $this->assertEquals(['active', 18], $result->bindings);
+    }
+
+    public function testPrewhereWithJoin(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->join('u', 't.uid', 'u.id')
+            ->prewhere([Query::equal('status', ['active'])])
+            ->filter([Query::greaterThan('age', 18)])
+            ->build();
+
+        $joinPos = strpos($result->query, 'JOIN');
+        $prewherePos = strpos($result->query, 'PREWHERE');
+        $wherePos = strpos($result->query, 'WHERE');
+
+        $this->assertNotFalse($joinPos);
+        $this->assertNotFalse($prewherePos);
+        $this->assertNotFalse($wherePos);
+        $this->assertLessThan($prewherePos, $joinPos);
+        $this->assertLessThan($wherePos, $prewherePos);
+    }
+
+    // ==================== FINAL keyword tests ====================
+
+    public function testFinalKeywordInFromClause(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->final()
+            ->build();
+
+        $this->assertStringContainsString('FROM `t` FINAL', $result->query);
+    }
+
+    public function testFinalAppearsBeforeWhere(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->final()
+            ->filter([Query::equal('status', ['active'])])
+            ->build();
+
+        $finalPos = strpos($result->query, 'FINAL');
+        $wherePos = strpos($result->query, 'WHERE');
+
+        $this->assertNotFalse($finalPos);
+        $this->assertNotFalse($wherePos);
+        $this->assertLessThan($wherePos, $finalPos);
+    }
+
+    public function testFinalWithSample(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->final()
+            ->sample(0.5)
+            ->build();
+
+        $this->assertStringContainsString('FROM `t` FINAL SAMPLE 0.5', $result->query);
+    }
+
+    // ==================== SAMPLE tests ====================
+
+    public function testSampleFraction(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->sample(0.1)
+            ->build();
+
+        $this->assertStringContainsString('FROM `t` SAMPLE 0.1', $result->query);
+    }
+
+    public function testSampleZeroThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->from('t')
+            ->sample(0.0);
+    }
+
+    public function testSampleOneThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->from('t')
+            ->sample(1.0);
+    }
+
+    public function testSampleNegativeThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->from('t')
+            ->sample(-0.5);
+    }
+
+    // ==================== UPDATE (ALTER TABLE) tests ====================
+
+    public function testUpdateAlterTableSyntax(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->set(['name' => 'Bob'])
+            ->filter([Query::equal('id', [1])])
+            ->update();
+
+        $this->assertEquals(
+            'ALTER TABLE `t` UPDATE `name` = ? WHERE `id` IN (?)',
+            $result->query
+        );
+        $this->assertEquals(['Bob', 1], $result->bindings);
+    }
+
+    public function testUpdateWithoutWhereClauseThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('WHERE');
+
+        (new Builder())
+            ->from('t')
+            ->set(['name' => 'Bob'])
+            ->update();
+    }
+
+    public function testUpdateWithoutAssignmentsThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->from('t')
+            ->filter([Query::equal('id', [1])])
+            ->update();
+    }
+
+    public function testUpdateWithRawSet(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->setRaw('counter', '`counter` + 1')
+            ->filter([Query::equal('id', [1])])
+            ->update();
+
+        $this->assertStringContainsString('`counter` = `counter` + 1', $result->query);
+        $this->assertStringContainsString('ALTER TABLE `t` UPDATE', $result->query);
+    }
+
+    public function testUpdateWithRawSetBindings(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->setRaw('name', 'CONCAT(?, ?)', ['hello', ' world'])
+            ->filter([Query::equal('id', [1])])
+            ->update();
+
+        $this->assertStringContainsString('`name` = CONCAT(?, ?)', $result->query);
+        $this->assertEquals(['hello', ' world', 1], $result->bindings);
+    }
+
+    // ==================== DELETE (ALTER TABLE) tests ====================
+
+    public function testDeleteAlterTableSyntax(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::equal('id', [1])])
+            ->delete();
+
+        $this->assertEquals(
+            'ALTER TABLE `t` DELETE WHERE `id` IN (?)',
+            $result->query
+        );
+        $this->assertEquals([1], $result->bindings);
+    }
+
+    public function testDeleteWithoutWhereClauseThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->from('t')
+            ->delete();
+    }
+
+    public function testDeleteWithMultipleFilters(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([
+                Query::equal('status', ['old']),
+                Query::lessThan('age', 5),
+            ])
+            ->delete();
+
+        $this->assertStringContainsString('WHERE `status` IN (?) AND `age` < ?', $result->query);
+        $this->assertEquals(['old', 5], $result->bindings);
+    }
+
+    // ==================== LIKE/Contains overrides ====================
+
+    public function testStartsWithUsesStartsWith(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::startsWith('name', 'foo')])
+            ->build();
+
+        $this->assertStringContainsString('startsWith(`name`, ?)', $result->query);
+        $this->assertEquals(['foo'], $result->bindings);
+    }
+
+    public function testNotStartsWithUsesNotStartsWith(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::notStartsWith('name', 'foo')])
+            ->build();
+
+        $this->assertStringContainsString('NOT startsWith(`name`, ?)', $result->query);
+        $this->assertEquals(['foo'], $result->bindings);
+    }
+
+    public function testEndsWithUsesEndsWith(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::endsWith('name', 'foo')])
+            ->build();
+
+        $this->assertStringContainsString('endsWith(`name`, ?)', $result->query);
+        $this->assertEquals(['foo'], $result->bindings);
+    }
+
+    public function testNotEndsWithUsesNotEndsWith(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::notEndsWith('name', 'foo')])
+            ->build();
+
+        $this->assertStringContainsString('NOT endsWith(`name`, ?)', $result->query);
+        $this->assertEquals(['foo'], $result->bindings);
+    }
+
+    public function testContainsSingleValueUsesPosition(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::contains('name', ['foo'])])
+            ->build();
+
+        $this->assertStringContainsString('position(`name`, ?) > 0', $result->query);
+        $this->assertEquals(['foo'], $result->bindings);
+    }
+
+    public function testContainsMultipleValuesUsesOrPosition(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::contains('name', ['foo', 'bar'])])
+            ->build();
+
+        $this->assertStringContainsString('(position(`name`, ?) > 0 OR position(`name`, ?) > 0)', $result->query);
+        $this->assertEquals(['foo', 'bar'], $result->bindings);
+    }
+
+    public function testContainsAllUsesAndPosition(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::containsAll('name', ['foo', 'bar'])])
+            ->build();
+
+        $this->assertStringContainsString('(position(`name`, ?) > 0 AND position(`name`, ?) > 0)', $result->query);
+        $this->assertEquals(['foo', 'bar'], $result->bindings);
+    }
+
+    public function testNotContainsSingleValue(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::notContains('name', ['foo'])])
+            ->build();
+
+        $this->assertStringContainsString('position(`name`, ?) = 0', $result->query);
+        $this->assertEquals(['foo'], $result->bindings);
+    }
+
+    // ==================== NotContains multiple ====================
+
+    public function testNotContainsMultipleValues(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::notContains('name', ['a', 'b'])])
+            ->build();
+
+        $this->assertStringContainsString('(position(`name`, ?) = 0 AND position(`name`, ?) = 0)', $result->query);
+        $this->assertEquals(['a', 'b'], $result->bindings);
+    }
+
+    // ==================== Regex ====================
+
+    public function testRegexUsesMatch(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::regex('name', '^test')])
+            ->build();
+
+        $this->assertStringContainsString('match(`name`, ?)', $result->query);
+        $this->assertEquals(['^test'], $result->bindings);
+    }
+
+    // ==================== Search throws ====================
+
+    public function testSearchThrowsUnsupported(): void
+    {
+        $this->expectException(UnsupportedException::class);
+
+        (new Builder())
+            ->from('t')
+            ->filter([Query::search('body', 'hello')])
+            ->build();
+    }
+
+    // ==================== Hints/Settings ====================
+
+    public function testSettingsKeyValue(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->settings(['max_threads' => '4', 'enable_optimize_predicate_expression' => '1'])
+            ->build();
+
+        $this->assertStringContainsString('SETTINGS max_threads=4, enable_optimize_predicate_expression=1', $result->query);
+    }
+
+    public function testHintAndSettingsCombined(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->hint('max_threads=2')
+            ->settings(['enable_optimize_predicate_expression' => '1'])
+            ->build();
+
+        $this->assertStringContainsString('SETTINGS max_threads=2, enable_optimize_predicate_expression=1', $result->query);
+    }
+
+    public function testHintsPreserveBindings(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::equal('status', ['active'])])
+            ->hint('max_threads=4')
+            ->build();
+
+        $this->assertEquals(['active'], $result->bindings);
+        $this->assertStringContainsString('SETTINGS max_threads=4', $result->query);
+    }
+
+    public function testHintsWithJoin(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->join('u', 't.uid', 'u.id')
+            ->hint('max_threads=4')
+            ->build();
+
+        $this->assertStringContainsString('SETTINGS max_threads=4', $result->query);
+        // SETTINGS must be at the very end
+        $this->assertStringEndsWith('SETTINGS max_threads=4', $result->query);
+    }
+
+    // ==================== CTE tests ====================
+
+    public function testCTE(): void
+    {
+        $sub = (new Builder())
+            ->from('events')
+            ->filter([Query::equal('type', ['click'])]);
+
+        $result = (new Builder())
+            ->with('sub', $sub)
+            ->from('sub')
+            ->build();
+
+        $this->assertEquals(
+            'WITH `sub` AS (SELECT * FROM `events` WHERE `type` IN (?)) SELECT * FROM `sub`',
+            $result->query
+        );
+        $this->assertEquals(['click'], $result->bindings);
+    }
+
+    public function testCTERecursive(): void
+    {
+        $sub = (new Builder())
+            ->from('categories')
+            ->filter([Query::equal('parent_id', [0])]);
+
+        $result = (new Builder())
+            ->withRecursive('tree', $sub)
+            ->from('tree')
+            ->build();
+
+        $this->assertStringContainsString('WITH RECURSIVE `tree` AS', $result->query);
+    }
+
+    public function testCTEBindingOrder(): void
+    {
+        $sub = (new Builder())
+            ->from('events')
+            ->filter([Query::equal('type', ['click'])]);
+
+        $result = (new Builder())
+            ->with('sub', $sub)
+            ->from('sub')
+            ->filter([Query::greaterThan('count', 5)])
+            ->build();
+
+        // CTE bindings come before main query bindings
+        $this->assertEquals(['click', 5], $result->bindings);
+    }
+
+    // ==================== Window functions ====================
+
+    public function testWindowFunctionPartitionAndOrder(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->selectWindow('ROW_NUMBER()', 'rn', ['user_id'], ['created_at'])
+            ->build();
+
+        $this->assertStringContainsString('ROW_NUMBER() OVER (PARTITION BY `user_id` ORDER BY `created_at` ASC) AS `rn`', $result->query);
+    }
+
+    public function testWindowFunctionOrderDescending(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->selectWindow('ROW_NUMBER()', 'rn', ['user_id'], ['-created_at'])
+            ->build();
+
+        $this->assertStringContainsString('ROW_NUMBER() OVER (PARTITION BY `user_id` ORDER BY `created_at` DESC) AS `rn`', $result->query);
+    }
+
+    public function testMultipleWindowFunctions(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->selectWindow('ROW_NUMBER()', 'rn', ['user_id'], ['created_at'])
+            ->selectWindow('SUM(`amount`)', 'total', ['user_id'], null)
+            ->build();
+
+        $this->assertStringContainsString('ROW_NUMBER() OVER', $result->query);
+        $this->assertStringContainsString('SUM(`amount`) OVER', $result->query);
+    }
+
+    // ==================== CASE expression ====================
+
+    public function testSelectCaseExpression(): void
+    {
+        $case = (new CaseBuilder())
+            ->when('`status` = ?', '?', ['active'], ['Active'])
+            ->elseResult('?', ['Unknown'])
+            ->alias('label')
+            ->build();
+
+        $result = (new Builder())
+            ->from('t')
+            ->selectCase($case)
+            ->build();
+
+        $this->assertStringContainsString('CASE WHEN `status` = ? THEN ? ELSE ? END AS label', $result->query);
+        $this->assertEquals(['active', 'Active', 'Unknown'], $result->bindings);
+    }
+
+    public function testSetCaseInUpdate(): void
+    {
+        $case = (new CaseBuilder())
+            ->when('`role` = ?', '?', ['admin'], ['Admin'])
+            ->elseResult('?', ['User'])
+            ->build();
+
+        $result = (new Builder())
+            ->from('t')
+            ->setRaw('label', $case->sql, $case->bindings)
+            ->filter([Query::equal('id', [1])])
+            ->update();
+
+        $this->assertStringContainsString('ALTER TABLE `t` UPDATE', $result->query);
+        $this->assertStringContainsString('CASE WHEN `role` = ? THEN ? ELSE ? END', $result->query);
+        $this->assertEquals(['admin', 'Admin', 'User', 1], $result->bindings);
+    }
+
+    // ==================== Union/Intersect/Except ====================
+
+    public function testUnionSimple(): void
+    {
+        $other = (new Builder())->from('b');
+        $result = (new Builder())
+            ->from('a')
+            ->union($other)
+            ->build();
+
+        $this->assertStringContainsString('UNION', $result->query);
+        $this->assertStringNotContainsString('UNION ALL', $result->query);
+    }
+
+    public function testUnionAll(): void
+    {
+        $other = (new Builder())->from('b');
+        $result = (new Builder())
+            ->from('a')
+            ->unionAll($other)
+            ->build();
+
+        $this->assertStringContainsString('UNION ALL', $result->query);
+    }
+
+    public function testUnionBindingsOrder(): void
+    {
+        $other = (new Builder())->from('b')->filter([Query::equal('y', [2])]);
+        $result = (new Builder())
+            ->from('a')
+            ->filter([Query::equal('x', [1])])
+            ->union($other)
+            ->build();
+
+        $this->assertEquals([1, 2], $result->bindings);
+    }
+
+    // ==================== Pagination ====================
+
+    public function testPage(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->page(2, 25)
+            ->build();
+
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertStringContainsString('OFFSET ?', $result->query);
+        $this->assertEquals([25, 25], $result->bindings);
+    }
+
+    public function testCursorAfter(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->cursorAfter('abc')
+            ->sortAsc('_cursor')
+            ->build();
+
+        $this->assertStringContainsString('`_cursor` > ?', $result->query);
+        $this->assertEquals(['abc'], $result->bindings);
+    }
+
+    // ==================== Validation errors ====================
+
+    public function testBuildWithoutTableThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())->build();
+    }
+
+    public function testInsertWithoutRowsThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->into('t')
+            ->insert();
+    }
+
+    public function testBatchInsertMismatchedColumnsThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->into('t')
+            ->set(['name' => 'Alice', 'age' => 30])
+            ->set(['name' => 'Bob', 'email' => 'bob@example.com'])
+            ->insert();
+    }
+
+    // ==================== Batch insert ====================
+
+    public function testBatchInsertMultipleRows(): void
+    {
+        $result = (new Builder())
+            ->into('t')
+            ->set(['name' => 'Alice', 'age' => 30])
+            ->set(['name' => 'Bob', 'age' => 25])
+            ->insert();
+
+        $this->assertEquals(
+            'INSERT INTO `t` (`name`, `age`) VALUES (?, ?), (?, ?)',
+            $result->query
+        );
+        $this->assertEquals(['Alice', 30, 'Bob', 25], $result->bindings);
+    }
+
+    // ==================== Join filter placement ====================
+
+    public function testJoinFilterForcedToWhere(): void
+    {
+        $hook = new class () implements JoinFilter {
+            public function filterJoin(string $table, string $joinType): JoinCondition
+            {
+                return new JoinCondition(
+                    new Condition('`active` = ?', [1]),
+                    Placement::On,
+                );
+            }
+        };
+
+        $result = (new Builder())
+            ->from('t')
+            ->addHook($hook)
+            ->leftJoin('u', 't.uid', 'u.id')
+            ->build();
+
+        // ClickHouse forces all join filter conditions to WHERE placement
+        $this->assertStringContainsString('WHERE `active` = ?', $result->query);
+        $this->assertStringNotContainsString('ON `t`.`uid` = `u`.`id` AND', $result->query);
+    }
+
+    // ==================== toRawSql ====================
+
+    public function testToRawSqlClickHouseSyntax(): void
+    {
+        $sql = (new Builder())
+            ->from('t')
+            ->final()
+            ->filter([Query::equal('status', ['active'])])
+            ->limit(10)
+            ->toRawSql();
+
+        $this->assertStringContainsString('FROM `t` FINAL', $sql);
+        $this->assertStringContainsString("'active'", $sql);
+        $this->assertStringNotContainsString('?', $sql);
+    }
+
+    // ==================== Reset comprehensive ====================
+
+    public function testResetClearsPrewhere(): void
+    {
+        $builder = (new Builder())
+            ->from('t')
+            ->prewhere([Query::equal('status', ['active'])]);
+
+        $builder->build();
+        $builder->reset();
+
+        $result = $builder->from('t')->build();
+        $this->assertStringNotContainsString('PREWHERE', $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testResetClearsSampleAndFinal(): void
+    {
+        $builder = (new Builder())
+            ->from('t')
+            ->final()
+            ->sample(0.5);
+
+        $builder->build();
+        $builder->reset();
+
+        $result = $builder->from('t')->build();
+        $this->assertStringNotContainsString('FINAL', $result->query);
+        $this->assertStringNotContainsString('SAMPLE', $result->query);
+    }
+
+    public function testEqualEmptyArrayReturnsFalse(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::equal('x', [])])
+            ->build();
+
+        $this->assertStringContainsString('1 = 0', $result->query);
+    }
+
+    public function testEqualWithNullOnly(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::equal('x', [null])])
+            ->build();
+
+        $this->assertStringContainsString('`x` IS NULL', $result->query);
+    }
+
+    public function testEqualWithNullAndValues(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::equal('x', [1, null])])
+            ->build();
+
+        $this->assertStringContainsString('(`x` IN (?) OR `x` IS NULL)', $result->query);
+        $this->assertContains(1, $result->bindings);
+    }
+
+    public function testNotEqualSingleValue(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::notEqual('x', 42)])
+            ->build();
+
+        $this->assertStringContainsString('`x` != ?', $result->query);
+        $this->assertContains(42, $result->bindings);
+    }
+
+    public function testAndFilter(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::and([Query::greaterThan('age', 18), Query::lessThan('age', 65)])])
+            ->build();
+
+        $this->assertStringContainsString('(`age` > ? AND `age` < ?)', $result->query);
+    }
+
+    public function testOrFilter(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::or([Query::equal('role', ['admin']), Query::equal('role', ['editor'])])])
+            ->build();
+
+        $this->assertStringContainsString('(`role` IN (?) OR `role` IN (?))', $result->query);
+    }
+
+    public function testNestedAndInsideOr(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::or([
+                Query::and([Query::greaterThan('age', 18), Query::lessThan('age', 30)]),
+                Query::and([Query::greaterThan('score', 80), Query::lessThan('score', 100)]),
+            ])])
+            ->build();
+
+        $this->assertStringContainsString('((`age` > ? AND `age` < ?) OR (`score` > ? AND `score` < ?))', $result->query);
+        $this->assertEquals([18, 30, 80, 100], $result->bindings);
+    }
+
+    public function testBetweenFilter(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::between('age', 18, 65)])
+            ->build();
+
+        $this->assertStringContainsString('`age` BETWEEN ? AND ?', $result->query);
+        $this->assertEquals([18, 65], $result->bindings);
+    }
+
+    public function testNotBetweenFilter(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::notBetween('score', 0, 50)])
+            ->build();
+
+        $this->assertStringContainsString('`score` NOT BETWEEN ? AND ?', $result->query);
+        $this->assertEquals([0, 50], $result->bindings);
+    }
+
+    public function testExistsMultipleAttributes(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::exists(['name', 'email'])])
+            ->build();
+
+        $this->assertStringContainsString('(`name` IS NOT NULL AND `email` IS NOT NULL)', $result->query);
+    }
+
+    public function testNotExistsSingle(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::notExists(['name'])])
+            ->build();
+
+        $this->assertStringContainsString('(`name` IS NULL)', $result->query);
+    }
+
+    public function testRawFilter(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::raw('score > ?', [10])])
+            ->build();
+
+        $this->assertStringContainsString('score > ?', $result->query);
+        $this->assertContains(10, $result->bindings);
+    }
+
+    public function testRawFilterEmpty(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::raw('')])
+            ->build();
+
+        $this->assertStringContainsString('1 = 1', $result->query);
+    }
+
+    public function testDottedIdentifier(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->select(['events.name'])
+            ->build();
+
+        $this->assertStringContainsString('`events`.`name`', $result->query);
+    }
+
+    public function testMultipleOrderBy(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->sortAsc('name')
+            ->sortDesc('age')
+            ->build();
+
+        $this->assertStringContainsString('ORDER BY `name` ASC, `age` DESC', $result->query);
+    }
+
+    public function testDistinctWithSelect(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->distinct()
+            ->select(['name'])
+            ->build();
+
+        $this->assertStringContainsString('SELECT DISTINCT `name`', $result->query);
+    }
+
+    public function testSumWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->sum('amount', 'total')
+            ->build();
+
+        $this->assertStringContainsString('SUM(`amount`) AS `total`', $result->query);
+    }
+
+    public function testMultipleAggregates(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->count('*', 'cnt')
+            ->sum('amount', 'total')
+            ->build();
+
+        $this->assertStringContainsString('COUNT(*) AS `cnt`', $result->query);
+        $this->assertStringContainsString('SUM(`amount`) AS `total`', $result->query);
+    }
+
+    public function testIsNullFilter(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::isNull('deleted_at')])
+            ->build();
+
+        $this->assertStringContainsString('`deleted_at` IS NULL', $result->query);
+    }
+
+    public function testIsNotNullFilter(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::isNotNull('name')])
+            ->build();
+
+        $this->assertStringContainsString('`name` IS NOT NULL', $result->query);
+    }
+
+    public function testLessThan(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::lessThan('age', 30)])
+            ->build();
+
+        $this->assertStringContainsString('`age` < ?', $result->query);
+        $this->assertEquals([30], $result->bindings);
+    }
+
+    public function testLessThanEqual(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::lessThanEqual('age', 30)])
+            ->build();
+
+        $this->assertStringContainsString('`age` <= ?', $result->query);
+        $this->assertEquals([30], $result->bindings);
+    }
+
+    public function testGreaterThan(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::greaterThan('score', 50)])
+            ->build();
+
+        $this->assertStringContainsString('`score` > ?', $result->query);
+        $this->assertEquals([50], $result->bindings);
+    }
+
+    public function testGreaterThanEqual(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::greaterThanEqual('score', 50)])
+            ->build();
+
+        $this->assertStringContainsString('`score` >= ?', $result->query);
+        $this->assertEquals([50], $result->bindings);
+    }
+
+    public function testRightJoin(): void
+    {
+        $result = (new Builder())
+            ->from('a')
+            ->rightJoin('b', 'a.id', 'b.a_id')
+            ->build();
+
+        $this->assertStringContainsString('RIGHT JOIN `b` ON `a`.`id` = `b`.`a_id`', $result->query);
+    }
+
+    public function testCrossJoin(): void
+    {
+        $result = (new Builder())
+            ->from('a')
+            ->crossJoin('b')
+            ->build();
+
+        $this->assertStringContainsString('CROSS JOIN `b`', $result->query);
+        $this->assertStringNotContainsString(' ON ', $result->query);
+    }
+
+    public function testPrewhereAndFilterBindingOrderVerification(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->prewhere([Query::equal('status', ['active'])])
+            ->filter([Query::greaterThan('count', 5)])
+            ->build();
+
+        $this->assertEquals(['active', 5], $result->bindings);
+    }
+
+    public function testUpdateRawSetAndFilterBindingOrder(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->setRaw('count', 'count + ?', [1])
+            ->filter([Query::equal('status', ['active'])])
+            ->update();
+
+        $this->assertEquals([1, 'active'], $result->bindings);
+    }
+
+    public function testSortRandomUsesRand(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->sortRandom()
+            ->build();
+
+        $this->assertStringContainsString('ORDER BY rand()', $result->query);
+    }
+
+    // Feature 1: Table Aliases (ClickHouse - alias AFTER FINAL/SAMPLE)
+
+    public function testTableAliasClickHouse(): void
+    {
+        $result = (new Builder())
+            ->from('events', 'e')
+            ->build();
+
+        $this->assertStringContainsString('FROM `events` AS `e`', $result->query);
+    }
+
+    public function testTableAliasWithFinal(): void
+    {
+        $result = (new Builder())
+            ->from('events', 'e')
+            ->final()
+            ->build();
+
+        $this->assertStringContainsString('FROM `events` FINAL AS `e`', $result->query);
+    }
+
+    public function testTableAliasWithSample(): void
+    {
+        $result = (new Builder())
+            ->from('events', 'e')
+            ->sample(0.1)
+            ->build();
+
+        $this->assertStringContainsString('FROM `events` SAMPLE 0.1 AS `e`', $result->query);
+    }
+
+    public function testTableAliasWithFinalAndSample(): void
+    {
+        $result = (new Builder())
+            ->from('events', 'e')
+            ->final()
+            ->sample(0.5)
+            ->build();
+
+        $this->assertStringContainsString('FROM `events` FINAL SAMPLE 0.5 AS `e`', $result->query);
+    }
+
+    // Feature 2: Subqueries (ClickHouse)
+
+    public function testFromSubClickHouse(): void
+    {
+        $sub = (new Builder())->from('events')->select(['user_id'])->groupBy(['user_id']);
+        $result = (new Builder())
+            ->fromSub($sub, 'sub')
+            ->select(['user_id'])
+            ->build();
+
+        $this->assertEquals(
+            'SELECT `user_id` FROM (SELECT `user_id` FROM `events` GROUP BY `user_id`) AS `sub`',
+            $result->query
+        );
+    }
+
+    public function testFilterWhereInClickHouse(): void
+    {
+        $sub = (new Builder())->from('orders')->select(['user_id']);
+        $result = (new Builder())
+            ->from('users')
+            ->filterWhereIn('id', $sub)
+            ->build();
+
+        $this->assertStringContainsString('`id` IN (SELECT `user_id` FROM `orders`)', $result->query);
+    }
+
+    // Feature 3: Raw ORDER BY / GROUP BY / HAVING (ClickHouse)
+
+    public function testOrderByRawClickHouse(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->orderByRaw('toDate(`created_at`) ASC')
+            ->build();
+
+        $this->assertStringContainsString('ORDER BY toDate(`created_at`) ASC', $result->query);
+    }
+
+    public function testGroupByRawClickHouse(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->count('*', 'cnt')
+            ->groupByRaw('toDate(`created_at`)')
+            ->build();
+
+        $this->assertStringContainsString('GROUP BY toDate(`created_at`)', $result->query);
+    }
+
+    // Feature 4: countDistinct (ClickHouse)
+
+    public function testCountDistinctClickHouse(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->countDistinct('user_id', 'unique_users')
+            ->build();
+
+        $this->assertEquals(
+            'SELECT COUNT(DISTINCT `user_id`) AS `unique_users` FROM `events`',
+            $result->query
+        );
+    }
+
+    // Feature 5: JoinBuilder (ClickHouse)
+
+    public function testJoinWhereClickHouse(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->joinWhere('users', function (\Utopia\Query\Builder\JoinBuilder $join): void {
+                $join->on('events.user_id', 'users.id');
+            })
+            ->build();
+
+        $this->assertStringContainsString('JOIN `users` ON `events`.`user_id` = `users`.`id`', $result->query);
+    }
+
+    // Feature 6: EXISTS Subquery (ClickHouse)
+
+    public function testFilterExistsClickHouse(): void
+    {
+        $sub = (new Builder())->from('orders')->select(['id'])->filter([Query::raw('`orders`.`user_id` = `users`.`id`')]);
+        $result = (new Builder())
+            ->from('users')
+            ->filterExists($sub)
+            ->build();
+
+        $this->assertStringContainsString('EXISTS (SELECT `id` FROM `orders`', $result->query);
+    }
+
+    // Feature 9: EXPLAIN (ClickHouse)
+
+    public function testExplainClickHouse(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->explain();
+
+        $this->assertStringStartsWith('EXPLAIN SELECT', $result->query);
+    }
+
+    public function testExplainAnalyzeClickHouse(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->explain(true);
+
+        $this->assertStringStartsWith('EXPLAIN ANALYZE SELECT', $result->query);
+    }
+
+    // Feature: Cross Join Alias (ClickHouse)
+
+    public function testCrossJoinAliasClickHouse(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->crossJoin('dates', 'd')
+            ->build();
+
+        $this->assertStringContainsString('CROSS JOIN `dates` AS `d`', $result->query);
+    }
+
+    // Subquery bindings (ClickHouse)
+
+    public function testWhereInSubqueryClickHouse(): void
+    {
+        $sub = (new Builder())->from('active_users')->select(['id']);
+
+        $result = (new Builder())
+            ->from('events')
+            ->filterWhereIn('user_id', $sub)
+            ->build();
+
+        $this->assertStringContainsString('`user_id` IN (SELECT `id` FROM `active_users`)', $result->query);
+    }
+
+    public function testWhereNotInSubqueryClickHouse(): void
+    {
+        $sub = (new Builder())->from('banned_users')->select(['id']);
+
+        $result = (new Builder())
+            ->from('events')
+            ->filterWhereNotIn('user_id', $sub)
+            ->build();
+
+        $this->assertStringContainsString('`user_id` NOT IN (SELECT', $result->query);
+    }
+
+    public function testSelectSubClickHouse(): void
+    {
+        $sub = (new Builder())->from('events')->selectRaw('COUNT(*)');
+
+        $result = (new Builder())
+            ->from('users')
+            ->selectSub($sub, 'event_count')
+            ->build();
+
+        $this->assertStringContainsString('(SELECT COUNT(*) FROM `events`) AS `event_count`', $result->query);
+    }
+
+    public function testFromSubWithGroupByClickHouse(): void
+    {
+        $sub = (new Builder())->from('events')->select(['user_id'])->groupBy(['user_id']);
+
+        $result = (new Builder())
+            ->fromSub($sub, 'sub')
+            ->select(['user_id'])
+            ->build();
+
+        $this->assertStringContainsString('FROM (SELECT `user_id` FROM `events`', $result->query);
+        $this->assertStringContainsString(') AS `sub`', $result->query);
+    }
+
+    // NOT EXISTS (ClickHouse)
+
+    public function testFilterNotExistsClickHouse(): void
+    {
+        $sub = (new Builder())->from('banned')->select(['id']);
+
+        $result = (new Builder())
+            ->from('users')
+            ->filterNotExists($sub)
+            ->build();
+
+        $this->assertStringContainsString('NOT EXISTS (SELECT', $result->query);
+    }
+
+    // HavingRaw (ClickHouse)
+
+    public function testHavingRawClickHouse(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->count('*', 'cnt')
+            ->groupBy(['user_id'])
+            ->havingRaw('COUNT(*) > ?', [10])
+            ->build();
+
+        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
+        $this->assertEquals([10], $result->bindings);
+    }
+
+    // Table alias with FINAL and SAMPLE and alias combined
+
+    public function testTableAliasWithFinalSampleAndAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events', 'e')
+            ->final()
+            ->sample(0.5)
+            ->build();
+
+        $this->assertStringContainsString('FINAL', $result->query);
+        $this->assertStringContainsString('SAMPLE', $result->query);
+        $this->assertStringContainsString('AS `e`', $result->query);
+    }
+
+    // JoinWhere LEFT JOIN (ClickHouse)
+
+    public function testJoinWhereLeftJoinClickHouse(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->joinWhere('users', function (\Utopia\Query\Builder\JoinBuilder $join): void {
+                $join->on('events.user_id', 'users.id')
+                     ->where('users.active', '=', 1);
+            }, 'LEFT JOIN')
+            ->build();
+
+        $this->assertStringContainsString('LEFT JOIN `users` ON', $result->query);
+        $this->assertEquals([1], $result->bindings);
+    }
+
+    // JoinWhere with alias (ClickHouse)
+
+    public function testJoinWhereWithAliasClickHouse(): void
+    {
+        $result = (new Builder())
+            ->from('events', 'e')
+            ->joinWhere('users', function (\Utopia\Query\Builder\JoinBuilder $join): void {
+                $join->on('e.user_id', 'u.id');
+            }, 'JOIN', 'u')
+            ->build();
+
+        $this->assertStringContainsString('JOIN `users` AS `u`', $result->query);
+    }
+
+    // JoinWhere with multiple ON conditions (ClickHouse)
+
+    public function testJoinWhereMultipleOnsClickHouse(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->joinWhere('users', function (\Utopia\Query\Builder\JoinBuilder $join): void {
+                $join->on('events.user_id', 'users.id')
+                     ->on('events.tenant_id', 'users.tenant_id');
+            })
+            ->build();
+
+        $this->assertStringContainsString(
+            'ON `events`.`user_id` = `users`.`id` AND `events`.`tenant_id` = `users`.`tenant_id`',
+            $result->query
+        );
+    }
+
+    // EXPLAIN preserves bindings (ClickHouse)
+
+    public function testExplainPreservesBindings(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->filter([Query::equal('status', ['active'])])
+            ->explain();
+
+        $this->assertStringStartsWith('EXPLAIN SELECT', $result->query);
+        $this->assertEquals(['active'], $result->bindings);
+    }
+
+    // countDistinct without alias (ClickHouse)
+
+    public function testCountDistinctWithoutAliasClickHouse(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->countDistinct('user_id')
+            ->build();
+
+        $this->assertStringContainsString('COUNT(DISTINCT `user_id`)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    // Multiple subqueries combined (ClickHouse)
+
+    public function testMultipleSubqueriesCombined(): void
+    {
+        $sub1 = (new Builder())->from('active_users')->select(['id']);
+        $sub2 = (new Builder())->from('banned_users')->select(['id']);
+
+        $result = (new Builder())
+            ->from('events')
+            ->filterWhereIn('user_id', $sub1)
+            ->filterWhereNotIn('user_id', $sub2)
+            ->build();
+
+        $this->assertStringContainsString('IN (SELECT', $result->query);
+        $this->assertStringContainsString('NOT IN (SELECT', $result->query);
+    }
+
+    // PREWHERE with subquery (ClickHouse)
+
+    public function testPrewhereWithSubquery(): void
+    {
+        $sub = (new Builder())->from('active_users')->select(['id']);
+
+        $result = (new Builder())
+            ->from('events')
+            ->prewhere([Query::equal('type', ['click'])])
+            ->filterWhereIn('user_id', $sub)
+            ->build();
+
+        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertStringContainsString('IN (SELECT', $result->query);
+    }
+
+    // Settings with subquery (ClickHouse)
+
+    public function testSettingsStillAppear(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->settings(['max_threads' => '4'])
+            ->orderByRaw('`created_at` DESC')
+            ->build();
+
+        $this->assertStringContainsString('SETTINGS max_threads=4', $result->query);
+        $this->assertStringContainsString('ORDER BY `created_at` DESC', $result->query);
     }
 }

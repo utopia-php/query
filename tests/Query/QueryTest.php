@@ -3,6 +3,7 @@
 namespace Tests\Query;
 
 use PHPUnit\Framework\TestCase;
+use Utopia\Query\Builder\MySQL as MySQLBuilder;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
 
@@ -209,10 +210,7 @@ class QueryTest extends TestCase
         $query = Query::unionAll($inner);
         $this->assertSame(Method::UnionAll, $query->getMethod());
     }
-
-    // ══════════════════════════════════════════
     //  ADDITIONAL EDGE CASES
-    // ══════════════════════════════════════════
 
     public function testMethodNoDuplicateValues(): void
     {
@@ -434,5 +432,212 @@ class QueryTest extends TestCase
     public function testDistinctIsSpatialQueryFalse(): void
     {
         $this->assertFalse(Query::distinct()->isSpatialQuery());
+    }
+
+    public function testToStringReturnsJson(): void
+    {
+        $json = Query::equal('name', ['John'])->toString();
+        $decoded = \json_decode($json, true);
+        $this->assertIsArray($decoded);
+        $this->assertEquals('equal', $decoded['method']);
+        $this->assertEquals('name', $decoded['attribute']);
+        $this->assertEquals(['John'], $decoded['values']);
+    }
+
+    public function testToStringWithNestedQuery(): void
+    {
+        $json = Query::and([Query::equal('x', [1])])->toString();
+        $decoded = \json_decode($json, true);
+        $this->assertIsArray($decoded);
+        /** @var array<string, mixed> $decoded */
+        $this->assertEquals('and', $decoded['method']);
+        $this->assertIsArray($decoded['values']);
+        $this->assertCount(1, $decoded['values']);
+        /** @var array<string, mixed> $inner */
+        $inner = $decoded['values'][0];
+        $this->assertEquals('equal', $inner['method']);
+    }
+
+    public function testToStringThrowsOnInvalidJson(): void
+    {
+        // Verify that toString returns valid JSON for complex queries
+        $query = Query::and([
+            Query::or([
+                Query::equal('a', [1]),
+                Query::greaterThan('b', 2),
+            ]),
+            Query::lessThan('c', 3),
+        ]);
+        $json = $query->toString();
+        $this->assertJson($json);
+    }
+
+    public function testSetMethodWithEnum(): void
+    {
+        $query = new Query('equal');
+        $query->setMethod(Method::GreaterThan);
+        $this->assertSame(Method::GreaterThan, $query->getMethod());
+    }
+
+    public function testToArraySimpleFilter(): void
+    {
+        $array = Query::equal('age', [25])->toArray();
+        $this->assertEquals('equal', $array['method']);
+        $this->assertEquals('age', $array['attribute']);
+        $this->assertEquals([25], $array['values']);
+    }
+
+    public function testToArrayWithEmptyAttribute(): void
+    {
+        $array = Query::distinct()->toArray();
+        $this->assertArrayNotHasKey('attribute', $array);
+    }
+
+    public function testToArrayNestedQuery(): void
+    {
+        $array = Query::and([Query::equal('x', [1])])->toArray();
+        $this->assertIsArray($array['values']);
+        $this->assertCount(1, $array['values']);
+        /** @var array<string, mixed> $nested */
+        $nested = $array['values'][0];
+        $this->assertArrayHasKey('method', $nested);
+        $this->assertArrayHasKey('attribute', $nested);
+        $this->assertArrayHasKey('values', $nested);
+        $this->assertEquals('equal', $nested['method']);
+    }
+
+    public function testCompileOrderAsc(): void
+    {
+        $builder = new MySQLBuilder();
+        $result = Query::orderAsc('name')->compile($builder);
+        $this->assertStringContainsString('ASC', $result);
+    }
+
+    public function testCompileOrderDesc(): void
+    {
+        $builder = new MySQLBuilder();
+        $result = Query::orderDesc('name')->compile($builder);
+        $this->assertStringContainsString('DESC', $result);
+    }
+
+    public function testCompileLimit(): void
+    {
+        $builder = new MySQLBuilder();
+        $result = Query::limit(10)->compile($builder);
+        $this->assertStringContainsString('LIMIT ?', $result);
+    }
+
+    public function testCompileOffset(): void
+    {
+        $builder = new MySQLBuilder();
+        $result = Query::offset(5)->compile($builder);
+        $this->assertStringContainsString('OFFSET ?', $result);
+    }
+
+    public function testCompileAggregate(): void
+    {
+        $builder = new MySQLBuilder();
+        $result = Query::count('*', 'total')->compile($builder);
+        $this->assertStringContainsString('COUNT(*)', $result);
+        $this->assertStringContainsString('total', $result);
+    }
+
+    public function testIsMethodReturnsFalseForGarbage(): void
+    {
+        $this->assertFalse(Query::isMethod('notAMethod'));
+    }
+
+    public function testIsMethodReturnsFalseForEmpty(): void
+    {
+        $this->assertFalse(Query::isMethod(''));
+    }
+
+    public function testJsonContainsFactory(): void
+    {
+        $query = Query::jsonContains('tags', 'php');
+        $this->assertSame(Method::JsonContains, $query->getMethod());
+        $this->assertEquals('tags', $query->getAttribute());
+        $this->assertEquals(['php'], $query->getValues());
+    }
+
+    public function testJsonNotContainsFactory(): void
+    {
+        $query = Query::jsonNotContains('meta', 42);
+        $this->assertSame(Method::JsonNotContains, $query->getMethod());
+    }
+
+    public function testJsonOverlapsFactory(): void
+    {
+        $query = Query::jsonOverlaps('tags', ['a', 'b']);
+        $this->assertSame(Method::JsonOverlaps, $query->getMethod());
+        $this->assertEquals([['a', 'b']], $query->getValues());
+    }
+
+    public function testJsonPathFactory(): void
+    {
+        $query = Query::jsonPath('data', 'name', '=', 'test');
+        $this->assertSame(Method::JsonPath, $query->getMethod());
+        $this->assertEquals(['name', '=', 'test'], $query->getValues());
+    }
+
+    public function testCoversFactory(): void
+    {
+        $query = Query::covers('zone', [1.0, 2.0]);
+        $this->assertSame(Method::Covers, $query->getMethod());
+    }
+
+    public function testNotCoversFactory(): void
+    {
+        $query = Query::notCovers('zone', [1.0, 2.0]);
+        $this->assertSame(Method::NotCovers, $query->getMethod());
+    }
+
+    public function testSpatialEqualsFactory(): void
+    {
+        $query = Query::spatialEquals('geom', [3.0, 4.0]);
+        $this->assertSame(Method::SpatialEquals, $query->getMethod());
+    }
+
+    public function testNotSpatialEqualsFactory(): void
+    {
+        $query = Query::notSpatialEquals('geom', [3.0, 4.0]);
+        $this->assertSame(Method::NotSpatialEquals, $query->getMethod());
+    }
+
+    public function testIsJsonMethod(): void
+    {
+        $this->assertTrue(Method::JsonContains->isJson());
+        $this->assertTrue(Method::JsonNotContains->isJson());
+        $this->assertTrue(Method::JsonOverlaps->isJson());
+        $this->assertTrue(Method::JsonPath->isJson());
+    }
+
+    public function testIsJsonMethodFalseForNonJson(): void
+    {
+        $this->assertFalse(Method::Equal->isJson());
+    }
+
+    public function testIsSpatialMethodCovers(): void
+    {
+        $this->assertTrue(Method::Covers->isSpatial());
+        $this->assertTrue(Method::NotCovers->isSpatial());
+        $this->assertTrue(Method::SpatialEquals->isSpatial());
+        $this->assertTrue(Method::NotSpatialEquals->isSpatial());
+    }
+
+    public function testIsSpatialMethodFalseForNonSpatial(): void
+    {
+        $this->assertFalse(Method::Equal->isSpatial());
+    }
+
+    public function testIsFilterMethod(): void
+    {
+        $this->assertTrue(Method::Equal->isFilter());
+        $this->assertTrue(Method::NotEqual->isFilter());
+    }
+
+    public function testIsFilterMethodFalseForNonFilter(): void
+    {
+        $this->assertFalse(Method::OrderAsc->isFilter());
     }
 }

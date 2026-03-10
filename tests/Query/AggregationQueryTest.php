@@ -93,11 +93,10 @@ class AggregationQueryTest extends TestCase
         $this->assertTrue(Method::Avg->isAggregate());
         $this->assertTrue(Method::Min->isAggregate());
         $this->assertTrue(Method::Max->isAggregate());
+        $this->assertTrue(Method::CountDistinct->isAggregate());
         $aggMethods = array_filter(Method::cases(), fn (Method $m) => $m->isAggregate());
-        $this->assertCount(5, $aggMethods);
+        $this->assertCount(6, $aggMethods);
     }
-
-    // ── Edge cases ──
 
     public function testCountWithEmptyStringAttribute(): void
     {
@@ -202,7 +201,7 @@ class AggregationQueryTest extends TestCase
 
     public function testCountCompileDispatch(): void
     {
-        $builder = new \Utopia\Query\Builder\SQL();
+        $builder = new \Utopia\Query\Builder\MySQL();
         $query = Query::count('id');
         $sql = $query->compile($builder);
         $this->assertEquals('COUNT(`id`)', $sql);
@@ -210,7 +209,7 @@ class AggregationQueryTest extends TestCase
 
     public function testSumCompileDispatch(): void
     {
-        $builder = new \Utopia\Query\Builder\SQL();
+        $builder = new \Utopia\Query\Builder\MySQL();
         $query = Query::sum('price', 'total');
         $sql = $query->compile($builder);
         $this->assertEquals('SUM(`price`) AS `total`', $sql);
@@ -218,7 +217,7 @@ class AggregationQueryTest extends TestCase
 
     public function testAvgCompileDispatch(): void
     {
-        $builder = new \Utopia\Query\Builder\SQL();
+        $builder = new \Utopia\Query\Builder\MySQL();
         $query = Query::avg('score');
         $sql = $query->compile($builder);
         $this->assertEquals('AVG(`score`)', $sql);
@@ -226,7 +225,7 @@ class AggregationQueryTest extends TestCase
 
     public function testMinCompileDispatch(): void
     {
-        $builder = new \Utopia\Query\Builder\SQL();
+        $builder = new \Utopia\Query\Builder\MySQL();
         $query = Query::min('price');
         $sql = $query->compile($builder);
         $this->assertEquals('MIN(`price`)', $sql);
@@ -234,7 +233,7 @@ class AggregationQueryTest extends TestCase
 
     public function testMaxCompileDispatch(): void
     {
-        $builder = new \Utopia\Query\Builder\SQL();
+        $builder = new \Utopia\Query\Builder\MySQL();
         $query = Query::max('price');
         $sql = $query->compile($builder);
         $this->assertEquals('MAX(`price`)', $sql);
@@ -242,7 +241,7 @@ class AggregationQueryTest extends TestCase
 
     public function testGroupByCompileDispatch(): void
     {
-        $builder = new \Utopia\Query\Builder\SQL();
+        $builder = new \Utopia\Query\Builder\MySQL();
         $query = Query::groupBy(['status', 'country']);
         $sql = $query->compile($builder);
         $this->assertEquals('`status`, `country`', $sql);
@@ -250,7 +249,7 @@ class AggregationQueryTest extends TestCase
 
     public function testHavingCompileDispatchUsesCompileFilter(): void
     {
-        $builder = new \Utopia\Query\Builder\SQL();
+        $builder = new \Utopia\Query\Builder\MySQL();
         $query = Query::having([Query::greaterThan('total', 5)]);
         $sql = $query->compile($builder);
         $this->assertEquals('(`total` > ?)', $sql);

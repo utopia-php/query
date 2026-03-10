@@ -189,8 +189,6 @@ class QueryParseTest extends TestCase
         $this->assertInstanceOf(Query::class, $parsed->getValues()[0]);
     }
 
-    // ── Round-trip tests for new types ──
-
     public function testRoundTripCount(): void
     {
         $original = Query::count('id', 'total');
@@ -275,12 +273,8 @@ class QueryParseTest extends TestCase
         $this->assertCount(1, $parsed->getValues());
         $this->assertInstanceOf(Query::class, $parsed->getValues()[0]);
     }
-
-    // ══════════════════════════════════════════
     //  ADDITIONAL EDGE CASES
-    // ══════════════════════════════════════════
 
-    // ── Round-trip additional ──
 
     public function testRoundTripAvg(): void
     {
@@ -419,8 +413,6 @@ class QueryParseTest extends TestCase
         $this->assertCount(2, $inner->getValues());
     }
 
-    // ── Parse edge cases ──
-
     public function testParseEmptyStringThrows(): void
     {
         $this->expectException(Exception::class);
@@ -471,8 +463,6 @@ class QueryParseTest extends TestCase
         $this->expectException(Exception::class);
         Query::parse('[1,2,3]');
     }
-
-    // ── toArray edge cases ──
 
     public function testToArrayCountWithAlias(): void
     {
@@ -549,8 +539,6 @@ class QueryParseTest extends TestCase
         $this->assertEquals([10], $array['values']);
     }
 
-    // ── parseQueries edge cases ──
-
     public function testParseQueriesEmpty(): void
     {
         $result = Query::parseQueries([]);
@@ -571,8 +559,6 @@ class QueryParseTest extends TestCase
         $this->assertSame(Method::Distinct, $queries[2]->getMethod());
         $this->assertSame(Method::Join, $queries[3]->getMethod());
     }
-
-    // ── toString edge cases ──
 
     public function testToStringGroupByProducesValidJson(): void
     {

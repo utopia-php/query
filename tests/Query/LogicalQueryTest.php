@@ -40,4 +40,51 @@ class LogicalQueryTest extends TestCase
         $this->assertSame(Method::ElemMatch, $query->getMethod());
         $this->assertEquals('items', $query->getAttribute());
     }
+
+    public function testOrIsNested(): void
+    {
+        $query = Query::or([Query::equal('x', [1])]);
+        $this->assertTrue($query->isNested());
+    }
+
+    public function testAndIsNested(): void
+    {
+        $query = Query::and([Query::equal('x', [1])]);
+        $this->assertTrue($query->isNested());
+    }
+
+    public function testElemMatchIsNested(): void
+    {
+        $query = Query::elemMatch('items', [Query::equal('field', ['val'])]);
+        $this->assertTrue($query->isNested());
+    }
+
+    public function testEmptyAnd(): void
+    {
+        $query = Query::and([]);
+        $this->assertEquals([], $query->getValues());
+    }
+
+    public function testEmptyOr(): void
+    {
+        $query = Query::or([]);
+        $this->assertEquals([], $query->getValues());
+    }
+
+    public function testNestedAndOr(): void
+    {
+        $query = Query::and([
+            Query::or([
+                Query::equal('a', [1]),
+                Query::equal('b', [2]),
+            ]),
+        ]);
+        $values = $query->getValues();
+        $this->assertCount(1, $values);
+        /** @var Query $orQuery */
+        $orQuery = $values[0];
+        $this->assertSame(Method::Or, $orQuery->getMethod());
+        $orValues = $orQuery->getValues();
+        $this->assertCount(2, $orValues);
+    }
 }

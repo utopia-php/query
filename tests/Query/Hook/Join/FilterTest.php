@@ -1,0 +1,298 @@
+<?php
+
+namespace Tests\Query\Hook\Join;
+
+use PHPUnit\Framework\TestCase;
+use Utopia\Query\Builder\Condition;
+use Utopia\Query\Builder\MySQL as Builder;
+use Utopia\Query\Hook\Filter;
+use Utopia\Query\Hook\Filter\Permission;
+use Utopia\Query\Hook\Filter\Tenant;
+use Utopia\Query\Hook\Join\Condition as JoinCondition;
+use Utopia\Query\Hook\Join\Filter as JoinFilter;
+use Utopia\Query\Hook\Join\Placement;
+use Utopia\Query\Query;
+
+class FilterTest extends TestCase
+{
+    public function testOnPlacementForLeftJoin(): void
+    {
+        $hook = new class () implements JoinFilter {
+            public function filterJoin(string $table, string $joinType): JoinCondition
+            {
+                return new JoinCondition(
+                    new Condition('active = ?', [1]),
+                    Placement::On,
+                );
+            }
+        };
+
+        $result = (new Builder())
+            ->from('users')
+            ->addHook($hook)
+            ->leftJoin('orders', 'users.id', 'orders.user_id')
+            ->build();
+
+        $this->assertStringContainsString('LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id` AND active = ?', $result->query);
+        $this->assertStringNotContainsString('WHERE', $result->query);
+        $this->assertEquals([1], $result->bindings);
+    }
+
+    public function testWherePlacementForInnerJoin(): void
+    {
+        $hook = new class () implements JoinFilter {
+            public function filterJoin(string $table, string $joinType): JoinCondition
+            {
+                return new JoinCondition(
+                    new Condition('active = ?', [1]),
+                    Placement::Where,
+                );
+            }
+        };
+
+        $result = (new Builder())
+            ->from('users')
+            ->addHook($hook)
+            ->join('orders', 'users.id', 'orders.user_id')
+            ->build();
+
+        $this->assertStringContainsString('JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $result->query);
+        $this->assertStringNotContainsString('ON `users`.`id` = `orders`.`user_id` AND', $result->query);
+        $this->assertStringContainsString('WHERE active = ?', $result->query);
+        $this->assertEquals([1], $result->bindings);
+    }
+
+    public function testReturnsNullSkipsJoin(): void
+    {
+        $hook = new class () implements JoinFilter {
+            public function filterJoin(string $table, string $joinType): ?JoinCondition
+            {
+                return null;
+            }
+        };
+
+        $result = (new Builder())
+            ->from('users')
+            ->addHook($hook)
+            ->leftJoin('orders', 'users.id', 'orders.user_id')
+            ->build();
+
+        $this->assertEquals('SELECT * FROM `users` LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testCrossJoinForcesOnToWhere(): void
+    {
+        $hook = new class () implements JoinFilter {
+            public function filterJoin(string $table, string $joinType): JoinCondition
+            {
+                return new JoinCondition(
+                    new Condition('active = ?', [1]),
+                    Placement::On,
+                );
+            }
+        };
+
+        $result = (new Builder())
+            ->from('users')
+            ->addHook($hook)
+            ->crossJoin('settings')
+            ->build();
+
+        $this->assertStringContainsString('CROSS JOIN `settings`', $result->query);
+        $this->assertStringNotContainsString('CROSS JOIN `settings` AND', $result->query);
+        $this->assertStringContainsString('WHERE active = ?', $result->query);
+        $this->assertEquals([1], $result->bindings);
+    }
+
+    public function testMultipleHooksOnSameJoin(): void
+    {
+        $hook1 = new class () implements JoinFilter {
+            public function filterJoin(string $table, string $joinType): JoinCondition
+            {
+                return new JoinCondition(
+                    new Condition('active = ?', [1]),
+                    Placement::On,
+                );
+            }
+        };
+
+        $hook2 = new class () implements JoinFilter {
+            public function filterJoin(string $table, string $joinType): JoinCondition
+            {
+                return new JoinCondition(
+                    new Condition('visible = ?', [true]),
+                    Placement::On,
+                );
+            }
+        };
+
+        $result = (new Builder())
+            ->from('users')
+            ->addHook($hook1)
+            ->addHook($hook2)
+            ->leftJoin('orders', 'users.id', 'orders.user_id')
+            ->build();
+
+        $this->assertStringContainsString(
+            'LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id` AND active = ? AND visible = ?',
+            $result->query
+        );
+        $this->assertEquals([1, true], $result->bindings);
+    }
+
+    public function testBindingOrderCorrectness(): void
+    {
+        $onHook = new class () implements JoinFilter {
+            public function filterJoin(string $table, string $joinType): JoinCondition
+            {
+                return new JoinCondition(
+                    new Condition('on_col = ?', ['on_val']),
+                    Placement::On,
+                );
+            }
+        };
+
+        $whereHook = new class () implements JoinFilter {
+            public function filterJoin(string $table, string $joinType): JoinCondition
+            {
+                return new JoinCondition(
+                    new Condition('where_col = ?', ['where_val']),
+                    Placement::Where,
+                );
+            }
+        };
+
+        $result = (new Builder())
+            ->from('users')
+            ->addHook($onHook)
+            ->addHook($whereHook)
+            ->leftJoin('orders', 'users.id', 'orders.user_id')
+            ->filter([Query::equal('status', ['active'])])
+            ->build();
+
+        // ON bindings come first (during join compilation), then filter bindings, then WHERE join filter bindings
+        $this->assertEquals(['on_val', 'active', 'where_val'], $result->bindings);
+    }
+
+    public function testFilterOnlyBackwardCompat(): void
+    {
+        $hook = new class () implements Filter {
+            public function filter(string $table): Condition
+            {
+                return new Condition('deleted = ?', [0]);
+            }
+        };
+
+        $result = (new Builder())
+            ->from('users')
+            ->addHook($hook)
+            ->leftJoin('orders', 'users.id', 'orders.user_id')
+            ->build();
+
+        // Filter-only hooks should still apply to WHERE, not to joins
+        $this->assertStringContainsString('LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $result->query);
+        $this->assertStringNotContainsString('ON `users`.`id` = `orders`.`user_id` AND', $result->query);
+        $this->assertStringContainsString('WHERE deleted = ?', $result->query);
+        $this->assertEquals([0], $result->bindings);
+    }
+
+    public function testDualInterfaceHook(): void
+    {
+        $hook = new class () implements Filter, JoinFilter {
+            public function filter(string $table): Condition
+            {
+                return new Condition('main_active = ?', [1]);
+            }
+
+            public function filterJoin(string $table, string $joinType): JoinCondition
+            {
+                return new JoinCondition(
+                    new Condition('join_active = ?', [1]),
+                    Placement::On,
+                );
+            }
+        };
+
+        $result = (new Builder())
+            ->from('users')
+            ->addHook($hook)
+            ->leftJoin('orders', 'users.id', 'orders.user_id')
+            ->build();
+
+        // Filter applies to WHERE for main table
+        $this->assertStringContainsString('WHERE main_active = ?', $result->query);
+        // JoinFilter applies to ON for join
+        $this->assertStringContainsString('ON `users`.`id` = `orders`.`user_id` AND join_active = ?', $result->query);
+        // ON binding first, then WHERE binding
+        $this->assertEquals([1, 1], $result->bindings);
+    }
+
+    public function testPermissionLeftJoinOnPlacement(): void
+    {
+        $hook = new Permission(
+            roles: ['role:admin'],
+            permissionsTable: fn (string $table) => "mydb_{$table}_perms",
+        );
+        $condition = $hook->filterJoin('orders', 'LEFT JOIN');
+
+        $this->assertNotNull($condition);
+        $this->assertEquals(Placement::On, $condition->placement);
+        $this->assertStringContainsString('id IN', $condition->condition->getExpression());
+    }
+
+    public function testPermissionInnerJoinWherePlacement(): void
+    {
+        $hook = new Permission(
+            roles: ['role:admin'],
+            permissionsTable: fn (string $table) => "mydb_{$table}_perms",
+        );
+        $condition = $hook->filterJoin('orders', 'JOIN');
+
+        $this->assertNotNull($condition);
+        $this->assertEquals(Placement::Where, $condition->placement);
+    }
+
+    public function testTenantLeftJoinOnPlacement(): void
+    {
+        $hook = new Tenant(['t1']);
+        $condition = $hook->filterJoin('orders', 'LEFT JOIN');
+
+        $this->assertNotNull($condition);
+        $this->assertEquals(Placement::On, $condition->placement);
+        $this->assertStringContainsString('tenant_id IN', $condition->condition->getExpression());
+    }
+
+    public function testTenantInnerJoinWherePlacement(): void
+    {
+        $hook = new Tenant(['t1']);
+        $condition = $hook->filterJoin('orders', 'JOIN');
+
+        $this->assertNotNull($condition);
+        $this->assertEquals(Placement::Where, $condition->placement);
+    }
+
+    public function testHookReceivesCorrectTableAndJoinType(): void
+    {
+        // Tenant returns On for RIGHT JOIN — verifying it received the correct joinType
+        $hook = new Tenant(['t1']);
+
+        $rightJoinResult = $hook->filterJoin('orders', 'RIGHT JOIN');
+        $this->assertNotNull($rightJoinResult);
+        $this->assertEquals(Placement::On, $rightJoinResult->placement);
+
+        // Same hook returns Where for JOIN — verifying joinType discrimination
+        $innerJoinResult = $hook->filterJoin('orders', 'JOIN');
+        $this->assertNotNull($innerJoinResult);
+        $this->assertEquals(Placement::Where, $innerJoinResult->placement);
+
+        // Verify table name is used in the condition expression
+        $permHook = new Permission(
+            roles: ['role:admin'],
+            permissionsTable: fn (string $table) => "mydb_{$table}_perms",
+        );
+        $result = $permHook->filterJoin('orders', 'LEFT JOIN');
+        $this->assertNotNull($result);
+        $this->assertStringContainsString('mydb_orders_perms', $result->condition->getExpression());
+    }
+}

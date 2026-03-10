@@ -1,15 +1,15 @@
 <?php
 
-namespace Tests\Query\Hook;
+namespace Tests\Query\Hook\Attribute;
 
 use PHPUnit\Framework\TestCase;
-use Utopia\Query\Hook\AttributeMapHook;
+use Utopia\Query\Hook\Attribute\Map;
 
-class AttributeHookTest extends TestCase
+class AttributeTest extends TestCase
 {
     public function testMappedAttribute(): void
     {
-        $hook = new AttributeMapHook([
+        $hook = new Map([
             '$id' => '_uid',
             '$createdAt' => '_createdAt',
         ]);
@@ -20,7 +20,7 @@ class AttributeHookTest extends TestCase
 
     public function testUnmappedPassthrough(): void
     {
-        $hook = new AttributeMapHook(['$id' => '_uid']);
+        $hook = new Map(['$id' => '_uid']);
 
         $this->assertEquals('name', $hook->resolve('name'));
         $this->assertEquals('status', $hook->resolve('status'));
@@ -28,7 +28,7 @@ class AttributeHookTest extends TestCase
 
     public function testEmptyMap(): void
     {
-        $hook = new AttributeMapHook([]);
+        $hook = new Map([]);
 
         $this->assertEquals('anything', $hook->resolve('anything'));
     }

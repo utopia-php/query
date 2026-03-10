@@ -4,6 +4,7 @@ namespace Tests\Query;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\CursorDirection;
+use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
 use Utopia\Query\OrderDirection;
 use Utopia\Query\Query;
@@ -285,8 +286,6 @@ class QueryHelperTest extends TestCase
         $this->assertEquals([], $grouped->filters);
     }
 
-    // ── groupByType with new types ──
-
     public function testGroupByTypeAggregations(): void
     {
         $queries = [
@@ -354,8 +353,6 @@ class QueryHelperTest extends TestCase
         $this->assertCount(2, $grouped->unions);
     }
 
-    // ── merge() ──
-
     public function testMergeConcatenates(): void
     {
         $a = [Query::equal('name', ['John'])];
@@ -399,8 +396,6 @@ class QueryHelperTest extends TestCase
         $this->assertEquals('xyz', $result[0]->getValue());
     }
 
-    // ── diff() ──
-
     public function testDiffReturnsUnique(): void
     {
         $shared = Query::equal('name', ['John']);
@@ -426,8 +421,6 @@ class QueryHelperTest extends TestCase
         $result = Query::diff($a, $b);
         $this->assertCount(1, $result);
     }
-
-    // ── validate() ──
 
     public function testValidatePassesAllowed(): void
     {
@@ -490,8 +483,6 @@ class QueryHelperTest extends TestCase
         $this->assertCount(0, $errors);
     }
 
-    // ── page() static helper ──
-
     public function testPageStaticHelper(): void
     {
         $result = Query::page(3, 10);
@@ -511,9 +502,8 @@ class QueryHelperTest extends TestCase
 
     public function testPageStaticHelperZero(): void
     {
-        $result = Query::page(0, 10);
-        $this->assertEquals(10, $result[0]->getValue());
-        $this->assertEquals(-10, $result[1]->getValue());
+        $this->expectException(ValidationException::class);
+        Query::page(0, 10);
     }
 
     public function testPageStaticHelperLarge(): void
@@ -522,12 +512,8 @@ class QueryHelperTest extends TestCase
         $this->assertEquals(50, $result[0]->getValue());
         $this->assertEquals(24950, $result[1]->getValue());
     }
-
-    // ══════════════════════════════════════════
     //  ADDITIONAL EDGE CASES
-    // ══════════════════════════════════════════
 
-    // ── groupByType with all new types combined ──
 
     public function testGroupByTypeAllNewTypes(): void
     {
@@ -610,8 +596,6 @@ class QueryHelperTest extends TestCase
         $this->assertEquals([], $grouped->unions);
     }
 
-    // ── merge() additional edge cases ──
-
     public function testMergeEmptyA(): void
     {
         $b = [Query::equal('x', [1])];
@@ -671,8 +655,6 @@ class QueryHelperTest extends TestCase
         $this->assertCount(4, $result);
     }
 
-    // ── diff() additional edge cases ──
-
     public function testDiffEmptyA(): void
     {
         $result = Query::diff([], [Query::equal('x', [1])]);
@@ -730,8 +712,6 @@ class QueryHelperTest extends TestCase
         $this->assertCount(1, $result);
         $this->assertSame(Method::Limit, $result[0]->getMethod());
     }
-
-    // ── validate() additional edge cases ──
 
     public function testValidateEmptyQueries(): void
     {
@@ -869,8 +849,6 @@ class QueryHelperTest extends TestCase
         $errors = Query::validate($queries, []);
         $this->assertCount(0, $errors);
     }
-
-    // ── getByType additional ──
 
     public function testGetByTypeWithNewTypes(): void
     {
