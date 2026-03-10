@@ -68,6 +68,7 @@ enum Method: string
 
     // Aggregation methods
     case Count = 'count';
+    case CountDistinct = 'countDistinct';
     case Sum = 'sum';
     case Avg = 'avg';
     case Min = 'min';
@@ -88,8 +89,52 @@ enum Method: string
     case Union = 'union';
     case UnionAll = 'unionAll';
 
+    // JSON filter methods
+    case JsonContains = 'jsonContains';
+    case JsonNotContains = 'jsonNotContains';
+    case JsonOverlaps = 'jsonOverlaps';
+    case JsonPath = 'jsonPath';
+
+    // Vector ordering
+    case OrderVectorDistance = 'orderVectorDistance';
+
+    // Spatial predicate extras
+    case Covers = 'covers';
+    case NotCovers = 'notCovers';
+    case SpatialEquals = 'spatialEquals';
+    case NotSpatialEquals = 'notSpatialEquals';
+
     // Raw
     case Raw = 'raw';
+
+    public function isFilter(): bool
+    {
+        return match ($this) {
+            self::Equal,
+            self::NotEqual,
+            self::LessThan,
+            self::LessThanEqual,
+            self::GreaterThan,
+            self::GreaterThanEqual,
+            self::Contains,
+            self::ContainsAny,
+            self::NotContains,
+            self::Search,
+            self::NotSearch,
+            self::IsNull,
+            self::IsNotNull,
+            self::Between,
+            self::NotBetween,
+            self::StartsWith,
+            self::NotStartsWith,
+            self::EndsWith,
+            self::NotEndsWith,
+            self::Regex,
+            self::Exists,
+            self::NotExists => true,
+            default => false,
+        };
+    }
 
     public function isSpatial(): bool
     {
@@ -105,7 +150,32 @@ enum Method: string
             self::Overlaps,
             self::NotOverlaps,
             self::Touches,
-            self::NotTouches => true,
+            self::NotTouches,
+            self::Covers,
+            self::NotCovers,
+            self::SpatialEquals,
+            self::NotSpatialEquals => true,
+            default => false,
+        };
+    }
+
+    public function isVector(): bool
+    {
+        return match ($this) {
+            self::VectorDot,
+            self::VectorCosine,
+            self::VectorEuclidean => true,
+            default => false,
+        };
+    }
+
+    public function isJson(): bool
+    {
+        return match ($this) {
+            self::JsonContains,
+            self::JsonNotContains,
+            self::JsonOverlaps,
+            self::JsonPath => true,
             default => false,
         };
     }
@@ -127,6 +197,7 @@ enum Method: string
     {
         return match ($this) {
             self::Count,
+            self::CountDistinct,
             self::Sum,
             self::Avg,
             self::Min,
@@ -142,16 +213,6 @@ enum Method: string
             self::LeftJoin,
             self::RightJoin,
             self::CrossJoin => true,
-            default => false,
-        };
-    }
-
-    public function isVector(): bool
-    {
-        return match ($this) {
-            self::VectorDot,
-            self::VectorCosine,
-            self::VectorEuclidean => true,
             default => false,
         };
     }

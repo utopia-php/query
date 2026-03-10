@@ -242,31 +242,23 @@ class Query
             Method::OrderAsc,
             Method::OrderDesc,
             Method::OrderRandom => $compiler->compileOrder($this),
-
             Method::Limit => $compiler->compileLimit($this),
-
             Method::Offset => $compiler->compileOffset($this),
-
             Method::CursorAfter,
             Method::CursorBefore => $compiler->compileCursor($this),
-
             Method::Select => $compiler->compileSelect($this),
-
             Method::Count,
+            Method::CountDistinct,
             Method::Sum,
             Method::Avg,
             Method::Min,
             Method::Max => $compiler->compileAggregate($this),
-
             Method::GroupBy => $compiler->compileGroupBy($this),
-
             Method::Join,
             Method::LeftJoin,
             Method::RightJoin,
             Method::CrossJoin => $compiler->compileJoin($this),
-
             Method::Having => $compiler->compileFilter($this),
-
             default => $compiler->compileFilter($this),
         };
     }
@@ -693,6 +685,7 @@ class Query
                     break;
 
                 case Method::Count:
+                case Method::CountDistinct:
                 case Method::Sum:
                 case Method::Avg:
                 case Method::Min:
@@ -974,6 +967,11 @@ class Query
         return new static(Method::Count, $attribute, $alias !== '' ? [$alias] : []);
     }
 
+    public static function countDistinct(string $attribute, string $alias = ''): static
+    {
+        return new static(Method::CountDistinct, $attribute, $alias !== '' ? [$alias] : []);
+    }
+
     public static function sum(string $attribute, string $alias = ''): static
     {
         return new static(Method::Sum, $attribute, $alias !== '' ? [$alias] : []);
@@ -1017,24 +1015,39 @@ class Query
 
     // Join factory methods
 
-    public static function join(string $table, string $left, string $right, string $operator = '='): static
+    public static function join(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
     {
-        return new static(Method::Join, $table, [$left, $operator, $right]);
+        $values = [$left, $operator, $right];
+        if ($alias !== '') {
+            $values[] = $alias;
+        }
+
+        return new static(Method::Join, $table, $values);
     }
 
-    public static function leftJoin(string $table, string $left, string $right, string $operator = '='): static
+    public static function leftJoin(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
     {
-        return new static(Method::LeftJoin, $table, [$left, $operator, $right]);
+        $values = [$left, $operator, $right];
+        if ($alias !== '') {
+            $values[] = $alias;
+        }
+
+        return new static(Method::LeftJoin, $table, $values);
     }
 
-    public static function rightJoin(string $table, string $left, string $right, string $operator = '='): static
+    public static function rightJoin(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
     {
-        return new static(Method::RightJoin, $table, [$left, $operator, $right]);
+        $values = [$left, $operator, $right];
+        if ($alias !== '') {
+            $values[] = $alias;
+        }
+
+        return new static(Method::RightJoin, $table, $values);
     }
 
-    public static function crossJoin(string $table): static
+    public static function crossJoin(string $table, string $alias = ''): static
     {
-        return new static(Method::CrossJoin, $table);
+        return new static(Method::CrossJoin, $table, $alias !== '' ? [$alias] : []);
     }
 
     // Union factory methods
@@ -1053,6 +1066,65 @@ class Query
     public static function unionAll(array $queries): static
     {
         return new static(Method::UnionAll, '', $queries);
+    }
+
+    // JSON factory methods
+
+    public static function jsonContains(string $attribute, mixed $value): static
+    {
+        return new static(Method::JsonContains, $attribute, [$value]);
+    }
+
+    public static function jsonNotContains(string $attribute, mixed $value): static
+    {
+        return new static(Method::JsonNotContains, $attribute, [$value]);
+    }
+
+    /**
+     * @param  array<mixed>  $values
+     */
+    public static function jsonOverlaps(string $attribute, array $values): static
+    {
+        return new static(Method::JsonOverlaps, $attribute, [$values]);
+    }
+
+    public static function jsonPath(string $attribute, string $path, string $operator, mixed $value): static
+    {
+        return new static(Method::JsonPath, $attribute, [$path, $operator, $value]);
+    }
+
+    // Spatial predicate extras
+
+    /**
+     * @param  array<mixed>  $values
+     */
+    public static function covers(string $attribute, array $values): static
+    {
+        return new static(Method::Covers, $attribute, [$values]);
+    }
+
+    /**
+     * @param  array<mixed>  $values
+     */
+    public static function notCovers(string $attribute, array $values): static
+    {
+        return new static(Method::NotCovers, $attribute, [$values]);
+    }
+
+    /**
+     * @param  array<mixed>  $values
+     */
+    public static function spatialEquals(string $attribute, array $values): static
+    {
+        return new static(Method::SpatialEquals, $attribute, [$values]);
+    }
+
+    /**
+     * @param  array<mixed>  $values
+     */
+    public static function notSpatialEquals(string $attribute, array $values): static
+    {
+        return new static(Method::NotSpatialEquals, $attribute, [$values]);
     }
 
     // Raw factory method
@@ -1074,6 +1146,13 @@ class Query
      */
     public static function page(int $page, int $perPage = 25): array
     {
+        if ($page < 1) {
+            throw new \Utopia\Query\Exception\ValidationException('Page must be >= 1, got ' . $page);
+        }
+        if ($perPage < 1) {
+            throw new \Utopia\Query\Exception\ValidationException('Per page must be >= 1, got ' . $perPage);
+        }
+
         return [
             static::limit($perPage),
             static::offset(($page - 1) * $perPage),
