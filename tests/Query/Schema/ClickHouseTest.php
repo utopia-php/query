@@ -3,14 +3,19 @@
 namespace Tests\Query\Schema;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\ClickHouse as ClickHouseBuilder;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\ClickHouse as Schema;
+use Utopia\Query\Schema\Feature\ForeignKeys;
+use Utopia\Query\Schema\Feature\Procedures;
+use Utopia\Query\Schema\Feature\Triggers;
 
 class ClickHouseTest extends TestCase
 {
+    use AssertsBindingCount;
     // CREATE TABLE
 
     public function testCreateTableBasic(): void
@@ -21,6 +26,7 @@ class ClickHouseTest extends TestCase
             $table->string('name');
             $table->datetime('created_at', 3);
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('CREATE TABLE `events`', $result->query);
         $this->assertStringContainsString('`id` Int64', $result->query);
@@ -44,6 +50,7 @@ class ClickHouseTest extends TestCase
             $table->json('json_col');
             $table->binary('bin_col');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`int_col` Int32', $result->query);
         $this->assertStringContainsString('`uint_col` UInt32', $result->query);
@@ -62,6 +69,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->create('t', function (Blueprint $table) {
             $table->string('name')->nullable();
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('Nullable(String)', $result->query);
     }
@@ -72,6 +80,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->create('t', function (Blueprint $table) {
             $table->enum('status', ['active', 'inactive']);
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString("Enum8('active' = 1, 'inactive' = 2)", $result->query);
     }
@@ -82,6 +91,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->create('embeddings', function (Blueprint $table) {
             $table->vector('embedding', 768);
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('Array(Float64)', $result->query);
     }
@@ -94,6 +104,7 @@ class ClickHouseTest extends TestCase
             $table->linestring('path');
             $table->polygon('area');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('Tuple(Float64, Float64)', $result->query);
         $this->assertStringContainsString('Array(Tuple(Float64, Float64))', $result->query);
@@ -119,6 +130,7 @@ class ClickHouseTest extends TestCase
             $table->string('name');
             $table->index(['name']);
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('INDEX `idx_name` `name` TYPE minmax GRANULARITY 3', $result->query);
     }
@@ -130,6 +142,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->alter('events', function (Blueprint $table) {
             $table->addColumn('score', 'float');
         });
+        $this->assertBindingCount($result);
 
         $this->assertEquals('ALTER TABLE `events` ADD COLUMN `score` Float64', $result->query);
     }
@@ -140,6 +153,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->alter('events', function (Blueprint $table) {
             $table->modifyColumn('name', 'string');
         });
+        $this->assertBindingCount($result);
 
         $this->assertEquals('ALTER TABLE `events` MODIFY COLUMN `name` String', $result->query);
     }
@@ -150,6 +164,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->alter('events', function (Blueprint $table) {
             $table->renameColumn('old', 'new');
         });
+        $this->assertBindingCount($result);
 
         $this->assertEquals('ALTER TABLE `events` RENAME COLUMN `old` TO `new`', $result->query);
     }
@@ -160,6 +175,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->alter('events', function (Blueprint $table) {
             $table->dropColumn('old_col');
         });
+        $this->assertBindingCount($result);
 
         $this->assertEquals('ALTER TABLE `events` DROP COLUMN `old_col`', $result->query);
     }
@@ -180,6 +196,7 @@ class ClickHouseTest extends TestCase
     {
         $schema = new Schema();
         $result = $schema->drop('events');
+        $this->assertBindingCount($result);
 
         $this->assertEquals('DROP TABLE `events`', $result->query);
     }
@@ -188,6 +205,7 @@ class ClickHouseTest extends TestCase
     {
         $schema = new Schema();
         $result = $schema->truncate('events');
+        $this->assertBindingCount($result);
 
         $this->assertEquals('TRUNCATE TABLE `events`', $result->query);
     }
@@ -226,17 +244,17 @@ class ClickHouseTest extends TestCase
 
     public function testDoesNotImplementForeignKeys(): void
     {
-        $this->assertNotInstanceOf(\Utopia\Query\Schema\Feature\ForeignKeys::class, new Schema()); // @phpstan-ignore method.alreadyNarrowedType
+        $this->assertNotInstanceOf(ForeignKeys::class, new Schema()); // @phpstan-ignore method.alreadyNarrowedType
     }
 
     public function testDoesNotImplementProcedures(): void
     {
-        $this->assertNotInstanceOf(\Utopia\Query\Schema\Feature\Procedures::class, new Schema()); // @phpstan-ignore method.alreadyNarrowedType
+        $this->assertNotInstanceOf(Procedures::class, new Schema()); // @phpstan-ignore method.alreadyNarrowedType
     }
 
     public function testDoesNotImplementTriggers(): void
     {
-        $this->assertNotInstanceOf(\Utopia\Query\Schema\Feature\Triggers::class, new Schema()); // @phpstan-ignore method.alreadyNarrowedType
+        $this->assertNotInstanceOf(Triggers::class, new Schema()); // @phpstan-ignore method.alreadyNarrowedType
     }
 
     // Edge cases
@@ -256,6 +274,7 @@ class ClickHouseTest extends TestCase
             $table->bigInteger('id')->primary();
             $table->integer('count')->default(0);
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('DEFAULT 0', $result->query);
     }
@@ -267,6 +286,7 @@ class ClickHouseTest extends TestCase
             $table->bigInteger('id')->primary();
             $table->string('name')->comment('User name');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString("COMMENT 'User name'", $result->query);
     }
@@ -279,6 +299,7 @@ class ClickHouseTest extends TestCase
             $table->datetime('created_at', 3)->primary();
             $table->string('name');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('ORDER BY (`id`, `created_at`)', $result->query);
     }
@@ -291,6 +312,7 @@ class ClickHouseTest extends TestCase
             $table->dropColumn('old_col');
             $table->renameColumn('nm', 'name');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('ADD COLUMN `score` Float64', $result->query);
         $this->assertStringContainsString('DROP COLUMN `old_col`', $result->query);
@@ -303,6 +325,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->alter('events', function (Blueprint $table) {
             $table->dropIndex('idx_name');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('DROP INDEX `idx_name`', $result->query);
     }
@@ -317,6 +340,7 @@ class ClickHouseTest extends TestCase
             $table->index(['name']);
             $table->index(['type']);
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('INDEX `idx_name`', $result->query);
         $this->assertStringContainsString('INDEX `idx_type`', $result->query);
@@ -329,6 +353,7 @@ class ClickHouseTest extends TestCase
             $table->bigInteger('id')->primary();
             $table->timestamp('ts_col');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`ts_col` DateTime', $result->query);
         $this->assertStringNotContainsString('DateTime64', $result->query);
@@ -341,6 +366,7 @@ class ClickHouseTest extends TestCase
             $table->bigInteger('id')->primary();
             $table->datetime('dt_col');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`dt_col` DateTime', $result->query);
         $this->assertStringNotContainsString('DateTime64', $result->query);
@@ -355,6 +381,7 @@ class ClickHouseTest extends TestCase
             $table->string('type');
             $table->index(['name', 'type']);
         });
+        $this->assertBindingCount($result);
 
         // Composite index wraps in parentheses
         $this->assertStringContainsString('INDEX `idx_name_type` (`name`, `type`) TYPE minmax GRANULARITY 3', $result->query);
@@ -368,5 +395,48 @@ class ClickHouseTest extends TestCase
         $schema->alter('events', function (Blueprint $table) {
             $table->dropForeignKey('fk_old');
         });
+    }
+
+    public function testExactCreateTableWithEngine(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('metrics', function (Blueprint $table) {
+            $table->bigInteger('id')->primary();
+            $table->string('name');
+            $table->float('value');
+            $table->datetime('recorded_at', 3);
+        });
+
+        $this->assertSame(
+            'CREATE TABLE `metrics` (`id` Int64, `name` String, `value` Float64, `recorded_at` DateTime64(3)) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAlterTableAddColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->alter('metrics', function (Blueprint $table) {
+            $table->addColumn('description', 'text')->nullable();
+        });
+
+        $this->assertSame(
+            'ALTER TABLE `metrics` ADD COLUMN `description` Nullable(String)',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactDropTable(): void
+    {
+        $schema = new Schema();
+        $result = $schema->drop('metrics');
+
+        $this->assertSame('DROP TABLE `metrics`', $result->query);
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
     }
 }

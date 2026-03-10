@@ -3,29 +3,34 @@
 namespace Tests\Query\Schema;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\MySQL as SQLBuilder;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\Blueprint;
+use Utopia\Query\Schema\Feature\ForeignKeys;
+use Utopia\Query\Schema\Feature\Procedures;
+use Utopia\Query\Schema\Feature\Triggers;
 use Utopia\Query\Schema\MySQL as Schema;
 
 class MySQLTest extends TestCase
 {
+    use AssertsBindingCount;
     // Feature interfaces
 
     public function testImplementsForeignKeys(): void
     {
-        $this->assertInstanceOf(\Utopia\Query\Schema\Feature\ForeignKeys::class, new Schema());
+        $this->assertInstanceOf(ForeignKeys::class, new Schema());
     }
 
     public function testImplementsProcedures(): void
     {
-        $this->assertInstanceOf(\Utopia\Query\Schema\Feature\Procedures::class, new Schema());
+        $this->assertInstanceOf(Procedures::class, new Schema());
     }
 
     public function testImplementsTriggers(): void
     {
-        $this->assertInstanceOf(\Utopia\Query\Schema\Feature\Triggers::class, new Schema());
+        $this->assertInstanceOf(Triggers::class, new Schema());
     }
 
     // CREATE TABLE
@@ -38,6 +43,7 @@ class MySQLTest extends TestCase
             $table->string('name', 255);
             $table->string('email', 255)->unique();
         });
+        $this->assertBindingCount($result);
 
         $this->assertEquals(
             'CREATE TABLE `users` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `name` VARCHAR(255) NOT NULL, `email` VARCHAR(255) NOT NULL, PRIMARY KEY (`id`), UNIQUE (`email`))',
@@ -61,6 +67,7 @@ class MySQLTest extends TestCase
             $table->binary('bin_col');
             $table->enum('status', ['active', 'inactive']);
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('INT NOT NULL', $result->query);
         $this->assertStringContainsString('BIGINT NOT NULL', $result->query);
@@ -84,6 +91,7 @@ class MySQLTest extends TestCase
             $table->integer('score')->default(0);
             $table->string('status')->default('draft');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`bio` TEXT NULL', $result->query);
         $this->assertStringContainsString("DEFAULT 1", $result->query);
@@ -97,6 +105,7 @@ class MySQLTest extends TestCase
         $result = $schema->create('t', function (Blueprint $table) {
             $table->integer('age')->unsigned();
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('INT UNSIGNED NOT NULL', $result->query);
     }
@@ -108,6 +117,7 @@ class MySQLTest extends TestCase
             $table->id();
             $table->timestamps();
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`created_at` DATETIME(3) NOT NULL', $result->query);
         $this->assertStringContainsString('`updated_at` DATETIME(3) NOT NULL', $result->query);
@@ -122,6 +132,7 @@ class MySQLTest extends TestCase
                 ->references('id')->on('users')
                 ->onDelete('CASCADE')->onUpdate('SET NULL');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString(
             'FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE SET NULL',
@@ -139,6 +150,7 @@ class MySQLTest extends TestCase
             $table->index(['name', 'email']);
             $table->uniqueIndex(['email']);
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('INDEX `idx_name_email` (`name`, `email`)', $result->query);
         $this->assertStringContainsString('UNIQUE INDEX `uniq_email` (`email`)', $result->query);
@@ -153,6 +165,7 @@ class MySQLTest extends TestCase
             $table->linestring('path');
             $table->polygon('area');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('POINT SRID 4326 NOT NULL', $result->query);
         $this->assertStringContainsString('LINESTRING SRID 4326 NOT NULL', $result->query);
@@ -162,7 +175,7 @@ class MySQLTest extends TestCase
     public function testCreateTableVectorThrows(): void
     {
         $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('Unknown column type');
+        $this->expectExceptionMessage('Vector type is not supported in MySQL.');
 
         $schema = new Schema();
         $schema->create('embeddings', function (Blueprint $table) {
@@ -176,6 +189,7 @@ class MySQLTest extends TestCase
         $result = $schema->create('t', function (Blueprint $table) {
             $table->string('name')->comment('User display name');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString("COMMENT 'User display name'", $result->query);
     }
@@ -187,6 +201,7 @@ class MySQLTest extends TestCase
         $result = $schema->alter('users', function (Blueprint $table) {
             $table->addColumn('avatar_url', 'string', 255)->nullable()->after('email');
         });
+        $this->assertBindingCount($result);
 
         $this->assertEquals(
             'ALTER TABLE `users` ADD COLUMN `avatar_url` VARCHAR(255) NULL AFTER `email`',
@@ -200,6 +215,7 @@ class MySQLTest extends TestCase
         $result = $schema->alter('users', function (Blueprint $table) {
             $table->modifyColumn('name', 'string', 500);
         });
+        $this->assertBindingCount($result);
 
         $this->assertEquals(
             'ALTER TABLE `users` MODIFY COLUMN `name` VARCHAR(500) NOT NULL',
@@ -213,6 +229,7 @@ class MySQLTest extends TestCase
         $result = $schema->alter('users', function (Blueprint $table) {
             $table->renameColumn('bio', 'biography');
         });
+        $this->assertBindingCount($result);
 
         $this->assertEquals(
             'ALTER TABLE `users` RENAME COLUMN `bio` TO `biography`',
@@ -226,6 +243,7 @@ class MySQLTest extends TestCase
         $result = $schema->alter('users', function (Blueprint $table) {
             $table->dropColumn('age');
         });
+        $this->assertBindingCount($result);
 
         $this->assertEquals(
             'ALTER TABLE `users` DROP COLUMN `age`',
@@ -239,6 +257,7 @@ class MySQLTest extends TestCase
         $result = $schema->alter('users', function (Blueprint $table) {
             $table->addIndex('idx_name', ['name']);
         });
+        $this->assertBindingCount($result);
 
         $this->assertEquals(
             'ALTER TABLE `users` ADD INDEX `idx_name` (`name`)',
@@ -252,6 +271,7 @@ class MySQLTest extends TestCase
         $result = $schema->alter('users', function (Blueprint $table) {
             $table->dropIndex('idx_old');
         });
+        $this->assertBindingCount($result);
 
         $this->assertEquals(
             'ALTER TABLE `users` DROP INDEX `idx_old`',
@@ -266,6 +286,7 @@ class MySQLTest extends TestCase
             $table->addForeignKey('dept_id')
                 ->references('id')->on('departments');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString(
             'ADD FOREIGN KEY (`dept_id`) REFERENCES `departments` (`id`)',
@@ -279,6 +300,7 @@ class MySQLTest extends TestCase
         $result = $schema->alter('users', function (Blueprint $table) {
             $table->dropForeignKey('fk_old');
         });
+        $this->assertBindingCount($result);
 
         $this->assertEquals(
             'ALTER TABLE `users` DROP FOREIGN KEY `fk_old`',
@@ -294,6 +316,7 @@ class MySQLTest extends TestCase
             $table->dropColumn('age');
             $table->renameColumn('bio', 'biography');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('ADD COLUMN', $result->query);
         $this->assertStringContainsString('DROP COLUMN `age`', $result->query);
@@ -305,6 +328,7 @@ class MySQLTest extends TestCase
     {
         $schema = new Schema();
         $result = $schema->drop('users');
+        $this->assertBindingCount($result);
 
         $this->assertEquals('DROP TABLE `users`', $result->query);
         $this->assertEquals([], $result->bindings);
@@ -323,6 +347,7 @@ class MySQLTest extends TestCase
     {
         $schema = new Schema();
         $result = $schema->rename('users', 'members');
+        $this->assertBindingCount($result);
 
         $this->assertEquals('RENAME TABLE `users` TO `members`', $result->query);
     }
@@ -332,6 +357,7 @@ class MySQLTest extends TestCase
     {
         $schema = new Schema();
         $result = $schema->truncate('users');
+        $this->assertBindingCount($result);
 
         $this->assertEquals('TRUNCATE TABLE `users`', $result->query);
     }
@@ -514,6 +540,7 @@ class MySQLTest extends TestCase
             $table->integer('product_id')->primary();
             $table->integer('quantity');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('PRIMARY KEY (`order_id`, `product_id`)', $result->query);
     }
@@ -524,6 +551,7 @@ class MySQLTest extends TestCase
         $result = $schema->create('t', function (Blueprint $table) {
             $table->string('name')->nullable()->default(null);
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('DEFAULT NULL', $result->query);
     }
@@ -534,6 +562,7 @@ class MySQLTest extends TestCase
         $result = $schema->create('t', function (Blueprint $table) {
             $table->float('score')->default(0.5);
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('DEFAULT 0.5', $result->query);
     }
@@ -564,6 +593,7 @@ class MySQLTest extends TestCase
             $table->dropColumn('name');
             $table->addIndex('idx_names', ['first_name', 'last_name']);
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('ADD COLUMN `first_name`', $result->query);
         $this->assertStringContainsString('ADD COLUMN `last_name`', $result->query);
@@ -580,6 +610,7 @@ class MySQLTest extends TestCase
                 ->references('id')->on('posts')
                 ->onDelete('CASCADE')->onUpdate('RESTRICT');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('ON DELETE CASCADE', $result->query);
         $this->assertStringContainsString('ON UPDATE RESTRICT', $result->query);
@@ -608,6 +639,7 @@ class MySQLTest extends TestCase
         $result = $schema->create('t', function (Blueprint $table) {
             $table->timestamp('ts_col');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('TIMESTAMP NOT NULL', $result->query);
         $this->assertStringNotContainsString('TIMESTAMP(', $result->query);
@@ -619,6 +651,7 @@ class MySQLTest extends TestCase
         $result = $schema->create('t', function (Blueprint $table) {
             $table->datetime('dt_col');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('DATETIME NOT NULL', $result->query);
         $this->assertStringNotContainsString('DATETIME(', $result->query);
@@ -639,6 +672,7 @@ class MySQLTest extends TestCase
             $table->addForeignKey('user_id')->references('id')->on('users');
             $table->dropForeignKey('fk_old_user');
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('ADD FOREIGN KEY', $result->query);
         $this->assertStringContainsString('DROP FOREIGN KEY `fk_old_user`', $result->query);
@@ -652,6 +686,7 @@ class MySQLTest extends TestCase
             $table->string('last');
             $table->index(['first', 'last']);
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('INDEX `idx_first_last`', $result->query);
     }
@@ -663,7 +698,73 @@ class MySQLTest extends TestCase
             $table->string('email');
             $table->uniqueIndex(['email']);
         });
+        $this->assertBindingCount($result);
 
         $this->assertStringContainsString('UNIQUE INDEX `uniq_email`', $result->query);
+    }
+
+    public function testExactCreateTableWithColumnsAndIndexes(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('products', function (Blueprint $table) {
+            $table->id();
+            $table->string('name', 100);
+            $table->integer('price');
+            $table->boolean('active')->default(true);
+            $table->index(['name']);
+            $table->uniqueIndex(['price']);
+        });
+
+        $this->assertSame(
+            'CREATE TABLE `products` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `name` VARCHAR(100) NOT NULL, `price` INT NOT NULL, `active` TINYINT(1) NOT NULL DEFAULT 1, PRIMARY KEY (`id`), INDEX `idx_name` (`name`), UNIQUE INDEX `uniq_price` (`price`))',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactAlterTableAddAndDropColumns(): void
+    {
+        $schema = new Schema();
+        $result = $schema->alter('users', function (Blueprint $table) {
+            $table->addColumn('phone', 'string', 20)->nullable();
+            $table->dropColumn('legacy_field');
+        });
+
+        $this->assertSame(
+            'ALTER TABLE `users` ADD COLUMN `phone` VARCHAR(20) NULL, DROP COLUMN `legacy_field`',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactCreateTableWithForeignKey(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('orders', function (Blueprint $table) {
+            $table->id();
+            $table->integer('customer_id');
+            $table->foreignKey('customer_id')
+                ->references('id')->on('customers')
+                ->onDelete('CASCADE')->onUpdate('CASCADE');
+        });
+
+        $this->assertSame(
+            'CREATE TABLE `orders` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `customer_id` INT NOT NULL, PRIMARY KEY (`id`), FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE CASCADE ON UPDATE CASCADE)',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExactDropTable(): void
+    {
+        $schema = new Schema();
+        $result = $schema->drop('sessions');
+
+        $this->assertSame('DROP TABLE `sessions`', $result->query);
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
     }
 }

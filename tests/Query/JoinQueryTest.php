@@ -3,6 +3,7 @@
 namespace Tests\Query;
 
 use PHPUnit\Framework\TestCase;
+use Utopia\Query\Builder\MySQL;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
 
@@ -104,7 +105,7 @@ class JoinQueryTest extends TestCase
 
     public function testJoinCompileDispatch(): void
     {
-        $builder = new \Utopia\Query\Builder\MySQL();
+        $builder = new MySQL();
         $query = Query::join('orders', 'users.id', 'orders.uid');
         $sql = $query->compile($builder);
         $this->assertEquals('JOIN `orders` ON `users`.`id` = `orders`.`uid`', $sql);
@@ -112,7 +113,7 @@ class JoinQueryTest extends TestCase
 
     public function testLeftJoinCompileDispatch(): void
     {
-        $builder = new \Utopia\Query\Builder\MySQL();
+        $builder = new MySQL();
         $query = Query::leftJoin('p', 'u.id', 'p.uid');
         $sql = $query->compile($builder);
         $this->assertEquals('LEFT JOIN `p` ON `u`.`id` = `p`.`uid`', $sql);
@@ -120,7 +121,7 @@ class JoinQueryTest extends TestCase
 
     public function testRightJoinCompileDispatch(): void
     {
-        $builder = new \Utopia\Query\Builder\MySQL();
+        $builder = new MySQL();
         $query = Query::rightJoin('o', 'u.id', 'o.uid');
         $sql = $query->compile($builder);
         $this->assertEquals('RIGHT JOIN `o` ON `u`.`id` = `o`.`uid`', $sql);
@@ -128,7 +129,7 @@ class JoinQueryTest extends TestCase
 
     public function testCrossJoinCompileDispatch(): void
     {
-        $builder = new \Utopia\Query\Builder\MySQL();
+        $builder = new MySQL();
         $query = Query::crossJoin('colors');
         $sql = $query->compile($builder);
         $this->assertEquals('CROSS JOIN `colors`', $sql);

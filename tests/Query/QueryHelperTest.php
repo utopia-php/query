@@ -871,4 +871,98 @@ class QueryHelperTest extends TestCase
         $distinct = Query::getByType($queries, [Method::Distinct]);
         $this->assertCount(1, $distinct);
     }
+
+    // ── Query::diff() edge cases (exercises array_any) ─────────
+
+    public function testDiffIdenticalArraysReturnEmpty(): void
+    {
+        $queries = [Query::equal('a', [1]), Query::limit(10), Query::orderAsc('name')];
+        $result = Query::diff($queries, $queries);
+        $this->assertCount(0, $result);
+    }
+
+    public function testDiffLargeArrayUsesArrayAny(): void
+    {
+        $a = [];
+        $b = [];
+        for ($i = 0; $i < 100; $i++) {
+            $a[] = Query::equal('col', [$i]);
+            if ($i % 2 === 0) {
+                $b[] = Query::equal('col', [$i]);
+            }
+        }
+        $result = Query::diff($a, $b);
+        $this->assertCount(50, $result);
+    }
+
+    public function testDiffPreservesOrder(): void
+    {
+        $a = [Query::equal('x', [3]), Query::equal('x', [1]), Query::equal('x', [2])];
+        $b = [Query::equal('x', [1])];
+        $result = Query::diff($a, $b);
+        $this->assertCount(2, $result);
+        $this->assertSame([3], $result[0]->getValues());
+        $this->assertSame([2], $result[1]->getValues());
+    }
+
+    public function testDiffWithDifferentMethodsSameAttribute(): void
+    {
+        $a = [Query::equal('name', ['John']), Query::notEqual('name', 'John')];
+        $b = [Query::equal('name', ['John'])];
+        $result = Query::diff($a, $b);
+        $this->assertCount(1, $result);
+        $this->assertSame(Method::NotEqual, $result[0]->getMethod());
+    }
+
+    public function testDiffSingleElementArrays(): void
+    {
+        $a = [Query::limit(10)];
+        $b = [Query::limit(10)];
+        $this->assertCount(0, Query::diff($a, $b));
+
+        $b = [Query::limit(20)];
+        $this->assertCount(1, Query::diff($a, $b));
+    }
+
+    // ── #[\Deprecated] on Query::contains() ────────────────────
+
+    public function testContainsHasDeprecatedAttribute(): void
+    {
+        $ref = new \ReflectionMethod(Query::class, 'contains');
+        $attrs = $ref->getAttributes(\Deprecated::class);
+        $this->assertCount(1, $attrs);
+
+        /** @var \Deprecated $instance */
+        $instance = $attrs[0]->newInstance();
+        $this->assertNotNull($instance->message);
+        $this->assertStringContainsString('containsAny', $instance->message);
+    }
+
+    public function testContainsStillFunctions(): void
+    {
+        $query = @Query::contains('tags', ['a', 'b']);
+        $this->assertSame(Method::Contains, $query->getMethod());
+        $this->assertSame('tags', $query->getAttribute());
+        $this->assertSame(['a', 'b'], $query->getValues());
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // Coverage: Query.php uncovered lines
+    // ══════════════════════════════════════════════════════════════
+
+    // ── Query::page() with perPage < 1 (line 1152) ──────────────
+
+    public function testPageThrowsOnZeroPerPage(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Per page must be >= 1');
+        Query::page(1, 0);
+    }
+
+    public function testPageThrowsOnNegativePerPage(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Per page must be >= 1');
+        Query::page(1, -5);
+    }
 }

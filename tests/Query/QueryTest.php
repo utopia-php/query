@@ -4,7 +4,9 @@ namespace Tests\Query;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Builder\MySQL as MySQLBuilder;
+use Utopia\Query\CursorDirection;
 use Utopia\Query\Method;
+use Utopia\Query\OrderDirection;
 use Utopia\Query\Query;
 
 class QueryTest extends TestCase
@@ -110,11 +112,11 @@ class QueryTest extends TestCase
 
     public function testMethodEnumValues(): void
     {
-        $this->assertEquals('ASC', \Utopia\Query\OrderDirection::Asc->value);
-        $this->assertEquals('DESC', \Utopia\Query\OrderDirection::Desc->value);
-        $this->assertEquals('RANDOM', \Utopia\Query\OrderDirection::Random->value);
-        $this->assertEquals('after', \Utopia\Query\CursorDirection::After->value);
-        $this->assertEquals('before', \Utopia\Query\CursorDirection::Before->value);
+        $this->assertEquals('ASC', OrderDirection::Asc->value);
+        $this->assertEquals('DESC', OrderDirection::Desc->value);
+        $this->assertEquals('RANDOM', OrderDirection::Random->value);
+        $this->assertEquals('after', CursorDirection::After->value);
+        $this->assertEquals('before', CursorDirection::Before->value);
     }
 
     public function testVectorMethodsAreVector(): void

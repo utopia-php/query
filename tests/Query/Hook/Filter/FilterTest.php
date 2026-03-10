@@ -13,8 +13,8 @@ class FilterTest extends TestCase
         $hook = new Tenant(['t1']);
         $condition = $hook->filter('users');
 
-        $this->assertEquals('tenant_id IN (?)', $condition->getExpression());
-        $this->assertEquals(['t1'], $condition->getBindings());
+        $this->assertEquals('tenant_id IN (?)', $condition->expression);
+        $this->assertEquals(['t1'], $condition->bindings);
     }
 
     public function testTenantMultipleIds(): void
@@ -22,8 +22,8 @@ class FilterTest extends TestCase
         $hook = new Tenant(['t1', 't2', 't3']);
         $condition = $hook->filter('users');
 
-        $this->assertEquals('tenant_id IN (?, ?, ?)', $condition->getExpression());
-        $this->assertEquals(['t1', 't2', 't3'], $condition->getBindings());
+        $this->assertEquals('tenant_id IN (?, ?, ?)', $condition->expression);
+        $this->assertEquals(['t1', 't2', 't3'], $condition->bindings);
     }
 
     public function testTenantCustomColumn(): void
@@ -31,8 +31,8 @@ class FilterTest extends TestCase
         $hook = new Tenant(['t1'], 'organization_id');
         $condition = $hook->filter('users');
 
-        $this->assertEquals('organization_id IN (?)', $condition->getExpression());
-        $this->assertEquals(['t1'], $condition->getBindings());
+        $this->assertEquals('organization_id IN (?)', $condition->expression);
+        $this->assertEquals(['t1'], $condition->bindings);
     }
 
     public function testPermissionWithRoles(): void
@@ -45,9 +45,9 @@ class FilterTest extends TestCase
 
         $this->assertEquals(
             'id IN (SELECT DISTINCT document_id FROM mydb_documents_perms WHERE role IN (?, ?) AND type = ?)',
-            $condition->getExpression()
+            $condition->expression
         );
-        $this->assertEquals(['role:admin', 'role:user', 'read'], $condition->getBindings());
+        $this->assertEquals(['role:admin', 'role:user', 'read'], $condition->bindings);
     }
 
     public function testPermissionEmptyRoles(): void
@@ -58,8 +58,8 @@ class FilterTest extends TestCase
         );
         $condition = $hook->filter('documents');
 
-        $this->assertEquals('1 = 0', $condition->getExpression());
-        $this->assertEquals([], $condition->getBindings());
+        $this->assertEquals('1 = 0', $condition->expression);
+        $this->assertEquals([], $condition->bindings);
     }
 
     public function testPermissionCustomType(): void
@@ -73,9 +73,9 @@ class FilterTest extends TestCase
 
         $this->assertEquals(
             'id IN (SELECT DISTINCT document_id FROM mydb_documents_perms WHERE role IN (?) AND type = ?)',
-            $condition->getExpression()
+            $condition->expression
         );
-        $this->assertEquals(['role:admin', 'write'], $condition->getBindings());
+        $this->assertEquals(['role:admin', 'write'], $condition->bindings);
     }
 
     public function testPermissionCustomDocumentColumn(): void
@@ -87,7 +87,7 @@ class FilterTest extends TestCase
         );
         $condition = $hook->filter('documents');
 
-        $this->assertStringStartsWith('doc_id IN', $condition->getExpression());
+        $this->assertStringStartsWith('doc_id IN', $condition->expression);
     }
 
     public function testPermissionCustomColumns(): void
@@ -104,9 +104,9 @@ class FilterTest extends TestCase
 
         $this->assertEquals(
             'uid IN (SELECT DISTINCT resource_id FROM acl WHERE principal IN (?) AND access = ?)',
-            $condition->getExpression()
+            $condition->expression
         );
-        $this->assertEquals(['admin', 'read'], $condition->getBindings());
+        $this->assertEquals(['admin', 'read'], $condition->bindings);
     }
 
     public function testPermissionStaticTable(): void
@@ -117,7 +117,7 @@ class FilterTest extends TestCase
         );
         $condition = $hook->filter('any_table');
 
-        $this->assertStringContainsString('FROM permissions', $condition->getExpression());
+        $this->assertStringContainsString('FROM permissions', $condition->expression);
     }
 
     public function testPermissionWithColumns(): void
@@ -131,9 +131,9 @@ class FilterTest extends TestCase
 
         $this->assertEquals(
             'id IN (SELECT DISTINCT document_id FROM mydb_users_perms WHERE role IN (?) AND type = ? AND (column IS NULL OR column IN (?, ?)))',
-            $condition->getExpression()
+            $condition->expression
         );
-        $this->assertEquals(['role:admin', 'read', 'email', 'phone'], $condition->getBindings());
+        $this->assertEquals(['role:admin', 'read', 'email', 'phone'], $condition->bindings);
     }
 
     public function testPermissionWithSingleColumn(): void
@@ -147,9 +147,9 @@ class FilterTest extends TestCase
 
         $this->assertEquals(
             'id IN (SELECT DISTINCT document_id FROM employees_perms WHERE role IN (?) AND type = ? AND (column IS NULL OR column IN (?)))',
-            $condition->getExpression()
+            $condition->expression
         );
-        $this->assertEquals(['role:user', 'read', 'salary'], $condition->getBindings());
+        $this->assertEquals(['role:user', 'read', 'salary'], $condition->bindings);
     }
 
     public function testPermissionWithEmptyColumns(): void
@@ -163,9 +163,9 @@ class FilterTest extends TestCase
 
         $this->assertEquals(
             'id IN (SELECT DISTINCT document_id FROM mydb_users_perms WHERE role IN (?) AND type = ? AND column IS NULL)',
-            $condition->getExpression()
+            $condition->expression
         );
-        $this->assertEquals(['role:admin', 'read'], $condition->getBindings());
+        $this->assertEquals(['role:admin', 'read'], $condition->bindings);
     }
 
     public function testPermissionWithoutColumnsOmitsClause(): void
@@ -176,7 +176,7 @@ class FilterTest extends TestCase
         );
         $condition = $hook->filter('users');
 
-        $this->assertStringNotContainsString('column', $condition->getExpression());
+        $this->assertStringNotContainsString('column', $condition->expression);
     }
 
     public function testPermissionCustomColumnColumn(): void
@@ -191,8 +191,80 @@ class FilterTest extends TestCase
 
         $this->assertEquals(
             'id IN (SELECT DISTINCT document_id FROM acl WHERE role IN (?) AND type = ? AND (field IS NULL OR field IN (?)))',
-            $condition->getExpression()
+            $condition->expression
         );
-        $this->assertEquals(['role:admin', 'read', 'email'], $condition->getBindings());
+        $this->assertEquals(['role:admin', 'read', 'email'], $condition->bindings);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // Coverage: Permission.php uncovered lines
+    // ══════════════════════════════════════════════════════════════
+
+    // ── Invalid column name (line 36) ────────────────────────────
+
+    public function testPermissionInvalidColumnNameThrows(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid column name');
+        new Permission(
+            roles: ['admin'],
+            permissionsTable: fn (string $table) => 'perms',
+            documentColumn: '123bad',
+        );
+    }
+
+    // ── Invalid permissions table name (line 51) ─────────────────
+
+    public function testPermissionInvalidTableNameThrows(): void
+    {
+        $hook = new Permission(
+            roles: ['admin'],
+            permissionsTable: fn (string $table) => 'invalid table!',
+        );
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid permissions table name');
+        $hook->filter('users');
+    }
+
+    // ── subqueryFilter (lines 72-74) ─────────────────────────────
+
+    public function testPermissionWithSubqueryFilter(): void
+    {
+        $tenantFilter = new Tenant(['t1']);
+
+        $hook = new Permission(
+            roles: ['role:admin'],
+            permissionsTable: fn (string $table) => 'perms',
+            subqueryFilter: $tenantFilter,
+        );
+        $condition = $hook->filter('users');
+
+        $this->assertStringContainsString('AND tenant_id IN (?)', $condition->expression);
+        $this->assertContains('t1', $condition->bindings);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // Coverage: Tenant.php uncovered lines
+    // ══════════════════════════════════════════════════════════════
+
+    // ── Invalid column name (line 22) ────────────────────────────
+
+    public function testTenantInvalidColumnNameThrows(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid column name');
+        new Tenant(['t1'], '123bad');
+    }
+
+    // ── Empty tenantIds (line 29) ────────────────────────────────
+
+    public function testTenantEmptyTenantIdsReturnsNoMatch(): void
+    {
+        $hook = new Tenant([]);
+        $condition = $hook->filter('users');
+
+        $this->assertSame('1 = 0', $condition->expression);
+        $this->assertSame([], $condition->bindings);
     }
 }
