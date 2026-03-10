@@ -2,13 +2,14 @@
 
 namespace Utopia\Query\Builder\Feature;
 
+use Utopia\Query\Builder\VectorMetric;
+
 interface VectorSearch
 {
     /**
      * Order results by vector distance (nearest first).
      *
      * @param  array<float>  $vector  The query vector
-     * @param  string  $metric  Distance metric: 'cosine', 'euclidean', 'dot'
      */
-    public function orderByVectorDistance(string $attribute, array $vector, string $metric = 'cosine'): static;
+    public function orderByVectorDistance(string $attribute, array $vector, VectorMetric $metric = VectorMetric::Cosine): static;
 }

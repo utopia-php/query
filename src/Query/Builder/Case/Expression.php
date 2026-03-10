@@ -13,11 +13,4 @@ readonly class Expression
     ) {
     }
 
-    /**
-     * @return array{sql: string, bindings: list<mixed>}
-     */
-    public function toSql(): array
-    {
-        return ['sql' => $this->sql, 'bindings' => $this->bindings];
-    }
 }

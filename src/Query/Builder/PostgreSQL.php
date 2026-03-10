@@ -18,10 +18,10 @@ class PostgreSQL extends SQL implements Spatial, VectorSearch, Json, Returning, 
     /** @var list<string> */
     protected array $returningColumns = [];
 
-    /** @var array<string, array{expression: string, bindings: list<mixed>}> */
+    /** @var array<string, Condition> */
     protected array $jsonSets = [];
 
-    /** @var ?array{attribute: string, vector: array<float>, metric: string} */
+    /** @var ?array{attribute: string, vector: array<float>, metric: VectorMetric} */
     protected ?array $vectorOrder = null;
 
     protected function compileRandom(): string
@@ -93,14 +93,16 @@ class PostgreSQL extends SQL implements Spatial, VectorSearch, Json, Returning, 
 
     public function forUpdateOf(string $table): static
     {
-        $this->lockMode = 'FOR UPDATE OF ' . $this->quote($table);
+        $this->lockMode = LockMode::ForUpdate;
+        $this->lockOfTable = $table;
 
         return $this;
     }
 
     public function forShareOf(string $table): static
     {
-        $this->lockMode = 'FOR SHARE OF ' . $this->quote($table);
+        $this->lockMode = LockMode::ForShare;
+        $this->lockOfTable = $table;
 
         return $this;
     }
@@ -127,8 +129,8 @@ class PostgreSQL extends SQL implements Spatial, VectorSearch, Json, Returning, 
 
     public function update(): BuildResult
     {
-        foreach ($this->jsonSets as $col => $data) {
-            $this->setRaw($col, $data['expression'], $data['bindings']);
+        foreach ($this->jsonSets as $col => $condition) {
+            $this->setRaw($col, $condition->expression, $condition->bindings);
         }
 
         $result = parent::update();
@@ -268,7 +270,7 @@ class PostgreSQL extends SQL implements Spatial, VectorSearch, Json, Returning, 
         return $this;
     }
 
-    public function orderByVectorDistance(string $attribute, array $vector, string $metric = 'cosine'): static
+    public function orderByVectorDistance(string $attribute, array $vector, VectorMetric $metric = VectorMetric::Cosine): static
     {
         $this->vectorOrder = [
             'attribute' => $attribute,
@@ -309,40 +311,40 @@ class PostgreSQL extends SQL implements Spatial, VectorSearch, Json, Returning, 
 
     public function setJsonAppend(string $column, array $values): static
     {
-        $this->jsonSets[$column] = [
-            'expression' => 'COALESCE(' . $this->resolveAndWrap($column) . ', \'[]\'::jsonb) || ?::jsonb',
-            'bindings' => [\json_encode($values)],
-        ];
+        $this->jsonSets[$column] = new Condition(
+            'COALESCE(' . $this->resolveAndWrap($column) . ', \'[]\'::jsonb) || ?::jsonb',
+            [\json_encode($values)],
+        );
 
         return $this;
     }
 
     public function setJsonPrepend(string $column, array $values): static
     {
-        $this->jsonSets[$column] = [
-            'expression' => '?::jsonb || COALESCE(' . $this->resolveAndWrap($column) . ', \'[]\'::jsonb)',
-            'bindings' => [\json_encode($values)],
-        ];
+        $this->jsonSets[$column] = new Condition(
+            '?::jsonb || COALESCE(' . $this->resolveAndWrap($column) . ', \'[]\'::jsonb)',
+            [\json_encode($values)],
+        );
 
         return $this;
     }
 
     public function setJsonInsert(string $column, int $index, mixed $value): static
     {
-        $this->jsonSets[$column] = [
-            'expression' => 'jsonb_insert(' . $this->resolveAndWrap($column) . ', \'{' . $index . '}\', ?::jsonb)',
-            'bindings' => [\json_encode($value)],
-        ];
+        $this->jsonSets[$column] = new Condition(
+            'jsonb_insert(' . $this->resolveAndWrap($column) . ', \'{' . $index . '}\', ?::jsonb)',
+            [\json_encode($value)],
+        );
 
         return $this;
     }
 
     public function setJsonRemove(string $column, mixed $value): static
     {
-        $this->jsonSets[$column] = [
-            'expression' => $this->resolveAndWrap($column) . ' - ?',
-            'bindings' => [\json_encode($value)],
-        ];
+        $this->jsonSets[$column] = new Condition(
+            $this->resolveAndWrap($column) . ' - ?',
+            [\json_encode($value)],
+        );
 
         return $this;
     }
@@ -388,28 +390,20 @@ class PostgreSQL extends SQL implements Spatial, VectorSearch, Json, Returning, 
         return parent::compileFilter($query);
     }
 
-    /**
-     * @return array{expression: string, bindings: list<mixed>}|null
-     */
-    protected function compileVectorOrderExpr(): ?array
+    protected function compileVectorOrderExpr(): ?Condition
     {
         if ($this->vectorOrder === null) {
             return null;
         }
 
         $attr = $this->resolveAndWrap($this->vectorOrder['attribute']);
-        $operator = match ($this->vectorOrder['metric']) {
-            'cosine' => '<=>',
-            'euclidean' => '<->',
-            'dot' => '<#>',
-            default => '<=>',
-        };
+        $operator = $this->vectorOrder['metric']->toOperator();
         $vectorJson = \json_encode($this->vectorOrder['vector']);
 
-        return [
-            'expression' => '(' . $attr . ' ' . $operator . ' ?::vector) ASC',
-            'bindings' => [$vectorJson],
-        ];
+        return new Condition(
+            '(' . $attr . ' ' . $operator . ' ?::vector) ASC',
+            [$vectorJson],
+        );
     }
 
     public function reset(): static

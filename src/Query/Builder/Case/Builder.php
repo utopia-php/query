@@ -6,7 +6,7 @@ use Utopia\Query\Exception\ValidationException;
 
 class Builder
 {
-    /** @var list<array{condition: string, result: string, conditionBindings: list<mixed>, resultBindings: list<mixed>}> */
+    /** @var list<WhenClause> */
     private array $whens = [];
 
     private ?string $elseResult = null;
@@ -22,12 +22,7 @@ class Builder
      */
     public function when(string $condition, string $result, array $conditionBindings = [], array $resultBindings = []): static
     {
-        $this->whens[] = [
-            'condition' => $condition,
-            'result' => $result,
-            'conditionBindings' => $conditionBindings,
-            'resultBindings' => $resultBindings,
-        ];
+        $this->whens[] = new WhenClause($condition, $result, $conditionBindings, $resultBindings);
 
         return $this;
     }
@@ -67,11 +62,11 @@ class Builder
         $bindings = [];
 
         foreach ($this->whens as $when) {
-            $sql .= ' WHEN ' . $when['condition'] . ' THEN ' . $when['result'];
-            foreach ($when['conditionBindings'] as $binding) {
+            $sql .= ' WHEN ' . $when->condition . ' THEN ' . $when->result;
+            foreach ($when->conditionBindings as $binding) {
                 $bindings[] = $binding;
             }
-            foreach ($when['resultBindings'] as $binding) {
+            foreach ($when->resultBindings as $binding) {
                 $bindings[] = $binding;
             }
         }

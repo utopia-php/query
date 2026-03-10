@@ -8,11 +8,11 @@ class JoinBuilder
 {
     private const ALLOWED_OPERATORS = ['=', '!=', '<', '>', '<=', '>=', '<>'];
 
-    /** @var list<array{left: string, operator: string, right: string}> */
-    private array $ons = [];
+    /** @var list<JoinOn> */
+    public private(set) array $ons = [];
 
-    /** @var list<array{expression: string, bindings: list<mixed>}> */
-    private array $wheres = [];
+    /** @var list<Condition> */
+    public private(set) array $wheres = [];
 
     /**
      * Add an ON condition to the join.
@@ -26,7 +26,7 @@ class JoinBuilder
             throw new ValidationException('Invalid join operator: ' . $operator);
         }
 
-        $this->ons[] = ['left' => $left, 'operator' => $operator, 'right' => $right];
+        $this->ons[] = new JoinOn($left, $operator, $right);
 
         return $this;
     }
@@ -36,7 +36,7 @@ class JoinBuilder
      */
     public function onRaw(string $expression, array $bindings = []): static
     {
-        $this->wheres[] = ['expression' => $expression, 'bindings' => $bindings];
+        $this->wheres[] = new Condition($expression, $bindings);
 
         return $this;
     }
@@ -57,7 +57,7 @@ class JoinBuilder
             throw new ValidationException('Invalid join operator: ' . $operator);
         }
 
-        $this->wheres[] = ['expression' => $column . ' ' . $operator . ' ?', 'bindings' => [$value]];
+        $this->wheres[] = new Condition($column . ' ' . $operator . ' ?', [$value]);
 
         return $this;
     }
@@ -67,20 +67,9 @@ class JoinBuilder
      */
     public function whereRaw(string $expression, array $bindings = []): static
     {
-        $this->wheres[] = ['expression' => $expression, 'bindings' => $bindings];
+        $this->wheres[] = new Condition($expression, $bindings);
 
         return $this;
     }
 
-    /** @return list<array{left: string, operator: string, right: string}> */
-    public function getOns(): array
-    {
-        return $this->ons;
-    }
-
-    /** @return list<array{expression: string, bindings: list<mixed>}> */
-    public function getWheres(): array
-    {
-        return $this->wheres;
-    }
 }

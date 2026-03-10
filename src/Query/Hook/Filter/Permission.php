@@ -3,6 +3,7 @@
 namespace Utopia\Query\Hook\Filter;
 
 use Utopia\Query\Builder\Condition;
+use Utopia\Query\Builder\JoinType;
 use Utopia\Query\Hook\Filter;
 use Utopia\Query\Hook\Join\Condition as JoinCondition;
 use Utopia\Query\Hook\Join\Filter as JoinFilter;
@@ -69,8 +70,8 @@ class Permission implements Filter, JoinFilter
         $subFilterBindings = [];
         if ($this->subqueryFilter !== null) {
             $subCondition = $this->subqueryFilter->filter($permTable);
-            $subFilterClause = ' AND ' . $subCondition->getExpression();
-            $subFilterBindings = $subCondition->getBindings();
+            $subFilterClause = ' AND ' . $subCondition->expression;
+            $subFilterBindings = $subCondition->bindings;
         }
 
         return new Condition(
@@ -79,12 +80,12 @@ class Permission implements Filter, JoinFilter
         );
     }
 
-    public function filterJoin(string $table, string $joinType): ?JoinCondition
+    public function filterJoin(string $table, JoinType $joinType): ?JoinCondition
     {
         $condition = $this->filter($table);
 
         $placement = match ($joinType) {
-            'LEFT JOIN', 'RIGHT JOIN' => Placement::On,
+            JoinType::Left, JoinType::Right => Placement::On,
             default => Placement::Where,
         };
 

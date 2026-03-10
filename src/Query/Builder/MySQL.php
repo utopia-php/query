@@ -14,7 +14,7 @@ class MySQL extends SQL implements Spatial, Json, Hints
     /** @var list<string> */
     protected array $hints = [];
 
-    /** @var array<string, array{expression: string, bindings: list<mixed>}> */
+    /** @var array<string, Condition> */
     protected array $jsonSets = [];
 
     protected function compileRandom(): string
@@ -194,40 +194,40 @@ class MySQL extends SQL implements Spatial, Json, Hints
 
     public function setJsonAppend(string $column, array $values): static
     {
-        $this->jsonSets[$column] = [
-            'expression' => 'JSON_MERGE_PRESERVE(IFNULL(' . $this->resolveAndWrap($column) . ', JSON_ARRAY()), ?)',
-            'bindings' => [\json_encode($values)],
-        ];
+        $this->jsonSets[$column] = new Condition(
+            'JSON_MERGE_PRESERVE(IFNULL(' . $this->resolveAndWrap($column) . ', JSON_ARRAY()), ?)',
+            [\json_encode($values)],
+        );
 
         return $this;
     }
 
     public function setJsonPrepend(string $column, array $values): static
     {
-        $this->jsonSets[$column] = [
-            'expression' => 'JSON_MERGE_PRESERVE(?, IFNULL(' . $this->resolveAndWrap($column) . ', JSON_ARRAY()))',
-            'bindings' => [\json_encode($values)],
-        ];
+        $this->jsonSets[$column] = new Condition(
+            'JSON_MERGE_PRESERVE(?, IFNULL(' . $this->resolveAndWrap($column) . ', JSON_ARRAY()))',
+            [\json_encode($values)],
+        );
 
         return $this;
     }
 
     public function setJsonInsert(string $column, int $index, mixed $value): static
     {
-        $this->jsonSets[$column] = [
-            'expression' => 'JSON_ARRAY_INSERT(' . $this->resolveAndWrap($column) . ', ?, ?)',
-            'bindings' => ['$[' . $index . ']', $value],
-        ];
+        $this->jsonSets[$column] = new Condition(
+            'JSON_ARRAY_INSERT(' . $this->resolveAndWrap($column) . ', ?, ?)',
+            ['$[' . $index . ']', $value],
+        );
 
         return $this;
     }
 
     public function setJsonRemove(string $column, mixed $value): static
     {
-        $this->jsonSets[$column] = [
-            'expression' => 'JSON_REMOVE(' . $this->resolveAndWrap($column) . ', JSON_UNQUOTE(JSON_SEARCH(' . $this->resolveAndWrap($column) . ', \'one\', ?)))',
-            'bindings' => [$value],
-        ];
+        $this->jsonSets[$column] = new Condition(
+            'JSON_REMOVE(' . $this->resolveAndWrap($column) . ', JSON_UNQUOTE(JSON_SEARCH(' . $this->resolveAndWrap($column) . ', \'one\', ?)))',
+            [$value],
+        );
 
         return $this;
     }
@@ -316,8 +316,8 @@ class MySQL extends SQL implements Spatial, Json, Hints
     public function update(): BuildResult
     {
         // Apply JSON sets as rawSets before calling parent
-        foreach ($this->jsonSets as $col => $data) {
-            $this->setRaw($col, $data['expression'], $data['bindings']);
+        foreach ($this->jsonSets as $col => $condition) {
+            $this->setRaw($col, $condition->expression, $condition->bindings);
         }
 
         $result = parent::update();

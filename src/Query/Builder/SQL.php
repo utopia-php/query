@@ -15,42 +15,42 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert
 
     public function forUpdate(): static
     {
-        $this->lockMode = 'FOR UPDATE';
+        $this->lockMode = LockMode::ForUpdate;
 
         return $this;
     }
 
     public function forShare(): static
     {
-        $this->lockMode = 'FOR SHARE';
+        $this->lockMode = LockMode::ForShare;
 
         return $this;
     }
 
     public function forUpdateSkipLocked(): static
     {
-        $this->lockMode = 'FOR UPDATE SKIP LOCKED';
+        $this->lockMode = LockMode::ForUpdateSkipLocked;
 
         return $this;
     }
 
     public function forUpdateNoWait(): static
     {
-        $this->lockMode = 'FOR UPDATE NOWAIT';
+        $this->lockMode = LockMode::ForUpdateNoWait;
 
         return $this;
     }
 
     public function forShareSkipLocked(): static
     {
-        $this->lockMode = 'FOR SHARE SKIP LOCKED';
+        $this->lockMode = LockMode::ForShareSkipLocked;
 
         return $this;
     }
 
     public function forShareNoWait(): static
     {
-        $this->lockMode = 'FOR SHARE NOWAIT';
+        $this->lockMode = LockMode::ForShareNoWait;
 
         return $this;
     }
@@ -116,12 +116,24 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert
             $placeholders = [];
             foreach ($columns as $col) {
                 $this->addBinding($row[$col] ?? null);
-                $placeholders[] = '?';
+                if (isset($this->insertColumnExpressions[$col])) {
+                    $placeholders[] = $this->insertColumnExpressions[$col];
+                    foreach ($this->insertColumnExpressionBindings[$col] ?? [] as $extra) {
+                        $this->addBinding($extra);
+                    }
+                } else {
+                    $placeholders[] = '?';
+                }
             }
             $rowPlaceholders[] = '(' . \implode(', ', $placeholders) . ')';
         }
 
-        $sql = 'INSERT INTO ' . $this->quote($this->table)
+        $tablePart = $this->quote($this->table);
+        if ($this->insertAlias !== '') {
+            $tablePart .= ' AS ' . $this->insertAlias;
+        }
+
+        $sql = 'INSERT INTO ' . $tablePart
             . ' (' . \implode(', ', $wrappedColumns) . ')'
             . ' VALUES ' . \implode(', ', $rowPlaceholders);
 

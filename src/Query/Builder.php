@@ -5,10 +5,19 @@ namespace Utopia\Query;
 use Closure;
 use Utopia\Query\Builder\BuildResult;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
+use Utopia\Query\Builder\Condition;
+use Utopia\Query\Builder\CteClause;
+use Utopia\Query\Builder\ExistsSubquery;
 use Utopia\Query\Builder\Feature;
 use Utopia\Query\Builder\GroupedQueries;
 use Utopia\Query\Builder\JoinBuilder;
+use Utopia\Query\Builder\JoinType;
+use Utopia\Query\Builder\LockMode;
+use Utopia\Query\Builder\SubSelect;
 use Utopia\Query\Builder\UnionClause;
+use Utopia\Query\Builder\UnionType;
+use Utopia\Query\Builder\WhereInSubquery;
+use Utopia\Query\Builder\WindowSelect;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Hook\Attribute;
@@ -66,26 +75,28 @@ abstract class Builder implements
     /** @var array<string, list<mixed>> */
     protected array $rawSetBindings = [];
 
-    protected ?string $lockMode = null;
+    protected ?LockMode $lockMode = null;
+
+    protected ?string $lockOfTable = null;
 
     protected ?Builder $insertSelectSource = null;
 
     /** @var list<string> */
     protected array $insertSelectColumns = [];
 
-    /** @var list<array{name: string, query: string, bindings: list<mixed>, recursive: bool}> */
+    /** @var list<CteClause> */
     protected array $ctes = [];
 
-    /** @var list<array{expression: string, bindings: list<mixed>}> */
+    /** @var list<Condition> */
     protected array $rawSelects = [];
 
-    /** @var list<array{function: string, alias: string, partitionBy: ?list<string>, orderBy: ?list<string>}> */
+    /** @var list<WindowSelect> */
     protected array $windowSelects = [];
 
-    /** @var list<array{sql: string, bindings: list<mixed>}> */
+    /** @var list<CaseExpression> */
     protected array $caseSelects = [];
 
-    /** @var array<string, array{sql: string, bindings: list<mixed>}> */
+    /** @var array<string, CaseExpression> */
     protected array $caseSets = [];
 
     /** @var string[] */
@@ -100,28 +111,37 @@ abstract class Builder implements
     /** @var array<string, list<mixed>> */
     protected array $conflictRawSetBindings = [];
 
-    /** @var list<array{column: string, subquery: Builder, not: bool}> */
+    /** @var array<string, string> Column-specific expressions for INSERT (e.g. 'location' => 'ST_GeomFromText(?)') */
+    protected array $insertColumnExpressions = [];
+
+    /** @var array<string, list<mixed>> Extra bindings for insert column expressions */
+    protected array $insertColumnExpressionBindings = [];
+
+    protected string $insertAlias = '';
+
+    /** @var list<WhereInSubquery> */
     protected array $whereInSubqueries = [];
 
-    /** @var list<array{subquery: Builder, alias: string}> */
+    /** @var list<SubSelect> */
     protected array $subSelects = [];
 
-    /** @var ?array{subquery: Builder, alias: string} */
-    protected ?array $fromSubquery = null;
+    protected ?SubSelect $fromSubquery = null;
 
-    /** @var list<array{expression: string, bindings: list<mixed>}> */
+    protected bool $noTable = false;
+
+    /** @var list<Condition> */
     protected array $rawOrders = [];
 
-    /** @var list<array{expression: string, bindings: list<mixed>}> */
+    /** @var list<Condition> */
     protected array $rawGroups = [];
 
-    /** @var list<array{expression: string, bindings: list<mixed>}> */
+    /** @var list<Condition> */
     protected array $rawHavings = [];
 
     /** @var array<int, JoinBuilder> */
     protected array $joinBuilders = [];
 
-    /** @var list<array{subquery: Builder, not: bool}> */
+    /** @var list<ExistsSubquery> */
     protected array $existsSubqueries = [];
 
     abstract protected function quote(string $identifier): string;
@@ -147,14 +167,18 @@ abstract class Builder implements
 
     protected function buildTableClause(): string
     {
+        if ($this->noTable) {
+            return '';
+        }
+
         $fromSub = $this->fromSubquery;
         if ($fromSub !== null) {
-            $subResult = $fromSub['subquery']->build();
+            $subResult = $fromSub->subquery->build();
             foreach ($subResult->bindings as $binding) {
                 $this->addBinding($binding);
             }
 
-            return 'FROM (' . $subResult->query . ') AS ' . $this->quote($fromSub['alias']);
+            return 'FROM (' . $subResult->query . ') AS ' . $this->quote($fromSub->alias);
         }
 
         $sql = 'FROM ' . $this->quote($this->table);
@@ -181,6 +205,20 @@ abstract class Builder implements
         $this->table = $table;
         $this->tableAlias = $alias;
         $this->fromSubquery = null;
+        $this->noTable = false;
+
+        return $this;
+    }
+
+    /**
+     * Build a query without a FROM clause (e.g. SELECT 1, SELECT CONNECTION_ID()).
+     */
+    public function fromNone(): static
+    {
+        $this->noTable = true;
+        $this->table = '';
+        $this->tableAlias = '';
+        $this->fromSubquery = null;
 
         return $this;
     }
@@ -188,6 +226,17 @@ abstract class Builder implements
     public function into(string $table): static
     {
         $this->table = $table;
+
+        return $this;
+    }
+
+    /**
+     * Set an alias for the INSERT target table (e.g. INSERT INTO table AS alias).
+     * Used by PostgreSQL ON CONFLICT to reference the existing row.
+     */
+    public function insertAs(string $alias): static
+    {
+        $this->insertAlias = $alias;
 
         return $this;
     }
@@ -236,30 +285,48 @@ abstract class Builder implements
         return $this;
     }
 
+    /**
+     * Register a raw expression wrapper for a column in INSERT statements.
+     *
+     * The expression must contain exactly one `?` placeholder which will receive
+     * the column's value from each row. E.g. `ST_GeomFromText(?, 4326)`.
+     *
+     * @param  list<mixed>  $extraBindings  Additional bindings beyond the column value (e.g. SRID)
+     */
+    public function insertColumnExpression(string $column, string $expression, array $extraBindings = []): static
+    {
+        $this->insertColumnExpressions[$column] = $expression;
+        if (! empty($extraBindings)) {
+            $this->insertColumnExpressionBindings[$column] = $extraBindings;
+        }
+
+        return $this;
+    }
+
     public function filterWhereIn(string $column, Builder $subquery): static
     {
-        $this->whereInSubqueries[] = ['column' => $column, 'subquery' => $subquery, 'not' => false];
+        $this->whereInSubqueries[] = new WhereInSubquery($column, $subquery, false);
 
         return $this;
     }
 
     public function filterWhereNotIn(string $column, Builder $subquery): static
     {
-        $this->whereInSubqueries[] = ['column' => $column, 'subquery' => $subquery, 'not' => true];
+        $this->whereInSubqueries[] = new WhereInSubquery($column, $subquery, true);
 
         return $this;
     }
 
     public function selectSub(Builder $subquery, string $alias): static
     {
-        $this->subSelects[] = ['subquery' => $subquery, 'alias' => $alias];
+        $this->subSelects[] = new SubSelect($subquery, $alias);
 
         return $this;
     }
 
     public function fromSub(Builder $subquery, string $alias): static
     {
-        $this->fromSubquery = ['subquery' => $subquery, 'alias' => $alias];
+        $this->fromSubquery = new SubSelect($subquery, $alias);
         $this->table = '';
 
         return $this;
@@ -270,7 +337,7 @@ abstract class Builder implements
      */
     public function orderByRaw(string $expression, array $bindings = []): static
     {
-        $this->rawOrders[] = ['expression' => $expression, 'bindings' => $bindings];
+        $this->rawOrders[] = new Condition($expression, $bindings);
 
         return $this;
     }
@@ -280,7 +347,7 @@ abstract class Builder implements
      */
     public function groupByRaw(string $expression, array $bindings = []): static
     {
-        $this->rawGroups[] = ['expression' => $expression, 'bindings' => $bindings];
+        $this->rawGroups[] = new Condition($expression, $bindings);
 
         return $this;
     }
@@ -290,7 +357,7 @@ abstract class Builder implements
      */
     public function havingRaw(string $expression, array $bindings = []): static
     {
-        $this->rawHavings[] = ['expression' => $expression, 'bindings' => $bindings];
+        $this->rawHavings[] = new Condition($expression, $bindings);
 
         return $this;
     }
@@ -305,15 +372,15 @@ abstract class Builder implements
     /**
      * @param  \Closure(JoinBuilder): void  $callback
      */
-    public function joinWhere(string $table, Closure $callback, string $type = 'JOIN', string $alias = ''): static
+    public function joinWhere(string $table, Closure $callback, JoinType $type = JoinType::Inner, string $alias = ''): static
     {
         $joinBuilder = new JoinBuilder();
         $callback($joinBuilder);
 
         $method = match ($type) {
-            'LEFT JOIN' => Method::LeftJoin,
-            'RIGHT JOIN' => Method::RightJoin,
-            'CROSS JOIN' => Method::CrossJoin,
+            JoinType::Left => Method::LeftJoin,
+            JoinType::Right => Method::RightJoin,
+            JoinType::Cross => Method::CrossJoin,
             default => Method::Join,
         };
 
@@ -336,14 +403,14 @@ abstract class Builder implements
 
     public function filterExists(Builder $subquery): static
     {
-        $this->existsSubqueries[] = ['subquery' => $subquery, 'not' => false];
+        $this->existsSubqueries[] = new ExistsSubquery($subquery, false);
 
         return $this;
     }
 
     public function filterNotExists(Builder $subquery): static
     {
-        $this->existsSubqueries[] = ['subquery' => $subquery, 'not' => true];
+        $this->existsSubqueries[] = new ExistsSubquery($subquery, true);
 
         return $this;
     }
@@ -547,7 +614,7 @@ abstract class Builder implements
     public function union(self $other): static
     {
         $result = $other->build();
-        $this->unions[] = new UnionClause('UNION', $result->query, $result->bindings);
+        $this->unions[] = new UnionClause(UnionType::Union, $result->query, $result->bindings);
 
         return $this;
     }
@@ -555,7 +622,7 @@ abstract class Builder implements
     public function unionAll(self $other): static
     {
         $result = $other->build();
-        $this->unions[] = new UnionClause('UNION ALL', $result->query, $result->bindings);
+        $this->unions[] = new UnionClause(UnionType::UnionAll, $result->query, $result->bindings);
 
         return $this;
     }
@@ -563,7 +630,7 @@ abstract class Builder implements
     public function intersect(self $other): static
     {
         $result = $other->build();
-        $this->unions[] = new UnionClause('INTERSECT', $result->query, $result->bindings);
+        $this->unions[] = new UnionClause(UnionType::Intersect, $result->query, $result->bindings);
 
         return $this;
     }
@@ -571,7 +638,7 @@ abstract class Builder implements
     public function intersectAll(self $other): static
     {
         $result = $other->build();
-        $this->unions[] = new UnionClause('INTERSECT ALL', $result->query, $result->bindings);
+        $this->unions[] = new UnionClause(UnionType::IntersectAll, $result->query, $result->bindings);
 
         return $this;
     }
@@ -579,7 +646,7 @@ abstract class Builder implements
     public function except(self $other): static
     {
         $result = $other->build();
-        $this->unions[] = new UnionClause('EXCEPT', $result->query, $result->bindings);
+        $this->unions[] = new UnionClause(UnionType::Except, $result->query, $result->bindings);
 
         return $this;
     }
@@ -587,7 +654,7 @@ abstract class Builder implements
     public function exceptAll(self $other): static
     {
         $result = $other->build();
-        $this->unions[] = new UnionClause('EXCEPT ALL', $result->query, $result->bindings);
+        $this->unions[] = new UnionClause(UnionType::ExceptAll, $result->query, $result->bindings);
 
         return $this;
     }
@@ -637,7 +704,7 @@ abstract class Builder implements
     public function with(string $name, self $query): static
     {
         $result = $query->build();
-        $this->ctes[] = ['name' => $name, 'query' => $result->query, 'bindings' => $result->bindings, 'recursive' => false];
+        $this->ctes[] = new CteClause($name, $result->query, $result->bindings, false);
 
         return $this;
     }
@@ -645,7 +712,7 @@ abstract class Builder implements
     public function withRecursive(string $name, self $query): static
     {
         $result = $query->build();
-        $this->ctes[] = ['name' => $name, 'query' => $result->query, 'bindings' => $result->bindings, 'recursive' => true];
+        $this->ctes[] = new CteClause($name, $result->query, $result->bindings, true);
 
         return $this;
     }
@@ -655,33 +722,28 @@ abstract class Builder implements
      */
     public function selectRaw(string $expression, array $bindings = []): static
     {
-        $this->rawSelects[] = ['expression' => $expression, 'bindings' => $bindings];
+        $this->rawSelects[] = new Condition($expression, $bindings);
 
         return $this;
     }
 
     public function selectWindow(string $function, string $alias, ?array $partitionBy = null, ?array $orderBy = null): static
     {
-        $this->windowSelects[] = [
-            'function' => $function,
-            'alias' => $alias,
-            'partitionBy' => $partitionBy,
-            'orderBy' => $orderBy,
-        ];
+        $this->windowSelects[] = new WindowSelect($function, $alias, $partitionBy, $orderBy);
 
         return $this;
     }
 
     public function selectCase(CaseExpression $case): static
     {
-        $this->caseSelects[] = ['sql' => $case->sql, 'bindings' => $case->bindings];
+        $this->caseSelects[] = $case;
 
         return $this;
     }
 
     public function setCase(string $column, CaseExpression $case): static
     {
-        $this->caseSets[$column] = ['sql' => $case->sql, 'bindings' => $case->bindings];
+        $this->caseSets[$column] = $case;
 
         return $this;
     }
@@ -748,13 +810,13 @@ abstract class Builder implements
             $hasRecursive = false;
             $cteParts = [];
             foreach ($this->ctes as $cte) {
-                if ($cte['recursive']) {
+                if ($cte->recursive) {
                     $hasRecursive = true;
                 }
-                foreach ($cte['bindings'] as $binding) {
+                foreach ($cte->bindings as $binding) {
                     $this->addBinding($binding);
                 }
-                $cteParts[] = $this->quote($cte['name']) . ' AS (' . $cte['query'] . ')';
+                $cteParts[] = $this->quote($cte->name) . ' AS (' . $cte->query . ')';
             }
             $keyword = $hasRecursive ? 'WITH RECURSIVE' : 'WITH';
             $ctePrefix = $keyword . ' ' . \implode(', ', $cteParts) . ' ';
@@ -779,8 +841,8 @@ abstract class Builder implements
 
         // Sub-selects
         foreach ($this->subSelects as $subSelect) {
-            $subResult = $subSelect['subquery']->build();
-            $selectParts[] = '(' . $subResult->query . ') AS ' . $this->quote($subSelect['alias']);
+            $subResult = $subSelect->subquery->build();
+            $selectParts[] = '(' . $subResult->query . ') AS ' . $this->quote($subSelect->alias);
             foreach ($subResult->bindings as $binding) {
                 $this->addBinding($binding);
             }
@@ -788,8 +850,8 @@ abstract class Builder implements
 
         // Raw selects
         foreach ($this->rawSelects as $rawSelect) {
-            $selectParts[] = $rawSelect['expression'];
-            foreach ($rawSelect['bindings'] as $binding) {
+            $selectParts[] = $rawSelect->expression;
+            foreach ($rawSelect->bindings as $binding) {
                 $this->addBinding($binding);
             }
         }
@@ -798,17 +860,17 @@ abstract class Builder implements
         foreach ($this->windowSelects as $win) {
             $overParts = [];
 
-            if ($win['partitionBy'] !== null && $win['partitionBy'] !== []) {
+            if ($win->partitionBy !== null && $win->partitionBy !== []) {
                 $partCols = \array_map(
                     fn (string $col): string => $this->resolveAndWrap($col),
-                    $win['partitionBy']
+                    $win->partitionBy
                 );
                 $overParts[] = 'PARTITION BY ' . \implode(', ', $partCols);
             }
 
-            if ($win['orderBy'] !== null && $win['orderBy'] !== []) {
+            if ($win->orderBy !== null && $win->orderBy !== []) {
                 $orderCols = [];
-                foreach ($win['orderBy'] as $col) {
+                foreach ($win->orderBy as $col) {
                     if (\str_starts_with($col, '-')) {
                         $orderCols[] = $this->resolveAndWrap(\substr($col, 1)) . ' DESC';
                     } else {
@@ -819,13 +881,13 @@ abstract class Builder implements
             }
 
             $overClause = \implode(' ', $overParts);
-            $selectParts[] = $win['function'] . ' OVER (' . $overClause . ') AS ' . $this->quote($win['alias']);
+            $selectParts[] = $win->function . ' OVER (' . $overClause . ') AS ' . $this->quote($win->alias);
         }
 
         // CASE selects
         foreach ($this->caseSelects as $caseSelect) {
-            $selectParts[] = $caseSelect['sql'];
-            foreach ($caseSelect['bindings'] as $binding) {
+            $selectParts[] = $caseSelect->sql;
+            foreach ($caseSelect->bindings as $binding) {
                 $this->addBinding($binding);
             }
         }
@@ -836,7 +898,10 @@ abstract class Builder implements
         $parts[] = $selectKeyword . ' ' . $selectSQL;
 
         // FROM
-        $parts[] = $this->buildTableClause();
+        $tableClause = $this->buildTableClause();
+        if ($tableClause !== '') {
+            $parts[] = $tableClause;
+        }
 
         // JOINS
         $joinFilterWhereClauses = [];
@@ -861,13 +926,13 @@ abstract class Builder implements
 
                 $joinTable = $joinQuery->getAttribute();
                 $joinType = match ($joinQuery->getMethod()) {
-                    Method::Join => 'JOIN',
-                    Method::LeftJoin => 'LEFT JOIN',
-                    Method::RightJoin => 'RIGHT JOIN',
-                    Method::CrossJoin => 'CROSS JOIN',
-                    default => 'JOIN',
+                    Method::Join => JoinType::Inner,
+                    Method::LeftJoin => JoinType::Left,
+                    Method::RightJoin => JoinType::Right,
+                    Method::CrossJoin => JoinType::Cross,
+                    default => JoinType::Inner,
                 };
-                $isCrossJoin = $joinQuery->getMethod() === Method::CrossJoin;
+                $isCrossJoin = $joinType === JoinType::Cross;
 
                 foreach ($this->joinFilterHooks as $hook) {
                     $result = $hook->filterJoin($joinTable, $joinType);
@@ -878,8 +943,8 @@ abstract class Builder implements
                     $placement = $this->resolveJoinFilterPlacement($result->placement, $isCrossJoin);
 
                     if ($placement === Placement::On) {
-                        $joinSQL .= ' AND ' . $result->condition->getExpression();
-                        foreach ($result->condition->getBindings() as $binding) {
+                        $joinSQL .= ' AND ' . $result->condition->expression;
+                        foreach ($result->condition->bindings as $binding) {
                             $this->addBinding($binding);
                         }
                     } else {
@@ -903,24 +968,24 @@ abstract class Builder implements
 
         foreach ($this->filterHooks as $hook) {
             $condition = $hook->filter($this->table);
-            $whereClauses[] = $condition->getExpression();
-            foreach ($condition->getBindings() as $binding) {
+            $whereClauses[] = $condition->expression;
+            foreach ($condition->bindings as $binding) {
                 $this->addBinding($binding);
             }
         }
 
         foreach ($joinFilterWhereClauses as $condition) {
-            $whereClauses[] = $condition->getExpression();
-            foreach ($condition->getBindings() as $binding) {
+            $whereClauses[] = $condition->expression;
+            foreach ($condition->bindings as $binding) {
                 $this->addBinding($binding);
             }
         }
 
         // WHERE IN subqueries
         foreach ($this->whereInSubqueries as $sub) {
-            $subResult = $sub['subquery']->build();
-            $prefix = $sub['not'] ? 'NOT IN' : 'IN';
-            $whereClauses[] = $this->resolveAndWrap($sub['column']) . ' ' . $prefix . ' (' . $subResult->query . ')';
+            $subResult = $sub->subquery->build();
+            $prefix = $sub->not ? 'NOT IN' : 'IN';
+            $whereClauses[] = $this->resolveAndWrap($sub->column) . ' ' . $prefix . ' (' . $subResult->query . ')';
             foreach ($subResult->bindings as $binding) {
                 $this->addBinding($binding);
             }
@@ -928,8 +993,8 @@ abstract class Builder implements
 
         // EXISTS subqueries
         foreach ($this->existsSubqueries as $sub) {
-            $subResult = $sub['subquery']->build();
-            $prefix = $sub['not'] ? 'NOT EXISTS' : 'EXISTS';
+            $subResult = $sub->subquery->build();
+            $prefix = $sub->not ? 'NOT EXISTS' : 'EXISTS';
             $whereClauses[] = $prefix . ' (' . $subResult->query . ')';
             foreach ($subResult->bindings as $binding) {
                 $this->addBinding($binding);
@@ -961,8 +1026,8 @@ abstract class Builder implements
             $groupByParts = $groupByCols;
         }
         foreach ($this->rawGroups as $rawGroup) {
-            $groupByParts[] = $rawGroup['expression'];
-            foreach ($rawGroup['bindings'] as $binding) {
+            $groupByParts[] = $rawGroup->expression;
+            foreach ($rawGroup->bindings as $binding) {
                 $this->addBinding($binding);
             }
         }
@@ -981,8 +1046,8 @@ abstract class Builder implements
             }
         }
         foreach ($this->rawHavings as $rawHaving) {
-            $havingClauses[] = $rawHaving['expression'];
-            foreach ($rawHaving['bindings'] as $binding) {
+            $havingClauses[] = $rawHaving->expression;
+            foreach ($rawHaving->bindings as $binding) {
                 $this->addBinding($binding);
             }
         }
@@ -995,8 +1060,8 @@ abstract class Builder implements
 
         $vectorOrderExpr = $this->compileVectorOrderExpr();
         if ($vectorOrderExpr !== null) {
-            $orderClauses[] = $vectorOrderExpr['expression'];
-            foreach ($vectorOrderExpr['bindings'] as $binding) {
+            $orderClauses[] = $vectorOrderExpr->expression;
+            foreach ($vectorOrderExpr->bindings as $binding) {
                 $this->addBinding($binding);
             }
         }
@@ -1010,8 +1075,8 @@ abstract class Builder implements
             $orderClauses[] = $this->compileOrder($orderQuery);
         }
         foreach ($this->rawOrders as $rawOrder) {
-            $orderClauses[] = $rawOrder['expression'];
-            foreach ($rawOrder['bindings'] as $binding) {
+            $orderClauses[] = $rawOrder->expression;
+            foreach ($rawOrder->bindings as $binding) {
                 $this->addBinding($binding);
             }
         }
@@ -1033,7 +1098,11 @@ abstract class Builder implements
 
         // LOCKING
         if ($this->lockMode !== null) {
-            $parts[] = $this->lockMode;
+            $lockSql = $this->lockMode->toSql();
+            if ($this->lockOfTable !== null) {
+                $lockSql .= ' OF ' . $this->quote($this->lockOfTable);
+            }
+            $parts[] = $lockSql;
         }
 
         $sql = \implode(' ', $parts);
@@ -1043,7 +1112,7 @@ abstract class Builder implements
             $sql = '(' . $sql . ')';
         }
         foreach ($this->unions as $union) {
-            $sql .= ' ' . $union->type . ' (' . $union->query . ')';
+            $sql .= ' ' . $union->type->value . ' (' . $union->query . ')';
             foreach ($union->bindings as $binding) {
                 $this->addBinding($binding);
             }
@@ -1073,12 +1142,24 @@ abstract class Builder implements
             $placeholders = [];
             foreach ($columns as $col) {
                 $bindings[] = $row[$col] ?? null;
-                $placeholders[] = '?';
+                if (isset($this->insertColumnExpressions[$col])) {
+                    $placeholders[] = $this->insertColumnExpressions[$col];
+                    foreach ($this->insertColumnExpressionBindings[$col] ?? [] as $extra) {
+                        $bindings[] = $extra;
+                    }
+                } else {
+                    $placeholders[] = '?';
+                }
             }
             $rowPlaceholders[] = '(' . \implode(', ', $placeholders) . ')';
         }
 
-        $sql = 'INSERT INTO ' . $this->quote($this->table)
+        $tablePart = $this->quote($this->table);
+        if ($this->insertAlias !== '') {
+            $tablePart .= ' AS ' . $this->insertAlias;
+        }
+
+        $sql = 'INSERT INTO ' . $tablePart
             . ' (' . \implode(', ', $wrappedColumns) . ')'
             . ' VALUES ' . \implode(', ', $rowPlaceholders);
 
@@ -1120,8 +1201,8 @@ abstract class Builder implements
         }
 
         foreach ($this->caseSets as $col => $caseData) {
-            $assignments[] = $this->resolveAndWrap($col) . ' = ' . $caseData['sql'];
-            foreach ($caseData['bindings'] as $binding) {
+            $assignments[] = $this->resolveAndWrap($col) . ' = ' . $caseData->sql;
+            foreach ($caseData->bindings as $binding) {
                 $this->addBinding($binding);
             }
         }
@@ -1167,17 +1248,17 @@ abstract class Builder implements
 
         foreach ($this->filterHooks as $hook) {
             $condition = $hook->filter($this->table);
-            $whereClauses[] = $condition->getExpression();
-            foreach ($condition->getBindings() as $binding) {
+            $whereClauses[] = $condition->expression;
+            foreach ($condition->bindings as $binding) {
                 $this->addBinding($binding);
             }
         }
 
         // WHERE IN subqueries
         foreach ($this->whereInSubqueries as $sub) {
-            $subResult = $sub['subquery']->build();
-            $prefix = $sub['not'] ? 'NOT IN' : 'IN';
-            $whereClauses[] = $this->resolveAndWrap($sub['column']) . ' ' . $prefix . ' (' . $subResult->query . ')';
+            $subResult = $sub->subquery->build();
+            $prefix = $sub->not ? 'NOT IN' : 'IN';
+            $whereClauses[] = $this->resolveAndWrap($sub->column) . ' ' . $prefix . ' (' . $subResult->query . ')';
             foreach ($subResult->bindings as $binding) {
                 $this->addBinding($binding);
             }
@@ -1185,8 +1266,8 @@ abstract class Builder implements
 
         // EXISTS subqueries
         foreach ($this->existsSubqueries as $sub) {
-            $subResult = $sub['subquery']->build();
-            $prefix = $sub['not'] ? 'NOT EXISTS' : 'EXISTS';
+            $subResult = $sub->subquery->build();
+            $prefix = $sub->not ? 'NOT EXISTS' : 'EXISTS';
             $whereClauses[] = $prefix . ' (' . $subResult->query . ')';
             foreach ($subResult->bindings as $binding) {
                 $this->addBinding($binding);
@@ -1213,8 +1294,8 @@ abstract class Builder implements
             $orderClauses[] = $this->compileOrder($orderQuery);
         }
         foreach ($this->rawOrders as $rawOrder) {
-            $orderClauses[] = $rawOrder['expression'];
-            foreach ($rawOrder['bindings'] as $binding) {
+            $orderClauses[] = $rawOrder->expression;
+            foreach ($rawOrder->bindings as $binding) {
                 $this->addBinding($binding);
             }
         }
@@ -1236,16 +1317,17 @@ abstract class Builder implements
 
     /**
      * Hook for subclasses to inject a vector distance ORDER BY expression.
-     *
-     * @return array{expression: string, bindings: list<mixed>}|null
      */
-    protected function compileVectorOrderExpr(): ?array
+    protected function compileVectorOrderExpr(): ?Condition
     {
         return null;
     }
 
     protected function validateTable(): void
     {
+        if ($this->noTable) {
+            return;
+        }
         if ($this->table === '' && $this->fromSubquery === null) {
             throw new ValidationException('No table specified. Call from() or into() before building a query.');
         }
@@ -1318,7 +1400,11 @@ abstract class Builder implements
         $this->conflictUpdateColumns = [];
         $this->conflictRawSets = [];
         $this->conflictRawSetBindings = [];
+        $this->insertColumnExpressions = [];
+        $this->insertColumnExpressionBindings = [];
+        $this->insertAlias = '';
         $this->lockMode = null;
+        $this->lockOfTable = null;
         $this->insertSelectSource = null;
         $this->insertSelectColumns = [];
         $this->ctes = [];
@@ -1329,6 +1415,7 @@ abstract class Builder implements
         $this->whereInSubqueries = [];
         $this->subSelects = [];
         $this->fromSubquery = null;
+        $this->noTable = false;
         $this->rawOrders = [];
         $this->rawGroups = [];
         $this->rawHavings = [];
@@ -1553,15 +1640,15 @@ abstract class Builder implements
 
         $onParts = [];
 
-        foreach ($joinBuilder->getOns() as $on) {
-            $left = $this->resolveAndWrap($on['left']);
-            $right = $this->resolveAndWrap($on['right']);
-            $onParts[] = $left . ' ' . $on['operator'] . ' ' . $right;
+        foreach ($joinBuilder->ons as $on) {
+            $left = $this->resolveAndWrap($on->left);
+            $right = $this->resolveAndWrap($on->right);
+            $onParts[] = $left . ' ' . $on->operator . ' ' . $right;
         }
 
-        foreach ($joinBuilder->getWheres() as $where) {
-            $onParts[] = $where['expression'];
-            foreach ($where['bindings'] as $binding) {
+        foreach ($joinBuilder->wheres as $where) {
+            $onParts[] = $where->expression;
+            foreach ($where->bindings as $binding) {
                 $this->addBinding($binding);
             }
         }

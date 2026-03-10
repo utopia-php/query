@@ -13,14 +13,4 @@ readonly class Condition
     ) {
     }
 
-    public function getExpression(): string
-    {
-        return $this->expression;
-    }
-
-    /** @return list<mixed> */
-    public function getBindings(): array
-    {
-        return $this->bindings;
-    }
 }

@@ -257,8 +257,8 @@ class ClickHouse extends BaseBuilder implements Hints
         }
 
         foreach ($this->caseSets as $col => $caseData) {
-            $assignments[] = $this->resolveAndWrap($col) . ' = ' . $caseData['sql'];
-            foreach ($caseData['bindings'] as $binding) {
+            $assignments[] = $this->resolveAndWrap($col) . ' = ' . $caseData->sql;
+            foreach ($caseData->bindings as $binding) {
                 $this->addBinding($binding);
             }
         }
@@ -327,12 +327,12 @@ class ClickHouse extends BaseBuilder implements Hints
     {
         $fromSub = $this->fromSubquery;
         if ($fromSub !== null) {
-            $subResult = $fromSub['subquery']->build();
+            $subResult = $fromSub->subquery->build();
             foreach ($subResult->bindings as $binding) {
                 $this->addBinding($binding);
             }
 
-            return 'FROM (' . $subResult->query . ') AS ' . $this->quote($fromSub['alias']);
+            return 'FROM (' . $subResult->query . ') AS ' . $this->quote($fromSub->alias);
         }
 
         $sql = 'FROM ' . $this->quote($this->table);

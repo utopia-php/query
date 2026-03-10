@@ -335,10 +335,9 @@ class Query
     /**
      * Helper method to create Query with contains method
      *
-     * @deprecated Use containsAny() for array attributes, or keep using contains() for string substring matching.
-     *
      * @param  array<mixed>  $values
      */
+    #[\Deprecated('Use containsAny() for array attributes, or keep using contains() for string substring matching.')]
     public static function contains(string $attribute, array $values): static
     {
         return new static(Method::Contains, $attribute, $values);
@@ -1210,16 +1209,7 @@ class Query
         $result = [];
         foreach ($queriesA as $queryA) {
             $aArray = $queryA->toArray();
-            $found = false;
-
-            foreach ($bArrays as $bArray) {
-                if ($aArray === $bArray) {
-                    $found = true;
-                    break;
-                }
-            }
-
-            if (! $found) {
+            if (! array_any($bArrays, fn (array $b): bool => $aArray === $b)) {
                 $result[] = $queryA;
             }
         }

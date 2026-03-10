@@ -3,6 +3,7 @@
 namespace Utopia\Query\Hook\Filter;
 
 use Utopia\Query\Builder\Condition;
+use Utopia\Query\Builder\JoinType;
 use Utopia\Query\Hook\Filter;
 use Utopia\Query\Hook\Join\Condition as JoinCondition;
 use Utopia\Query\Hook\Join\Filter as JoinFilter;
@@ -36,12 +37,12 @@ class Tenant implements Filter, JoinFilter
         );
     }
 
-    public function filterJoin(string $table, string $joinType): ?JoinCondition
+    public function filterJoin(string $table, JoinType $joinType): ?JoinCondition
     {
         $condition = $this->filter($table);
 
         $placement = match ($joinType) {
-            'LEFT JOIN', 'RIGHT JOIN' => Placement::On,
+            JoinType::Left, JoinType::Right => Placement::On,
             default => Placement::Where,
         };
 
