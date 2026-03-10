@@ -15,22 +15,22 @@ class ClickHouse extends Schema
     protected function compileColumnType(Column $column): string
     {
         $type = match ($column->type) {
-            'string' => 'String',
-            'text' => 'String',
-            'integer' => $column->isUnsigned ? 'UInt32' : 'Int32',
-            'bigInteger' => $column->isUnsigned ? 'UInt64' : 'Int64',
-            'float' => 'Float64',
-            'boolean' => 'UInt8',
-            'datetime' => $column->precision ? 'DateTime64(' . $column->precision . ')' : 'DateTime',
-            'timestamp' => $column->precision ? 'DateTime64(' . $column->precision . ')' : 'DateTime',
-            'json' => 'String',
-            'binary' => 'String',
-            'enum' => $this->compileClickHouseEnum($column->enumValues),
-            'point' => 'Tuple(Float64, Float64)',
-            'linestring' => 'Array(Tuple(Float64, Float64))',
-            'polygon' => 'Array(Array(Tuple(Float64, Float64)))',
-            'vector' => 'Array(Float64)',
-            default => throw new UnsupportedException('Unknown column type: ' . $column->type),
+            ColumnType::String => 'String',
+            ColumnType::Text => 'String',
+            ColumnType::MediumText, ColumnType::LongText => 'String',
+            ColumnType::Integer => $column->isUnsigned ? 'UInt32' : 'Int32',
+            ColumnType::BigInteger => $column->isUnsigned ? 'UInt64' : 'Int64',
+            ColumnType::Float => 'Float64',
+            ColumnType::Boolean => 'UInt8',
+            ColumnType::Datetime => $column->precision ? 'DateTime64(' . $column->precision . ')' : 'DateTime',
+            ColumnType::Timestamp => $column->precision ? 'DateTime64(' . $column->precision . ')' : 'DateTime',
+            ColumnType::Json => 'String',
+            ColumnType::Binary => 'String',
+            ColumnType::Enum => $this->compileClickHouseEnum($column->enumValues),
+            ColumnType::Point => 'Tuple(Float64, Float64)',
+            ColumnType::Linestring => 'Array(Tuple(Float64, Float64))',
+            ColumnType::Polygon => 'Array(Array(Tuple(Float64, Float64)))',
+            ColumnType::Vector => 'Array(Float64)',
         };
 
         if ($column->isNullable) {
@@ -87,29 +87,29 @@ class ClickHouse extends Schema
 
         $alterations = [];
 
-        foreach ($blueprint->getColumns() as $column) {
+        foreach ($blueprint->columns as $column) {
             $keyword = $column->isModify ? 'MODIFY COLUMN' : 'ADD COLUMN';
             $alterations[] = $keyword . ' ' . $this->compileColumnDefinition($column);
         }
 
-        foreach ($blueprint->getRenameColumns() as $rename) {
-            $alterations[] = 'RENAME COLUMN ' . $this->quote($rename['from'])
-                . ' TO ' . $this->quote($rename['to']);
+        foreach ($blueprint->renameColumns as $rename) {
+            $alterations[] = 'RENAME COLUMN ' . $this->quote($rename->from)
+                . ' TO ' . $this->quote($rename->to);
         }
 
-        foreach ($blueprint->getDropColumns() as $col) {
+        foreach ($blueprint->dropColumns as $col) {
             $alterations[] = 'DROP COLUMN ' . $this->quote($col);
         }
 
-        foreach ($blueprint->getDropIndexes() as $name) {
+        foreach ($blueprint->dropIndexes as $name) {
             $alterations[] = 'DROP INDEX ' . $this->quote($name);
         }
 
-        if (! empty($blueprint->getForeignKeys())) {
+        if (! empty($blueprint->foreignKeys)) {
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
         }
 
-        if (! empty($blueprint->getDropForeignKeys())) {
+        if (! empty($blueprint->dropForeignKeys)) {
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
         }
 
@@ -130,7 +130,7 @@ class ClickHouse extends Schema
         $columnDefs = [];
         $primaryKeys = [];
 
-        foreach ($blueprint->getColumns() as $column) {
+        foreach ($blueprint->columns as $column) {
             $def = $this->compileColumnDefinition($column);
             $columnDefs[] = $def;
 
@@ -140,14 +140,14 @@ class ClickHouse extends Schema
         }
 
         // Indexes (ClickHouse uses INDEX ... TYPE ... GRANULARITY ...)
-        foreach ($blueprint->getIndexes() as $index) {
+        foreach ($blueprint->indexes as $index) {
             $cols = \array_map(fn (string $c): string => $this->quote($c), $index->columns);
             $expr = \count($cols) === 1 ? $cols[0] : '(' . \implode(', ', $cols) . ')';
             $columnDefs[] = 'INDEX ' . $this->quote($index->name)
                 . ' ' . $expr . ' TYPE minmax GRANULARITY 3';
         }
 
-        if (! empty($blueprint->getForeignKeys())) {
+        if (! empty($blueprint->foreignKeys)) {
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
         }
 

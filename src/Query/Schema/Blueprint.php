@@ -5,29 +5,35 @@ namespace Utopia\Query\Schema;
 class Blueprint
 {
     /** @var list<Column> */
-    private array $columns = [];
+    public private(set) array $columns = [];
 
     /** @var list<Index> */
-    private array $indexes = [];
+    public private(set) array $indexes = [];
 
     /** @var list<ForeignKey> */
-    private array $foreignKeys = [];
+    public private(set) array $foreignKeys = [];
 
     /** @var list<string> */
-    private array $dropColumns = [];
+    public private(set) array $dropColumns = [];
 
-    /** @var list<array{from: string, to: string}> */
-    private array $renameColumns = [];
-
-    /** @var list<string> */
-    private array $dropIndexes = [];
+    /** @var list<RenameColumn> */
+    public private(set) array $renameColumns = [];
 
     /** @var list<string> */
-    private array $dropForeignKeys = [];
+    public private(set) array $dropIndexes = [];
+
+    /** @var list<string> */
+    public private(set) array $dropForeignKeys = [];
+
+    /** @var list<string> Raw SQL column definitions (bypass typed Column objects) */
+    public private(set) array $rawColumnDefs = [];
+
+    /** @var list<string> Raw SQL index definitions (bypass typed Index objects) */
+    public private(set) array $rawIndexDefs = [];
 
     public function id(string $name = 'id'): Column
     {
-        $col = new Column($name, 'bigInteger');
+        $col = new Column($name, ColumnType::BigInteger);
         $col->isUnsigned = true;
         $col->isAutoIncrement = true;
         $col->isPrimary = true;
@@ -38,7 +44,7 @@ class Blueprint
 
     public function string(string $name, int $length = 255): Column
     {
-        $col = new Column($name, 'string', $length);
+        $col = new Column($name, ColumnType::String, $length);
         $this->columns[] = $col;
 
         return $col;
@@ -46,7 +52,23 @@ class Blueprint
 
     public function text(string $name): Column
     {
-        $col = new Column($name, 'text');
+        $col = new Column($name, ColumnType::Text);
+        $this->columns[] = $col;
+
+        return $col;
+    }
+
+    public function mediumText(string $name): Column
+    {
+        $col = new Column($name, ColumnType::MediumText);
+        $this->columns[] = $col;
+
+        return $col;
+    }
+
+    public function longText(string $name): Column
+    {
+        $col = new Column($name, ColumnType::LongText);
         $this->columns[] = $col;
 
         return $col;
@@ -54,7 +76,7 @@ class Blueprint
 
     public function integer(string $name): Column
     {
-        $col = new Column($name, 'integer');
+        $col = new Column($name, ColumnType::Integer);
         $this->columns[] = $col;
 
         return $col;
@@ -62,7 +84,7 @@ class Blueprint
 
     public function bigInteger(string $name): Column
     {
-        $col = new Column($name, 'bigInteger');
+        $col = new Column($name, ColumnType::BigInteger);
         $this->columns[] = $col;
 
         return $col;
@@ -70,7 +92,7 @@ class Blueprint
 
     public function float(string $name): Column
     {
-        $col = new Column($name, 'float');
+        $col = new Column($name, ColumnType::Float);
         $this->columns[] = $col;
 
         return $col;
@@ -78,7 +100,7 @@ class Blueprint
 
     public function boolean(string $name): Column
     {
-        $col = new Column($name, 'boolean');
+        $col = new Column($name, ColumnType::Boolean);
         $this->columns[] = $col;
 
         return $col;
@@ -86,7 +108,7 @@ class Blueprint
 
     public function datetime(string $name, int $precision = 0): Column
     {
-        $col = new Column($name, 'datetime', precision: $precision);
+        $col = new Column($name, ColumnType::Datetime, precision: $precision);
         $this->columns[] = $col;
 
         return $col;
@@ -94,7 +116,7 @@ class Blueprint
 
     public function timestamp(string $name, int $precision = 0): Column
     {
-        $col = new Column($name, 'timestamp', precision: $precision);
+        $col = new Column($name, ColumnType::Timestamp, precision: $precision);
         $this->columns[] = $col;
 
         return $col;
@@ -102,7 +124,7 @@ class Blueprint
 
     public function json(string $name): Column
     {
-        $col = new Column($name, 'json');
+        $col = new Column($name, ColumnType::Json);
         $this->columns[] = $col;
 
         return $col;
@@ -110,7 +132,7 @@ class Blueprint
 
     public function binary(string $name): Column
     {
-        $col = new Column($name, 'binary');
+        $col = new Column($name, ColumnType::Binary);
         $this->columns[] = $col;
 
         return $col;
@@ -121,7 +143,7 @@ class Blueprint
      */
     public function enum(string $name, array $values): Column
     {
-        $col = new Column($name, 'enum');
+        $col = new Column($name, ColumnType::Enum);
         $col->enumValues = $values;
         $this->columns[] = $col;
 
@@ -130,7 +152,7 @@ class Blueprint
 
     public function point(string $name, int $srid = 4326): Column
     {
-        $col = new Column($name, 'point');
+        $col = new Column($name, ColumnType::Point);
         $col->srid = $srid;
         $this->columns[] = $col;
 
@@ -139,7 +161,7 @@ class Blueprint
 
     public function linestring(string $name, int $srid = 4326): Column
     {
-        $col = new Column($name, 'linestring');
+        $col = new Column($name, ColumnType::Linestring);
         $col->srid = $srid;
         $this->columns[] = $col;
 
@@ -148,7 +170,7 @@ class Blueprint
 
     public function polygon(string $name, int $srid = 4326): Column
     {
-        $col = new Column($name, 'polygon');
+        $col = new Column($name, ColumnType::Polygon);
         $col->srid = $srid;
         $this->columns[] = $col;
 
@@ -157,7 +179,7 @@ class Blueprint
 
     public function vector(string $name, int $dimensions): Column
     {
-        $col = new Column($name, 'vector');
+        $col = new Column($name, ColumnType::Vector);
         $col->dimensions = $dimensions;
         $this->columns[] = $col;
 
@@ -172,24 +194,64 @@ class Blueprint
 
     /**
      * @param  string[]  $columns
+     * @param  array<string, int>  $lengths
+     * @param  array<string, string>  $orders
+     * @param  array<string, string>  $collations
      */
-    public function index(array $columns, string $name = '', string $method = '', string $operatorClass = ''): void
-    {
+    public function index(
+        array $columns,
+        string $name = '',
+        string $method = '',
+        string $operatorClass = '',
+        array $lengths = [],
+        array $orders = [],
+        array $collations = [],
+    ): void {
         if ($name === '') {
             $name = 'idx_' . \implode('_', $columns);
         }
-        $this->indexes[] = new Index($name, $columns, method: $method, operatorClass: $operatorClass);
+        $this->indexes[] = new Index($name, $columns, IndexType::Index, $lengths, $orders, $method, $operatorClass, $collations);
+    }
+
+    /**
+     * @param  string[]  $columns
+     * @param  array<string, int>  $lengths
+     * @param  array<string, string>  $orders
+     * @param  array<string, string>  $collations
+     */
+    public function uniqueIndex(
+        array $columns,
+        string $name = '',
+        array $lengths = [],
+        array $orders = [],
+        array $collations = [],
+    ): void {
+        if ($name === '') {
+            $name = 'uniq_' . \implode('_', $columns);
+        }
+        $this->indexes[] = new Index($name, $columns, IndexType::Unique, $lengths, $orders, collations: $collations);
     }
 
     /**
      * @param  string[]  $columns
      */
-    public function uniqueIndex(array $columns, string $name = ''): void
+    public function fulltextIndex(array $columns, string $name = ''): void
     {
         if ($name === '') {
-            $name = 'uniq_' . \implode('_', $columns);
+            $name = 'ft_' . \implode('_', $columns);
         }
-        $this->indexes[] = new Index($name, $columns, 'unique');
+        $this->indexes[] = new Index($name, $columns, IndexType::Fulltext);
+    }
+
+    /**
+     * @param  string[]  $columns
+     */
+    public function spatialIndex(array $columns, string $name = ''): void
+    {
+        if ($name === '') {
+            $name = 'sp_' . \implode('_', $columns);
+        }
+        $this->indexes[] = new Index($name, $columns, IndexType::Spatial);
     }
 
     public function foreignKey(string $column): ForeignKey
@@ -200,17 +262,23 @@ class Blueprint
         return $fk;
     }
 
-    public function addColumn(string $name, string $type, int|null $lengthOrPrecision = null): Column
+    public function addColumn(string $name, ColumnType|string $type, int|null $lengthOrPrecision = null): Column
     {
-        $col = new Column($name, $type, $type === 'string' ? $lengthOrPrecision : null, $type !== 'string' ? $lengthOrPrecision : null);
+        if (\is_string($type)) {
+            $type = ColumnType::from($type);
+        }
+        $col = new Column($name, $type, $type === ColumnType::String ? $lengthOrPrecision : null, $type !== ColumnType::String ? $lengthOrPrecision : null);
         $this->columns[] = $col;
 
         return $col;
     }
 
-    public function modifyColumn(string $name, string $type, int|null $lengthOrPrecision = null): Column
+    public function modifyColumn(string $name, ColumnType|string $type, int|null $lengthOrPrecision = null): Column
     {
-        $col = new Column($name, $type, $type === 'string' ? $lengthOrPrecision : null, $type !== 'string' ? $lengthOrPrecision : null);
+        if (\is_string($type)) {
+            $type = ColumnType::from($type);
+        }
+        $col = new Column($name, $type, $type === ColumnType::String ? $lengthOrPrecision : null, $type !== ColumnType::String ? $lengthOrPrecision : null);
         $col->isModify = true;
         $this->columns[] = $col;
 
@@ -219,7 +287,7 @@ class Blueprint
 
     public function renameColumn(string $from, string $to): void
     {
-        $this->renameColumns[] = ['from' => $from, 'to' => $to];
+        $this->renameColumns[] = new RenameColumn($from, $to);
     }
 
     public function dropColumn(string $name): void
@@ -229,10 +297,26 @@ class Blueprint
 
     /**
      * @param  string[]  $columns
+     * @param  array<string, int>  $lengths
+     * @param  array<string, string>  $orders
+     * @param  array<string, string>  $collations
+     * @param  list<string>  $rawColumns  Raw SQL expressions appended to column list (bypass quoting)
      */
-    public function addIndex(string $name, array $columns): void
-    {
-        $this->indexes[] = new Index($name, $columns);
+    public function addIndex(
+        string $name,
+        array $columns,
+        IndexType|string $type = IndexType::Index,
+        array $lengths = [],
+        array $orders = [],
+        string $method = '',
+        string $operatorClass = '',
+        array $collations = [],
+        array $rawColumns = [],
+    ): void {
+        if (\is_string($type)) {
+            $type = IndexType::from($type);
+        }
+        $this->indexes[] = new Index($name, $columns, $type, $lengths, $orders, $method, $operatorClass, $collations, $rawColumns);
     }
 
     public function dropIndex(string $name): void
@@ -253,45 +337,24 @@ class Blueprint
         $this->dropForeignKeys[] = $name;
     }
 
-    /** @return list<Column> */
-    public function getColumns(): array
+    /**
+     * Add a raw SQL column definition (bypass typed Column objects).
+     *
+     * Example: $table->rawColumn('`my_col` VARCHAR(255) NOT NULL DEFAULT ""')
+     */
+    public function rawColumn(string $definition): void
     {
-        return $this->columns;
+        $this->rawColumnDefs[] = $definition;
     }
 
-    /** @return list<Index> */
-    public function getIndexes(): array
+    /**
+     * Add a raw SQL index definition (bypass typed Index objects).
+     *
+     * Example: $table->rawIndex('INDEX `idx_name` (`col1`, `col2`)')
+     */
+    public function rawIndex(string $definition): void
     {
-        return $this->indexes;
+        $this->rawIndexDefs[] = $definition;
     }
 
-    /** @return list<ForeignKey> */
-    public function getForeignKeys(): array
-    {
-        return $this->foreignKeys;
-    }
-
-    /** @return list<string> */
-    public function getDropColumns(): array
-    {
-        return $this->dropColumns;
-    }
-
-    /** @return list<array{from: string, to: string}> */
-    public function getRenameColumns(): array
-    {
-        return $this->renameColumns;
-    }
-
-    /** @return list<string> */
-    public function getDropIndexes(): array
-    {
-        return $this->dropIndexes;
-    }
-
-    /** @return list<string> */
-    public function getDropForeignKeys(): array
-    {
-        return $this->dropForeignKeys;
-    }
 }

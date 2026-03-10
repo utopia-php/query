@@ -3,7 +3,6 @@
 namespace Utopia\Query\Schema;
 
 use Utopia\Query\Builder\BuildResult;
-use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 
 class PostgreSQL extends SQL
@@ -13,22 +12,21 @@ class PostgreSQL extends SQL
     protected function compileColumnType(Column $column): string
     {
         return match ($column->type) {
-            'string' => 'VARCHAR(' . ($column->length ?? 255) . ')',
-            'text' => 'TEXT',
-            'integer' => 'INTEGER',
-            'bigInteger' => 'BIGINT',
-            'float' => 'DOUBLE PRECISION',
-            'boolean' => 'BOOLEAN',
-            'datetime' => $column->precision ? 'TIMESTAMP(' . $column->precision . ')' : 'TIMESTAMP',
-            'timestamp' => $column->precision ? 'TIMESTAMP(' . $column->precision . ') WITHOUT TIME ZONE' : 'TIMESTAMP WITHOUT TIME ZONE',
-            'json' => 'JSONB',
-            'binary' => 'BYTEA',
-            'enum' => 'TEXT',
-            'point' => 'GEOMETRY(POINT' . ($column->srid !== null ? ', ' . $column->srid : '') . ')',
-            'linestring' => 'GEOMETRY(LINESTRING' . ($column->srid !== null ? ', ' . $column->srid : '') . ')',
-            'polygon' => 'GEOMETRY(POLYGON' . ($column->srid !== null ? ', ' . $column->srid : '') . ')',
-            'vector' => 'VECTOR(' . ($column->dimensions ?? 0) . ')',
-            default => throw new UnsupportedException('Unknown column type: ' . $column->type),
+            ColumnType::String => 'VARCHAR(' . ($column->length ?? 255) . ')',
+            ColumnType::Text, ColumnType::MediumText, ColumnType::LongText => 'TEXT',
+            ColumnType::Integer => 'INTEGER',
+            ColumnType::BigInteger => 'BIGINT',
+            ColumnType::Float => 'DOUBLE PRECISION',
+            ColumnType::Boolean => 'BOOLEAN',
+            ColumnType::Datetime => $column->precision ? 'TIMESTAMP(' . $column->precision . ')' : 'TIMESTAMP',
+            ColumnType::Timestamp => $column->precision ? 'TIMESTAMP(' . $column->precision . ') WITHOUT TIME ZONE' : 'TIMESTAMP WITHOUT TIME ZONE',
+            ColumnType::Json => 'JSONB',
+            ColumnType::Binary => 'BYTEA',
+            ColumnType::Enum => 'TEXT',
+            ColumnType::Point => 'GEOMETRY(POINT' . ($column->srid !== null ? ', ' . $column->srid : '') . ')',
+            ColumnType::Linestring => 'GEOMETRY(LINESTRING' . ($column->srid !== null ? ', ' . $column->srid : '') . ')',
+            ColumnType::Polygon => 'GEOMETRY(POLYGON' . ($column->srid !== null ? ', ' . $column->srid : '') . ')',
+            ColumnType::Vector => 'VECTOR(' . ($column->dimensions ?? 0) . ')',
         };
     }
 
@@ -71,7 +69,7 @@ class PostgreSQL extends SQL
         }
 
         // PostgreSQL enum emulation via CHECK constraint
-        if ($column->type === 'enum' && ! empty($column->enumValues)) {
+        if ($column->type === ColumnType::Enum && ! empty($column->enumValues)) {
             $values = \array_map(fn (string $v): string => "'" . \str_replace("'", "''", $v) . "'", $column->enumValues);
             $parts[] = 'CHECK (' . $this->quote($column->name) . ' IN (' . \implode(', ', $values) . '))';
         }
@@ -83,6 +81,10 @@ class PostgreSQL extends SQL
 
     /**
      * @param  string[]  $columns
+     * @param  array<string, int>  $lengths
+     * @param  array<string, string>  $orders
+     * @param  array<string, string>  $collations
+     * @param  list<string>  $rawColumns
      */
     public function createIndex(
         string $table,
@@ -92,6 +94,10 @@ class PostgreSQL extends SQL
         string $type = '',
         string $method = '',
         string $operatorClass = '',
+        array $lengths = [],
+        array $orders = [],
+        array $collations = [],
+        array $rawColumns = [],
     ): BuildResult {
         if ($method !== '' && ! \preg_match('/^[A-Za-z0-9_]+$/', $method)) {
             throw new ValidationException('Invalid index method: ' . $method);
@@ -109,16 +115,10 @@ class PostgreSQL extends SQL
             $sql .= ' USING ' . \strtoupper($method);
         }
 
-        $colParts = [];
-        foreach ($columns as $c) {
-            $part = $this->quote($c);
-            if ($operatorClass !== '') {
-                $part .= ' ' . $operatorClass;
-            }
-            $colParts[] = $part;
-        }
+        $indexType = $unique ? IndexType::Unique : ($type !== '' ? IndexType::from($type) : IndexType::Index);
+        $index = new Index($name, $columns, $indexType, $lengths, $orders, $method, $operatorClass, $collations, $rawColumns);
 
-        $sql .= ' (' . \implode(', ', $colParts) . ')';
+        $sql .= ' (' . $this->compileIndexColumns($index) . ')';
 
         return new BuildResult($sql, []);
     }
@@ -141,7 +141,7 @@ class PostgreSQL extends SQL
     }
 
     /**
-     * @param  list<array{0: string, 1: string, 2: string}>  $params
+     * @param  list<array{0: ParameterDirection|string, 1: string, 2: string}>  $params
      */
     public function createProcedure(string $name, array $params, string $body): BuildResult
     {
@@ -162,18 +162,22 @@ class PostgreSQL extends SQL
     public function createTrigger(
         string $name,
         string $table,
-        string $timing,
-        string $event,
+        TriggerTiming|string $timing,
+        TriggerEvent|string $event,
         string $body,
     ): BuildResult {
-        $timing = \strtoupper($timing);
-        $event = \strtoupper($event);
-
-        if (!\in_array($timing, ['BEFORE', 'AFTER', 'INSTEAD OF'], true)) {
-            throw new \Utopia\Query\Exception\ValidationException('Invalid trigger timing: ' . $timing);
+        if ($timing instanceof TriggerTiming) {
+            $timingValue = $timing->value;
+        } else {
+            $timingValue = \strtoupper($timing);
+            TriggerTiming::from($timingValue);
         }
-        if (!\in_array($event, ['INSERT', 'UPDATE', 'DELETE'], true)) {
-            throw new \Utopia\Query\Exception\ValidationException('Invalid trigger event: ' . $event);
+
+        if ($event instanceof TriggerEvent) {
+            $eventValue = $event->value;
+        } else {
+            $eventValue = \strtoupper($event);
+            TriggerEvent::from($eventValue);
         }
 
         $funcName = $name . '_func';
@@ -181,7 +185,7 @@ class PostgreSQL extends SQL
         $sql = 'CREATE FUNCTION ' . $this->quote($funcName)
             . '() RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN ' . $body . ' RETURN NEW; END; $$; '
             . 'CREATE TRIGGER ' . $this->quote($name)
-            . ' ' . $timing . ' ' . $event
+            . ' ' . $timingValue . ' ' . $eventValue
             . ' ON ' . $this->quote($table)
             . ' FOR EACH ROW EXECUTE FUNCTION ' . $this->quote($funcName) . '()';
 
@@ -198,7 +202,7 @@ class PostgreSQL extends SQL
 
         $alterations = [];
 
-        foreach ($blueprint->getColumns() as $column) {
+        foreach ($blueprint->columns as $column) {
             $keyword = $column->isModify ? 'ALTER COLUMN' : 'ADD COLUMN';
             if ($column->isModify) {
                 $def = $keyword . ' ' . $this->quote($column->name)
@@ -209,29 +213,29 @@ class PostgreSQL extends SQL
             $alterations[] = $def;
         }
 
-        foreach ($blueprint->getRenameColumns() as $rename) {
-            $alterations[] = 'RENAME COLUMN ' . $this->quote($rename['from'])
-                . ' TO ' . $this->quote($rename['to']);
+        foreach ($blueprint->renameColumns as $rename) {
+            $alterations[] = 'RENAME COLUMN ' . $this->quote($rename->from)
+                . ' TO ' . $this->quote($rename->to);
         }
 
-        foreach ($blueprint->getDropColumns() as $col) {
+        foreach ($blueprint->dropColumns as $col) {
             $alterations[] = 'DROP COLUMN ' . $this->quote($col);
         }
 
-        foreach ($blueprint->getForeignKeys() as $fk) {
+        foreach ($blueprint->foreignKeys as $fk) {
             $def = 'ADD FOREIGN KEY (' . $this->quote($fk->column) . ')'
                 . ' REFERENCES ' . $this->quote($fk->refTable)
                 . ' (' . $this->quote($fk->refColumn) . ')';
-            if ($fk->onDelete !== '') {
-                $def .= ' ON DELETE ' . $fk->onDelete;
+            if ($fk->onDelete !== null) {
+                $def .= ' ON DELETE ' . $fk->onDelete->value;
             }
-            if ($fk->onUpdate !== '') {
-                $def .= ' ON UPDATE ' . $fk->onUpdate;
+            if ($fk->onUpdate !== null) {
+                $def .= ' ON UPDATE ' . $fk->onUpdate->value;
             }
             $alterations[] = $def;
         }
 
-        foreach ($blueprint->getDropForeignKeys() as $name) {
+        foreach ($blueprint->dropForeignKeys as $name) {
             $alterations[] = 'DROP CONSTRAINT ' . $this->quote($name);
         }
 
@@ -243,9 +247,8 @@ class PostgreSQL extends SQL
         }
 
         // PostgreSQL indexes are standalone statements, not ALTER TABLE clauses
-        foreach ($blueprint->getIndexes() as $index) {
-            $cols = \array_map(fn (string $c): string => $this->quote($c), $index->columns);
-            $keyword = $index->type === 'unique' ? 'CREATE UNIQUE INDEX' : 'CREATE INDEX';
+        foreach ($blueprint->indexes as $index) {
+            $keyword = $index->type === IndexType::Unique ? 'CREATE UNIQUE INDEX' : 'CREATE INDEX';
 
             $indexSql = $keyword . ' ' . $this->quote($index->name)
                 . ' ON ' . $this->quote($table);
@@ -254,20 +257,11 @@ class PostgreSQL extends SQL
                 $indexSql .= ' USING ' . \strtoupper($index->method);
             }
 
-            $colParts = [];
-            foreach ($cols as $c) {
-                $part = $c;
-                if ($index->operatorClass !== '') {
-                    $part .= ' ' . $index->operatorClass;
-                }
-                $colParts[] = $part;
-            }
-
-            $indexSql .= ' (' . \implode(', ', $colParts) . ')';
+            $indexSql .= ' (' . $this->compileIndexColumns($index) . ')';
             $statements[] = $indexSql;
         }
 
-        foreach ($blueprint->getDropIndexes() as $name) {
+        foreach ($blueprint->dropIndexes as $name) {
             $statements[] = 'DROP INDEX ' . $this->quote($name);
         }
 
@@ -290,5 +284,66 @@ class PostgreSQL extends SQL
     public function dropExtension(string $name): BuildResult
     {
         return new BuildResult('DROP EXTENSION IF EXISTS ' . $this->quote($name), []);
+    }
+
+    /**
+     * Create a collation.
+     *
+     * @param  array<string, string>  $options  Key-value pairs (e.g. ['provider' => 'icu', 'locale' => 'und-u-ks-level1'])
+     */
+    public function createCollation(string $name, array $options, bool $deterministic = true): BuildResult
+    {
+        $optParts = [];
+        foreach ($options as $key => $value) {
+            $optParts[] = $key . " = '" . \str_replace("'", "''", $value) . "'";
+        }
+        $optParts[] = 'deterministic = ' . ($deterministic ? 'true' : 'false');
+
+        $sql = 'CREATE COLLATION IF NOT EXISTS ' . $this->quote($name)
+            . ' (' . \implode(', ', $optParts) . ')';
+
+        return new BuildResult($sql, []);
+    }
+
+    public function renameIndex(string $table, string $from, string $to): BuildResult
+    {
+        return new BuildResult(
+            'ALTER INDEX ' . $this->quote($from) . ' RENAME TO ' . $this->quote($to),
+            []
+        );
+    }
+
+    /**
+     * PostgreSQL uses schemas instead of databases for namespace isolation.
+     */
+    public function createDatabase(string $name): BuildResult
+    {
+        return new BuildResult('CREATE SCHEMA ' . $this->quote($name), []);
+    }
+
+    public function dropDatabase(string $name): BuildResult
+    {
+        return new BuildResult('DROP SCHEMA IF EXISTS ' . $this->quote($name) . ' CASCADE', []);
+    }
+
+    public function analyzeTable(string $table): BuildResult
+    {
+        return new BuildResult('ANALYZE ' . $this->quote($table), []);
+    }
+
+    /**
+     * Alter a column's type with an optional USING expression for type casting.
+     */
+    public function alterColumnType(string $table, string $column, string $type, string $using = ''): BuildResult
+    {
+        $sql = 'ALTER TABLE ' . $this->quote($table)
+            . ' ALTER COLUMN ' . $this->quote($column)
+            . ' TYPE ' . $type;
+
+        if ($using !== '') {
+            $sql .= ' USING ' . $using;
+        }
+
+        return new BuildResult($sql, []);
     }
 }

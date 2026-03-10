@@ -31,9 +31,11 @@ class Column
 
     public bool $isModify = false;
 
+    public ?string $collation = null;
+
     public function __construct(
         public string $name,
-        public string $type,
+        public ColumnType $type,
         public ?int $length = null,
         public ?int $precision = null,
     ) {
@@ -92,6 +94,13 @@ class Column
     public function comment(string $comment): static
     {
         $this->comment = $comment;
+
+        return $this;
+    }
+
+    public function collation(string $collation): static
+    {
+        $this->collation = $collation;
 
         return $this;
     }

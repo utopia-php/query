@@ -10,9 +10,9 @@ class ForeignKey
 
     public string $refColumn = '';
 
-    public string $onDelete = '';
+    public ?ForeignKeyAction $onDelete = null;
 
-    public string $onUpdate = '';
+    public ?ForeignKeyAction $onUpdate = null;
 
     public function __construct(string $column)
     {
@@ -33,13 +33,10 @@ class ForeignKey
         return $this;
     }
 
-    private const ALLOWED_ACTIONS = ['CASCADE', 'SET NULL', 'SET DEFAULT', 'RESTRICT', 'NO ACTION'];
-
-    public function onDelete(string $action): static
+    public function onDelete(ForeignKeyAction|string $action): static
     {
-        $action = \strtoupper($action);
-        if (!\in_array($action, self::ALLOWED_ACTIONS, true)) {
-            throw new \InvalidArgumentException('Invalid foreign key action: ' . $action);
+        if (\is_string($action)) {
+            $action = ForeignKeyAction::from(\strtoupper($action));
         }
 
         $this->onDelete = $action;
@@ -47,11 +44,10 @@ class ForeignKey
         return $this;
     }
 
-    public function onUpdate(string $action): static
+    public function onUpdate(ForeignKeyAction|string $action): static
     {
-        $action = \strtoupper($action);
-        if (!\in_array($action, self::ALLOWED_ACTIONS, true)) {
-            throw new \InvalidArgumentException('Invalid foreign key action: ' . $action);
+        if (\is_string($action)) {
+            $action = ForeignKeyAction::from(\strtoupper($action));
         }
 
         $this->onUpdate = $action;
