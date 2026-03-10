@@ -5,7 +5,7 @@ namespace Utopia\Query\Hook;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Hook;
 
-interface FilterHook extends Hook
+interface Filter extends Hook
 {
     public function filter(string $table): Condition;
 }
