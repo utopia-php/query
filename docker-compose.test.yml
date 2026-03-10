@@ -1,0 +1,28 @@
+services:
+  mysql:
+    image: mysql:8.4
+    ports:
+      - "13306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: test
+      MYSQL_DATABASE: query_test
+    tmpfs:
+      - /var/lib/mysql
+
+  postgres:
+    image: postgres:16
+    ports:
+      - "15432:5432"
+    environment:
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: query_test
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24
+    ports:
+      - "18123:8123"
+      - "19000:9000"
+    tmpfs:
+      - /var/lib/clickhouse
