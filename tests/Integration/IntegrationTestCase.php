@@ -14,6 +14,8 @@ abstract class IntegrationTestCase extends TestCase
 
     protected ?ClickHouseClient $clickhouse = null;
 
+    protected ?MongoDBClient $mongoClient = null;
+
     /** @var list<string> */
     private array $mysqlCleanup = [];
 
@@ -22,6 +24,9 @@ abstract class IntegrationTestCase extends TestCase
 
     /** @var list<string> */
     private array $clickhouseCleanup = [];
+
+    /** @var list<string> */
+    private array $mongoCleanup = [];
 
     protected function connectMysql(): PDO
     {
@@ -60,6 +65,30 @@ abstract class IntegrationTestCase extends TestCase
         return $this->clickhouse;
     }
 
+    protected function connectMongoDB(): MongoDBClient
+    {
+        if ($this->mongoClient === null) {
+            $this->mongoClient = new MongoDBClient();
+        }
+
+        return $this->mongoClient;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function executeOnMongoDB(BuildResult $result): array
+    {
+        $mongo = $this->connectMongoDB();
+
+        return $mongo->execute($result->query, $result->bindings);
+    }
+
+    protected function trackMongoCollection(string $collection): void
+    {
+        $this->mongoCleanup[] = $collection;
+    }
+
     /**
      * @return list<array<string, mixed>>
      */
@@ -67,7 +96,17 @@ abstract class IntegrationTestCase extends TestCase
     {
         $pdo = $this->connectMysql();
         $stmt = $pdo->prepare($result->query);
-        $stmt->execute($result->bindings);
+
+        foreach ($result->bindings as $i => $value) {
+            $type = match (true) {
+                is_bool($value) => PDO::PARAM_BOOL,
+                is_int($value) => PDO::PARAM_INT,
+                $value === null => PDO::PARAM_NULL,
+                default => PDO::PARAM_STR,
+            };
+            $stmt->bindValue($i + 1, $value, $type);
+        }
+        $stmt->execute();
 
         /** @var list<array<string, mixed>> */
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -80,7 +119,17 @@ abstract class IntegrationTestCase extends TestCase
     {
         $pdo = $this->connectPostgres();
         $stmt = $pdo->prepare($result->query);
-        $stmt->execute($result->bindings);
+
+        foreach ($result->bindings as $i => $value) {
+            $type = match (true) {
+                is_bool($value) => PDO::PARAM_BOOL,
+                is_int($value) => PDO::PARAM_INT,
+                $value === null => PDO::PARAM_NULL,
+                default => PDO::PARAM_STR,
+            };
+            $stmt->bindValue($i + 1, $value, $type);
+        }
+        $stmt->execute();
 
         /** @var list<array<string, mixed>> */
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -128,12 +177,14 @@ abstract class IntegrationTestCase extends TestCase
 
     protected function tearDown(): void
     {
+        $this->mysql?->exec('SET FOREIGN_KEY_CHECKS = 0');
         foreach ($this->mysqlCleanup as $table) {
             $stmt = $this->mysql?->prepare("DROP TABLE IF EXISTS `{$table}`");
             if ($stmt !== null && $stmt !== false) {
                 $stmt->execute();
             }
         }
+        $this->mysql?->exec('SET FOREIGN_KEY_CHECKS = 1');
 
         foreach ($this->postgresCleanup as $table) {
             $stmt = $this->postgres?->prepare("DROP TABLE IF EXISTS \"{$table}\" CASCADE");
@@ -146,8 +197,13 @@ abstract class IntegrationTestCase extends TestCase
             $this->clickhouse?->statement("DROP TABLE IF EXISTS `{$table}`");
         }
 
+        foreach ($this->mongoCleanup as $collection) {
+            $this->mongoClient?->dropCollection($collection);
+        }
+
         $this->mysqlCleanup = [];
         $this->postgresCleanup = [];
         $this->clickhouseCleanup = [];
+        $this->mongoCleanup = [];
     }
 }

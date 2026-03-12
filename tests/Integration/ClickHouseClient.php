@@ -20,6 +20,8 @@ class ClickHouseClient
 
         $placeholderIndex = 0;
         $paramMap = [];
+        $isInsert = (bool) preg_match('/^\s*INSERT\b/i', $query);
+
         $sql = preg_replace_callback('/\?/', function () use (&$placeholderIndex, $params, &$paramMap, &$url) {
             $key = 'param_p' . $placeholderIndex;
             $value = $params[$placeholderIndex] ?? null;
@@ -42,7 +44,7 @@ class ClickHouseClient
             'http' => [
                 'method' => 'POST',
                 'header' => "Content-Type: text/plain\r\n",
-                'content' => $sql . ' FORMAT JSONEachRow',
+                'content' => $isInsert ? $sql : $sql . ' FORMAT JSONEachRow',
                 'ignore_errors' => true,
                 'timeout' => 10,
             ],

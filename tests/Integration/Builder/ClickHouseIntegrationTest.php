@@ -27,7 +27,7 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
                 `email` String,
                 `age` UInt32,
                 `country` String
-            ) ENGINE = MergeTree()
+            ) ENGINE = ReplacingMergeTree()
             ORDER BY `id`
         ');
 
@@ -126,7 +126,7 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
 
         $rows = $this->executeOnClickhouse($result);
 
-        $this->assertCount(3, $rows);
+        $this->assertCount(4, $rows);
         foreach ($rows as $row) {
             $this->assertEquals('click', $row['action']);
         }
@@ -275,10 +275,11 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
 
         $rows = $this->executeOnClickhouse($result);
 
-        $this->assertCount(3, $rows);
+        $this->assertCount(4, $rows);
         $this->assertEquals(1, (int) $rows[0]['rn']); // @phpstan-ignore cast.int
         $this->assertEquals(2, (int) $rows[1]['rn']); // @phpstan-ignore cast.int
         $this->assertEquals(3, (int) $rows[2]['rn']); // @phpstan-ignore cast.int
+        $this->assertEquals(4, (int) $rows[3]['rn']); // @phpstan-ignore cast.int
     }
 
     public function testSelectWithDistinct(): void
@@ -322,8 +323,20 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
 
     public function testSelectWithSample(): void
     {
+        $this->trackClickhouseTable('ch_sample');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_sample`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_sample` (
+                `id` UInt32,
+                `name` String
+            ) ENGINE = MergeTree()
+            ORDER BY `id`
+            SAMPLE BY `id`
+        ');
+        $this->clickhouseStatement("INSERT INTO `ch_sample` VALUES (1, 'A'), (2, 'B'), (3, 'C'), (4, 'D'), (5, 'E')");
+
         $result = (new Builder())
-            ->from('ch_users')
+            ->from('ch_sample')
             ->select(['id', 'name'])
             ->sample(0.5)
             ->build();

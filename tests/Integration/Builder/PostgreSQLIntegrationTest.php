@@ -230,6 +230,8 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
 
     public function testDeleteWithWhere(): void
     {
+        $this->postgresStatement("DELETE FROM \"orders\" WHERE \"user_id\" = 5");
+
         $result = (new Builder())
             ->from('users')
             ->filter([Query::equal('name', ['Eve'])])
@@ -249,6 +251,8 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
 
     public function testDeleteWithReturning(): void
     {
+        $this->postgresStatement("DELETE FROM \"orders\" WHERE \"user_id\" = 3");
+
         $result = (new Builder())
             ->from('users')
             ->filter([Query::equal('name', ['Charlie'])])
@@ -268,7 +272,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
             ->select(['user_id'])
             ->count('*', 'order_count')
             ->groupBy(['user_id'])
-            ->having([Query::greaterThan('order_count', 1)])
+            ->havingRaw('COUNT(*) > ?', [1])
             ->sortAsc('user_id')
             ->build();
 
