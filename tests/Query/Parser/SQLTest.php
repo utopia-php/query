@@ -22,108 +22,108 @@ class SQLTest extends TestCase
 
     // -- classifySQL Edge Cases --
 
-    public function test_classify_leading_whitespace(): void
+    public function testClassifyLeadingWhitespace(): void
     {
         $this->assertSame(Type::Read, $this->parser->classifySQL("   \t\n  SELECT * FROM users"));
     }
 
-    public function test_classify_leading_line_comment(): void
+    public function testClassifyLeadingLineComment(): void
     {
         $this->assertSame(Type::Read, $this->parser->classifySQL("-- this is a comment\nSELECT * FROM users"));
     }
 
-    public function test_classify_leading_block_comment(): void
+    public function testClassifyLeadingBlockComment(): void
     {
         $this->assertSame(Type::Read, $this->parser->classifySQL("/* block comment */ SELECT * FROM users"));
     }
 
-    public function test_classify_multiple_comments(): void
+    public function testClassifyMultipleComments(): void
     {
         $sql = "-- line comment\n/* block comment */\n  -- another line\n  SELECT 1";
         $this->assertSame(Type::Read, $this->parser->classifySQL($sql));
     }
 
-    public function test_classify_nested_block_comment(): void
+    public function testClassifyNestedBlockComment(): void
     {
         $sql = "/* outer /* inner */ SELECT 1";
         $this->assertSame(Type::Read, $this->parser->classifySQL($sql));
     }
 
-    public function test_classify_empty_query(): void
+    public function testClassifyEmptyQuery(): void
     {
         $this->assertSame(Type::Unknown, $this->parser->classifySQL(''));
     }
 
-    public function test_classify_whitespace_only(): void
+    public function testClassifyWhitespaceOnly(): void
     {
         $this->assertSame(Type::Unknown, $this->parser->classifySQL("   \t\n  "));
     }
 
-    public function test_classify_comment_only(): void
+    public function testClassifyCommentOnly(): void
     {
         $this->assertSame(Type::Unknown, $this->parser->classifySQL('-- just a comment'));
     }
 
-    public function test_classify_select_with_parenthesis(): void
+    public function testClassifySelectWithParenthesis(): void
     {
         $this->assertSame(Type::Read, $this->parser->classifySQL('SELECT(1)'));
     }
 
-    public function test_classify_select_with_semicolon(): void
+    public function testClassifySelectWithSemicolon(): void
     {
         $this->assertSame(Type::Read, $this->parser->classifySQL('SELECT;'));
     }
 
     // -- COPY Direction --
 
-    public function test_classify_copy_to(): void
+    public function testClassifyCopyTo(): void
     {
         $this->assertSame(Type::Read, $this->parser->classifySQL('COPY users TO STDOUT'));
     }
 
-    public function test_classify_copy_from(): void
+    public function testClassifyCopyFrom(): void
     {
         $this->assertSame(Type::Write, $this->parser->classifySQL("COPY users FROM '/tmp/data.csv'"));
     }
 
-    public function test_classify_copy_ambiguous(): void
+    public function testClassifyCopyAmbiguous(): void
     {
         $this->assertSame(Type::Write, $this->parser->classifySQL('COPY users'));
     }
 
     // -- CTE (WITH) --
 
-    public function test_classify_cte_with_select(): void
+    public function testClassifyCteWithSelect(): void
     {
         $sql = 'WITH active_users AS (SELECT * FROM users WHERE active = true) SELECT * FROM active_users';
         $this->assertSame(Type::Read, $this->parser->classifySQL($sql));
     }
 
-    public function test_classify_cte_with_insert(): void
+    public function testClassifyCteWithInsert(): void
     {
         $sql = 'WITH new_data AS (SELECT 1 AS id) INSERT INTO users SELECT * FROM new_data';
         $this->assertSame(Type::Write, $this->parser->classifySQL($sql));
     }
 
-    public function test_classify_cte_with_update(): void
+    public function testClassifyCteWithUpdate(): void
     {
         $sql = 'WITH src AS (SELECT id FROM staging) UPDATE users SET active = true FROM src WHERE users.id = src.id';
         $this->assertSame(Type::Write, $this->parser->classifySQL($sql));
     }
 
-    public function test_classify_cte_with_delete(): void
+    public function testClassifyCteWithDelete(): void
     {
         $sql = 'WITH old AS (SELECT id FROM users WHERE created_at < now()) DELETE FROM users WHERE id IN (SELECT id FROM old)';
         $this->assertSame(Type::Write, $this->parser->classifySQL($sql));
     }
 
-    public function test_classify_cte_recursive_select(): void
+    public function testClassifyCteRecursiveSelect(): void
     {
         $sql = 'WITH RECURSIVE tree AS (SELECT id, parent_id FROM categories WHERE parent_id IS NULL UNION ALL SELECT c.id, c.parent_id FROM categories c JOIN tree t ON c.parent_id = t.id) SELECT * FROM tree';
         $this->assertSame(Type::Read, $this->parser->classifySQL($sql));
     }
 
-    public function test_classify_cte_no_final_keyword(): void
+    public function testClassifyCteNoFinalKeyword(): void
     {
         $sql = 'WITH x AS (SELECT 1)';
         $this->assertSame(Type::Read, $this->parser->classifySQL($sql));
@@ -131,39 +131,39 @@ class SQLTest extends TestCase
 
     // -- extractKeyword --
 
-    public function test_extract_keyword_simple(): void
+    public function testExtractKeywordSimple(): void
     {
         $this->assertSame('SELECT', $this->parser->extractKeyword('SELECT * FROM users'));
     }
 
-    public function test_extract_keyword_lowercase(): void
+    public function testExtractKeywordLowercase(): void
     {
         $this->assertSame('INSERT', $this->parser->extractKeyword('insert into users'));
     }
 
-    public function test_extract_keyword_with_whitespace(): void
+    public function testExtractKeywordWithWhitespace(): void
     {
         $this->assertSame('DELETE', $this->parser->extractKeyword("  \t\n  DELETE FROM users"));
     }
 
-    public function test_extract_keyword_with_comments(): void
+    public function testExtractKeywordWithComments(): void
     {
         $this->assertSame('UPDATE', $this->parser->extractKeyword("-- comment\nUPDATE users SET x = 1"));
     }
 
-    public function test_extract_keyword_empty(): void
+    public function testExtractKeywordEmpty(): void
     {
         $this->assertSame('', $this->parser->extractKeyword(''));
     }
 
-    public function test_extract_keyword_parenthesized(): void
+    public function testExtractKeywordParenthesized(): void
     {
         $this->assertSame('SELECT', $this->parser->extractKeyword('SELECT(1)'));
     }
 
     // -- Performance --
 
-    public function test_classify_sql_performance(): void
+    public function testClassifySqlPerformance(): void
     {
         $queries = [
             'SELECT * FROM users WHERE id = 1',

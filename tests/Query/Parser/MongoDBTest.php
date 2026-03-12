@@ -69,91 +69,91 @@ class MongoDBTest extends TestCase
 
     // -- Read Commands --
 
-    public function test_find_command(): void
+    public function testFindCommand(): void
     {
         $data = $this->buildOpMsg(['find' => 'users', '$db' => 'mydb']);
         $this->assertSame(Type::Read, $this->parser->parse($data));
     }
 
-    public function test_aggregate_command(): void
+    public function testAggregateCommand(): void
     {
         $data = $this->buildOpMsg(['aggregate' => 'users', '$db' => 'mydb']);
         $this->assertSame(Type::Read, $this->parser->parse($data));
     }
 
-    public function test_count_command(): void
+    public function testCountCommand(): void
     {
         $data = $this->buildOpMsg(['count' => 'users', '$db' => 'mydb']);
         $this->assertSame(Type::Read, $this->parser->parse($data));
     }
 
-    public function test_distinct_command(): void
+    public function testDistinctCommand(): void
     {
         $data = $this->buildOpMsg(['distinct' => 'users', 'key' => 'name', '$db' => 'mydb']);
         $this->assertSame(Type::Read, $this->parser->parse($data));
     }
 
-    public function test_list_collections_command(): void
+    public function testListCollectionsCommand(): void
     {
         $data = $this->buildOpMsg(['listCollections' => 1, '$db' => 'mydb']);
         $this->assertSame(Type::Read, $this->parser->parse($data));
     }
 
-    public function test_list_databases_command(): void
+    public function testListDatabasesCommand(): void
     {
         $data = $this->buildOpMsg(['listDatabases' => 1, '$db' => 'admin']);
         $this->assertSame(Type::Read, $this->parser->parse($data));
     }
 
-    public function test_list_indexes_command(): void
+    public function testListIndexesCommand(): void
     {
         $data = $this->buildOpMsg(['listIndexes' => 'users', '$db' => 'mydb']);
         $this->assertSame(Type::Read, $this->parser->parse($data));
     }
 
-    public function test_db_stats_command(): void
+    public function testDbStatsCommand(): void
     {
         $data = $this->buildOpMsg(['dbStats' => 1, '$db' => 'mydb']);
         $this->assertSame(Type::Read, $this->parser->parse($data));
     }
 
-    public function test_coll_stats_command(): void
+    public function testCollStatsCommand(): void
     {
         $data = $this->buildOpMsg(['collStats' => 'users', '$db' => 'mydb']);
         $this->assertSame(Type::Read, $this->parser->parse($data));
     }
 
-    public function test_explain_command(): void
+    public function testExplainCommand(): void
     {
         $data = $this->buildOpMsg(['explain' => 'users', '$db' => 'mydb']);
         $this->assertSame(Type::Read, $this->parser->parse($data));
     }
 
-    public function test_get_more_command(): void
+    public function testGetMoreCommand(): void
     {
         $data = $this->buildOpMsg(['getMore' => 12345, '$db' => 'mydb']);
         $this->assertSame(Type::Read, $this->parser->parse($data));
     }
 
-    public function test_server_status_command(): void
+    public function testServerStatusCommand(): void
     {
         $data = $this->buildOpMsg(['serverStatus' => 1, '$db' => 'admin']);
         $this->assertSame(Type::Read, $this->parser->parse($data));
     }
 
-    public function test_ping_command(): void
+    public function testPingCommand(): void
     {
         $data = $this->buildOpMsg(['ping' => 1, '$db' => 'admin']);
         $this->assertSame(Type::Read, $this->parser->parse($data));
     }
 
-    public function test_hello_command(): void
+    public function testHelloCommand(): void
     {
         $data = $this->buildOpMsg(['hello' => 1, '$db' => 'admin']);
         $this->assertSame(Type::Read, $this->parser->parse($data));
     }
 
-    public function test_is_master_command(): void
+    public function testIsMasterCommand(): void
     {
         $data = $this->buildOpMsg(['isMaster' => 1, '$db' => 'admin']);
         $this->assertSame(Type::Read, $this->parser->parse($data));
@@ -161,61 +161,61 @@ class MongoDBTest extends TestCase
 
     // -- Write Commands --
 
-    public function test_insert_command(): void
+    public function testInsertCommand(): void
     {
         $data = $this->buildOpMsg(['insert' => 'users', '$db' => 'mydb']);
         $this->assertSame(Type::Write, $this->parser->parse($data));
     }
 
-    public function test_update_command(): void
+    public function testUpdateCommand(): void
     {
         $data = $this->buildOpMsg(['update' => 'users', '$db' => 'mydb']);
         $this->assertSame(Type::Write, $this->parser->parse($data));
     }
 
-    public function test_delete_command(): void
+    public function testDeleteCommand(): void
     {
         $data = $this->buildOpMsg(['delete' => 'users', '$db' => 'mydb']);
         $this->assertSame(Type::Write, $this->parser->parse($data));
     }
 
-    public function test_find_and_modify_command(): void
+    public function testFindAndModifyCommand(): void
     {
         $data = $this->buildOpMsg(['findAndModify' => 'users', '$db' => 'mydb']);
         $this->assertSame(Type::Write, $this->parser->parse($data));
     }
 
-    public function test_create_command(): void
+    public function testCreateCommand(): void
     {
         $data = $this->buildOpMsg(['create' => 'new_collection', '$db' => 'mydb']);
         $this->assertSame(Type::Write, $this->parser->parse($data));
     }
 
-    public function test_drop_command(): void
+    public function testDropCommand(): void
     {
         $data = $this->buildOpMsg(['drop' => 'users', '$db' => 'mydb']);
         $this->assertSame(Type::Write, $this->parser->parse($data));
     }
 
-    public function test_create_indexes_command(): void
+    public function testCreateIndexesCommand(): void
     {
         $data = $this->buildOpMsg(['createIndexes' => 'users', '$db' => 'mydb']);
         $this->assertSame(Type::Write, $this->parser->parse($data));
     }
 
-    public function test_drop_indexes_command(): void
+    public function testDropIndexesCommand(): void
     {
         $data = $this->buildOpMsg(['dropIndexes' => 'users', '$db' => 'mydb']);
         $this->assertSame(Type::Write, $this->parser->parse($data));
     }
 
-    public function test_drop_database_command(): void
+    public function testDropDatabaseCommand(): void
     {
         $data = $this->buildOpMsg(['dropDatabase' => 1, '$db' => 'mydb']);
         $this->assertSame(Type::Write, $this->parser->parse($data));
     }
 
-    public function test_rename_collection_command(): void
+    public function testRenameCollectionCommand(): void
     {
         $data = $this->buildOpMsg(['renameCollection' => 'users', '$db' => 'admin']);
         $this->assertSame(Type::Write, $this->parser->parse($data));
@@ -223,19 +223,19 @@ class MongoDBTest extends TestCase
 
     // -- Transaction Commands --
 
-    public function test_start_transaction(): void
+    public function testStartTransaction(): void
     {
         $data = $this->buildOpMsg(['find' => 'users', '$db' => 'mydb', 'startTransaction' => true]);
         $this->assertSame(Type::TransactionBegin, $this->parser->parse($data));
     }
 
-    public function test_commit_transaction(): void
+    public function testCommitTransaction(): void
     {
         $data = $this->buildOpMsg(['commitTransaction' => 1, '$db' => 'admin']);
         $this->assertSame(Type::TransactionEnd, $this->parser->parse($data));
     }
 
-    public function test_abort_transaction(): void
+    public function testAbortTransaction(): void
     {
         $data = $this->buildOpMsg(['abortTransaction' => 1, '$db' => 'admin']);
         $this->assertSame(Type::TransactionEnd, $this->parser->parse($data));
@@ -243,12 +243,12 @@ class MongoDBTest extends TestCase
 
     // -- Edge Cases --
 
-    public function test_too_short_packet(): void
+    public function testTooShortPacket(): void
     {
         $this->assertSame(Type::Unknown, $this->parser->parse("\x00\x00\x00\x00"));
     }
 
-    public function test_wrong_opcode(): void
+    public function testWrongOpcode(): void
     {
         // Build a packet with opcode 2004 (OP_QUERY, legacy) instead of 2013
         $bson = $this->encodeBsonDocument(['find' => 'users']);
@@ -261,13 +261,13 @@ class MongoDBTest extends TestCase
         $this->assertSame(Type::Unknown, $this->parser->parse($header . $body));
     }
 
-    public function test_unknown_command(): void
+    public function testUnknownCommand(): void
     {
         $data = $this->buildOpMsg(['customCommand' => 1, '$db' => 'mydb']);
         $this->assertSame(Type::Unknown, $this->parser->parse($data));
     }
 
-    public function test_empty_bson_document(): void
+    public function testEmptyBsonDocument(): void
     {
         // OP_MSG with an empty BSON document (just 5 bytes: length + terminator)
         $bson = \pack('V', 5) . "\x00";
@@ -280,19 +280,19 @@ class MongoDBTest extends TestCase
         $this->assertSame(Type::Unknown, $this->parser->parse($header . $body));
     }
 
-    public function test_classify_sql_returns_unknown(): void
+    public function testClassifySqlReturnsUnknown(): void
     {
         $this->assertSame(Type::Unknown, $this->parser->classifySQL('SELECT * FROM users'));
     }
 
-    public function test_extract_keyword_returns_empty(): void
+    public function testExtractKeywordReturnsEmpty(): void
     {
         $this->assertSame('', $this->parser->extractKeyword('SELECT'));
     }
 
     // -- Performance --
 
-    public function test_parse_performance(): void
+    public function testParsePerformance(): void
     {
         $data = $this->buildOpMsg(['find' => 'users', '$db' => 'mydb']);
         $iterations = 100_000;
@@ -311,7 +311,7 @@ class MongoDBTest extends TestCase
         );
     }
 
-    public function test_transaction_scan_performance(): void
+    public function testTransactionScanPerformance(): void
     {
         // Document with many keys before startTransaction to test scanning
         $data = $this->buildOpMsg([

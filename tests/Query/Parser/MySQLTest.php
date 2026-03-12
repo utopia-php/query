@@ -54,120 +54,120 @@ class MySQLTest extends TestCase
 
     // -- Read Queries --
 
-    public function test_select_query(): void
+    public function testSelectQuery(): void
     {
         $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('SELECT * FROM users WHERE id = 1')));
     }
 
-    public function test_select_lowercase(): void
+    public function testSelectLowercase(): void
     {
         $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('select id from users')));
     }
 
-    public function test_show_query(): void
+    public function testShowQuery(): void
     {
         $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('SHOW DATABASES')));
     }
 
-    public function test_describe_query(): void
+    public function testDescribeQuery(): void
     {
         $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('DESCRIBE users')));
     }
 
-    public function test_desc_query(): void
+    public function testDescQuery(): void
     {
         $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('DESC users')));
     }
 
-    public function test_explain_query(): void
+    public function testExplainQuery(): void
     {
         $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('EXPLAIN SELECT * FROM users')));
     }
 
     // -- Write Queries --
 
-    public function test_insert_query(): void
+    public function testInsertQuery(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery("INSERT INTO users (name) VALUES ('test')")));
     }
 
-    public function test_update_query(): void
+    public function testUpdateQuery(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery("UPDATE users SET name = 'test' WHERE id = 1")));
     }
 
-    public function test_delete_query(): void
+    public function testDeleteQuery(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('DELETE FROM users WHERE id = 1')));
     }
 
-    public function test_create_table(): void
+    public function testCreateTable(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('CREATE TABLE test (id INT PRIMARY KEY)')));
     }
 
-    public function test_drop_table(): void
+    public function testDropTable(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('DROP TABLE test')));
     }
 
-    public function test_alter_table(): void
+    public function testAlterTable(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('ALTER TABLE users ADD COLUMN email VARCHAR(255)')));
     }
 
-    public function test_truncate(): void
+    public function testTruncate(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('TRUNCATE TABLE users')));
     }
 
     // -- Transaction Commands --
 
-    public function test_begin_transaction(): void
+    public function testBeginTransaction(): void
     {
         $this->assertSame(Type::TransactionBegin, $this->parser->parse($this->buildQuery('BEGIN')));
     }
 
-    public function test_start_transaction(): void
+    public function testStartTransaction(): void
     {
         $this->assertSame(Type::TransactionBegin, $this->parser->parse($this->buildQuery('START TRANSACTION')));
     }
 
-    public function test_commit(): void
+    public function testCommit(): void
     {
         $this->assertSame(Type::TransactionEnd, $this->parser->parse($this->buildQuery('COMMIT')));
     }
 
-    public function test_rollback(): void
+    public function testRollback(): void
     {
         $this->assertSame(Type::TransactionEnd, $this->parser->parse($this->buildQuery('ROLLBACK')));
     }
 
-    public function test_set_command(): void
+    public function testSetCommand(): void
     {
         $this->assertSame(Type::Transaction, $this->parser->parse($this->buildQuery('SET autocommit = 0')));
     }
 
     // -- Prepared Statement Protocol --
 
-    public function test_stmt_prepare_routes_to_write(): void
+    public function testStmtPrepareRoutesToWrite(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildStmtPrepare('SELECT * FROM users WHERE id = ?')));
     }
 
-    public function test_stmt_execute_routes_to_write(): void
+    public function testStmtExecuteRoutesToWrite(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildStmtExecute(1)));
     }
 
     // -- Edge Cases --
 
-    public function test_too_short_packet(): void
+    public function testTooShortPacket(): void
     {
         $this->assertSame(Type::Unknown, $this->parser->parse("\x00\x00"));
     }
 
-    public function test_unknown_command(): void
+    public function testUnknownCommand(): void
     {
         $header = \pack('V', 1);
         $header[3] = "\x00";
@@ -177,7 +177,7 @@ class MySQLTest extends TestCase
 
     // -- Performance --
 
-    public function test_parse_performance(): void
+    public function testParsePerformance(): void
     {
         $data = $this->buildQuery('SELECT * FROM users WHERE id = 1');
         $iterations = 100_000;

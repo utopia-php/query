@@ -61,170 +61,170 @@ class PostgreSQLTest extends TestCase
 
     // -- Read Queries --
 
-    public function test_select_query(): void
+    public function testSelectQuery(): void
     {
         $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('SELECT * FROM users WHERE id = 1')));
     }
 
-    public function test_select_lowercase(): void
+    public function testSelectLowercase(): void
     {
         $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('select id, name from users')));
     }
 
-    public function test_select_mixed_case(): void
+    public function testSelectMixedCase(): void
     {
         $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('SeLeCt * FROM users')));
     }
 
-    public function test_show_query(): void
+    public function testShowQuery(): void
     {
         $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('SHOW TABLES')));
     }
 
-    public function test_describe_query(): void
+    public function testDescribeQuery(): void
     {
         $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('DESCRIBE users')));
     }
 
-    public function test_explain_query(): void
+    public function testExplainQuery(): void
     {
         $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('EXPLAIN SELECT * FROM users')));
     }
 
-    public function test_table_query(): void
+    public function testTableQuery(): void
     {
         $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('TABLE users')));
     }
 
-    public function test_values_query(): void
+    public function testValuesQuery(): void
     {
         $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery("VALUES (1, 'a'), (2, 'b')")));
     }
 
     // -- Write Queries --
 
-    public function test_insert_query(): void
+    public function testInsertQuery(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery("INSERT INTO users (name) VALUES ('test')")));
     }
 
-    public function test_update_query(): void
+    public function testUpdateQuery(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery("UPDATE users SET name = 'test' WHERE id = 1")));
     }
 
-    public function test_delete_query(): void
+    public function testDeleteQuery(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('DELETE FROM users WHERE id = 1')));
     }
 
-    public function test_create_table(): void
+    public function testCreateTable(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('CREATE TABLE test (id INT PRIMARY KEY)')));
     }
 
-    public function test_drop_table(): void
+    public function testDropTable(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('DROP TABLE IF EXISTS test')));
     }
 
-    public function test_alter_table(): void
+    public function testAlterTable(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('ALTER TABLE users ADD COLUMN email TEXT')));
     }
 
-    public function test_truncate(): void
+    public function testTruncate(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('TRUNCATE TABLE users')));
     }
 
-    public function test_grant(): void
+    public function testGrant(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('GRANT SELECT ON users TO readonly')));
     }
 
-    public function test_revoke(): void
+    public function testRevoke(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('REVOKE ALL ON users FROM public')));
     }
 
-    public function test_lock_table(): void
+    public function testLockTable(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('LOCK TABLE users IN ACCESS EXCLUSIVE MODE')));
     }
 
-    public function test_call(): void
+    public function testCall(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('CALL my_procedure()')));
     }
 
-    public function test_do(): void
+    public function testDo(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery("DO \$\$ BEGIN RAISE NOTICE 'hello'; END \$\$")));
     }
 
     // -- Transaction Commands --
 
-    public function test_begin_transaction(): void
+    public function testBeginTransaction(): void
     {
         $this->assertSame(Type::TransactionBegin, $this->parser->parse($this->buildQuery('BEGIN')));
     }
 
-    public function test_start_transaction(): void
+    public function testStartTransaction(): void
     {
         $this->assertSame(Type::TransactionBegin, $this->parser->parse($this->buildQuery('START TRANSACTION')));
     }
 
-    public function test_commit(): void
+    public function testCommit(): void
     {
         $this->assertSame(Type::TransactionEnd, $this->parser->parse($this->buildQuery('COMMIT')));
     }
 
-    public function test_rollback(): void
+    public function testRollback(): void
     {
         $this->assertSame(Type::TransactionEnd, $this->parser->parse($this->buildQuery('ROLLBACK')));
     }
 
-    public function test_savepoint(): void
+    public function testSavepoint(): void
     {
         $this->assertSame(Type::Transaction, $this->parser->parse($this->buildQuery('SAVEPOINT sp1')));
     }
 
-    public function test_release_savepoint(): void
+    public function testReleaseSavepoint(): void
     {
         $this->assertSame(Type::Transaction, $this->parser->parse($this->buildQuery('RELEASE SAVEPOINT sp1')));
     }
 
-    public function test_set_command(): void
+    public function testSetCommand(): void
     {
         $this->assertSame(Type::Transaction, $this->parser->parse($this->buildQuery("SET search_path TO 'public'")));
     }
 
     // -- Extended Query Protocol --
 
-    public function test_parse_message_routes_to_write(): void
+    public function testParseMessageRoutesToWrite(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildParse('stmt1', 'SELECT * FROM users')));
     }
 
-    public function test_bind_message_routes_to_write(): void
+    public function testBindMessageRoutesToWrite(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildBind()));
     }
 
-    public function test_execute_message_routes_to_write(): void
+    public function testExecuteMessageRoutesToWrite(): void
     {
         $this->assertSame(Type::Write, $this->parser->parse($this->buildExecute()));
     }
 
     // -- Edge Cases --
 
-    public function test_too_short_packet(): void
+    public function testTooShortPacket(): void
     {
         $this->assertSame(Type::Unknown, $this->parser->parse('Q'));
     }
 
-    public function test_unknown_message_type(): void
+    public function testUnknownMessageType(): void
     {
         $data = 'X' . \pack('N', 5) . "\x00";
         $this->assertSame(Type::Unknown, $this->parser->parse($data));
@@ -232,7 +232,7 @@ class PostgreSQLTest extends TestCase
 
     // -- Performance --
 
-    public function test_parse_performance(): void
+    public function testParsePerformance(): void
     {
         $data = $this->buildQuery('SELECT * FROM users WHERE id = 1');
         $iterations = 100_000;
