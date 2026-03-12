@@ -1,6 +1,6 @@
 <?php
 
-namespace Utopia\Query\Hook\Filter;
+namespace Tests\Query\Fixture;
 
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\JoinType;
@@ -9,15 +9,15 @@ use Utopia\Query\Hook\Join\Condition as JoinCondition;
 use Utopia\Query\Hook\Join\Filter as JoinFilter;
 use Utopia\Query\Hook\Join\Placement;
 
-class Permission implements Filter, JoinFilter
+class PermissionFilter implements Filter, JoinFilter
 {
     private const IDENTIFIER_PATTERN = '/^[a-zA-Z_][a-zA-Z0-9_.]*$/';
 
     /**
      * @param  list<string>  $roles
-     * @param  \Closure(string): string  $permissionsTable  Receives the base table name, returns the permissions table name
-     * @param  list<string>|null  $columns  Column names to check permissions for. NULL rows (wildcard) are always included.
-     * @param  Filter|null  $subqueryFilter  Optional filter applied inside the permissions subquery (e.g. tenant filtering)
+     * @param  \Closure(string): string  $permissionsTable
+     * @param  list<string>|null  $columns
+     * @param  Filter|null  $subqueryFilter
      */
     public function __construct(
         protected array $roles,

@@ -4,11 +4,11 @@ namespace Tests\Query\Hook\Join;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
+use Tests\Query\Fixture\PermissionFilter as Permission;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\JoinType;
 use Utopia\Query\Builder\MySQL as Builder;
 use Utopia\Query\Hook\Filter;
-use Utopia\Query\Hook\Filter\Permission;
 use Utopia\Query\Hook\Filter\Tenant;
 use Utopia\Query\Hook\Join\Condition as JoinCondition;
 use Utopia\Query\Hook\Join\Filter as JoinFilter;

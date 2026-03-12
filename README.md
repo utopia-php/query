@@ -555,21 +555,15 @@ $result = (new Builder())
 
 ```php
 use Utopia\Query\Hook\Filter\Tenant;
-use Utopia\Query\Hook\Filter\Permission;
 
 $result = (new Builder())
     ->from('users')
     ->addHook(new Tenant(['tenant_abc']))
-    ->addHook(new Permission(
-        roles: ['role:member'],
-        permissionsTable: fn(string $table) => "mydb_{$table}_perms",
-    ))
     ->filter([Query::equal('status', ['active'])])
     ->build();
 
 // SELECT * FROM `users`
 //   WHERE `status` IN (?) AND `tenant_id` IN (?)
-//   AND `id` IN (SELECT DISTINCT `document_id` FROM `mydb_users_perms` WHERE `role` IN (?) AND `type` = ?)
 ```
 
 **Custom filter hooks** implement `Hook\Filter`:

@@ -3,7 +3,7 @@
 namespace Tests\Query\Hook\Filter;
 
 use PHPUnit\Framework\TestCase;
-use Utopia\Query\Hook\Filter\Permission;
+use Tests\Query\Fixture\PermissionFilter as Permission;
 use Utopia\Query\Hook\Filter\Tenant;
 
 class FilterTest extends TestCase
