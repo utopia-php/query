@@ -1,10 +1,11 @@
 # Utopia Query
 
 [![Tests](https://github.com/utopia-php/query/actions/workflows/tests.yml/badge.svg)](https://github.com/utopia-php/query/actions/workflows/tests.yml)
+[![Integration Tests](https://github.com/utopia-php/query/actions/workflows/integration.yml/badge.svg)](https://github.com/utopia-php/query/actions/workflows/integration.yml)
 [![Linter](https://github.com/utopia-php/query/actions/workflows/linter.yml/badge.svg)](https://github.com/utopia-php/query/actions/workflows/linter.yml)
 [![Static Analysis](https://github.com/utopia-php/query/actions/workflows/static-analysis.yml/badge.svg)](https://github.com/utopia-php/query/actions/workflows/static-analysis.yml)
 
-A PHP library for building type-safe, dialect-aware SQL queries and DDL statements. Provides a fluent builder API with parameterized output for MySQL, PostgreSQL, and ClickHouse, plus a serializable `Query` value object for passing query definitions between services.
+A PHP library for building type-safe, dialect-aware SQL queries and DDL statements. Provides a fluent builder API with parameterized output for MySQL, MariaDB, PostgreSQL, SQLite, and ClickHouse, plus a serializable `Query` value object for passing query definitions between services.
 
 ## Installation
 
@@ -30,6 +31,7 @@ composer require utopia-php/query
 - [Query Builder](#query-builder)
   - [Basic Usage](#basic-usage)
   - [Aggregations](#aggregations)
+  - [Conditional Aggregates](#conditional-aggregates)
   - [Joins](#joins)
   - [Unions and Set Operations](#unions-and-set-operations)
   - [CTEs (Common Table Expressions)](#ctes-common-table-expressions)
@@ -41,12 +43,16 @@ composer require utopia-php/query
   - [Upsert](#upsert)
   - [Locking](#locking)
   - [Transactions](#transactions)
+  - [EXPLAIN](#explain)
   - [Conditional Building](#conditional-building)
+  - [Builder Cloning and Callbacks](#builder-cloning-and-callbacks)
   - [Debugging](#debugging)
   - [Hooks](#hooks)
 - [Dialect-Specific Features](#dialect-specific-features)
   - [MySQL](#mysql)
+  - [MariaDB](#mariadb)
   - [PostgreSQL](#postgresql)
+  - [SQLite](#sqlite)
   - [ClickHouse](#clickhouse)
   - [Feature Matrix](#feature-matrix)
 - [Schema Builder](#schema-builder)
@@ -54,10 +60,13 @@ composer require utopia-php/query
   - [Altering Tables](#altering-tables)
   - [Indexes](#indexes)
   - [Foreign Keys](#foreign-keys)
+  - [Partitions](#partitions)
+  - [Comments](#comments)
   - [Views](#views)
   - [Procedures and Triggers](#procedures-and-triggers)
   - [PostgreSQL Schema Extensions](#postgresql-schema-extensions)
   - [ClickHouse Schema](#clickhouse-schema)
+  - [SQLite Schema](#sqlite-schema)
 - [Compiler Interface](#compiler-interface)
 - [Contributing](#contributing)
 - [License](#license)
@@ -226,15 +235,17 @@ $errors = Query::validate($queries, ['name', 'age', 'status']);
 
 ## Query Builder
 
-The builder generates parameterized SQL from the fluent API. Every `build()`, `insert()`, `update()`, and `delete()` call returns a `BuildResult` with `->query` (the SQL string) and `->bindings` (the parameter array).
+The builder generates parameterized SQL from the fluent API. Every `build()`, `insert()`, `update()`, and `delete()` call returns a `BuildResult` with `->query` (the SQL string), `->bindings` (the parameter array), and `->readOnly` (whether the query is read-only).
 
-Three dialect implementations are provided:
+Five dialect implementations are provided:
 
-- `Utopia\Query\Builder\MySQL` — MySQL/MariaDB
+- `Utopia\Query\Builder\MySQL` — MySQL
+- `Utopia\Query\Builder\MariaDB` — MariaDB (extends MySQL with dialect-specific spatial handling)
 - `Utopia\Query\Builder\PostgreSQL` — PostgreSQL
+- `Utopia\Query\Builder\SQLite` — SQLite
 - `Utopia\Query\Builder\ClickHouse` — ClickHouse
 
-MySQL and PostgreSQL extend `Builder\SQL` which adds locking, transactions, and upsert. ClickHouse extends `Builder` directly with its own `ALTER TABLE` mutation syntax.
+MySQL, MariaDB, PostgreSQL, and SQLite extend `Builder\SQL` which adds locking, transactions, upsert, spatial queries, and full-text search. ClickHouse extends `Builder` directly with its own `ALTER TABLE` mutation syntax.
 
 ### Basic Usage
 
@@ -256,6 +267,7 @@ $result = (new Builder())
 
 $result->query;    // SELECT `name`, `email` FROM `users` WHERE `status` IN (?) AND `age` > ? ORDER BY `name` ASC LIMIT ? OFFSET ?
 $result->bindings; // ['active', 18, 25, 0]
+$result->readOnly; // true
 ```
 
 **Batch mode** — pass all queries at once:
@@ -314,6 +326,26 @@ $result = (new Builder())
 // SELECT DISTINCT `country` FROM `users`
 ```
 
+### Conditional Aggregates
+
+Available on MySQL, PostgreSQL, SQLite, and ClickHouse via the `ConditionalAggregates` interface:
+
+```php
+use Utopia\Query\Builder\PostgreSQL as Builder;
+
+$result = (new Builder())
+    ->from('orders')
+    ->countWhen('status = ?', 'active_count', 'active')
+    ->sumWhen('amount', 'status = ?', 'active_total', 'active')
+    ->build();
+
+// PostgreSQL: COUNT(*) FILTER (WHERE status = ?) AS "active_count", SUM("amount") FILTER (WHERE status = ?) AS "active_total"
+// MySQL:      COUNT(CASE WHEN status = ? THEN 1 END) AS `active_count`, SUM(CASE WHEN status = ? THEN `amount` END) AS `active_total`
+// ClickHouse: countIf(status = ?) AS `active_count`, sumIf(`amount`, status = ?) AS `active_total`
+```
+
+Also available: `avgWhen()`, `minWhen()`, `maxWhen()`.
+
 ### Joins
 
 ```php
@@ -321,13 +353,53 @@ $result = (new Builder())
     ->from('users')
     ->join('orders', 'users.id', 'orders.user_id')
     ->leftJoin('profiles', 'users.id', 'profiles.user_id')
+    ->rightJoin('notes', 'users.id', 'notes.user_id')
     ->crossJoin('colors')
+    ->naturalJoin('defaults')
     ->build();
 
 // SELECT * FROM `users`
 //   JOIN `orders` ON `users`.`id` = `orders`.`user_id`
 //   LEFT JOIN `profiles` ON `users`.`id` = `profiles`.`user_id`
+//   RIGHT JOIN `notes` ON `users`.`id` = `notes`.`user_id`
 //   CROSS JOIN `colors`
+//   NATURAL JOIN `defaults`
+```
+
+**Complex join conditions** with `joinWhere()`:
+
+```php
+use Utopia\Query\Builder\JoinType;
+
+$result = (new Builder())
+    ->from('users')
+    ->joinWhere('orders', function ($join) {
+        $join->on('users.id', 'orders.user_id')
+            ->where('orders.status', '=', 'active');
+    }, JoinType::Left)
+    ->build();
+```
+
+**Full outer joins** (PostgreSQL, ClickHouse):
+
+```php
+$result = (new \Utopia\Query\Builder\PostgreSQL())
+    ->from('left_table')
+    ->fullOuterJoin('right_table', 'left_table.id', 'right_table.id')
+    ->build();
+
+// SELECT * FROM "left_table" FULL OUTER JOIN "right_table" ON "left_table"."id" = "right_table"."id"
+```
+
+**Lateral joins** (MySQL, PostgreSQL):
+
+```php
+$sub = (new Builder())->from('orders')->filter([Query::raw('orders.user_id = users.id')])->limit(3);
+
+$result = (new Builder())
+    ->from('users')
+    ->joinLateral($sub, 'recent_orders')
+    ->build();
 ```
 
 ### Unions and Set Operations
@@ -362,7 +434,17 @@ $result = (new Builder())
 //   SELECT `name` FROM `active_users`
 ```
 
-Use `withRecursive()` for recursive CTEs.
+Use `withRecursive()` for recursive CTEs, or `withRecursiveSeedStep()` to construct a recursive CTE from separate seed and step builders:
+
+```php
+$seed = (new Builder())->from('employees')->filter([Query::isNull('manager_id')]);
+$step = (new Builder())->from('employees')->join('org', 'employees.manager_id', 'org.id');
+
+$result = (new Builder())
+    ->withRecursiveSeedStep('org', $seed, $step)
+    ->from('org')
+    ->build();
+```
 
 ### Window Functions
 
@@ -381,6 +463,24 @@ $result = (new Builder())
 ```
 
 Prefix an `orderBy` column with `-` for descending order (e.g., `['-amount']`).
+
+**Named window definitions** allow reusing the same window across multiple expressions:
+
+```php
+$result = (new Builder())
+    ->from('sales')
+    ->select(['employee', 'amount'])
+    ->window('w', partitionBy: ['department'], orderBy: ['date'])
+    ->selectWindow('ROW_NUMBER()', 'row_num', windowName: 'w')
+    ->selectWindow('SUM(amount)', 'running_total', windowName: 'w')
+    ->build();
+
+// SELECT `employee`, `amount`,
+//   ROW_NUMBER() OVER `w` AS `row_num`,
+//   SUM(amount) OVER `w` AS `running_total`
+//   FROM `sales`
+//   WINDOW `w` AS (PARTITION BY `department` ORDER BY `date` ASC)
+```
 
 ### CASE Expressions
 
@@ -455,7 +555,7 @@ $result = (new Builder())
 
 ### Upsert
 
-Available on MySQL and PostgreSQL builders (`Builder\SQL` subclasses):
+Available on MySQL, PostgreSQL, and SQLite builders (`Builder\SQL` subclasses):
 
 ```php
 // MySQL — ON DUPLICATE KEY UPDATE
@@ -475,9 +575,36 @@ $result = (new \Utopia\Query\Builder\PostgreSQL())
     ->upsert();
 ```
 
+**Insert or ignore** — skip rows that conflict instead of updating:
+
+```php
+$result = (new Builder())
+    ->into('counters')
+    ->set('key', 'visits')
+    ->set('value', 1)
+    ->onConflict(['key'])
+    ->insertOrIgnore();
+
+// MySQL:      INSERT IGNORE INTO `counters` ...
+// PostgreSQL: INSERT INTO "counters" ... ON CONFLICT ("key") DO NOTHING
+// SQLite:     INSERT OR IGNORE INTO `counters` ...
+```
+
+**Upsert from SELECT** — insert from a subquery with conflict resolution:
+
+```php
+$source = (new Builder())->from('staging')->select(['key', 'value']);
+
+$result = (new Builder())
+    ->into('counters')
+    ->fromSelect($source, ['key', 'value'])
+    ->onConflict(['key'])
+    ->upsertSelect();
+```
+
 ### Locking
 
-Available on MySQL and PostgreSQL builders:
+Available on MySQL, PostgreSQL, and SQLite builders:
 
 ```php
 $result = (new Builder())
@@ -489,11 +616,13 @@ $result = (new Builder())
 // SELECT * FROM `accounts` WHERE `id` IN (?) FOR UPDATE
 ```
 
-Also available: `forShare()`.
+Also available: `forShare()`, `forUpdateSkipLocked()`, `forUpdateNoWait()`, `forShareSkipLocked()`, `forShareNoWait()`.
+
+PostgreSQL also supports table-specific locking: `forUpdateOf('accounts')`, `forShareOf('accounts')`.
 
 ### Transactions
 
-Available on MySQL and PostgreSQL builders:
+Available on MySQL, PostgreSQL, and SQLite builders:
 
 ```php
 $builder = new Builder();
@@ -505,6 +634,28 @@ $builder->commit();           // COMMIT
 $builder->rollback();         // ROLLBACK
 ```
 
+### EXPLAIN
+
+Available on all builders. MySQL and PostgreSQL provide extended options:
+
+```php
+// Basic explain
+$result = (new Builder())
+    ->from('users')
+    ->filter([Query::equal('status', ['active'])])
+    ->explain();
+
+// MySQL — with format
+$result = (new \Utopia\Query\Builder\MySQL())
+    ->from('users')
+    ->explain(analyze: true, format: 'JSON');
+
+// PostgreSQL — with analyze, verbose, buffers, format
+$result = (new \Utopia\Query\Builder\PostgreSQL())
+    ->from('users')
+    ->explain(analyze: true, verbose: true, buffers: true, format: 'JSON');
+```
+
 ### Conditional Building
 
 `when()` applies a callback only when the condition is true:
@@ -513,6 +664,26 @@ $builder->rollback();         // ROLLBACK
 $result = (new Builder())
     ->from('users')
     ->when($filterActive, fn(Builder $b) => $b->filter([Query::equal('status', ['active'])]))
+    ->build();
+```
+
+### Builder Cloning and Callbacks
+
+**Cloning** creates a deep copy of the builder, useful for branching from a shared base:
+
+```php
+$base = (new Builder())->from('users')->filter([Query::equal('status', ['active'])]);
+$withLimit = $base->clone()->limit(10);
+$withSort = $base->clone()->sortAsc('name');
+```
+
+**Build callbacks** run before or after building:
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->beforeBuild(fn(Builder $b) => $b->filter([Query::isNotNull('email')]))
+    ->afterBuild(fn(BuildResult $r) => new BuildResult("/* traced */ {$r->query}", $r->bindings, $r->readOnly))
     ->build();
 ```
 
@@ -584,23 +755,43 @@ class SoftDeleteHook implements Filter
 **Join filter hooks** inject per-join conditions with placement control (ON vs WHERE):
 
 ```php
+use Utopia\Query\Builder\Condition;
+use Utopia\Query\Builder\JoinType;
 use Utopia\Query\Hook\Join\Filter as JoinFilter;
-use Utopia\Query\Hook\Join\Condition as JoinCondition;
 use Utopia\Query\Hook\Join\Placement;
 
 class ActiveJoinFilter implements JoinFilter
 {
-    public function filterJoin(string $table, string $joinType): ?JoinCondition
+    public function filterJoin(string $table, JoinType $joinType): ?Condition
     {
-        return new JoinCondition(
-            new Condition('active = ?', [1]),
-            $joinType === 'LEFT JOIN' ? Placement::On : Placement::Where,
+        return new Condition(
+            'active = ?',
+            [1],
+            match ($joinType) {
+                JoinType::Left, JoinType::Right => Placement::On,
+                default => Placement::Where,
+            },
         );
     }
 }
 ```
 
-Built-in `Tenant` and `Permission` hooks implement both `Filter` and `JoinFilter` — they automatically apply ON placement for LEFT/RIGHT joins and WHERE placement for INNER/CROSS joins.
+The built-in `Tenant` hook implements both `Filter` and `JoinFilter` — it automatically applies ON placement for LEFT/RIGHT joins and WHERE placement for INNER/CROSS joins.
+
+**Write hooks** decorate rows before writes and run callbacks after create/update/delete operations:
+
+```php
+use Utopia\Query\Hook\Write;
+
+class AuditHook implements Write
+{
+    public function decorateRow(array $row, array $metadata = []): array { /* ... */ }
+    public function afterCreate(string $table, array $metadata, mixed $context): void { /* ... */ }
+    public function afterUpdate(string $table, array $metadata, mixed $context): void { /* ... */ }
+    public function afterBatchUpdate(string $table, array $updateData, array $metadata, mixed $context): void { /* ... */ }
+    public function afterDelete(string $table, array $ids, mixed $context): void { /* ... */ }
+}
+```
 
 ## Dialect-Specific Features
 
@@ -618,7 +809,7 @@ $result = (new Builder())
     ->filterDistance('location', [40.7128, -74.0060], '<', 5000, meters: true)
     ->build();
 
-// WHERE ST_Distance(ST_SRID(`location`, 4326), ST_GeomFromText(?, 4326), 'metre') < ?
+// WHERE ST_Distance(ST_SRID(`location`, 4326), ST_GeomFromText(?, 4326, 'axis-order=long-lat'), 'metre') < ?
 ```
 
 All spatial predicates: `filterDistance`, `filterIntersects`, `filterNotIntersects`, `filterCrosses`, `filterNotCrosses`, `filterOverlaps`, `filterNotOverlaps`, `filterTouches`, `filterNotTouches`, `filterCovers`, `filterNotCovers`, `filterSpatialEquals`, `filterNotSpatialEquals`.
@@ -657,7 +848,7 @@ $result = (new Builder())
 // SELECT /*+ NO_INDEX_MERGE(users) max_execution_time(5000) */ * FROM `users`
 ```
 
-**Full-text search** — `MATCH() AGAINST()`:
+**Full-text search** — `MATCH() AGAINST(? IN BOOLEAN MODE)`:
 
 ```php
 $result = (new Builder())
@@ -665,8 +856,42 @@ $result = (new Builder())
     ->filter([Query::search('content', 'hello world')])
     ->build();
 
-// WHERE MATCH(`content`) AGAINST (?)
+// WHERE MATCH(`content`) AGAINST(? IN BOOLEAN MODE)
 ```
+
+**UPDATE with JOIN:**
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->set('status', 'premium')
+    ->updateJoin('orders', 'users.id', 'orders.user_id')
+    ->filter([Query::greaterThan('orders.total', 1000)])
+    ->update();
+```
+
+**DELETE with JOIN:**
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->deleteUsing('u', 'orders', 'u.id', 'orders.user_id')
+    ->filter([Query::equal('orders.status', ['cancelled'])])
+    ->delete();
+```
+
+### MariaDB
+
+```php
+use Utopia\Query\Builder\MariaDB as Builder;
+```
+
+Extends MySQL with MariaDB-specific spatial handling:
+- Uses `ST_DISTANCE_SPHERE()` for meter-based distance calculations
+- Uses `ST_GeomFromText()` without the `axis-order` parameter
+- Validates that distance-in-meters only works between POINT types
+
+All other MySQL features (JSON, hints, lateral joins, etc.) are inherited.
 
 ### PostgreSQL
 
@@ -688,17 +913,19 @@ $result = (new Builder())
 **Vector search** — uses pgvector operators (`<=>`, `<->`, `<#>`):
 
 ```php
+use Utopia\Query\Builder\VectorMetric;
+
 $result = (new Builder())
     ->from('documents')
     ->select(['title'])
-    ->orderByVectorDistance('embedding', [0.1, 0.2, 0.3], 'cosine')
+    ->orderByVectorDistance('embedding', [0.1, 0.2, 0.3], VectorMetric::Cosine)
     ->limit(10)
     ->build();
 
 // SELECT "title" FROM "documents" ORDER BY ("embedding" <=> ?::vector) ASC LIMIT ?
 ```
 
-Metrics: `cosine` (`<=>`), `euclidean` (`<->`), `dot` (`<#>`).
+Metrics: `VectorMetric::Cosine` (`<=>`), `VectorMetric::Euclidean` (`<->`), `VectorMetric::Dot` (`<#>`).
 
 **JSON operations** — uses native JSONB operators:
 
@@ -711,7 +938,7 @@ $result = (new Builder())
 // WHERE "tags" @> ?::jsonb
 ```
 
-**Full-text search** — `to_tsvector() @@ plainto_tsquery()`:
+**Full-text search** — `to_tsvector() @@ websearch_to_tsquery()`:
 
 ```php
 $result = (new Builder())
@@ -719,10 +946,79 @@ $result = (new Builder())
     ->filter([Query::search('content', 'hello world')])
     ->build();
 
-// WHERE to_tsvector("content") @@ plainto_tsquery(?)
+// WHERE to_tsvector("content") @@ websearch_to_tsquery(?)
 ```
 
-**Regex** — uses PostgreSQL `~` operator instead of `REGEXP`.
+**Regex** — uses PostgreSQL `~` operator instead of `REGEXP`. String matching uses `ILIKE` for case-insensitive comparison.
+
+**RETURNING** — get affected rows back from INSERT/UPDATE/DELETE:
+
+```php
+$result = (new Builder())
+    ->into('users')
+    ->set('name', 'Alice')
+    ->returning(['id', 'created_at'])
+    ->insert();
+
+// INSERT INTO "users" ("name") VALUES (?) RETURNING "id", "created_at"
+```
+
+**MERGE** — SQL standard MERGE statement:
+
+```php
+$source = (new Builder())->from('staging');
+
+$result = (new Builder())
+    ->mergeInto('target')
+    ->using($source, 's')
+    ->on('"target"."id" = "s"."id"')
+    ->whenMatched('UPDATE SET "name" = "s"."name"')
+    ->whenNotMatched('INSERT ("id", "name") VALUES ("s"."id", "s"."name")')
+    ->executeMerge();
+```
+
+**UPDATE FROM / DELETE USING:**
+
+```php
+// UPDATE ... FROM
+$result = (new Builder())
+    ->from('users')
+    ->set('status', 'premium')
+    ->updateFrom('orders', 'o')
+    ->updateFromWhere('"users"."id" = "o"."user_id"')
+    ->update();
+
+// DELETE ... USING
+$result = (new Builder())
+    ->from('users')
+    ->deleteUsing('old_users', '"users"."id" = "old_users"."id"')
+    ->delete();
+```
+
+**Table sampling:**
+
+```php
+$result = (new Builder())
+    ->from('large_table')
+    ->tablesample(10.0, 'BERNOULLI')
+    ->count('*', 'approx')
+    ->build();
+
+// SELECT COUNT(*) AS "approx" FROM "large_table" TABLESAMPLE BERNOULLI (10)
+```
+
+### SQLite
+
+```php
+use Utopia\Query\Builder\SQLite as Builder;
+```
+
+Extends `Builder\SQL` with SQLite-specific behavior:
+- JSON support via `json_each()` and `json_extract()`
+- Conditional aggregates using `CASE WHEN` syntax
+- `INSERT OR IGNORE` for insertOrIgnore
+- Regex and full-text search throw `UnsupportedException`
+- Spatial queries throw `UnsupportedException`
 
 ### ClickHouse
 
@@ -807,16 +1103,22 @@ $result = (new Builder())
 
 Unsupported features are not on the class — consumers type-hint the interface to check capability (e.g., `if ($builder instanceof Spatial)`).
 
-| Feature | Builder | SQL | MySQL | PostgreSQL | ClickHouse |
-|---------|:-------:|:---:|:-----:|:----------:|:----------:|
-| Selects, Filters, Aggregates, Joins, Unions, CTEs, Inserts, Updates, Deletes, Hooks | x | | | | |
-| Windows | x | | | | |
-| Locking, Transactions, Upsert | | x | | | |
-| Spatial | | | x | x | |
-| Vector Search | | | | x | |
-| JSON | | | x | x | |
-| Hints | | | x | | x |
-| PREWHERE, FINAL, SAMPLE | | | | | x |
+| Feature | Builder | SQL | MySQL | MariaDB | PostgreSQL | SQLite | ClickHouse |
+|---------|:-------:|:---:|:-----:|:-------:|:----------:|:------:|:----------:|
+| Selects, Filters, Aggregates, Joins, Unions, CTEs, Inserts, Updates, Deletes, Hooks | x | | | | | | |
+| Windows | x | | | | | | |
+| Locking, Transactions, Upsert | | x | | | | | |
+| Spatial, Full-Text Search | | x | | | | | |
+| Conditional Aggregates | | | x | x | x | x | x |
+| JSON | | | x | x | x | x | |
+| Hints | | | x | x | | | x |
+| Lateral Joins | | | x | x | x | | |
+| Full Outer Joins | | | | | x | | x |
+| Table Sampling | | | | | x | | x |
+| Merge | | | | | x | | |
+| Returning | | | | | x | | |
+| Vector Search | | | | | x | | |
+| PREWHERE, FINAL, SAMPLE | | | | | | | x |
 
 ## Schema Builder
 
@@ -824,7 +1126,7 @@ The schema builder generates DDL statements for table creation, alteration, inde
 
 ```php
 use Utopia\Query\Schema\MySQL as Schema;
-// or: PostgreSQL, ClickHouse
+// or: PostgreSQL, ClickHouse, SQLite
 ```
 
 ### Creating Tables
@@ -845,9 +1147,18 @@ $result = $schema->create('users', function ($table) {
 $result->query; // CREATE TABLE `users` (...)
 ```
 
-Available column types: `id`, `string`, `text`, `integer`, `bigInteger`, `float`, `boolean`, `datetime`, `timestamp`, `json`, `binary`, `enum`, `point`, `linestring`, `polygon`, `vector` (PostgreSQL only), `timestamps`.
+Use `createIfNotExists()` to add `IF NOT EXISTS`:
 
-Column modifiers: `nullable()`, `default($value)`, `unsigned()`, `unique()`, `primary()`, `autoIncrement()`, `after($column)`, `comment($text)`.
+```php
+$result = $schema->createIfNotExists('users', function ($table) {
+    $table->id();
+    $table->string('name', 255);
+});
+```
+
+Available column types: `id`, `string`, `text`, `mediumText`, `longText`, `integer`, `bigInteger`, `float`, `boolean`, `datetime`, `timestamp`, `json`, `binary`, `enum`, `point`, `linestring`, `polygon`, `vector` (PostgreSQL only), `timestamps`.
+
+Column modifiers: `nullable()`, `default($value)`, `unsigned()`, `unique()`, `primary()`, `autoIncrement()`, `after($column)`, `comment($text)`, `collation($collation)`.
 
 ### Altering Tables
 
@@ -867,7 +1178,7 @@ $result = $schema->createIndex('users', 'idx_email', ['email'], unique: true);
 $result = $schema->dropIndex('users', 'idx_email');
 ```
 
-PostgreSQL supports index methods and operator classes:
+PostgreSQL supports index methods, operator classes, and concurrent creation:
 
 ```php
 $schema = new \Utopia\Query\Schema\PostgreSQL();
@@ -879,15 +1190,58 @@ $result = $schema->createIndex('users', 'idx_name_trgm', ['name'],
 // HNSW vector index
 $result = $schema->createIndex('documents', 'idx_embedding', ['embedding'],
     method: 'hnsw', operatorClass: 'vector_cosine_ops');
+
+// Concurrent index creation (non-blocking)
+$result = $schema->createIndex('users', 'idx_email', ['email'], concurrently: true);
+
+// Concurrent index drop
+$result = $schema->dropIndexConcurrently('idx_email');
 ```
 
 ### Foreign Keys
 
 ```php
+use Utopia\Query\Schema\ForeignKeyAction;
+
 $result = $schema->addForeignKey('orders', 'fk_user', 'user_id',
-    'users', 'id', onDelete: 'CASCADE');
+    'users', 'id', onDelete: ForeignKeyAction::Cascade);
 
 $result = $schema->dropForeignKey('orders', 'fk_user');
+```
+
+Available actions: `ForeignKeyAction::Cascade`, `SetNull`, `SetDefault`, `Restrict`, `NoAction`.
+
+### Partitions
+
+Available on MySQL, PostgreSQL, and ClickHouse:
+
+```php
+// Define partition strategy in table creation
+$result = $schema->create('events', function ($table) {
+    $table->id();
+    $table->datetime('created_at');
+    $table->partitionByRange('created_at');
+});
+
+// Create a child partition (MySQL, PostgreSQL)
+$result = $schema->createPartition('events', 'events_2024', "VALUES LESS THAN ('2025-01-01')");
+
+// Drop a partition
+$result = $schema->dropPartition('events', 'events_2024');
+```
+
+Partition strategies: `partitionByRange()`, `partitionByList()`, `partitionByHash()`.
+
+### Comments
+
+Table and column comments are available via the `TableComments` and `ColumnComments` interfaces:
+
+```php
+// Table comments (MySQL, PostgreSQL, ClickHouse)
+$result = $schema->commentOnTable('users', 'Main user accounts table');
+
+// Column comments (PostgreSQL, ClickHouse)
+$result = $schema->commentOnColumn('users', 'email', 'Primary contact email');
 ```
 
 ### Views
@@ -903,11 +1257,19 @@ $result = $schema->dropView('active_users');
 ### Procedures and Triggers
 
 ```php
-// MySQL
-$result = $schema->createProcedure('update_stats', ['IN user_id INT'], 'UPDATE stats SET count = count + 1 WHERE id = user_id;');
+use Utopia\Query\Schema\ParameterDirection;
+use Utopia\Query\Schema\TriggerTiming;
+use Utopia\Query\Schema\TriggerEvent;
+
+// Procedure
+$result = $schema->createProcedure('update_stats', [
+    [ParameterDirection::In, 'user_id', 'INT'],
+], 'UPDATE stats SET count = count + 1 WHERE id = user_id;');
 
 // Trigger
-$result = $schema->createTrigger('before_insert_users', 'users', 'BEFORE', 'INSERT', 'SET NEW.created_at = NOW();');
+$result = $schema->createTrigger('before_insert_users', 'users',
+    TriggerTiming::Before, TriggerEvent::Insert,
+    'SET NEW.created_at = NOW();');
 ```
 
 ### PostgreSQL Schema Extensions
@@ -920,11 +1282,28 @@ $result = $schema->createExtension('vector');
 // CREATE EXTENSION IF NOT EXISTS "vector"
 
 // Procedures → CREATE FUNCTION ... LANGUAGE plpgsql
-$result = $schema->createProcedure('increment', ['p_id INTEGER'], '
+$result = $schema->createProcedure('increment', [
+    [ParameterDirection::In, 'p_id', 'INTEGER'],
+], '
 BEGIN
     UPDATE counters SET value = value + 1 WHERE id = p_id;
 END;
 ');
+
+// Custom types
+$result = $schema->createType('status_type', ['active', 'inactive', 'banned']);
+$result = $schema->dropType('status_type');
+
+// Sequences
+$result = $schema->createSequence('order_seq', start: 1000, incrementBy: 1);
+$result = $schema->dropSequence('order_seq');
+$result = $schema->nextVal('order_seq');
+
+// Collations
+$result = $schema->createCollation('custom_collation', ['locale' => 'en-US-u-ks-level2']);
+
+// Alter column type with optional USING expression
+$result = $schema->alterColumnType('users', 'age', 'BIGINT', using: '"age"::BIGINT');
 
 // DROP CONSTRAINT instead of DROP FOREIGN KEY
 $result = $schema->dropForeignKey('orders', 'fk_user');
@@ -953,6 +1332,16 @@ $result = $schema->create('events', function ($table) {
 ```
 
 ClickHouse uses `Nullable(type)` wrapping for nullable columns, `Enum8(...)` for enums, `Tuple(Float64, Float64)` for points, and `TYPE minmax GRANULARITY 3` for indexes. Foreign keys, stored procedures, and triggers throw `UnsupportedException`.
+
+Supports `TableComments`, `ColumnComments`, and `DropPartition` interfaces.
+
+### SQLite Schema
+
+```php
+$schema = new \Utopia\Query\Schema\SQLite();
+```
+
+SQLite uses simplified type mappings: `INTEGER` for booleans, `TEXT` for datetimes/JSON, `REAL` for floats, `BLOB` for binary. Auto-increment uses `AUTOINCREMENT`. Vector and spatial types are not supported. Foreign keys, stored procedures, and triggers throw `UnsupportedException`.
 
 ## Compiler Interface
 
@@ -989,6 +1378,14 @@ composer test          # Run tests
 composer lint          # Check formatting
 composer format        # Auto-format code
 composer check         # Run static analysis (PHPStan level max)
+```
+
+**Integration tests** require Docker:
+
+```bash
+docker compose -f docker-compose.test.yml up -d   # Start MySQL, PostgreSQL, ClickHouse
+composer test:integration                          # Run integration tests
+docker compose -f docker-compose.test.yml down     # Stop containers
 ```
 
 ## License
