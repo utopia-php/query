@@ -11,7 +11,11 @@ use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\Feature\ForeignKeys;
 use Utopia\Query\Schema\Feature\Procedures;
 use Utopia\Query\Schema\Feature\Triggers;
+use Utopia\Query\Schema\ForeignKeyAction;
 use Utopia\Query\Schema\MySQL as Schema;
+use Utopia\Query\Schema\ParameterDirection;
+use Utopia\Query\Schema\TriggerEvent;
+use Utopia\Query\Schema\TriggerTiming;
 
 class MySQLTest extends TestCase
 {
@@ -130,7 +134,7 @@ class MySQLTest extends TestCase
             $table->id();
             $table->foreignKey('user_id')
                 ->references('id')->on('users')
-                ->onDelete('CASCADE')->onUpdate('SET NULL');
+                ->onDelete(ForeignKeyAction::Cascade)->onUpdate(ForeignKeyAction::SetNull);
         });
         $this->assertBindingCount($result);
 
@@ -448,8 +452,8 @@ class MySQLTest extends TestCase
             'user_id',
             'users',
             'id',
-            onDelete: 'CASCADE',
-            onUpdate: 'SET NULL'
+            onDelete: ForeignKeyAction::Cascade,
+            onUpdate: ForeignKeyAction::SetNull
         );
 
         $this->assertEquals(
@@ -486,7 +490,7 @@ class MySQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->createProcedure(
             'update_stats',
-            params: [['IN', 'user_id', 'INT'], ['OUT', 'total', 'INT']],
+            params: [[ParameterDirection::In, 'user_id', 'INT'], [ParameterDirection::Out, 'total', 'INT']],
             body: 'SELECT COUNT(*) INTO total FROM orders WHERE orders.user_id = user_id;'
         );
 
@@ -511,8 +515,8 @@ class MySQLTest extends TestCase
         $result = $schema->createTrigger(
             'trg_updated_at',
             'users',
-            timing: 'BEFORE',
-            event: 'UPDATE',
+            timing: TriggerTiming::Before,
+            event: TriggerEvent::Update,
             body: 'SET NEW.updated_at = NOW(3);'
         );
 
@@ -608,7 +612,7 @@ class MySQLTest extends TestCase
             $table->id();
             $table->foreignKey('post_id')
                 ->references('id')->on('posts')
-                ->onDelete('CASCADE')->onUpdate('RESTRICT');
+                ->onDelete(ForeignKeyAction::Cascade)->onUpdate(ForeignKeyAction::Restrict);
         });
         $this->assertBindingCount($result);
 
@@ -747,7 +751,7 @@ class MySQLTest extends TestCase
             $table->integer('customer_id');
             $table->foreignKey('customer_id')
                 ->references('id')->on('customers')
-                ->onDelete('CASCADE')->onUpdate('CASCADE');
+                ->onDelete(ForeignKeyAction::Cascade)->onUpdate(ForeignKeyAction::Cascade);
         });
 
         $this->assertSame(

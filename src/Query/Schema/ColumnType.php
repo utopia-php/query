@@ -5,12 +5,14 @@ namespace Utopia\Query\Schema;
 enum ColumnType: string
 {
     case String = 'string';
+    case Varchar = 'varchar';
     case Text = 'text';
-    case MediumText = 'mediumText';
-    case LongText = 'longText';
+    case MediumText = 'mediumtext';
+    case LongText = 'longtext';
     case Integer = 'integer';
-    case BigInteger = 'bigInteger';
+    case BigInteger = 'biginteger';
     case Float = 'float';
+    case Double = 'double';
     case Boolean = 'boolean';
     case Datetime = 'datetime';
     case Timestamp = 'timestamp';
@@ -21,4 +23,8 @@ enum ColumnType: string
     case Linestring = 'linestring';
     case Polygon = 'polygon';
     case Vector = 'vector';
+    case Id = 'id';
+    case Uuid7 = 'uuid7';
+    case Object = 'object';
+    case Relationship = 'relationship';
 }

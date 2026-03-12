@@ -4,28 +4,35 @@ namespace Utopia\Query\Schema;
 
 use Utopia\Query\Builder\BuildResult;
 use Utopia\Query\Exception\ValidationException;
+use Utopia\Query\Schema\Feature\ColumnComments;
+use Utopia\Query\Schema\Feature\CreatePartition;
+use Utopia\Query\Schema\Feature\DropPartition;
+use Utopia\Query\Schema\Feature\Sequences;
+use Utopia\Query\Schema\Feature\TableComments;
+use Utopia\Query\Schema\Feature\Types;
 
-class PostgreSQL extends SQL
+class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnComments, CreatePartition, DropPartition
 {
     protected string $wrapChar = '"';
 
     protected function compileColumnType(Column $column): string
     {
         return match ($column->type) {
-            ColumnType::String => 'VARCHAR(' . ($column->length ?? 255) . ')',
+            ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'VARCHAR(' . ($column->length ?? 255) . ')',
             ColumnType::Text, ColumnType::MediumText, ColumnType::LongText => 'TEXT',
             ColumnType::Integer => 'INTEGER',
-            ColumnType::BigInteger => 'BIGINT',
-            ColumnType::Float => 'DOUBLE PRECISION',
+            ColumnType::BigInteger, ColumnType::Id => 'BIGINT',
+            ColumnType::Float, ColumnType::Double => 'DOUBLE PRECISION',
             ColumnType::Boolean => 'BOOLEAN',
             ColumnType::Datetime => $column->precision ? 'TIMESTAMP(' . $column->precision . ')' : 'TIMESTAMP',
             ColumnType::Timestamp => $column->precision ? 'TIMESTAMP(' . $column->precision . ') WITHOUT TIME ZONE' : 'TIMESTAMP WITHOUT TIME ZONE',
-            ColumnType::Json => 'JSONB',
+            ColumnType::Json, ColumnType::Object => 'JSONB',
             ColumnType::Binary => 'BYTEA',
             ColumnType::Enum => 'TEXT',
             ColumnType::Point => 'GEOMETRY(POINT' . ($column->srid !== null ? ', ' . $column->srid : '') . ')',
             ColumnType::Linestring => 'GEOMETRY(LINESTRING' . ($column->srid !== null ? ', ' . $column->srid : '') . ')',
             ColumnType::Polygon => 'GEOMETRY(POLYGON' . ($column->srid !== null ? ', ' . $column->srid : '') . ')',
+            ColumnType::Uuid7 => 'VARCHAR(36)',
             ColumnType::Vector => 'VECTOR(' . ($column->dimensions ?? 0) . ')',
         };
     }
@@ -98,6 +105,7 @@ class PostgreSQL extends SQL
         array $orders = [],
         array $collations = [],
         array $rawColumns = [],
+        bool $concurrently = false,
     ): BuildResult {
         if ($method !== '' && ! \preg_match('/^[A-Za-z0-9_]+$/', $method)) {
             throw new ValidationException('Invalid index method: ' . $method);
@@ -107,6 +115,10 @@ class PostgreSQL extends SQL
         }
 
         $keyword = $unique ? 'CREATE UNIQUE INDEX' : 'CREATE INDEX';
+
+        if ($concurrently) {
+            $keyword .= ' CONCURRENTLY';
+        }
 
         $sql = $keyword . ' ' . $this->quote($name)
             . ' ON ' . $this->quote($table);
@@ -141,7 +153,7 @@ class PostgreSQL extends SQL
     }
 
     /**
-     * @param  list<array{0: ParameterDirection|string, 1: string, 2: string}>  $params
+     * @param  list<array{0: ParameterDirection, 1: string, 2: string}>  $params
      */
     public function createProcedure(string $name, array $params, string $body): BuildResult
     {
@@ -162,30 +174,16 @@ class PostgreSQL extends SQL
     public function createTrigger(
         string $name,
         string $table,
-        TriggerTiming|string $timing,
-        TriggerEvent|string $event,
+        TriggerTiming $timing,
+        TriggerEvent $event,
         string $body,
     ): BuildResult {
-        if ($timing instanceof TriggerTiming) {
-            $timingValue = $timing->value;
-        } else {
-            $timingValue = \strtoupper($timing);
-            TriggerTiming::from($timingValue);
-        }
-
-        if ($event instanceof TriggerEvent) {
-            $eventValue = $event->value;
-        } else {
-            $eventValue = \strtoupper($event);
-            TriggerEvent::from($eventValue);
-        }
-
         $funcName = $name . '_func';
 
         $sql = 'CREATE FUNCTION ' . $this->quote($funcName)
             . '() RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN ' . $body . ' RETURN NEW; END; $$; '
             . 'CREATE TRIGGER ' . $this->quote($name)
-            . ' ' . $timingValue . ' ' . $eventValue
+            . ' ' . $timing->value . ' ' . $event->value
             . ' ON ' . $this->quote($table)
             . ' FOR EACH ROW EXECUTE FUNCTION ' . $this->quote($funcName) . '()';
 
@@ -227,10 +225,10 @@ class PostgreSQL extends SQL
                 . ' REFERENCES ' . $this->quote($fk->refTable)
                 . ' (' . $this->quote($fk->refColumn) . ')';
             if ($fk->onDelete !== null) {
-                $def .= ' ON DELETE ' . $fk->onDelete->value;
+                $def .= ' ON DELETE ' . $fk->onDelete->toSql();
             }
             if ($fk->onUpdate !== null) {
-                $def .= ' ON UPDATE ' . $fk->onUpdate->value;
+                $def .= ' ON UPDATE ' . $fk->onUpdate->toSql();
             }
             $alterations[] = $def;
         }
@@ -345,5 +343,78 @@ class PostgreSQL extends SQL
         }
 
         return new BuildResult($sql, []);
+    }
+
+    public function dropIndexConcurrently(string $name): BuildResult
+    {
+        return new BuildResult('DROP INDEX CONCURRENTLY ' . $this->quote($name), []);
+    }
+
+    public function createType(string $name, array $values): BuildResult
+    {
+        $escaped = array_map(fn (string $v): string => "'" . str_replace("'", "''", $v) . "'", $values);
+
+        return new BuildResult(
+            'CREATE TYPE ' . $this->quote($name) . ' AS ENUM (' . implode(', ', $escaped) . ')',
+            []
+        );
+    }
+
+    public function dropType(string $name): BuildResult
+    {
+        return new BuildResult('DROP TYPE ' . $this->quote($name), []);
+    }
+
+    public function createSequence(string $name, int $start = 1, int $incrementBy = 1): BuildResult
+    {
+        return new BuildResult(
+            'CREATE SEQUENCE ' . $this->quote($name) . ' START ' . $start . ' INCREMENT BY ' . $incrementBy,
+            []
+        );
+    }
+
+    public function dropSequence(string $name): BuildResult
+    {
+        return new BuildResult('DROP SEQUENCE ' . $this->quote($name), []);
+    }
+
+    public function nextVal(string $name): BuildResult
+    {
+        return new BuildResult(
+            "SELECT nextval('" . str_replace("'", "''", $name) . "')",
+            []
+        );
+    }
+
+    public function commentOnTable(string $table, string $comment): BuildResult
+    {
+        return new BuildResult(
+            'COMMENT ON TABLE ' . $this->quote($table) . " IS '" . str_replace("'", "''", $comment) . "'",
+            []
+        );
+    }
+
+    public function commentOnColumn(string $table, string $column, string $comment): BuildResult
+    {
+        return new BuildResult(
+            'COMMENT ON COLUMN ' . $this->quote($table) . '.' . $this->quote($column) . " IS '" . str_replace("'", "''", $comment) . "'",
+            []
+        );
+    }
+
+    public function createPartition(string $parent, string $name, string $expression): BuildResult
+    {
+        return new BuildResult(
+            'CREATE TABLE ' . $this->quote($name) . ' PARTITION OF ' . $this->quote($parent) . ' FOR VALUES ' . $expression,
+            []
+        );
+    }
+
+    public function dropPartition(string $table, string $name): BuildResult
+    {
+        return new BuildResult(
+            'DROP TABLE ' . $this->quote($name),
+            []
+        );
     }
 }

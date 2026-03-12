@@ -4,34 +4,34 @@ namespace Utopia\Query\Schema;
 
 class Column
 {
-    public bool $isNullable = false;
+    public private(set) bool $isNullable = false;
 
-    public mixed $default = null;
+    public private(set) mixed $default = null;
 
-    public bool $hasDefault = false;
+    public private(set) bool $hasDefault = false;
 
-    public bool $isUnsigned = false;
+    public private(set) bool $isUnsigned = false;
 
-    public bool $isUnique = false;
+    public private(set) bool $isUnique = false;
 
-    public bool $isPrimary = false;
+    public private(set) bool $isPrimary = false;
 
-    public bool $isAutoIncrement = false;
+    public private(set) bool $isAutoIncrement = false;
 
-    public ?string $after = null;
+    public private(set) ?string $after = null;
 
-    public ?string $comment = null;
+    public private(set) ?string $comment = null;
 
     /** @var string[] */
-    public array $enumValues = [];
+    public private(set) array $enumValues = [];
 
-    public ?int $srid = null;
+    public private(set) ?int $srid = null;
 
-    public ?int $dimensions = null;
+    public private(set) ?int $dimensions = null;
 
-    public bool $isModify = false;
+    public private(set) bool $isModify = false;
 
-    public ?string $collation = null;
+    public private(set) ?string $collation = null;
 
     public function __construct(
         public string $name,
@@ -101,6 +101,37 @@ class Column
     public function collation(string $collation): static
     {
         $this->collation = $collation;
+
+        return $this;
+    }
+
+    /**
+     * @param  string[]  $values
+     */
+    public function enum(array $values): static
+    {
+        $this->enumValues = $values;
+
+        return $this;
+    }
+
+    public function srid(int $srid): static
+    {
+        $this->srid = $srid;
+
+        return $this;
+    }
+
+    public function dimensions(int $dimensions): static
+    {
+        $this->dimensions = $dimensions;
+
+        return $this;
+    }
+
+    public function modify(): static
+    {
+        $this->isModify = true;
 
         return $this;
     }

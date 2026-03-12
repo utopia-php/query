@@ -10,7 +10,11 @@ use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\Feature\ForeignKeys;
 use Utopia\Query\Schema\Feature\Procedures;
 use Utopia\Query\Schema\Feature\Triggers;
+use Utopia\Query\Schema\ForeignKeyAction;
+use Utopia\Query\Schema\ParameterDirection;
 use Utopia\Query\Schema\PostgreSQL as Schema;
+use Utopia\Query\Schema\TriggerEvent;
+use Utopia\Query\Schema\TriggerTiming;
 
 class PostgreSQLTest extends TestCase
 {
@@ -195,7 +199,7 @@ class PostgreSQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->createProcedure(
             'update_stats',
-            params: [['IN', 'user_id', 'INT'], ['OUT', 'total', 'INT']],
+            params: [[ParameterDirection::In, 'user_id', 'INT'], [ParameterDirection::Out, 'total', 'INT']],
             body: 'SELECT COUNT(*) INTO total FROM orders WHERE orders.user_id = user_id;'
         );
 
@@ -219,8 +223,8 @@ class PostgreSQLTest extends TestCase
         $result = $schema->createTrigger(
             'trg_updated_at',
             'users',
-            timing: 'BEFORE',
-            event: 'UPDATE',
+            timing: TriggerTiming::Before,
+            event: TriggerEvent::Update,
             body: 'NEW.updated_at = NOW();'
         );
 
@@ -426,7 +430,7 @@ class PostgreSQLTest extends TestCase
     {
         $schema = new Schema();
         $result = $schema->alter('orders', function (Blueprint $table) {
-            $table->addForeignKey('user_id')->references('id')->on('users')->onDelete('CASCADE');
+            $table->addForeignKey('user_id')->references('id')->on('users')->onDelete(ForeignKeyAction::Cascade);
         });
         $this->assertBindingCount($result);
 
@@ -488,7 +492,7 @@ class PostgreSQLTest extends TestCase
             $table->id();
             $table->foreignKey('user_id')
                 ->references('id')->on('users')
-                ->onDelete('CASCADE');
+                ->onDelete(ForeignKeyAction::Cascade);
         });
         $this->assertBindingCount($result);
 
@@ -498,7 +502,7 @@ class PostgreSQLTest extends TestCase
     public function testAddForeignKeyStandalone(): void
     {
         $schema = new Schema();
-        $result = $schema->addForeignKey('orders', 'fk_user', 'user_id', 'users', 'id', 'CASCADE', 'SET NULL');
+        $result = $schema->addForeignKey('orders', 'fk_user', 'user_id', 'users', 'id', ForeignKeyAction::Cascade, ForeignKeyAction::SetNull);
 
         $this->assertEquals(
             'ALTER TABLE "orders" ADD CONSTRAINT "fk_user" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE SET NULL',

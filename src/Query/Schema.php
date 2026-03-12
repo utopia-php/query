@@ -18,7 +18,15 @@ abstract class Schema
     /**
      * @param  callable(Blueprint): void  $definition
      */
-    public function create(string $table, callable $definition): BuildResult
+    public function createIfNotExists(string $table, callable $definition): BuildResult
+    {
+        return $this->create($table, $definition, true);
+    }
+
+    /**
+     * @param  callable(Blueprint): void  $definition
+     */
+    public function create(string $table, callable $definition, bool $ifNotExists = false): BuildResult
     {
         $blueprint = new Blueprint();
         $definition($blueprint);
@@ -77,16 +85,20 @@ abstract class Schema
                 . ' REFERENCES ' . $this->quote($fk->refTable)
                 . ' (' . $this->quote($fk->refColumn) . ')';
             if ($fk->onDelete !== null) {
-                $def .= ' ON DELETE ' . $fk->onDelete->value;
+                $def .= ' ON DELETE ' . $fk->onDelete->toSql();
             }
             if ($fk->onUpdate !== null) {
-                $def .= ' ON UPDATE ' . $fk->onUpdate->value;
+                $def .= ' ON UPDATE ' . $fk->onUpdate->toSql();
             }
             $columnDefs[] = $def;
         }
 
-        $sql = 'CREATE TABLE ' . $this->quote($table)
+        $sql = 'CREATE TABLE ' . ($ifNotExists ? 'IF NOT EXISTS ' : '') . $this->quote($table)
             . ' (' . \implode(', ', $columnDefs) . ')';
+
+        if ($blueprint->partitionType !== null) {
+            $sql .= ' PARTITION BY ' . $blueprint->partitionType->value . '(' . $blueprint->partitionExpression . ')';
+        }
 
         return new BuildResult($sql, []);
     }
@@ -139,10 +151,10 @@ abstract class Schema
                 . ' REFERENCES ' . $this->quote($fk->refTable)
                 . ' (' . $this->quote($fk->refColumn) . ')';
             if ($fk->onDelete !== null) {
-                $def .= ' ON DELETE ' . $fk->onDelete->value;
+                $def .= ' ON DELETE ' . $fk->onDelete->toSql();
             }
             if ($fk->onUpdate !== null) {
-                $def .= ' ON UPDATE ' . $fk->onUpdate->value;
+                $def .= ' ON UPDATE ' . $fk->onUpdate->toSql();
             }
             $alterations[] = $def;
         }

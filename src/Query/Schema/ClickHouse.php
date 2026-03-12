@@ -7,29 +7,33 @@ use Utopia\Query\Builder\BuildResult;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\QuotesIdentifiers;
 use Utopia\Query\Schema;
+use Utopia\Query\Schema\Feature\ColumnComments;
+use Utopia\Query\Schema\Feature\DropPartition;
+use Utopia\Query\Schema\Feature\TableComments;
 
-class ClickHouse extends Schema
+class ClickHouse extends Schema implements TableComments, ColumnComments, DropPartition
 {
     use QuotesIdentifiers;
 
     protected function compileColumnType(Column $column): string
     {
         $type = match ($column->type) {
-            ColumnType::String => 'String',
+            ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'String',
             ColumnType::Text => 'String',
             ColumnType::MediumText, ColumnType::LongText => 'String',
             ColumnType::Integer => $column->isUnsigned ? 'UInt32' : 'Int32',
-            ColumnType::BigInteger => $column->isUnsigned ? 'UInt64' : 'Int64',
-            ColumnType::Float => 'Float64',
+            ColumnType::BigInteger, ColumnType::Id => $column->isUnsigned ? 'UInt64' : 'Int64',
+            ColumnType::Float, ColumnType::Double => 'Float64',
             ColumnType::Boolean => 'UInt8',
             ColumnType::Datetime => $column->precision ? 'DateTime64(' . $column->precision . ')' : 'DateTime',
             ColumnType::Timestamp => $column->precision ? 'DateTime64(' . $column->precision . ')' : 'DateTime',
-            ColumnType::Json => 'String',
+            ColumnType::Json, ColumnType::Object => 'String',
             ColumnType::Binary => 'String',
             ColumnType::Enum => $this->compileClickHouseEnum($column->enumValues),
             ColumnType::Point => 'Tuple(Float64, Float64)',
             ColumnType::Linestring => 'Array(Tuple(Float64, Float64))',
             ColumnType::Polygon => 'Array(Array(Tuple(Float64, Float64)))',
+            ColumnType::Uuid7 => 'FixedString(36)',
             ColumnType::Vector => 'Array(Float64)',
         };
 
@@ -122,7 +126,7 @@ class ClickHouse extends Schema
     /**
      * @param  callable(Blueprint): void  $definition
      */
-    public function create(string $table, callable $definition): BuildResult
+    public function create(string $table, callable $definition, bool $ifNotExists = false): BuildResult
     {
         $blueprint = new Blueprint();
         $definition($blueprint);
@@ -151,9 +155,13 @@ class ClickHouse extends Schema
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
         }
 
-        $sql = 'CREATE TABLE ' . $this->quote($table)
+        $sql = 'CREATE TABLE ' . ($ifNotExists ? 'IF NOT EXISTS ' : '') . $this->quote($table)
             . ' (' . \implode(', ', $columnDefs) . ')'
             . ' ENGINE = MergeTree()';
+
+        if ($blueprint->partitionType !== null) {
+            $sql .= ' PARTITION BY ' . $blueprint->partitionExpression;
+        }
 
         if (! empty($primaryKeys)) {
             $sql .= ' ORDER BY (' . \implode(', ', $primaryKeys) . ')';
@@ -181,5 +189,29 @@ class ClickHouse extends Schema
         }
 
         return 'Enum8(' . \implode(', ', $parts) . ')';
+    }
+
+    public function commentOnTable(string $table, string $comment): BuildResult
+    {
+        return new BuildResult(
+            'ALTER TABLE ' . $this->quote($table) . " MODIFY COMMENT '" . str_replace("'", "''", $comment) . "'",
+            []
+        );
+    }
+
+    public function commentOnColumn(string $table, string $column, string $comment): BuildResult
+    {
+        return new BuildResult(
+            'ALTER TABLE ' . $this->quote($table) . ' COMMENT COLUMN ' . $this->quote($column) . " '" . str_replace("'", "''", $comment) . "'",
+            []
+        );
+    }
+
+    public function dropPartition(string $table, string $name): BuildResult
+    {
+        return new BuildResult(
+            'ALTER TABLE ' . $this->quote($table) . " DROP PARTITION '" . str_replace("'", "''", $name) . "'",
+            []
+        );
     }
 }

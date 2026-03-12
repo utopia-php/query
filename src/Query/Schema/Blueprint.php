@@ -31,12 +31,15 @@ class Blueprint
     /** @var list<string> Raw SQL index definitions (bypass typed Index objects) */
     public private(set) array $rawIndexDefs = [];
 
+    public private(set) ?PartitionType $partitionType = null;
+    public private(set) string $partitionExpression = '';
+
     public function id(string $name = 'id'): Column
     {
-        $col = new Column($name, ColumnType::BigInteger);
-        $col->isUnsigned = true;
-        $col->isAutoIncrement = true;
-        $col->isPrimary = true;
+        $col = (new Column($name, ColumnType::BigInteger))
+            ->unsigned()
+            ->autoIncrement()
+            ->primary();
         $this->columns[] = $col;
 
         return $col;
@@ -143,8 +146,8 @@ class Blueprint
      */
     public function enum(string $name, array $values): Column
     {
-        $col = new Column($name, ColumnType::Enum);
-        $col->enumValues = $values;
+        $col = (new Column($name, ColumnType::Enum))
+            ->enum($values);
         $this->columns[] = $col;
 
         return $col;
@@ -152,8 +155,8 @@ class Blueprint
 
     public function point(string $name, int $srid = 4326): Column
     {
-        $col = new Column($name, ColumnType::Point);
-        $col->srid = $srid;
+        $col = (new Column($name, ColumnType::Point))
+            ->srid($srid);
         $this->columns[] = $col;
 
         return $col;
@@ -161,8 +164,8 @@ class Blueprint
 
     public function linestring(string $name, int $srid = 4326): Column
     {
-        $col = new Column($name, ColumnType::Linestring);
-        $col->srid = $srid;
+        $col = (new Column($name, ColumnType::Linestring))
+            ->srid($srid);
         $this->columns[] = $col;
 
         return $col;
@@ -170,8 +173,8 @@ class Blueprint
 
     public function polygon(string $name, int $srid = 4326): Column
     {
-        $col = new Column($name, ColumnType::Polygon);
-        $col->srid = $srid;
+        $col = (new Column($name, ColumnType::Polygon))
+            ->srid($srid);
         $this->columns[] = $col;
 
         return $col;
@@ -179,8 +182,8 @@ class Blueprint
 
     public function vector(string $name, int $dimensions): Column
     {
-        $col = new Column($name, ColumnType::Vector);
-        $col->dimensions = $dimensions;
+        $col = (new Column($name, ColumnType::Vector))
+            ->dimensions($dimensions);
         $this->columns[] = $col;
 
         return $col;
@@ -278,8 +281,8 @@ class Blueprint
         if (\is_string($type)) {
             $type = ColumnType::from($type);
         }
-        $col = new Column($name, $type, $type === ColumnType::String ? $lengthOrPrecision : null, $type !== ColumnType::String ? $lengthOrPrecision : null);
-        $col->isModify = true;
+        $col = (new Column($name, $type, $type === ColumnType::String ? $lengthOrPrecision : null, $type !== ColumnType::String ? $lengthOrPrecision : null))
+            ->modify();
         $this->columns[] = $col;
 
         return $col;
@@ -355,6 +358,24 @@ class Blueprint
     public function rawIndex(string $definition): void
     {
         $this->rawIndexDefs[] = $definition;
+    }
+
+    public function partitionByRange(string $expression): void
+    {
+        $this->partitionType = PartitionType::Range;
+        $this->partitionExpression = $expression;
+    }
+
+    public function partitionByList(string $expression): void
+    {
+        $this->partitionType = PartitionType::List;
+        $this->partitionExpression = $expression;
+    }
+
+    public function partitionByHash(string $expression): void
+    {
+        $this->partitionType = PartitionType::Hash;
+        $this->partitionExpression = $expression;
     }
 
 }
