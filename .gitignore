@@ -3,3 +3,5 @@ composer.phar
 /vendor/
 .idea
 coverage
+coverage.xml
+.DS_Store
