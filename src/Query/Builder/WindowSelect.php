@@ -13,6 +13,7 @@ readonly class WindowSelect
         public string $alias,
         public ?array $partitionBy,
         public ?array $orderBy,
+        public ?string $windowName = null,
     ) {
     }
 }

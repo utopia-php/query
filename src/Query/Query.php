@@ -257,7 +257,9 @@ class Query
             Method::Join,
             Method::LeftJoin,
             Method::RightJoin,
-            Method::CrossJoin => $compiler->compileJoin($this),
+            Method::CrossJoin,
+            Method::FullOuterJoin,
+            Method::NaturalJoin => $compiler->compileJoin($this),
             Method::Having => $compiler->compileFilter($this),
             default => $compiler->compileFilter($this),
         };
@@ -637,92 +639,72 @@ class Query
             $attribute = $query->getAttribute();
             $values = $query->getValues();
 
-            switch ($method) {
-                case Method::OrderAsc:
-                case Method::OrderDesc:
-                case Method::OrderRandom:
+            match (true) {
+                $method === Method::OrderAsc,
+                $method === Method::OrderDesc,
+                $method === Method::OrderRandom => (function () use ($method, $attribute, &$orderAttributes, &$orderTypes): void {
                     if (! empty($attribute)) {
                         $orderAttributes[] = $attribute;
                     }
-
                     $orderTypes[] = match ($method) {
                         Method::OrderAsc => OrderDirection::Asc,
                         Method::OrderDesc => OrderDirection::Desc,
                         Method::OrderRandom => OrderDirection::Random,
                     };
+                })(),
 
-                    break;
-                case Method::Limit:
-                    // Keep the 1st limit encountered and ignore the rest
-                    if ($limit !== null) {
-                        break;
+                $method === Method::Limit => (function () use ($values, &$limit): void {
+                    if ($limit === null && isset($values[0]) && \is_numeric($values[0])) {
+                        $limit = \intval($values[0]);
                     }
+                })(),
 
-                    $limit = isset($values[0]) && \is_numeric($values[0]) ? \intval($values[0]) : $limit;
-                    break;
-                case Method::Offset:
-                    // Keep the 1st offset encountered and ignore the rest
-                    if ($offset !== null) {
-                        break;
+                $method === Method::Offset => (function () use ($values, &$offset): void {
+                    if ($offset === null && isset($values[0]) && \is_numeric($values[0])) {
+                        $offset = \intval($values[0]);
                     }
+                })(),
 
-                    $offset = isset($values[0]) && \is_numeric($values[0]) ? \intval($values[0]) : $offset;
-                    break;
-                case Method::CursorAfter:
-                case Method::CursorBefore:
-                    // Keep the 1st cursor encountered and ignore the rest
-                    if ($cursor !== null) {
-                        break;
+                $method === Method::CursorAfter,
+                $method === Method::CursorBefore => (function () use ($method, $values, $limit, &$cursor, &$cursorDirection): void {
+                    if ($cursor === null) {
+                        $cursor = $values[0] ?? $limit;
+                        $cursorDirection = $method === Method::CursorAfter ? CursorDirection::After : CursorDirection::Before;
                     }
+                })(),
 
-                    $cursor = $values[0] ?? $limit;
-                    $cursorDirection = $method === Method::CursorAfter ? CursorDirection::After : CursorDirection::Before;
-                    break;
+                $method === Method::Select => $selections[] = clone $query,
 
-                case Method::Select:
-                    $selections[] = clone $query;
-                    break;
+                $method === Method::Count,
+                $method === Method::CountDistinct,
+                $method === Method::Sum,
+                $method === Method::Avg,
+                $method === Method::Min,
+                $method === Method::Max => $aggregations[] = clone $query,
 
-                case Method::Count:
-                case Method::CountDistinct:
-                case Method::Sum:
-                case Method::Avg:
-                case Method::Min:
-                case Method::Max:
-                    $aggregations[] = clone $query;
-                    break;
-
-                case Method::GroupBy:
+                $method === Method::GroupBy => (function () use ($values, &$groupBy): void {
                     /** @var array<string> $values */
                     foreach ($values as $col) {
                         $groupBy[] = $col;
                     }
-                    break;
+                })(),
 
-                case Method::Having:
-                    $having[] = clone $query;
-                    break;
+                $method === Method::Having => $having[] = clone $query,
 
-                case Method::Distinct:
-                    $distinct = true;
-                    break;
+                $method === Method::Distinct => $distinct = true,
 
-                case Method::Join:
-                case Method::LeftJoin:
-                case Method::RightJoin:
-                case Method::CrossJoin:
-                    $joins[] = clone $query;
-                    break;
+                $method === Method::Join,
+                $method === Method::LeftJoin,
+                $method === Method::RightJoin,
+                $method === Method::CrossJoin,
+                $method === Method::FullOuterJoin,
+                $method === Method::NaturalJoin => $joins[] = clone $query,
 
-                case Method::Union:
-                case Method::UnionAll:
-                    $unions[] = clone $query;
-                    break;
+                $method === Method::Union,
+                $method === Method::UnionAll => $unions[] = clone $query,
 
-                default:
-                    $filters[] = clone $query;
-                    break;
-            }
+                default => $filters[] = clone $query,
+            };
         }
 
         return new GroupedQueries(
@@ -1047,6 +1029,21 @@ class Query
     public static function crossJoin(string $table, string $alias = ''): static
     {
         return new static(Method::CrossJoin, $table, $alias !== '' ? [$alias] : []);
+    }
+
+    public static function fullOuterJoin(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
+    {
+        $values = [$left, $operator, $right];
+        if ($alias !== '') {
+            $values[] = $alias;
+        }
+
+        return new static(Method::FullOuterJoin, $table, $values);
+    }
+
+    public static function naturalJoin(string $table, string $alias = ''): static
+    {
+        return new static(Method::NaturalJoin, $table, $alias !== '' ? [$alias] : []);
     }
 
     // Union factory methods

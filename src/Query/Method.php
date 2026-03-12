@@ -84,6 +84,8 @@ enum Method: string
     case LeftJoin = 'leftJoin';
     case RightJoin = 'rightJoin';
     case CrossJoin = 'crossJoin';
+    case FullOuterJoin = 'fullOuterJoin';
+    case NaturalJoin = 'naturalJoin';
 
     // Union
     case Union = 'union';
@@ -212,7 +214,9 @@ enum Method: string
             self::Join,
             self::LeftJoin,
             self::RightJoin,
-            self::CrossJoin => true,
+            self::CrossJoin,
+            self::FullOuterJoin,
+            self::NaturalJoin => true,
             default => false,
         };
     }

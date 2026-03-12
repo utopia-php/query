@@ -2,15 +2,15 @@
 
 namespace Utopia\Query\Builder;
 
-readonly class BuildResult
+readonly class MergeClause
 {
     /**
      * @param  list<mixed>  $bindings
      */
     public function __construct(
-        public string $query,
-        public array $bindings,
-        public bool $readOnly = false,
+        public string $action,
+        public bool $matched,
+        public array $bindings = [],
     ) {
     }
 }

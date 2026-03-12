@@ -52,8 +52,10 @@ class JoinQueryTest extends TestCase
         $this->assertTrue(Method::LeftJoin->isJoin());
         $this->assertTrue(Method::RightJoin->isJoin());
         $this->assertTrue(Method::CrossJoin->isJoin());
+        $this->assertTrue(Method::FullOuterJoin->isJoin());
+        $this->assertTrue(Method::NaturalJoin->isJoin());
         $joinMethods = array_filter(Method::cases(), fn (Method $m) => $m->isJoin());
-        $this->assertCount(4, $joinMethods);
+        $this->assertCount(6, $joinMethods);
     }
 
     public function testJoinWithEmptyTableName(): void

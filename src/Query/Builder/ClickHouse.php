@@ -3,14 +3,16 @@
 namespace Utopia\Query\Builder;
 
 use Utopia\Query\Builder as BaseBuilder;
+use Utopia\Query\Builder\Feature\ConditionalAggregates;
+use Utopia\Query\Builder\Feature\FullOuterJoins;
 use Utopia\Query\Builder\Feature\Hints;
-use Utopia\Query\Exception\UnsupportedException;
+use Utopia\Query\Builder\Feature\TableSampling;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Hook\Join\Placement;
 use Utopia\Query\Query;
 use Utopia\Query\QuotesIdentifiers;
 
-class ClickHouse extends BaseBuilder implements Hints
+class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, TableSampling, FullOuterJoins
 {
     use QuotesIdentifiers;
     /**
@@ -96,6 +98,68 @@ class ClickHouse extends BaseBuilder implements Hints
         return $this;
     }
 
+    public function tablesample(float $percent, string $method = 'BERNOULLI'): static
+    {
+        return $this->sample($percent / 100);
+    }
+
+    public function countWhen(string $condition, string $alias = '', mixed ...$bindings): static
+    {
+        $expr = 'countIf(' . $condition . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr, \array_values($bindings));
+    }
+
+    public function sumWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
+    {
+        $expr = 'sumIf(' . $this->resolveAndWrap($column) . ', ' . $condition . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr, \array_values($bindings));
+    }
+
+    public function avgWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
+    {
+        $expr = 'avgIf(' . $this->resolveAndWrap($column) . ', ' . $condition . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr, \array_values($bindings));
+    }
+
+    public function minWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
+    {
+        $expr = 'minIf(' . $this->resolveAndWrap($column) . ', ' . $condition . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr, \array_values($bindings));
+    }
+
+    public function maxWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
+    {
+        $expr = 'maxIf(' . $this->resolveAndWrap($column) . ', ' . $condition . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr, \array_values($bindings));
+    }
+
+    public function fullOuterJoin(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
+    {
+        $this->pendingQueries[] = Query::fullOuterJoin($table, $left, $right, $operator, $alias);
+
+        return $this;
+    }
+
     public function reset(): static
     {
         parent::reset();
@@ -122,18 +186,6 @@ class ClickHouse extends BaseBuilder implements Hints
         $this->addBinding($values[0]);
 
         return 'match(' . $attribute . ', ?)';
-    }
-
-    /**
-     * ClickHouse does not support MATCH() AGAINST() full-text search
-     *
-     * @param  array<mixed>  $values
-     *
-     * @throws UnsupportedException
-     */
-    protected function compileSearch(string $attribute, array $values, bool $not): string
-    {
-        throw new UnsupportedException('Full-text search (MATCH AGAINST) is not supported in ClickHouse. Use contains() or a custom full-text index instead.');
     }
 
     /**
@@ -238,30 +290,7 @@ class ClickHouse extends BaseBuilder implements Hints
         $this->bindings = [];
         $this->validateTable();
 
-        $assignments = [];
-
-        if (! empty($this->pendingRows)) {
-            foreach ($this->pendingRows[0] as $col => $value) {
-                $assignments[] = $this->resolveAndWrap($col) . ' = ?';
-                $this->addBinding($value);
-            }
-        }
-
-        foreach ($this->rawSets as $col => $expression) {
-            $assignments[] = $this->resolveAndWrap($col) . ' = ' . $expression;
-            if (isset($this->rawSetBindings[$col])) {
-                foreach ($this->rawSetBindings[$col] as $binding) {
-                    $this->addBinding($binding);
-                }
-            }
-        }
-
-        foreach ($this->caseSets as $col => $caseData) {
-            $assignments[] = $this->resolveAndWrap($col) . ' = ' . $caseData->sql;
-            foreach ($caseData->bindings as $binding) {
-                $this->addBinding($binding);
-            }
-        }
+        $assignments = $this->compileAssignments();
 
         if (empty($assignments)) {
             throw new ValidationException('No assignments for UPDATE. Call set() or setRaw() before update().');
@@ -317,7 +346,7 @@ class ClickHouse extends BaseBuilder implements Hints
         if (! empty($this->hints)) {
             $settingsStr = \implode(', ', $this->hints);
 
-            return new BuildResult($result->query . ' SETTINGS ' . $settingsStr, $result->bindings);
+            return new BuildResult($result->query . ' SETTINGS ' . $settingsStr, $result->bindings, $result->readOnly);
         }
 
         return $result;

@@ -139,7 +139,7 @@ class ClickHouseTest extends TestCase
     public function testSearchThrowsException(): void
     {
         $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('Full-text search (MATCH AGAINST) is not supported in ClickHouse');
+        $this->expectExceptionMessage('Full-text search is not supported by this dialect.');
 
         (new Builder())
             ->from('logs')
@@ -150,7 +150,7 @@ class ClickHouseTest extends TestCase
     public function testNotSearchThrowsException(): void
     {
         $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('Full-text search (MATCH AGAINST) is not supported in ClickHouse');
+        $this->expectExceptionMessage('Full-text search is not supported by this dialect.');
 
         (new Builder())
             ->from('logs')
@@ -694,7 +694,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `events` PREWHERE `tag` IN (?, ?, ?)', $result->query);
+        $this->assertEquals('SELECT * FROM `events` PREWHERE (position(`tag`, ?) > 0 OR position(`tag`, ?) > 0 OR position(`tag`, ?) > 0)', $result->query);
         $this->assertEquals(['a', 'b', 'c'], $result->bindings);
     }
 
@@ -2077,7 +2077,7 @@ class ClickHouseTest extends TestCase
     public function testSearchThrowsExceptionMessage(): void
     {
         $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('Full-text search (MATCH AGAINST) is not supported in ClickHouse');
+        $this->expectExceptionMessage('Full-text search is not supported by this dialect.');
 
         (new Builder())
             ->from('logs')
@@ -2088,7 +2088,7 @@ class ClickHouseTest extends TestCase
     public function testNotSearchThrowsExceptionMessage(): void
     {
         $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('Full-text search (MATCH AGAINST) is not supported in ClickHouse');
+        $this->expectExceptionMessage('Full-text search is not supported by this dialect.');
 
         (new Builder())
             ->from('logs')
@@ -2105,7 +2105,7 @@ class ClickHouseTest extends TestCase
                 ->build();
             $this->fail('Expected Exception was not thrown');
         } catch (Exception $e) {
-            $this->assertStringContainsString('contains()', $e->getMessage());
+            $this->assertStringContainsString('Full-text search', $e->getMessage());
         }
     }
 
@@ -2448,7 +2448,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())->from('t')->filter([Query::containsAny('a', ['x', 'y'])])->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?, ?)', $result->query);
+        $this->assertEquals('SELECT * FROM `t` WHERE (position(`a`, ?) > 0 OR position(`a`, ?) > 0)', $result->query);
     }
 
     public function testFilterContainsAllValues(): void

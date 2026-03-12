@@ -2,20 +2,34 @@
 
 namespace Utopia\Query\Builder;
 
+use Utopia\Query\Builder as BaseBuilder;
+use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\Hints;
 use Utopia\Query\Builder\Feature\Json;
-use Utopia\Query\Builder\Feature\Spatial;
+use Utopia\Query\Builder\Feature\LateralJoins;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
-use Utopia\Query\Query;
 
-class MySQL extends SQL implements Spatial, Json, Hints
+class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJoins
 {
     /** @var list<string> */
     protected array $hints = [];
 
-    /** @var array<string, Condition> */
-    protected array $jsonSets = [];
+    protected string $updateJoinTable = '';
+
+    protected string $updateJoinLeft = '';
+
+    protected string $updateJoinRight = '';
+
+    protected string $updateJoinAlias = '';
+
+    protected string $deleteAlias = '';
+
+    protected string $deleteUsingTable = '';
+
+    protected string $deleteUsingLeft = '';
+
+    protected string $deleteUsingRight = '';
 
     protected function compileRandom(): string
     {
@@ -35,15 +49,34 @@ class MySQL extends SQL implements Spatial, Json, Hints
     /**
      * @param  array<mixed>  $values
      */
-    protected function compileSearch(string $attribute, array $values, bool $not): string
+    protected function compileSearchExpr(string $attribute, array $values, bool $not): string
     {
-        $this->addBinding($values[0]);
+        /** @var string $term */
+        $term = $values[0] ?? '';
+        $exact = \str_ends_with($term, '"') && \str_starts_with($term, '"');
 
-        if ($not) {
-            return 'NOT (MATCH(' . $attribute . ') AGAINST(?))';
+        $specialChars = '@,+,-,*,),(,<,>,~,"';
+        $sanitized = \str_replace(\explode(',', $specialChars), ' ', $term);
+        $sanitized = \preg_replace('/\s+/', ' ', $sanitized) ?? '';
+        $sanitized = \trim($sanitized);
+
+        if ($sanitized === '') {
+            return $not ? '1 = 1' : '1 = 0';
         }
 
-        return 'MATCH(' . $attribute . ') AGAINST(?)';
+        if ($exact) {
+            $sanitized = '"' . $sanitized . '"';
+        } else {
+            $sanitized .= '*';
+        }
+
+        $this->addBinding($sanitized);
+
+        if ($not) {
+            return 'NOT (MATCH(' . $attribute . ') AGAINST(? IN BOOLEAN MODE))';
+        }
+
+        return 'MATCH(' . $attribute . ') AGAINST(? IN BOOLEAN MODE)';
     }
 
     protected function compileConflictClause(): string
@@ -62,134 +95,6 @@ class MySQL extends SQL implements Spatial, Json, Hints
         }
 
         return 'ON DUPLICATE KEY UPDATE ' . \implode(', ', $updates);
-    }
-
-    public function filterDistance(string $attribute, array $point, string $operator, float $distance, bool $meters = false): static
-    {
-        $wkt = 'POINT(' . (float) $point[0] . ' ' . (float) $point[1] . ')';
-        $method = match ($operator) {
-            '<' => Method::DistanceLessThan,
-            '>' => Method::DistanceGreaterThan,
-            '=' => Method::DistanceEqual,
-            '!=' => Method::DistanceNotEqual,
-            default => Method::DistanceLessThan,
-        };
-
-        $this->pendingQueries[] = new Query($method, $attribute, [[$wkt, $distance, $meters]]);
-
-        return $this;
-    }
-
-    public function filterIntersects(string $attribute, array $geometry): static
-    {
-        $this->pendingQueries[] = Query::intersects($attribute, $geometry);
-
-        return $this;
-    }
-
-    public function filterNotIntersects(string $attribute, array $geometry): static
-    {
-        $this->pendingQueries[] = Query::notIntersects($attribute, $geometry);
-
-        return $this;
-    }
-
-    public function filterCrosses(string $attribute, array $geometry): static
-    {
-        $this->pendingQueries[] = Query::crosses($attribute, $geometry);
-
-        return $this;
-    }
-
-    public function filterNotCrosses(string $attribute, array $geometry): static
-    {
-        $this->pendingQueries[] = Query::notCrosses($attribute, $geometry);
-
-        return $this;
-    }
-
-    public function filterOverlaps(string $attribute, array $geometry): static
-    {
-        $this->pendingQueries[] = Query::overlaps($attribute, $geometry);
-
-        return $this;
-    }
-
-    public function filterNotOverlaps(string $attribute, array $geometry): static
-    {
-        $this->pendingQueries[] = Query::notOverlaps($attribute, $geometry);
-
-        return $this;
-    }
-
-    public function filterTouches(string $attribute, array $geometry): static
-    {
-        $this->pendingQueries[] = Query::touches($attribute, $geometry);
-
-        return $this;
-    }
-
-    public function filterNotTouches(string $attribute, array $geometry): static
-    {
-        $this->pendingQueries[] = Query::notTouches($attribute, $geometry);
-
-        return $this;
-    }
-
-    public function filterCovers(string $attribute, array $geometry): static
-    {
-        $this->pendingQueries[] = Query::covers($attribute, $geometry);
-
-        return $this;
-    }
-
-    public function filterNotCovers(string $attribute, array $geometry): static
-    {
-        $this->pendingQueries[] = Query::notCovers($attribute, $geometry);
-
-        return $this;
-    }
-
-    public function filterSpatialEquals(string $attribute, array $geometry): static
-    {
-        $this->pendingQueries[] = Query::spatialEquals($attribute, $geometry);
-
-        return $this;
-    }
-
-    public function filterNotSpatialEquals(string $attribute, array $geometry): static
-    {
-        $this->pendingQueries[] = Query::notSpatialEquals($attribute, $geometry);
-
-        return $this;
-    }
-
-    public function filterJsonContains(string $attribute, mixed $value): static
-    {
-        $this->pendingQueries[] = Query::jsonContains($attribute, $value);
-
-        return $this;
-    }
-
-    public function filterJsonNotContains(string $attribute, mixed $value): static
-    {
-        $this->pendingQueries[] = Query::jsonNotContains($attribute, $value);
-
-        return $this;
-    }
-
-    public function filterJsonOverlaps(string $attribute, array $values): static
-    {
-        $this->pendingQueries[] = Query::jsonOverlaps($attribute, $values);
-
-        return $this;
-    }
-
-    public function filterJsonPath(string $attribute, string $path, string $operator, mixed $value): static
-    {
-        $this->pendingQueries[] = Query::jsonPath($attribute, $path, $operator, $value);
-
-        return $this;
     }
 
     public function setJsonAppend(string $column, array $values): static
@@ -283,20 +188,18 @@ class MySQL extends SQL implements Spatial, Json, Hints
         return new BuildResult($sql, $this->bindings);
     }
 
-    public function compileFilter(Query $query): string
+    public function explain(bool $analyze = false, string $format = ''): BuildResult
     {
-        $method = $query->getMethod();
-        $attribute = $this->resolveAndWrap($query->getAttribute());
-
-        if ($method->isSpatial()) {
-            return $this->compileSpatialFilter($method, $attribute, $query);
+        $result = $this->build();
+        $prefix = 'EXPLAIN';
+        if ($analyze) {
+            $prefix .= ' ANALYZE';
+        }
+        if ($format !== '') {
+            $prefix .= ' FORMAT=' . \strtoupper($format);
         }
 
-        if ($method->isJson()) {
-            return $this->compileJsonFilter($method, $attribute, $query);
-        }
-
-        return parent::compileFilter($query);
+        return new BuildResult($prefix . ' ' . $result->query, $result->bindings, readOnly: true);
     }
 
     public function build(): BuildResult
@@ -307,17 +210,33 @@ class MySQL extends SQL implements Spatial, Json, Hints
             $hintStr = '/*+ ' . \implode(' ', $this->hints) . ' */';
             $query = \preg_replace('/^SELECT(\s+DISTINCT)?/', 'SELECT$1 ' . $hintStr, $result->query, 1);
 
-            return new BuildResult($query ?? $result->query, $result->bindings);
+            return new BuildResult($query ?? $result->query, $result->bindings, $result->readOnly);
         }
 
         return $result;
     }
 
+    public function updateJoin(string $table, string $left, string $right, string $alias = ''): static
+    {
+        $this->updateJoinTable = $table;
+        $this->updateJoinLeft = $left;
+        $this->updateJoinRight = $right;
+        $this->updateJoinAlias = $alias;
+
+        return $this;
+    }
+
     public function update(): BuildResult
     {
-        // Apply JSON sets as rawSets before calling parent
         foreach ($this->jsonSets as $col => $condition) {
             $this->setRaw($col, $condition->expression, $condition->bindings);
+        }
+
+        if ($this->updateJoinTable !== '') {
+            $result = $this->buildUpdateJoin();
+            $this->jsonSets = [];
+
+            return $result;
         }
 
         $result = parent::update();
@@ -326,48 +245,156 @@ class MySQL extends SQL implements Spatial, Json, Hints
         return $result;
     }
 
+    private function buildUpdateJoin(): BuildResult
+    {
+        $this->bindings = [];
+        $this->validateTable();
+
+        $joinTable = $this->quote($this->updateJoinTable);
+        if ($this->updateJoinAlias !== '') {
+            $joinTable .= ' AS ' . $this->quote($this->updateJoinAlias);
+        }
+
+        $sql = 'UPDATE ' . $this->quote($this->table)
+            . ' JOIN ' . $joinTable
+            . ' ON ' . $this->resolveAndWrap($this->updateJoinLeft) . ' = ' . $this->resolveAndWrap($this->updateJoinRight);
+
+        $assignments = $this->compileAssignments();
+
+        if (empty($assignments)) {
+            throw new ValidationException('No assignments for UPDATE. Call set() or setRaw() before update().');
+        }
+
+        $sql .= ' SET ' . \implode(', ', $assignments);
+
+        $parts = [$sql];
+        $this->compileWhereClauses($parts);
+
+        return new BuildResult(\implode(' ', $parts), $this->bindings);
+    }
+
+    public function deleteUsing(string $alias, string $table, string $left, string $right): static
+    {
+        $this->deleteAlias = $alias;
+        $this->deleteUsingTable = $table;
+        $this->deleteUsingLeft = $left;
+        $this->deleteUsingRight = $right;
+
+        return $this;
+    }
+
+    public function delete(): BuildResult
+    {
+        if ($this->deleteAlias !== '') {
+            return $this->buildDeleteUsing();
+        }
+
+        return parent::delete();
+    }
+
+    private function buildDeleteUsing(): BuildResult
+    {
+        $this->bindings = [];
+        $this->validateTable();
+
+        $sql = 'DELETE ' . $this->quote($this->deleteAlias)
+            . ' FROM ' . $this->quote($this->table) . ' AS ' . $this->quote($this->deleteAlias)
+            . ' JOIN ' . $this->quote($this->deleteUsingTable)
+            . ' ON ' . $this->resolveAndWrap($this->deleteUsingLeft) . ' = ' . $this->resolveAndWrap($this->deleteUsingRight);
+
+        $parts = [$sql];
+        $this->compileWhereClauses($parts);
+
+        return new BuildResult(\implode(' ', $parts), $this->bindings);
+    }
+
+    public function countWhen(string $condition, string $alias = '', mixed ...$bindings): static
+    {
+        $expr = 'COUNT(CASE WHEN ' . $condition . ' THEN 1 END)';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr, \array_values($bindings));
+    }
+
+    public function sumWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
+    {
+        $expr = 'SUM(CASE WHEN ' . $condition . ' THEN ' . $this->resolveAndWrap($column) . ' END)';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr, \array_values($bindings));
+    }
+
+    public function avgWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
+    {
+        $expr = 'AVG(CASE WHEN ' . $condition . ' THEN ' . $this->resolveAndWrap($column) . ' END)';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr, \array_values($bindings));
+    }
+
+    public function minWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
+    {
+        $expr = 'MIN(CASE WHEN ' . $condition . ' THEN ' . $this->resolveAndWrap($column) . ' END)';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr, \array_values($bindings));
+    }
+
+    public function maxWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
+    {
+        $expr = 'MAX(CASE WHEN ' . $condition . ' THEN ' . $this->resolveAndWrap($column) . ' END)';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr, \array_values($bindings));
+    }
+
+    public function joinLateral(BaseBuilder $subquery, string $alias, JoinType $type = JoinType::Inner): static
+    {
+        $this->lateralJoins[] = new LateralJoin($subquery, $alias, $type);
+
+        return $this;
+    }
+
+    public function leftJoinLateral(BaseBuilder $subquery, string $alias): static
+    {
+        return $this->joinLateral($subquery, $alias, JoinType::Left);
+    }
+
     public function reset(): static
     {
         parent::reset();
         $this->hints = [];
         $this->jsonSets = [];
+        $this->updateJoinTable = '';
+        $this->updateJoinLeft = '';
+        $this->updateJoinRight = '';
+        $this->updateJoinAlias = '';
+        $this->deleteAlias = '';
+        $this->deleteUsingTable = '';
+        $this->deleteUsingLeft = '';
+        $this->deleteUsingRight = '';
 
         return $this;
-    }
-
-    private function compileSpatialFilter(Method $method, string $attribute, Query $query): string
-    {
-        $values = $query->getValues();
-
-        return match ($method) {
-            Method::DistanceLessThan,
-            Method::DistanceGreaterThan,
-            Method::DistanceEqual,
-            Method::DistanceNotEqual => $this->compileSpatialDistance($method, $attribute, $values),
-            Method::Intersects => $this->compileSpatialPredicate('ST_Intersects', $attribute, $values, false),
-            Method::NotIntersects => $this->compileSpatialPredicate('ST_Intersects', $attribute, $values, true),
-            Method::Crosses => $this->compileSpatialPredicate('ST_Crosses', $attribute, $values, false),
-            Method::NotCrosses => $this->compileSpatialPredicate('ST_Crosses', $attribute, $values, true),
-            Method::Overlaps => $this->compileSpatialPredicate('ST_Overlaps', $attribute, $values, false),
-            Method::NotOverlaps => $this->compileSpatialPredicate('ST_Overlaps', $attribute, $values, true),
-            Method::Touches => $this->compileSpatialPredicate('ST_Touches', $attribute, $values, false),
-            Method::NotTouches => $this->compileSpatialPredicate('ST_Touches', $attribute, $values, true),
-            Method::Covers => $this->compileSpatialPredicate('ST_Contains', $attribute, $values, false),
-            Method::NotCovers => $this->compileSpatialPredicate('ST_Contains', $attribute, $values, true),
-            Method::SpatialEquals => $this->compileSpatialPredicate('ST_Equals', $attribute, $values, false),
-            Method::NotSpatialEquals => $this->compileSpatialPredicate('ST_Equals', $attribute, $values, true),
-            default => parent::compileFilter($query),
-        };
     }
 
     /**
      * @param  array<mixed>  $values
      */
-    private function compileSpatialDistance(Method $method, string $attribute, array $values): string
+    protected function compileSpatialDistance(Method $method, string $attribute, array $values): string
     {
-        /** @var array{0: string, 1: float, 2: bool} $data */
+        /** @var array{0: string|array<mixed>, 1: float, 2: bool} $data */
         $data = $values[0];
-        $wkt = $data[0];
+        $wkt = \is_array($data[0]) ? $this->geometryToWkt($data[0]) : $data[0];
         $distance = $data[1];
         $meters = $data[2];
 
@@ -379,51 +406,48 @@ class MySQL extends SQL implements Spatial, Json, Hints
             default => '<',
         };
 
-        if ($meters) {
-            $this->addBinding($wkt);
-            $this->addBinding($distance);
-
-            return 'ST_Distance(ST_SRID(' . $attribute . ', 4326), ST_GeomFromText(?, 4326), \'metre\') ' . $operator . ' ?';
-        }
-
         $this->addBinding($wkt);
         $this->addBinding($distance);
 
-        return 'ST_Distance(' . $attribute . ', ST_GeomFromText(?)) ' . $operator . ' ?';
+        if ($meters) {
+            return 'ST_Distance(ST_SRID(' . $attribute . ', 4326), ' . $this->geomFromText(4326) . ', \'metre\') ' . $operator . ' ?';
+        }
+
+        return 'ST_Distance(ST_SRID(' . $attribute . ', 0), ' . $this->geomFromText(0) . ') ' . $operator . ' ?';
     }
 
     /**
      * @param  array<mixed>  $values
      */
-    private function compileSpatialPredicate(string $function, string $attribute, array $values, bool $not): string
+    protected function compileSpatialPredicate(string $function, string $attribute, array $values, bool $not): string
     {
         /** @var array<mixed> $geometry */
         $geometry = $values[0];
         $wkt = $this->geometryToWkt($geometry);
         $this->addBinding($wkt);
 
-        $expr = $function . '(' . $attribute . ', ST_GeomFromText(?, 4326))';
+        $expr = $function . '(' . $attribute . ', ' . $this->geomFromText(4326) . ')';
 
         return $not ? 'NOT ' . $expr : $expr;
-    }
-
-    private function compileJsonFilter(Method $method, string $attribute, Query $query): string
-    {
-        $values = $query->getValues();
-
-        return match ($method) {
-            Method::JsonContains => $this->compileJsonContains($attribute, $values, false),
-            Method::JsonNotContains => $this->compileJsonContains($attribute, $values, true),
-            Method::JsonOverlaps => $this->compileJsonOverlapsFilter($attribute, $values),
-            Method::JsonPath => $this->compileJsonPathFilter($attribute, $values),
-            default => parent::compileFilter($query),
-        };
     }
 
     /**
      * @param  array<mixed>  $values
      */
-    private function compileJsonContains(string $attribute, array $values, bool $not): string
+    protected function compileSpatialCoversPredicate(string $attribute, array $values, bool $not): string
+    {
+        return $this->compileSpatialPredicate('ST_Contains', $attribute, $values, $not);
+    }
+
+    protected function geomFromText(int $srid): string
+    {
+        return "ST_GeomFromText(?, {$srid}, 'axis-order=long-lat')";
+    }
+
+    /**
+     * @param  array<mixed>  $values
+     */
+    protected function compileJsonContainsExpr(string $attribute, array $values, bool $not): string
     {
         $this->addBinding(\json_encode($values[0]));
         $expr = 'JSON_CONTAINS(' . $attribute . ', ?)';
@@ -434,7 +458,7 @@ class MySQL extends SQL implements Spatial, Json, Hints
     /**
      * @param  array<mixed>  $values
      */
-    private function compileJsonOverlapsFilter(string $attribute, array $values): string
+    protected function compileJsonOverlapsExpr(string $attribute, array $values): string
     {
         /** @var array<mixed> $arr */
         $arr = $values[0];
@@ -446,7 +470,7 @@ class MySQL extends SQL implements Spatial, Json, Hints
     /**
      * @param  array<mixed>  $values
      */
-    private function compileJsonPathFilter(string $attribute, array $values): string
+    protected function compileJsonPathExpr(string $attribute, array $values): string
     {
         /** @var string $path */
         $path = $values[0];

@@ -4,6 +4,7 @@ namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
+use Tests\Query\Fixture\PermissionFilter as Permission;
 use Utopia\Query\Builder\Case\Builder as CaseBuilder;
 use Utopia\Query\Builder\Case\Expression;
 use Utopia\Query\Builder\Condition;
@@ -34,7 +35,6 @@ use Utopia\Query\Hook;
 use Utopia\Query\Hook\Attribute;
 use Utopia\Query\Hook\Attribute\Map as AttributeMap;
 use Utopia\Query\Hook\Filter;
-use Utopia\Query\Hook\Filter\Permission;
 use Utopia\Query\Hook\Filter\Tenant;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
@@ -350,8 +350,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `tags` IN (?, ?)', $result->query);
-        $this->assertEquals(['a', 'b'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `t` WHERE (`tags` LIKE ? OR `tags` LIKE ?)', $result->query);
+        $this->assertEquals(['%a%', '%b%'], $result->bindings);
     }
 
     public function testContainsAll(): void
@@ -398,8 +398,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(?)', $result->query);
-        $this->assertEquals(['hello'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(? IN BOOLEAN MODE)', $result->query);
+        $this->assertEquals(['hello*'], $result->bindings);
     }
 
     public function testNotSearch(): void
@@ -410,8 +410,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE NOT (MATCH(`content`) AGAINST(?))', $result->query);
-        $this->assertEquals(['hello'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `t` WHERE NOT (MATCH(`content`) AGAINST(? IN BOOLEAN MODE))', $result->query);
+        $this->assertEquals(['hello*'], $result->bindings);
     }
 
     public function testRegex(): void
@@ -2482,8 +2482,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(?)', $result->query);
-        $this->assertEquals([''], $result->bindings);
+        $this->assertEquals('SELECT * FROM `t` WHERE 1 = 0', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 
     public function testSearchWithSpecialCharacters(): void
@@ -2494,7 +2494,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['hello "world" +required -excluded'], $result->bindings);
+        $this->assertEquals(['hello world required excluded*'], $result->bindings);
     }
 
     public function testSearchCombinedWithOtherFilters(): void
@@ -2510,10 +2510,10 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertEquals(
-            'SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(?) AND `status` IN (?) AND `views` > ?',
+            'SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(? IN BOOLEAN MODE) AND `status` IN (?) AND `views` > ?',
             $result->query
         );
-        $this->assertEquals(['hello', 'published', 100], $result->bindings);
+        $this->assertEquals(['hello*', 'published', 100], $result->bindings);
     }
 
     public function testNotSearchCombinedWithOtherFilters(): void
@@ -2528,10 +2528,10 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertEquals(
-            'SELECT * FROM `t` WHERE NOT (MATCH(`content`) AGAINST(?)) AND `status` IN (?)',
+            'SELECT * FROM `t` WHERE NOT (MATCH(`content`) AGAINST(? IN BOOLEAN MODE)) AND `status` IN (?)',
             $result->query
         );
-        $this->assertEquals(['spam', 'published'], $result->bindings);
+        $this->assertEquals(['spam*', 'published'], $result->bindings);
     }
 
     public function testSearchWithAttributeResolver(): void
@@ -2545,7 +2545,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE MATCH(`_body`) AGAINST(?)', $result->query);
+        $this->assertEquals('SELECT * FROM `t` WHERE MATCH(`_body`) AGAINST(? IN BOOLEAN MODE)', $result->query);
     }
 
     public function testSearchStandaloneCompileFilter(): void
@@ -2554,8 +2554,8 @@ class MySQLTest extends TestCase
         $query = Query::search('body', 'test');
         $sql = $builder->compileFilter($query);
 
-        $this->assertEquals('MATCH(`body`) AGAINST(?)', $sql);
-        $this->assertEquals(['test'], $builder->getBindings());
+        $this->assertEquals('MATCH(`body`) AGAINST(? IN BOOLEAN MODE)', $sql);
+        $this->assertEquals(['test*'], $builder->getBindings());
     }
 
     public function testNotSearchStandaloneCompileFilter(): void
@@ -2564,8 +2564,8 @@ class MySQLTest extends TestCase
         $query = Query::notSearch('body', 'spam');
         $sql = $builder->compileFilter($query);
 
-        $this->assertEquals('NOT (MATCH(`body`) AGAINST(?))', $sql);
-        $this->assertEquals(['spam'], $builder->getBindings());
+        $this->assertEquals('NOT (MATCH(`body`) AGAINST(? IN BOOLEAN MODE))', $sql);
+        $this->assertEquals(['spam*'], $builder->getBindings());
     }
 
     public function testSearchBindingPreservedExactly(): void
@@ -2577,7 +2577,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertSame($searchTerm, $result->bindings[0]);
+        $this->assertSame('hello world exact phrase required excluded*', $result->bindings[0]);
     }
 
     public function testSearchWithVeryLongText(): void
@@ -2589,7 +2589,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals($longText, $result->bindings[0]);
+        $this->assertEquals(trim($longText) . '*', $result->bindings[0]);
     }
 
     public function testMultipleSearchFilters(): void
@@ -2604,10 +2604,10 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertEquals(
-            'SELECT * FROM `t` WHERE MATCH(`title`) AGAINST(?) AND MATCH(`body`) AGAINST(?)',
+            'SELECT * FROM `t` WHERE MATCH(`title`) AGAINST(? IN BOOLEAN MODE) AND MATCH(`body`) AGAINST(? IN BOOLEAN MODE)',
             $result->query
         );
-        $this->assertEquals(['hello', 'world'], $result->bindings);
+        $this->assertEquals(['hello*', 'world*'], $result->bindings);
     }
 
     public function testSearchInAndLogicalGroup(): void
@@ -2624,7 +2624,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertEquals(
-            'SELECT * FROM `t` WHERE (MATCH(`content`) AGAINST(?) AND `status` IN (?))',
+            'SELECT * FROM `t` WHERE (MATCH(`content`) AGAINST(? IN BOOLEAN MODE) AND `status` IN (?))',
             $result->query
         );
     }
@@ -2643,10 +2643,10 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertEquals(
-            'SELECT * FROM `t` WHERE (MATCH(`title`) AGAINST(?) OR MATCH(`body`) AGAINST(?))',
+            'SELECT * FROM `t` WHERE (MATCH(`title`) AGAINST(? IN BOOLEAN MODE) OR MATCH(`body`) AGAINST(? IN BOOLEAN MODE))',
             $result->query
         );
-        $this->assertEquals(['hello', 'hello'], $result->bindings);
+        $this->assertEquals(['hello*', 'hello*'], $result->bindings);
     }
 
     public function testSearchAndRegexCombined(): void
@@ -2661,10 +2661,10 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertEquals(
-            'SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(?) AND `slug` REGEXP ?',
+            'SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(? IN BOOLEAN MODE) AND `slug` REGEXP ?',
             $result->query
         );
-        $this->assertEquals(['hello world', '^[a-z-]+$'], $result->bindings);
+        $this->assertEquals(['hello world*', '^[a-z-]+$'], $result->bindings);
     }
 
     public function testNotSearchStandalone(): void
@@ -2675,8 +2675,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE NOT (MATCH(`content`) AGAINST(?))', $result->query);
-        $this->assertEquals(['spam'], $result->bindings);
+        $this->assertEquals('SELECT * FROM `t` WHERE NOT (MATCH(`content`) AGAINST(? IN BOOLEAN MODE))', $result->query);
+        $this->assertEquals(['spam*'], $result->bindings);
     }
     //  3. SQL-Specific: RAND()
 
@@ -2952,8 +2952,8 @@ class MySQLTest extends TestCase
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::containsAny('col', ['a', 'b']));
-        $this->assertEquals('`col` IN (?, ?)', $sql);
-        $this->assertEquals(['a', 'b'], $builder->getBindings());
+        $this->assertEquals('(`col` LIKE ? OR `col` LIKE ?)', $sql);
+        $this->assertEquals(['%a%', '%b%'], $builder->getBindings());
     }
 
     public function testCompileFilterContainsAll(): void
@@ -3044,16 +3044,16 @@ class MySQLTest extends TestCase
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::search('body', 'hello'));
-        $this->assertEquals('MATCH(`body`) AGAINST(?)', $sql);
-        $this->assertEquals(['hello'], $builder->getBindings());
+        $this->assertEquals('MATCH(`body`) AGAINST(? IN BOOLEAN MODE)', $sql);
+        $this->assertEquals(['hello*'], $builder->getBindings());
     }
 
     public function testCompileFilterNotSearch(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::notSearch('body', 'spam'));
-        $this->assertEquals('NOT (MATCH(`body`) AGAINST(?))', $sql);
-        $this->assertEquals(['spam'], $builder->getBindings());
+        $this->assertEquals('NOT (MATCH(`body`) AGAINST(? IN BOOLEAN MODE))', $sql);
+        $this->assertEquals(['spam*'], $builder->getBindings());
     }
 
     public function testCompileFilterRegex(): void
@@ -4433,7 +4433,7 @@ class MySQLTest extends TestCase
             ->toRawSql();
 
         $this->assertStringContainsString("REGEXP '^test'", $sql);
-        $this->assertStringContainsString("AGAINST('hello')", $sql);
+        $this->assertStringContainsString("AGAINST('hello*' IN BOOLEAN MODE)", $sql);
         $this->assertStringNotContainsString('?', $sql);
     }
 
@@ -5421,7 +5421,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['hello', '^test'], $result->bindings);
+        $this->assertEquals(['hello*', '^test'], $result->bindings);
     }
 
     public function testBindingOrderWithCursorBeforeFilterAndLimit(): void
@@ -7192,7 +7192,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ST_Distance(ST_SRID(`coords`, 4326), ST_GeomFromText(?, 4326), \'metre\') < ?', $result->query);
+        $this->assertStringContainsString("ST_Distance(ST_SRID(`coords`, 4326), ST_GeomFromText(?, 4326, 'axis-order=long-lat'), 'metre') < ?", $result->query);
         $this->assertEquals('POINT(40.7128 -74.006)', $result->bindings[0]);
         $this->assertEquals(5000.0, $result->bindings[1]);
     }
@@ -7205,7 +7205,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ST_Distance(`coords`, ST_GeomFromText(?)) > ?', $result->query);
+        $this->assertStringContainsString("ST_Distance(ST_SRID(`coords`, 0), ST_GeomFromText(?, 0, 'axis-order=long-lat')) > ?", $result->query);
     }
 
     public function testFilterIntersectsPoint(): void
@@ -7216,7 +7216,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ST_Intersects(`area`, ST_GeomFromText(?, 4326))', $result->query);
+        $this->assertStringContainsString("ST_Intersects(`area`, ST_GeomFromText(?, 4326, 'axis-order=long-lat'))", $result->query);
         $this->assertEquals('POINT(1 2)', $result->bindings[0]);
     }
 
@@ -7239,7 +7239,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ST_Contains(`area`, ST_GeomFromText(?, 4326))', $result->query);
+        $this->assertStringContainsString("ST_Contains(`area`, ST_GeomFromText(?, 4326, 'axis-order=long-lat'))", $result->query);
     }
 
     public function testFilterSpatialEquals(): void
@@ -7694,7 +7694,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ST_Distance(`loc`, ST_GeomFromText(?)) < ?', $result->query);
+        $this->assertStringContainsString("ST_Distance(ST_SRID(`loc`, 0), ST_GeomFromText(?, 0, 'axis-order=long-lat')) < ?", $result->query);
         $this->assertEquals('POINT(1 2)', $result->bindings[0]);
         $this->assertEquals(50.0, $result->bindings[1]);
     }
@@ -8377,7 +8377,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT (MATCH(`body`) AGAINST(?))', $result->query);
+        $this->assertStringContainsString('NOT (MATCH(`body`) AGAINST(? IN BOOLEAN MODE))', $result->query);
     }
 
     public function testRegexpCompiles(): void
@@ -9245,8 +9245,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('MATCH(`body`) AGAINST(?)', $result->query);
-        $this->assertContains('hello world', $result->bindings);
+        $this->assertStringContainsString('MATCH(`body`) AGAINST(? IN BOOLEAN MODE)', $result->query);
+        $this->assertContains('hello world*', $result->bindings);
     }
 
     public function testNotSearchFilter(): void
@@ -9257,8 +9257,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT (MATCH(`body`) AGAINST(?))', $result->query);
-        $this->assertContains('spam', $result->bindings);
+        $this->assertStringContainsString('NOT (MATCH(`body`) AGAINST(? IN BOOLEAN MODE))', $result->query);
+        $this->assertContains('spam*', $result->bindings);
     }
 
     public function testIsNullFilter(): void
@@ -10087,7 +10087,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY `name` ASC, FIELD(`role`, ?)', $result->query);
+        $this->assertStringContainsString('ORDER BY FIELD(`role`, ?), `name` ASC', $result->query);
     }
 
     public function testMultipleRawGroupsCombined(): void

@@ -9,4 +9,6 @@ interface Upsert
     public function upsert(): BuildResult;
 
     public function insertOrIgnore(): BuildResult;
+
+    public function upsertSelect(): BuildResult;
 }

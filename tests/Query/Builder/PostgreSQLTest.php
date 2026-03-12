@@ -289,7 +289,8 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM "t" WHERE to_tsvector("body") @@ plainto_tsquery(?)', $result->query);
+        $expected = "SELECT * FROM \"t\" WHERE to_tsvector(regexp_replace(\"body\", '[^\\w]+', ' ', 'g')) @@ websearch_to_tsquery(?)";
+        $this->assertEquals($expected, $result->query);
         $this->assertEquals(['hello'], $result->bindings);
     }
 
@@ -301,7 +302,8 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM "t" WHERE NOT (to_tsvector("body") @@ plainto_tsquery(?))', $result->query);
+        $expected = "SELECT * FROM \"t\" WHERE NOT (to_tsvector(regexp_replace(\"body\", '[^\\w]+', ' ', 'g')) @@ websearch_to_tsquery(?))";
+        $this->assertEquals($expected, $result->query);
         $this->assertEquals(['spam'], $result->bindings);
     }
 
@@ -594,7 +596,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"tags\" ?| ARRAY", $result->query);
+        $this->assertStringContainsString('"tags" @> ?::jsonb', $result->query);
     }
 
     public function testFilterJsonPath(): void
@@ -853,7 +855,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ST_Distance("loc", ST_GeomFromText(?)) < ?', $result->query);
+        $this->assertStringContainsString('ST_Distance("loc", ST_GeomFromText(?, 4326)) < ?', $result->query);
         $this->assertEquals('POINT(1 2)', $result->bindings[0]);
         $this->assertEquals(50.0, $result->bindings[1]);
     }
@@ -953,7 +955,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"tags" ?| ARRAY(SELECT jsonb_array_elements_text(?::jsonb))', $result->query);
+        $this->assertStringContainsString('"tags" @> ?::jsonb', $result->query);
     }
 
     public function testFilterJsonPathComparison(): void
@@ -1432,8 +1434,8 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('to_tsvector("body") @@ plainto_tsquery(?)', $result->query);
-        $this->assertEquals(['hello world'], $result->bindings);
+        $this->assertStringContainsString("to_tsvector(regexp_replace(\"body\", '[^\\w]+', ' ', 'g')) @@ websearch_to_tsquery(?)", $result->query);
+        $this->assertEquals(['hello or world'], $result->bindings);
     }
 
     public function testUpsertUsesOnConflictDoUpdateSet(): void
@@ -1769,7 +1771,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"val" LIKE ?', $result->query);
+        $this->assertStringContainsString('"val" ILIKE ?', $result->query);
         $this->assertEquals(['100\%%'], $result->bindings);
     }
 
@@ -1781,7 +1783,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"val" LIKE ?', $result->query);
+        $this->assertStringContainsString('"val" ILIKE ?', $result->query);
         $this->assertEquals(['%a\_b'], $result->bindings);
     }
 
@@ -1793,7 +1795,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"path" LIKE ?', $result->query);
+        $this->assertStringContainsString('"path" ILIKE ?', $result->query);
         $this->assertEquals(['%a\\\\b%'], $result->bindings);
     }
 
@@ -1805,7 +1807,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("bio" LIKE ? OR "bio" LIKE ?)', $result->query);
+        $this->assertStringContainsString('("bio" ILIKE ? OR "bio" ILIKE ?)', $result->query);
     }
 
     public function testContainsAllUsesAnd(): void
@@ -1816,7 +1818,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("bio" LIKE ? AND "bio" LIKE ?)', $result->query);
+        $this->assertStringContainsString('("bio" ILIKE ? AND "bio" ILIKE ?)', $result->query);
     }
 
     public function testNotContainsMultipleUsesAnd(): void
@@ -1827,7 +1829,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("bio" NOT LIKE ? AND "bio" NOT LIKE ?)', $result->query);
+        $this->assertStringContainsString('("bio" NOT ILIKE ? AND "bio" NOT ILIKE ?)', $result->query);
     }
 
     public function testDottedIdentifier(): void
@@ -2243,7 +2245,7 @@ class PostgreSQLTest extends TestCase
             ->from('users')
             ->explain(true);
 
-        $this->assertStringStartsWith('EXPLAIN ANALYZE SELECT', $result->query);
+        $this->assertStringStartsWith('EXPLAIN (ANALYZE) SELECT', $result->query);
     }
 
     // Feature 10: Locking Variants (PostgreSQL)
@@ -2740,10 +2742,10 @@ class PostgreSQLTest extends TestCase
             ->build();
 
         $this->assertSame(
-            'SELECT * FROM "documents" WHERE "tags" ?| ARRAY(SELECT jsonb_array_elements_text(?::jsonb))',
+            'SELECT * FROM "documents" WHERE ("tags" @> ?::jsonb OR "tags" @> ?::jsonb)',
             $result->query
         );
-        $this->assertEquals(['["php","js"]'], $result->bindings);
+        $this->assertEquals(['"php"', '"js"'], $result->bindings);
         $this->assertBindingCount($result);
     }
 
@@ -3016,7 +3018,7 @@ class PostgreSQLTest extends TestCase
             ->explain(true);
 
         $this->assertSame(
-            'EXPLAIN ANALYZE SELECT "id", "name" FROM "users" WHERE "age" > ?',
+            'EXPLAIN (ANALYZE) SELECT "id", "name" FROM "users" WHERE "age" > ?',
             $result->query
         );
         $this->assertEquals([18], $result->bindings);

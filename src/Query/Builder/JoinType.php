@@ -8,4 +8,6 @@ enum JoinType: string
     case Left = 'LEFT JOIN';
     case Right = 'RIGHT JOIN';
     case Cross = 'CROSS JOIN';
+    case FullOuter = 'FULL OUTER JOIN';
+    case Natural = 'NATURAL JOIN';
 }

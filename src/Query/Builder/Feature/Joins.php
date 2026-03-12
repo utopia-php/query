@@ -14,6 +14,8 @@ interface Joins
 
     public function crossJoin(string $table, string $alias = ''): static;
 
+    public function naturalJoin(string $table, string $alias = ''): static;
+
     /**
      * @param  \Closure(\Utopia\Query\Builder\JoinBuilder): void  $callback
      */

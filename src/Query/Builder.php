@@ -12,11 +12,13 @@ use Utopia\Query\Builder\Feature;
 use Utopia\Query\Builder\GroupedQueries;
 use Utopia\Query\Builder\JoinBuilder;
 use Utopia\Query\Builder\JoinType;
+use Utopia\Query\Builder\LateralJoin;
 use Utopia\Query\Builder\LockMode;
 use Utopia\Query\Builder\SubSelect;
 use Utopia\Query\Builder\UnionClause;
 use Utopia\Query\Builder\UnionType;
 use Utopia\Query\Builder\WhereInSubquery;
+use Utopia\Query\Builder\WindowDefinition;
 use Utopia\Query\Builder\WindowSelect;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
@@ -93,6 +95,12 @@ abstract class Builder implements
     /** @var list<WindowSelect> */
     protected array $windowSelects = [];
 
+    /** @var list<WindowDefinition> */
+    protected array $windowDefinitions = [];
+
+    /** @var ?array{percent: float, method: string} */
+    protected ?array $tableSample = null;
+
     /** @var list<CaseExpression> */
     protected array $caseSelects = [];
 
@@ -144,6 +152,15 @@ abstract class Builder implements
     /** @var list<ExistsSubquery> */
     protected array $existsSubqueries = [];
 
+    /** @var list<LateralJoin> */
+    protected array $lateralJoins = [];
+
+    /** @var list<Closure> */
+    protected array $beforeBuildCallbacks = [];
+
+    /** @var list<Closure(BuildResult): BuildResult> */
+    protected array $afterBuildCallbacks = [];
+
     abstract protected function quote(string $identifier): string;
 
     /**
@@ -157,13 +174,6 @@ abstract class Builder implements
      * @param  array<mixed>  $values
      */
     abstract protected function compileRegex(string $attribute, array $values): string;
-
-    /**
-     * Compile a full-text search filter
-     *
-     * @param  array<mixed>  $values
-     */
-    abstract protected function compileSearch(string $attribute, array $values, bool $not): string;
 
     protected function buildTableClause(): string
     {
@@ -185,6 +195,10 @@ abstract class Builder implements
 
         if ($this->tableAlias !== '') {
             $sql .= ' AS ' . $this->quote($this->tableAlias);
+        }
+
+        if ($this->tableSample !== null) {
+            $sql .= ' TABLESAMPLE ' . $this->tableSample['method'] . '(' . $this->tableSample['percent'] . ')';
         }
 
         return $sql;
@@ -381,10 +395,12 @@ abstract class Builder implements
             JoinType::Left => Method::LeftJoin,
             JoinType::Right => Method::RightJoin,
             JoinType::Cross => Method::CrossJoin,
+            JoinType::FullOuter => Method::FullOuterJoin,
+            JoinType::Natural => Method::NaturalJoin,
             default => Method::Join,
         };
 
-        if ($method === Method::CrossJoin) {
+        if ($method === Method::CrossJoin || $method === Method::NaturalJoin) {
             $this->pendingQueries[] = new Query($method, $table, $alias !== '' ? [$alias] : []);
         } else {
             // Use placeholder values; the JoinBuilder will handle the ON clause
@@ -420,7 +436,7 @@ abstract class Builder implements
         $result = $this->build();
         $prefix = $analyze ? 'EXPLAIN ANALYZE ' : 'EXPLAIN ';
 
-        return new BuildResult($prefix . $result->query, $result->bindings);
+        return new BuildResult($prefix . $result->query, $result->bindings, readOnly: true);
     }
 
     /**
@@ -611,6 +627,13 @@ abstract class Builder implements
         return $this;
     }
 
+    public function naturalJoin(string $table, string $alias = ''): static
+    {
+        $this->pendingQueries[] = Query::naturalJoin($table, $alias);
+
+        return $this;
+    }
+
     public function union(self $other): static
     {
         $result = $other->build();
@@ -717,6 +740,17 @@ abstract class Builder implements
         return $this;
     }
 
+    public function withRecursiveSeedStep(string $name, self $seed, self $step): static
+    {
+        $seedResult = $seed->build();
+        $stepResult = $step->build();
+        $query = $seedResult->query . ' UNION ALL ' . $stepResult->query;
+        $bindings = \array_merge($seedResult->bindings, $stepResult->bindings);
+        $this->ctes[] = new CteClause($name, $query, $bindings, true);
+
+        return $this;
+    }
+
     /**
      * @param  list<mixed>  $bindings
      */
@@ -727,9 +761,16 @@ abstract class Builder implements
         return $this;
     }
 
-    public function selectWindow(string $function, string $alias, ?array $partitionBy = null, ?array $orderBy = null): static
+    public function selectWindow(string $function, string $alias, ?array $partitionBy = null, ?array $orderBy = null, ?string $windowName = null): static
     {
-        $this->windowSelects[] = new WindowSelect($function, $alias, $partitionBy, $orderBy);
+        $this->windowSelects[] = new WindowSelect($function, $alias, $partitionBy, $orderBy, $windowName);
+
+        return $this;
+    }
+
+    public function window(string $name, ?array $partitionBy = null, ?array $orderBy = null): static
+    {
+        $this->windowDefinitions[] = new WindowDefinition($name, $partitionBy, $orderBy);
 
         return $this;
     }
@@ -753,6 +794,20 @@ abstract class Builder implements
         if ($condition) {
             $callback($this);
         }
+
+        return $this;
+    }
+
+    public function beforeBuild(Closure $callback): static
+    {
+        $this->beforeBuildCallbacks[] = $callback;
+
+        return $this;
+    }
+
+    public function afterBuild(Closure $callback): static
+    {
+        $this->afterBuildCallbacks[] = $callback;
 
         return $this;
     }
@@ -802,6 +857,11 @@ abstract class Builder implements
     public function build(): BuildResult
     {
         $this->bindings = [];
+
+        foreach ($this->beforeBuildCallbacks as $callback) {
+            $callback($this);
+        }
+
         $this->validateTable();
 
         // CTE prefix
@@ -858,30 +918,34 @@ abstract class Builder implements
 
         // Window function selects
         foreach ($this->windowSelects as $win) {
-            $overParts = [];
+            if ($win->windowName !== null) {
+                $selectParts[] = $win->function . ' OVER ' . $this->quote($win->windowName) . ' AS ' . $this->quote($win->alias);
+            } else {
+                $overParts = [];
 
-            if ($win->partitionBy !== null && $win->partitionBy !== []) {
-                $partCols = \array_map(
-                    fn (string $col): string => $this->resolveAndWrap($col),
-                    $win->partitionBy
-                );
-                $overParts[] = 'PARTITION BY ' . \implode(', ', $partCols);
-            }
-
-            if ($win->orderBy !== null && $win->orderBy !== []) {
-                $orderCols = [];
-                foreach ($win->orderBy as $col) {
-                    if (\str_starts_with($col, '-')) {
-                        $orderCols[] = $this->resolveAndWrap(\substr($col, 1)) . ' DESC';
-                    } else {
-                        $orderCols[] = $this->resolveAndWrap($col) . ' ASC';
-                    }
+                if ($win->partitionBy !== null && $win->partitionBy !== []) {
+                    $partCols = \array_map(
+                        fn (string $col): string => $this->resolveAndWrap($col),
+                        $win->partitionBy
+                    );
+                    $overParts[] = 'PARTITION BY ' . \implode(', ', $partCols);
                 }
-                $overParts[] = 'ORDER BY ' . \implode(', ', $orderCols);
-            }
 
-            $overClause = \implode(' ', $overParts);
-            $selectParts[] = $win->function . ' OVER (' . $overClause . ') AS ' . $this->quote($win->alias);
+                if ($win->orderBy !== null && $win->orderBy !== []) {
+                    $orderCols = [];
+                    foreach ($win->orderBy as $col) {
+                        if (\str_starts_with($col, '-')) {
+                            $orderCols[] = $this->resolveAndWrap(\substr($col, 1)) . ' DESC';
+                        } else {
+                            $orderCols[] = $this->resolveAndWrap($col) . ' ASC';
+                        }
+                    }
+                    $overParts[] = 'ORDER BY ' . \implode(', ', $orderCols);
+                }
+
+                $overClause = \implode(' ', $overParts);
+                $selectParts[] = $win->function . ' OVER (' . $overClause . ') AS ' . $this->quote($win->alias);
+            }
         }
 
         // CASE selects
@@ -930,9 +994,11 @@ abstract class Builder implements
                     Method::LeftJoin => JoinType::Left,
                     Method::RightJoin => JoinType::Right,
                     Method::CrossJoin => JoinType::Cross,
+                    Method::FullOuterJoin => JoinType::FullOuter,
+                    Method::NaturalJoin => JoinType::Natural,
                     default => JoinType::Inner,
                 };
-                $isCrossJoin = $joinType === JoinType::Cross;
+                $isCrossJoin = $joinType === JoinType::Cross || $joinType === JoinType::Natural;
 
                 foreach ($this->joinFilterHooks as $hook) {
                     $result = $hook->filterJoin($joinTable, $joinType);
@@ -954,6 +1020,18 @@ abstract class Builder implements
 
                 $parts[] = $joinSQL;
             }
+        }
+
+        foreach ($this->lateralJoins as $lateral) {
+            $subResult = $lateral->subquery->build();
+            foreach ($subResult->bindings as $binding) {
+                $this->addBinding($binding);
+            }
+            $joinKeyword = match ($lateral->type) {
+                JoinType::Left => 'LEFT JOIN',
+                default => 'JOIN',
+            };
+            $parts[] = $joinKeyword . ' LATERAL (' . $subResult->query . ') AS ' . $this->quote($lateral->alias) . ' ON true';
         }
 
         // Hook: after joins (e.g. ClickHouse PREWHERE)
@@ -1055,6 +1133,31 @@ abstract class Builder implements
             $parts[] = 'HAVING ' . \implode(' AND ', $havingClauses);
         }
 
+        // WINDOW
+        if (! empty($this->windowDefinitions)) {
+            $windowParts = [];
+            foreach ($this->windowDefinitions as $winDef) {
+                $overParts = [];
+                if ($winDef->partitionBy !== null && $winDef->partitionBy !== []) {
+                    $partCols = \array_map(fn (string $col): string => $this->resolveAndWrap($col), $winDef->partitionBy);
+                    $overParts[] = 'PARTITION BY ' . \implode(', ', $partCols);
+                }
+                if ($winDef->orderBy !== null && $winDef->orderBy !== []) {
+                    $orderCols = [];
+                    foreach ($winDef->orderBy as $col) {
+                        if (\str_starts_with($col, '-')) {
+                            $orderCols[] = $this->resolveAndWrap(\substr($col, 1)) . ' DESC';
+                        } else {
+                            $orderCols[] = $this->resolveAndWrap($col) . ' ASC';
+                        }
+                    }
+                    $overParts[] = 'ORDER BY ' . \implode(', ', $orderCols);
+                }
+                $windowParts[] = $this->quote($winDef->name) . ' AS (' . \implode(' ', $overParts) . ')';
+            }
+            $parts[] = 'WINDOW ' . \implode(', ', $windowParts);
+        }
+
         // ORDER BY
         $orderClauses = [];
 
@@ -1066,6 +1169,12 @@ abstract class Builder implements
             }
         }
 
+        foreach ($this->rawOrders as $rawOrder) {
+            $orderClauses[] = $rawOrder->expression;
+            foreach ($rawOrder->bindings as $binding) {
+                $this->addBinding($binding);
+            }
+        }
         $orderQueries = Query::getByType($this->pendingQueries, [
             Method::OrderAsc,
             Method::OrderDesc,
@@ -1073,12 +1182,6 @@ abstract class Builder implements
         ], false);
         foreach ($orderQueries as $orderQuery) {
             $orderClauses[] = $this->compileOrder($orderQuery);
-        }
-        foreach ($this->rawOrders as $rawOrder) {
-            $orderClauses[] = $rawOrder->expression;
-            foreach ($rawOrder->bindings as $binding) {
-                $this->addBinding($binding);
-            }
         }
         if (! empty($orderClauses)) {
             $parts[] = 'ORDER BY ' . \implode(', ', $orderClauses);
@@ -1108,7 +1211,7 @@ abstract class Builder implements
         $sql = \implode(' ', $parts);
 
         // UNION
-        if (!empty($this->unions)) {
+        if (! empty($this->unions)) {
             $sql = '(' . $sql . ')';
         }
         foreach ($this->unions as $union) {
@@ -1120,7 +1223,13 @@ abstract class Builder implements
 
         $sql = $ctePrefix . $sql;
 
-        return new BuildResult($sql, $this->bindings);
+        $result = new BuildResult($sql, $this->bindings, readOnly: true);
+
+        foreach ($this->afterBuildCallbacks as $callback) {
+            $result = $callback($result);
+        }
+
+        return $result;
     }
 
     /**
@@ -1156,7 +1265,7 @@ abstract class Builder implements
 
         $tablePart = $this->quote($this->table);
         if ($this->insertAlias !== '') {
-            $tablePart .= ' AS ' . $this->insertAlias;
+            $tablePart .= ' AS ' . $this->quote($this->insertAlias);
         }
 
         $sql = 'INSERT INTO ' . $tablePart
@@ -1177,11 +1286,11 @@ abstract class Builder implements
         return new BuildResult($sql, $this->bindings);
     }
 
-    public function update(): BuildResult
+    /**
+     * @return list<string>
+     */
+    protected function compileAssignments(): array
     {
-        $this->bindings = [];
-        $this->validateTable();
-
         $assignments = [];
 
         if (! empty($this->pendingRows)) {
@@ -1207,15 +1316,27 @@ abstract class Builder implements
             }
         }
 
+        return $assignments;
+    }
+
+    public function update(): BuildResult
+    {
+        $this->bindings = [];
+        $this->validateTable();
+
+        $assignments = $this->compileAssignments();
+
         if (empty($assignments)) {
             throw new ValidationException('No assignments for UPDATE. Call set() or setRaw() before update().');
         }
 
+        $grouped = Query::groupByType($this->pendingQueries);
+
         $parts = ['UPDATE ' . $this->quote($this->table) . ' SET ' . \implode(', ', $assignments)];
 
-        $this->compileWhereClauses($parts);
+        $this->compileWhereClauses($parts, $grouped);
 
-        $this->compileOrderAndLimit($parts);
+        $this->compileOrderAndLimit($parts, $grouped);
 
         return new BuildResult(\implode(' ', $parts), $this->bindings);
     }
@@ -1225,11 +1346,13 @@ abstract class Builder implements
         $this->bindings = [];
         $this->validateTable();
 
+        $grouped = Query::groupByType($this->pendingQueries);
+
         $parts = ['DELETE FROM ' . $this->quote($this->table)];
 
-        $this->compileWhereClauses($parts);
+        $this->compileWhereClauses($parts, $grouped);
 
-        $this->compileOrderAndLimit($parts);
+        $this->compileOrderAndLimit($parts, $grouped);
 
         return new BuildResult(\implode(' ', $parts), $this->bindings);
     }
@@ -1237,9 +1360,9 @@ abstract class Builder implements
     /**
      * @param  array<string>  $parts
      */
-    protected function compileWhereClauses(array &$parts): void
+    protected function compileWhereClauses(array &$parts, ?GroupedQueries $grouped = null): void
     {
-        $grouped = Query::groupByType($this->pendingQueries);
+        $grouped ??= Query::groupByType($this->pendingQueries);
         $whereClauses = [];
 
         foreach ($grouped->filters as $filter) {
@@ -1282,8 +1405,10 @@ abstract class Builder implements
     /**
      * @param  array<string>  $parts
      */
-    protected function compileOrderAndLimit(array &$parts): void
+    protected function compileOrderAndLimit(array &$parts, ?GroupedQueries $grouped = null): void
     {
+        $grouped ??= Query::groupByType($this->pendingQueries);
+
         $orderClauses = [];
         $orderQueries = Query::getByType($this->pendingQueries, [
             Method::OrderAsc,
@@ -1303,7 +1428,6 @@ abstract class Builder implements
             $parts[] = 'ORDER BY ' . \implode(', ', $orderClauses);
         }
 
-        $grouped = Query::groupByType($this->pendingQueries);
         if ($grouped->limit !== null) {
             $parts[] = 'LIMIT ?';
             $this->addBinding($grouped->limit);
@@ -1410,6 +1534,8 @@ abstract class Builder implements
         $this->ctes = [];
         $this->rawSelects = [];
         $this->windowSelects = [];
+        $this->windowDefinitions = [];
+        $this->tableSample = null;
         $this->caseSelects = [];
         $this->caseSets = [];
         $this->whereInSubqueries = [];
@@ -1421,8 +1547,32 @@ abstract class Builder implements
         $this->rawHavings = [];
         $this->joinBuilders = [];
         $this->existsSubqueries = [];
+        $this->lateralJoins = [];
+        $this->beforeBuildCallbacks = [];
+        $this->afterBuildCallbacks = [];
 
         return $this;
+    }
+
+    public function clone(): static
+    {
+        return clone $this;
+    }
+
+    public function __clone(): void
+    {
+        if ($this->insertSelectSource !== null) {
+            $this->insertSelectSource = clone $this->insertSelectSource;
+        }
+        if ($this->fromSubquery !== null) {
+            $this->fromSubquery = new SubSelect(clone $this->fromSubquery->subquery, $this->fromSubquery->alias);
+        }
+        $this->subSelects = \array_map(fn (SubSelect $s) => new SubSelect(clone $s->subquery, $s->alias), $this->subSelects);
+        $this->whereInSubqueries = \array_map(fn (WhereInSubquery $s) => new WhereInSubquery($s->column, clone $s->subquery, $s->not), $this->whereInSubqueries);
+        $this->existsSubqueries = \array_map(fn (ExistsSubquery $s) => new ExistsSubquery(clone $s->subquery, $s->not), $this->existsSubqueries);
+        $this->joinBuilders = \array_map(fn (JoinBuilder $j) => clone $j, $this->joinBuilders);
+        $this->pendingQueries = \array_map(fn (Query $q) => clone $q, $this->pendingQueries);
+        $this->lateralJoins = \array_map(fn (LateralJoin $l) => new LateralJoin(clone $l->subquery, $l->alias, $l->type), $this->lateralJoins);
     }
 
     public function compileFilter(Query $query): string
@@ -1445,11 +1595,11 @@ abstract class Builder implements
             Method::EndsWith => $this->compileLike($attribute, $values, '%', '', false),
             Method::NotEndsWith => $this->compileLike($attribute, $values, '%', '', true),
             Method::Contains => $this->compileContains($attribute, $values),
-            Method::ContainsAny => $this->compileIn($attribute, $values),
+            Method::ContainsAny => $query->onArray() ? $this->compileIn($attribute, $values) : $this->compileContains($attribute, $values),
             Method::ContainsAll => $this->compileContainsAll($attribute, $values),
             Method::NotContains => $this->compileNotContains($attribute, $values),
-            Method::Search => $this->compileSearch($attribute, $values, false),
-            Method::NotSearch => $this->compileSearch($attribute, $values, true),
+            Method::Search => throw new UnsupportedException('Full-text search is not supported by this dialect.'),
+            Method::NotSearch => throw new UnsupportedException('Full-text search is not supported by this dialect.'),
             Method::Regex => $this->compileRegex($attribute, $values),
             Method::IsNull => $attribute . ' IS NULL',
             Method::IsNotNull => $attribute . ' IS NOT NULL',
@@ -1536,7 +1686,11 @@ abstract class Builder implements
             default => throw new ValidationException("Unknown aggregate: {$method->value}"),
         };
         $attr = $query->getAttribute();
-        $col = ($attr === '*' || $attr === '') ? '*' : $this->resolveAndWrap($attr);
+        $col = match (true) {
+            $attr === '*', $attr === '' => '*',
+            \is_numeric($attr) => $attr,
+            default => $this->resolveAndWrap($attr),
+        };
         /** @var string $alias */
         $alias = $query->getValue('');
         $sql = $func . '(' . $col . ')';
@@ -1567,14 +1721,16 @@ abstract class Builder implements
             Method::LeftJoin => 'LEFT JOIN',
             Method::RightJoin => 'RIGHT JOIN',
             Method::CrossJoin => 'CROSS JOIN',
+            Method::FullOuterJoin => 'FULL OUTER JOIN',
+            Method::NaturalJoin => 'NATURAL JOIN',
             default => throw new UnsupportedException('Unsupported join type: ' . $query->getMethod()->value),
         };
 
         $table = $this->quote($query->getAttribute());
         $values = $query->getValues();
 
-        // Handle alias for cross join (alias is values[0])
-        if ($query->getMethod() === Method::CrossJoin) {
+        // Handle alias for cross join and natural join (alias is values[0])
+        if ($query->getMethod() === Method::CrossJoin || $query->getMethod() === Method::NaturalJoin) {
             /** @var string $alias */
             $alias = $values[0] ?? '';
             if ($alias !== '') {
@@ -1619,6 +1775,8 @@ abstract class Builder implements
             Method::LeftJoin => 'LEFT JOIN',
             Method::RightJoin => 'RIGHT JOIN',
             Method::CrossJoin => 'CROSS JOIN',
+            Method::FullOuterJoin => 'FULL OUTER JOIN',
+            Method::NaturalJoin => 'NATURAL JOIN',
             default => throw new UnsupportedException('Unsupported join type: ' . $query->getMethod()->value),
         };
 
@@ -1626,7 +1784,7 @@ abstract class Builder implements
         $values = $query->getValues();
 
         // Handle alias
-        if ($query->getMethod() === Method::CrossJoin) {
+        if ($query->getMethod() === Method::CrossJoin || $query->getMethod() === Method::NaturalJoin) {
             /** @var string $alias */
             $alias = $values[0] ?? '';
         } else {
@@ -1688,7 +1846,8 @@ abstract class Builder implements
         $rawVal = $values[0];
         $val = $this->escapeLikeValue($rawVal);
         $this->addBinding($prefix . $val . $suffix);
-        $keyword = $not ? 'NOT LIKE' : 'LIKE';
+        $like = $this->getLikeKeyword();
+        $keyword = $not ? 'NOT ' . $like : $like;
 
         return $attribute . ' ' . $keyword . ' ?';
     }
@@ -1698,17 +1857,18 @@ abstract class Builder implements
      */
     protected function compileContains(string $attribute, array $values): string
     {
+        $like = $this->getLikeKeyword();
         /** @var array<string> $values */
         if (\count($values) === 1) {
             $this->addBinding('%' . $this->escapeLikeValue($values[0]) . '%');
 
-            return $attribute . ' LIKE ?';
+            return $attribute . ' ' . $like . ' ?';
         }
 
         $parts = [];
         foreach ($values as $value) {
             $this->addBinding('%' . $this->escapeLikeValue($value) . '%');
-            $parts[] = $attribute . ' LIKE ?';
+            $parts[] = $attribute . ' ' . $like . ' ?';
         }
 
         return '(' . \implode(' OR ', $parts) . ')';
@@ -1719,11 +1879,12 @@ abstract class Builder implements
      */
     protected function compileContainsAll(string $attribute, array $values): string
     {
+        $like = $this->getLikeKeyword();
         /** @var array<string> $values */
         $parts = [];
         foreach ($values as $value) {
             $this->addBinding('%' . $this->escapeLikeValue($value) . '%');
-            $parts[] = $attribute . ' LIKE ?';
+            $parts[] = $attribute . ' ' . $like . ' ?';
         }
 
         return '(' . \implode(' AND ', $parts) . ')';
@@ -1734,27 +1895,41 @@ abstract class Builder implements
      */
     protected function compileNotContains(string $attribute, array $values): string
     {
+        $like = $this->getLikeKeyword();
         /** @var array<string> $values */
         if (\count($values) === 1) {
             $this->addBinding('%' . $this->escapeLikeValue($values[0]) . '%');
 
-            return $attribute . ' NOT LIKE ?';
+            return $attribute . ' NOT ' . $like . ' ?';
         }
 
         $parts = [];
         foreach ($values as $value) {
             $this->addBinding('%' . $this->escapeLikeValue($value) . '%');
-            $parts[] = $attribute . ' NOT LIKE ?';
+            $parts[] = $attribute . ' NOT ' . $like . ' ?';
         }
 
         return '(' . \implode(' AND ', $parts) . ')';
     }
 
+    protected function getLikeKeyword(): string
+    {
+        return 'LIKE';
+    }
+
     /**
      * Escape LIKE metacharacters in user input before wrapping with wildcards.
      */
-    protected function escapeLikeValue(string $value): string
+    protected function escapeLikeValue(mixed $value): string
     {
+        if (\is_array($value)) {
+            $value = \json_encode($value) ?: '';
+        } elseif (\is_int($value) || \is_float($value) || \is_bool($value)) {
+            $value = (string) $value;
+        } elseif (!\is_string($value)) {
+            $value = '';
+        }
+
         return \str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
     }
 
@@ -1771,7 +1946,7 @@ abstract class Builder implements
     /**
      * @param  array<mixed>  $values
      */
-    private function compileIn(string $attribute, array $values): string
+    protected function compileIn(string $attribute, array $values): string
     {
         if ($values === []) {
             return '1 = 0';
@@ -1810,7 +1985,7 @@ abstract class Builder implements
     /**
      * @param  array<mixed>  $values
      */
-    private function compileNotIn(string $attribute, array $values): string
+    protected function compileNotIn(string $attribute, array $values): string
     {
         if ($values === []) {
             return '1 = 1';
@@ -1854,7 +2029,7 @@ abstract class Builder implements
     /**
      * @param  array<mixed>  $values
      */
-    private function compileComparison(string $attribute, string $operator, array $values): string
+    protected function compileComparison(string $attribute, string $operator, array $values): string
     {
         $this->addBinding($values[0]);
 
