@@ -12,11 +12,13 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Tests\\Query\\": "tests/Query"
+            "Tests\\Query\\": "tests/Query",
+            "Tests\\Integration\\": "tests/Integration"
         }
     },
     "scripts": {
-        "test": "vendor/bin/phpunit --configuration phpunit.xml",
+        "test": "vendor/bin/phpunit --testsuite Query",
+        "test:integration": "vendor/bin/phpunit --testsuite Integration",
         "lint": "php -d memory_limit=2G ./vendor/bin/pint --test",
         "format": "php -d memory_limit=2G ./vendor/bin/pint",
         "check": "./vendor/bin/phpstan analyse --level max src tests --memory-limit 2G"
@@ -27,6 +29,7 @@
     "require-dev": {
         "phpunit/phpunit": "^12.0",
         "laravel/pint": "*",
-        "phpstan/phpstan": "*"
+        "phpstan/phpstan": "*",
+        "mongodb/mongodb": "^1.20"
     }
 }
