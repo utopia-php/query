@@ -7,16 +7,21 @@ use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\Case\Builder as CaseBuilder;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\Feature\Aggregates;
+use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\CTEs;
 use Utopia\Query\Builder\Feature\Deletes;
+use Utopia\Query\Builder\Feature\FullOuterJoins;
 use Utopia\Query\Builder\Feature\Hints;
 use Utopia\Query\Builder\Feature\Hooks;
 use Utopia\Query\Builder\Feature\Inserts;
 use Utopia\Query\Builder\Feature\Joins;
 use Utopia\Query\Builder\Feature\Json;
+use Utopia\Query\Builder\Feature\LateralJoins;
 use Utopia\Query\Builder\Feature\Locking;
+use Utopia\Query\Builder\Feature\Merge;
 use Utopia\Query\Builder\Feature\Selects;
 use Utopia\Query\Builder\Feature\Spatial;
+use Utopia\Query\Builder\Feature\TableSampling;
 use Utopia\Query\Builder\Feature\Transactions;
 use Utopia\Query\Builder\Feature\Unions;
 use Utopia\Query\Builder\Feature\Updates;
@@ -24,12 +29,15 @@ use Utopia\Query\Builder\Feature\Upsert;
 use Utopia\Query\Builder\Feature\VectorSearch;
 use Utopia\Query\Builder\Feature\Windows;
 use Utopia\Query\Builder\JoinBuilder;
+use Utopia\Query\Builder\JoinType;
 use Utopia\Query\Builder\PostgreSQL as Builder;
 use Utopia\Query\Builder\VectorMetric;
 use Utopia\Query\Compiler;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Hook\Filter;
+use Utopia\Query\Method;
 use Utopia\Query\Query;
+use Utopia\Query\Schema\ColumnType;
 
 class PostgreSQLTest extends TestCase
 {
@@ -3397,6 +3405,2810 @@ class PostgreSQLTest extends TestCase
             $result->query
         );
         $this->assertEquals(['published', '[0.1,0.2,0.3]', 5], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testSearchEmptyTermReturnsNoMatch(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::search('body', '   ')])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('1 = 0', $result->query);
+    }
+
+    public function testNotSearchEmptyTermReturnsAllMatch(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::notSearch('body', '   ')])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('1 = 1', $result->query);
+    }
+
+    public function testSearchExactTermWrapsInQuotes(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::search('body', '"exact phrase"')])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('websearch_to_tsquery(?)', $result->query);
+        $this->assertEquals(['"exact phrase"'], $result->bindings);
+    }
+
+    public function testSearchSpecialCharsAreSanitized(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::search('body', '@+hello-world*')])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertEquals(['hello or world'], $result->bindings);
+    }
+
+    public function testUpsertConflictSetRawWithBindings(): void
+    {
+        $result = (new Builder())
+            ->from('counters')
+            ->set(['id' => 'views', 'count' => 1])
+            ->onConflict(['id'], ['count'])
+            ->conflictSetRaw('count', '"counters"."count" + ?', [1])
+            ->upsert();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ON CONFLICT ("id") DO UPDATE SET "count" = "counters"."count" + ?', $result->query);
+    }
+
+    public function testTableSampleBernoulli(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->tablesample(10.0, 'BERNOULLI')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('TABLESAMPLE BERNOULLI(10)', $result->query);
+    }
+
+    public function testTableSampleSystem(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->tablesample(25.0, 'system')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('TABLESAMPLE SYSTEM(25)', $result->query);
+    }
+
+    public function testImplementsTableSampling(): void
+    {
+        $this->assertInstanceOf(TableSampling::class, new Builder());
+    }
+
+    public function testImplementsConditionalAggregates(): void
+    {
+        $this->assertInstanceOf(ConditionalAggregates::class, new Builder());
+    }
+
+    public function testImplementsMerge(): void
+    {
+        $this->assertInstanceOf(Merge::class, new Builder());
+    }
+
+    public function testImplementsLateralJoins(): void
+    {
+        $this->assertInstanceOf(LateralJoins::class, new Builder());
+    }
+
+    public function testImplementsFullOuterJoins(): void
+    {
+        $this->assertInstanceOf(FullOuterJoins::class, new Builder());
+    }
+
+    public function testUpdateFromBasic(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->set(['status' => 'shipped'])
+            ->updateFrom('shipments', 's')
+            ->updateFromWhere('orders.id = s.order_id')
+            ->update();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('UPDATE "orders" SET "status" = ?', $result->query);
+        $this->assertStringContainsString('FROM "shipments" AS "s"', $result->query);
+        $this->assertStringContainsString('WHERE orders.id = s.order_id', $result->query);
+    }
+
+    public function testUpdateFromWithWhereFilter(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->set(['status' => 'shipped'])
+            ->updateFrom('shipments')
+            ->updateFromWhere('orders.id = shipments.order_id')
+            ->filter([Query::equal('orders.active', [true])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('UPDATE "orders" SET "status" = ?', $result->query);
+        $this->assertStringContainsString('FROM "shipments"', $result->query);
+        $this->assertStringContainsString('AND orders.id = shipments.order_id', $result->query);
+    }
+
+    public function testUpdateFromWithBindings(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->set(['status' => 'shipped'])
+            ->updateFrom('shipments', 's')
+            ->updateFromWhere('orders.id = s.order_id AND s.region = ?', 'US')
+            ->update();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('FROM "shipments" AS "s"', $result->query);
+        $this->assertContains('US', $result->bindings);
+    }
+
+    public function testUpdateFromWithoutAliasOrCondition(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->set(['status' => 'done'])
+            ->updateFrom('inventory')
+            ->update();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('FROM "inventory"', $result->query);
+    }
+
+    public function testUpdateFromReturning(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->set(['status' => 'shipped'])
+            ->updateFrom('shipments', 's')
+            ->updateFromWhere('orders.id = s.order_id')
+            ->returning(['orders.id'])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('RETURNING "orders"."id"', $result->query);
+    }
+
+    public function testUpdateFromNoAssignmentsThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->from('orders')
+            ->updateFrom('shipments')
+            ->update();
+    }
+
+    public function testDeleteUsingBasic(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->deleteUsing('old_orders', 'orders.id = old_orders.id')
+            ->delete();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('DELETE FROM "orders" USING "old_orders"', $result->query);
+        $this->assertStringContainsString('WHERE orders.id = old_orders.id', $result->query);
+    }
+
+    public function testDeleteUsingWithBindings(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->deleteUsing('expired', 'orders.id = expired.id AND expired.reason = ?', 'timeout')
+            ->delete();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('USING "expired"', $result->query);
+        $this->assertContains('timeout', $result->bindings);
+    }
+
+    public function testDeleteUsingWithFilterCombined(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->deleteUsing('expired', 'orders.id = expired.id')
+            ->filter([Query::equal('orders.status', ['cancelled'])])
+            ->delete();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('USING "expired"', $result->query);
+        $this->assertStringContainsString('AND orders.id = expired.id', $result->query);
+    }
+
+    public function testDeleteUsingReturning(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->deleteUsing('expired', 'orders.id = expired.id')
+            ->returning(['orders.id'])
+            ->delete();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('RETURNING "orders"."id"', $result->query);
+    }
+
+    public function testDeleteUsingWithoutCondition(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->deleteUsing('old_orders', '')
+            ->filter([Query::equal('status', ['old'])])
+            ->delete();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('DELETE FROM "orders" USING "old_orders"', $result->query);
+        $this->assertStringContainsString('WHERE "status" IN (?)', $result->query);
+    }
+
+    public function testUpsertSelectReturning(): void
+    {
+        $source = (new Builder())
+            ->from('staging')
+            ->select(['id', 'name', 'email']);
+
+        $result = (new Builder())
+            ->into('users')
+            ->fromSelect(['id', 'name', 'email'], $source)
+            ->onConflict(['id'], ['name', 'email'])
+            ->returning(['id'])
+            ->upsertSelect();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('RETURNING "id"', $result->query);
+    }
+
+    public function testCountWhenFilter(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->countWhen('status = ?', 'active_count', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('COUNT(*) FILTER (WHERE status = ?) AS "active_count"', $result->query);
+        $this->assertEquals(['active'], $result->bindings);
+    }
+
+    public function testCountWhenWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->countWhen('status = ?', '', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('COUNT(*) FILTER (WHERE status = ?)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testSumWhenFilter(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->sumWhen('amount', 'status = ?', 'active_total', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('SUM("amount") FILTER (WHERE status = ?) AS "active_total"', $result->query);
+        $this->assertEquals(['active'], $result->bindings);
+    }
+
+    public function testSumWhenWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->sumWhen('amount', 'status = ?', '', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testAvgWhenFilter(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->avgWhen('amount', 'status = ?', 'avg_active', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('AVG("amount") FILTER (WHERE status = ?) AS "avg_active"', $result->query);
+    }
+
+    public function testAvgWhenWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->avgWhen('amount', 'status = ?', '', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testMinWhenFilter(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->minWhen('amount', 'status = ?', 'min_active', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('MIN("amount") FILTER (WHERE status = ?) AS "min_active"', $result->query);
+    }
+
+    public function testMinWhenWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->minWhen('amount', 'status = ?', '', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testMaxWhenFilter(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->maxWhen('amount', 'status = ?', 'max_active', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('MAX("amount") FILTER (WHERE status = ?) AS "max_active"', $result->query);
+    }
+
+    public function testMaxWhenWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->maxWhen('amount', 'status = ?', '', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testMergeIntoBasic(): void
+    {
+        $source = (new Builder())
+            ->from('staging')
+            ->select(['id', 'name', 'email']);
+
+        $result = (new Builder())
+            ->mergeInto('users')
+            ->using($source, 'src')
+            ->on('users.id = src.id')
+            ->whenMatched('UPDATE SET name = src.name, email = src.email')
+            ->whenNotMatched('INSERT (id, name, email) VALUES (src.id, src.name, src.email)')
+            ->executeMerge();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('MERGE INTO "users"', $result->query);
+        $this->assertStringContainsString('USING (', $result->query);
+        $this->assertStringContainsString(') AS "src"', $result->query);
+        $this->assertStringContainsString('ON users.id = src.id', $result->query);
+        $this->assertStringContainsString('WHEN MATCHED THEN UPDATE SET', $result->query);
+        $this->assertStringContainsString('WHEN NOT MATCHED THEN INSERT', $result->query);
+    }
+
+    public function testMergeWithBindings(): void
+    {
+        $source = (new Builder())
+            ->from('staging')
+            ->filter([Query::equal('status', ['pending'])]);
+
+        $result = (new Builder())
+            ->mergeInto('users')
+            ->using($source, 'src')
+            ->on('users.id = src.id')
+            ->whenMatched('UPDATE SET name = src.name')
+            ->executeMerge();
+        $this->assertBindingCount($result);
+
+        $this->assertContains('pending', $result->bindings);
+    }
+
+    public function testMergeWithConditionBindings(): void
+    {
+        $source = (new Builder())->from('staging');
+
+        $result = (new Builder())
+            ->mergeInto('users')
+            ->using($source, 'src')
+            ->on('users.id = src.id AND src.region = ?', 'US')
+            ->whenMatched('UPDATE SET name = src.name')
+            ->executeMerge();
+        $this->assertBindingCount($result);
+
+        $this->assertContains('US', $result->bindings);
+    }
+
+    public function testMergeWithClauseBindings(): void
+    {
+        $source = (new Builder())->from('staging');
+
+        $result = (new Builder())
+            ->mergeInto('users')
+            ->using($source, 'src')
+            ->on('users.id = src.id')
+            ->whenMatched('UPDATE SET count = users.count + ?', 1)
+            ->whenNotMatched('INSERT (id, count) VALUES (src.id, ?)', 1)
+            ->executeMerge();
+        $this->assertBindingCount($result);
+
+        $this->assertEquals([1, 1], $result->bindings);
+    }
+
+    public function testMergeWithoutTargetThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())->executeMerge();
+    }
+
+    public function testMergeWithoutSourceThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->mergeInto('users')
+            ->executeMerge();
+    }
+
+    public function testMergeWithoutConditionThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $source = (new Builder())->from('staging');
+        (new Builder())
+            ->mergeInto('users')
+            ->using($source, 'src')
+            ->executeMerge();
+    }
+
+    public function testJoinLateral(): void
+    {
+        $sub = (new Builder())
+            ->from('orders')
+            ->select(['total'])
+            ->filter([Query::greaterThan('total', 100)])
+            ->limit(5);
+
+        $result = (new Builder())
+            ->from('users')
+            ->joinLateral($sub, 'latest_orders')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('JOIN LATERAL (', $result->query);
+        $this->assertStringContainsString(') AS "latest_orders" ON true', $result->query);
+    }
+
+    public function testLeftJoinLateral(): void
+    {
+        $sub = (new Builder())
+            ->from('orders')
+            ->select(['total'])
+            ->limit(3);
+
+        $result = (new Builder())
+            ->from('users')
+            ->leftJoinLateral($sub, 'recent_orders')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('LEFT JOIN LATERAL (', $result->query);
+        $this->assertStringContainsString(') AS "recent_orders" ON true', $result->query);
+    }
+
+    public function testJoinLateralWithType(): void
+    {
+        $sub = (new Builder())->from('orders')->select(['id']);
+
+        $result = (new Builder())
+            ->from('users')
+            ->joinLateral($sub, 'o', JoinType::Left)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('LEFT JOIN LATERAL', $result->query);
+    }
+
+    public function testFullOuterJoin(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->fullOuterJoin('orders', 'users.id', 'orders.user_id')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('FULL OUTER JOIN "orders" ON "users"."id" = "orders"."user_id"', $result->query);
+    }
+
+    public function testFullOuterJoinWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->fullOuterJoin('orders', 'users.id', 'o.user_id', '=', 'o')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('FULL OUTER JOIN "orders" AS "o"', $result->query);
+    }
+
+    public function testExplainVerbose(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->explain(verbose: true);
+
+        $this->assertStringStartsWith('EXPLAIN (VERBOSE) SELECT', $result->query);
+    }
+
+    public function testExplainBuffers(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->explain(buffers: true);
+
+        $this->assertStringStartsWith('EXPLAIN (BUFFERS) SELECT', $result->query);
+    }
+
+    public function testExplainFormat(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->explain(format: 'json');
+
+        $this->assertStringStartsWith('EXPLAIN (FORMAT JSON) SELECT', $result->query);
+    }
+
+    public function testExplainAllOptions(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->explain(analyze: true, verbose: true, buffers: true, format: 'yaml');
+
+        $this->assertStringStartsWith('EXPLAIN (ANALYZE, VERBOSE, BUFFERS, FORMAT YAML)', $result->query);
+    }
+
+    public function testObjectFilterNestedEqual(): void
+    {
+        $query = Query::equal('metadata.key', ['value']);
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("\"metadata\"->>'key' IN (?)", $result->query);
+    }
+
+    public function testObjectFilterNestedNotEqual(): void
+    {
+        $query = Query::notEqual('metadata.key', ['a', 'b']);
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("\"metadata\"->>'key' NOT IN", $result->query);
+    }
+
+    public function testObjectFilterNestedLessThan(): void
+    {
+        $query = Query::lessThan('data.score', 50);
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("\"data\"->>'score' < ?", $result->query);
+    }
+
+    public function testObjectFilterNestedLessThanEqual(): void
+    {
+        $query = Query::lessThanEqual('data.score', 50);
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("\"data\"->>'score' <= ?", $result->query);
+    }
+
+    public function testObjectFilterNestedGreaterThan(): void
+    {
+        $query = Query::greaterThan('data.score', 50);
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("\"data\"->>'score' > ?", $result->query);
+    }
+
+    public function testObjectFilterNestedGreaterThanEqual(): void
+    {
+        $query = Query::greaterThanEqual('data.score', 50);
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("\"data\"->>'score' >= ?", $result->query);
+    }
+
+    public function testObjectFilterNestedStartsWith(): void
+    {
+        $query = Query::startsWith('data.name', 'foo');
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("\"data\"->>'name' ILIKE ?", $result->query);
+    }
+
+    public function testObjectFilterNestedNotStartsWith(): void
+    {
+        $query = Query::notStartsWith('data.name', 'foo');
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("\"data\"->>'name' NOT ILIKE ?", $result->query);
+    }
+
+    public function testObjectFilterNestedEndsWith(): void
+    {
+        $query = Query::endsWith('data.name', 'bar');
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("\"data\"->>'name' ILIKE ?", $result->query);
+    }
+
+    public function testObjectFilterNestedNotEndsWith(): void
+    {
+        $query = Query::notEndsWith('data.name', 'bar');
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("\"data\"->>'name' NOT ILIKE ?", $result->query);
+    }
+
+    public function testObjectFilterNestedContains(): void
+    {
+        $query = Query::contains('data.name', ['mid']);
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("\"data\"->>'name' ILIKE ?", $result->query);
+    }
+
+    public function testObjectFilterNestedNotContains(): void
+    {
+        $query = Query::notContains('data.name', ['mid']);
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("\"data\"->>'name' NOT ILIKE ?", $result->query);
+    }
+
+    public function testObjectFilterNestedIsNull(): void
+    {
+        $query = Query::isNull('data.value');
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("\"data\"->>'value' IS NULL", $result->query);
+    }
+
+    public function testObjectFilterNestedIsNotNull(): void
+    {
+        $query = Query::isNotNull('data.value');
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("\"data\"->>'value' IS NOT NULL", $result->query);
+    }
+
+    public function testObjectFilterTopLevelEqual(): void
+    {
+        $query = Query::equal('metadata', [['key' => 'val']]);
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('"metadata" @> ?::jsonb', $result->query);
+    }
+
+    public function testObjectFilterTopLevelNotEqual(): void
+    {
+        $query = Query::notEqual('metadata', [['key' => 'val']]);
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('NOT ("metadata" @> ?::jsonb)', $result->query);
+    }
+
+    public function testObjectFilterTopLevelContains(): void
+    {
+        $query = Query::contains('tags', [['key' => 'val']]);
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('"tags" @> ?::jsonb', $result->query);
+    }
+
+    public function testObjectFilterTopLevelStartsWith(): void
+    {
+        $query = Query::startsWith('metadata', 'foo');
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('"metadata"::text ILIKE ?', $result->query);
+    }
+
+    public function testObjectFilterTopLevelNotStartsWith(): void
+    {
+        $query = Query::notStartsWith('metadata', 'foo');
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('"metadata"::text NOT ILIKE ?', $result->query);
+    }
+
+    public function testObjectFilterTopLevelEndsWith(): void
+    {
+        $query = Query::endsWith('metadata', 'bar');
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('"metadata"::text ILIKE ?', $result->query);
+    }
+
+    public function testObjectFilterTopLevelNotEndsWith(): void
+    {
+        $query = Query::notEndsWith('metadata', 'bar');
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('"metadata"::text NOT ILIKE ?', $result->query);
+    }
+
+    public function testObjectFilterTopLevelIsNull(): void
+    {
+        $query = Query::isNull('metadata');
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('"metadata" IS NULL', $result->query);
+    }
+
+    public function testObjectFilterTopLevelIsNotNull(): void
+    {
+        $query = Query::isNotNull('metadata');
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('"metadata" IS NOT NULL', $result->query);
+    }
+
+    public function testBuildJsonbPathDeepNested(): void
+    {
+        $query = Query::equal('data.level1.level2.leaf', ['val']);
+        $query->setAttributeType(ColumnType::Object->value);
+
+        $result = (new Builder())
+            ->from('t')
+            ->filter([$query])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("\"data\"->'level1'->'level2'->>'leaf'", $result->query);
+    }
+
+    public function testVectorFilterDefault(): void
+    {
+        $result = (new Builder())
+            ->from('embeddings')
+            ->filter([Query::vectorCosine('embedding', [0.1, 0.2])])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('("embedding" <=> ?::vector)', $result->query);
+    }
+
+    public function testSpatialDistanceEqual(): void
+    {
+        $result = (new Builder())
+            ->from('locations')
+            ->filterDistance('loc', [1.0, 2.0], '=', 500.0)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('= ?', $result->query);
+    }
+
+    public function testSpatialDistanceNotEqual(): void
+    {
+        $result = (new Builder())
+            ->from('locations')
+            ->filterDistance('loc', [1.0, 2.0], '!=', 500.0)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('!= ?', $result->query);
+    }
+
+    public function testResetClearsMergeState(): void
+    {
+        $source = (new Builder())->from('staging');
+        $builder = (new Builder())
+            ->mergeInto('users')
+            ->using($source, 'src')
+            ->on('users.id = src.id')
+            ->whenMatched('DELETE')
+            ->whenNotMatched('INSERT (id) VALUES (src.id)');
+
+        $builder->reset();
+
+        $this->expectException(ValidationException::class);
+        $builder->executeMerge();
+    }
+
+    public function testResetClearsUpdateFromState(): void
+    {
+        $builder = (new Builder())
+            ->from('orders')
+            ->set(['status' => 'shipped'])
+            ->updateFrom('shipments', 's')
+            ->updateFromWhere('orders.id = s.order_id');
+
+        $builder->reset();
+
+        $result = $builder
+            ->from('orders')
+            ->set(['status' => 'done'])
+            ->filter([Query::equal('id', [1])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString('FROM "shipments"', $result->query);
+    }
+
+    public function testResetClearsDeleteUsingState(): void
+    {
+        $builder = (new Builder())
+            ->from('orders')
+            ->deleteUsing('expired', 'orders.id = expired.id');
+
+        $builder->reset();
+
+        $result = $builder
+            ->from('orders')
+            ->filter([Query::equal('id', [1])])
+            ->delete();
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString('USING', $result->query);
+    }
+
+    public function testCteWithInsertReturning(): void
+    {
+        $cteQuery = (new Builder())
+            ->from('orders')
+            ->select(['id', 'customer_id'])
+            ->filter([Query::equal('status', ['pending'])]);
+
+        $sourceWithCte = (new Builder())
+            ->with('pending_orders', $cteQuery)
+            ->from('pending_orders')
+            ->select(['id', 'customer_id']);
+
+        $result = (new Builder())
+            ->into('archived_orders')
+            ->fromSelect(['id', 'customer_id'], $sourceWithCte)
+            ->insertSelect();
+
+        $this->assertStringContainsString('WITH "pending_orders" AS (', $result->query);
+        $this->assertStringContainsString('INSERT INTO "archived_orders"', $result->query);
+        $this->assertStringContainsString('SELECT "id", "customer_id" FROM "pending_orders"', $result->query);
+        $this->assertContains('pending', $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testRecursiveCteJoinToMainTable(): void
+    {
+        $seed = (new Builder())
+            ->from('categories')
+            ->select(['id', 'parent_id', 'name'])
+            ->filter([Query::isNull('parent_id')]);
+
+        $step = (new Builder())
+            ->from('categories')
+            ->select(['categories.id', 'categories.parent_id', 'categories.name'])
+            ->join('tree', 'categories.parent_id', 'tree.id');
+
+        $result = (new Builder())
+            ->withRecursiveSeedStep('tree', $seed, $step)
+            ->from('tree')
+            ->select(['id', 'name'])
+            ->build();
+
+        $this->assertStringContainsString('WITH RECURSIVE "tree" AS (', $result->query);
+        $this->assertStringContainsString('UNION ALL', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testMultipleCtesJoinBetweenThem(): void
+    {
+        $cteA = (new Builder())
+            ->from('users')
+            ->select(['id', 'name'])
+            ->filter([Query::equal('active', [true])]);
+
+        $cteB = (new Builder())
+            ->from('orders')
+            ->select(['user_id', 'total'])
+            ->filter([Query::greaterThan('total', 50)]);
+
+        $result = (new Builder())
+            ->with('active_users', $cteA)
+            ->with('big_orders', $cteB)
+            ->from('active_users')
+            ->select(['active_users.name', 'big_orders.total'])
+            ->join('big_orders', 'active_users.id', 'big_orders.user_id')
+            ->build();
+
+        $this->assertSame(
+            'WITH "active_users" AS (SELECT "id", "name" FROM "users" WHERE "active" IN (?)), "big_orders" AS (SELECT "user_id", "total" FROM "orders" WHERE "total" > ?) SELECT "active_users"."name", "big_orders"."total" FROM "active_users" JOIN "big_orders" ON "active_users"."id" = "big_orders"."user_id"',
+            $result->query
+        );
+        $this->assertEquals([true, 50], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testMergeWithCteSource(): void
+    {
+        $cteQuery = (new Builder())
+            ->from('staging')
+            ->select(['id', 'name', 'email'])
+            ->filter([Query::equal('status', ['ready'])]);
+
+        $sourceFromCte = (new Builder())
+            ->with('ready_staging', $cteQuery)
+            ->from('ready_staging')
+            ->select(['id', 'name', 'email']);
+
+        $result = (new Builder())
+            ->mergeInto('users')
+            ->using($sourceFromCte, 'src')
+            ->on('users.id = src.id')
+            ->whenMatched('UPDATE SET name = src.name, email = src.email')
+            ->whenNotMatched('INSERT (id, name, email) VALUES (src.id, src.name, src.email)')
+            ->executeMerge();
+
+        $this->assertStringContainsString('MERGE INTO "users"', $result->query);
+        $this->assertStringContainsString('WITH "ready_staging" AS (', $result->query);
+        $this->assertStringContainsString('WHEN MATCHED THEN', $result->query);
+        $this->assertStringContainsString('WHEN NOT MATCHED THEN', $result->query);
+        $this->assertContains('ready', $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testJsonPathWithWhereAndJoin(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->select(['users.id', 'orders.total'])
+            ->join('orders', 'users.id', 'orders.user_id')
+            ->filterJsonPath('users.metadata', 'role', '=', 'admin')
+            ->filter([Query::greaterThan('orders.total', 100)])
+            ->build();
+
+        $this->assertStringContainsString("\"users\".\"metadata\"->>'role' = ?", $result->query);
+        $this->assertStringContainsString('"orders"."total" > ?', $result->query);
+        $this->assertEquals(['admin', 100], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testJsonContainsWithGroupByHaving(): void
+    {
+        $result = (new Builder())
+            ->from('products')
+            ->count('*', 'cnt')
+            ->filterJsonContains('tags', 'sale')
+            ->groupBy(['category'])
+            ->having([Query::greaterThan('cnt', 3)])
+            ->build();
+
+        $this->assertStringContainsString('"tags" @> ?::jsonb', $result->query);
+        $this->assertStringContainsString('GROUP BY "category"', $result->query);
+        $this->assertStringContainsString('HAVING "cnt" > ?', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testUpdateFromWithComplexSubqueryReturning(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->set(['status' => 'shipped'])
+            ->updateFrom('shipments', 's')
+            ->updateFromWhere('orders.id = s.order_id AND s.date > ?', '2024-01-01')
+            ->filter([Query::equal('orders.warehouse', ['US-EAST'])])
+            ->returning(['orders.id', 'orders.status'])
+            ->update();
+
+        $this->assertStringContainsString('UPDATE "orders" SET "status" = ?', $result->query);
+        $this->assertStringContainsString('FROM "shipments" AS "s"', $result->query);
+        $this->assertStringContainsString('RETURNING "orders"."id", "orders"."status"', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testDeleteUsingWithFilterReturning(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->deleteUsing('blacklist', 'orders.user_id = blacklist.user_id')
+            ->filter([Query::lessThan('orders.created_at', '2023-01-01')])
+            ->returning(['orders.id'])
+            ->delete();
+
+        $this->assertStringContainsString('DELETE FROM "orders" USING "blacklist"', $result->query);
+        $this->assertStringContainsString('RETURNING "orders"."id"', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testLateralJoinWithAggregateAndWhere(): void
+    {
+        $sub = (new Builder())
+            ->from('orders')
+            ->select(['user_id'])
+            ->sum('total', 'order_total')
+            ->filter([Query::greaterThan('total', 0)])
+            ->groupBy(['user_id'])
+            ->limit(5);
+
+        $result = (new Builder())
+            ->from('users')
+            ->select(['users.name'])
+            ->joinLateral($sub, 'user_orders')
+            ->filter([Query::equal('users.active', [true])])
+            ->build();
+
+        $this->assertStringContainsString('JOIN LATERAL (', $result->query);
+        $this->assertStringContainsString(') AS "user_orders" ON true', $result->query);
+        $this->assertStringContainsString('"users"."active" IN (?)', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testFullOuterJoinWithNullFilter(): void
+    {
+        $result = (new Builder())
+            ->from('employees')
+            ->select(['employees.name', 'departments.name'])
+            ->fullOuterJoin('departments', 'employees.dept_id', 'departments.id')
+            ->filter([
+                Query::or([
+                    Query::isNull('employees.dept_id'),
+                    Query::isNull('departments.id'),
+                ]),
+            ])
+            ->build();
+
+        $this->assertStringContainsString('FULL OUTER JOIN "departments"', $result->query);
+        $this->assertStringContainsString('("employees"."dept_id" IS NULL OR "departments"."id" IS NULL)', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testWindowFunctionWithDistinct(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->distinct()
+            ->select(['customer_id'])
+            ->selectWindow('ROW_NUMBER()', 'rn', ['customer_id'], ['created_at'])
+            ->build();
+
+        $this->assertStringContainsString('SELECT DISTINCT', $result->query);
+        $this->assertStringContainsString('ROW_NUMBER() OVER (PARTITION BY "customer_id" ORDER BY "created_at" ASC) AS "rn"', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testNamedWindowDefinitionWithJoin(): void
+    {
+        $result = (new Builder())
+            ->from('employees')
+            ->select(['employees.name', 'departments.name'])
+            ->join('departments', 'employees.dept_id', 'departments.id')
+            ->selectWindow('RANK()', 'salary_rank', null, null, 'dept_window')
+            ->window('dept_window', ['employees.dept_id'], ['-employees.salary'])
+            ->build();
+
+        $this->assertStringContainsString('RANK() OVER "dept_window" AS "salary_rank"', $result->query);
+        $this->assertStringContainsString('WINDOW "dept_window" AS (PARTITION BY "employees"."dept_id" ORDER BY "employees"."salary" DESC)', $result->query);
+        $this->assertStringContainsString('JOIN "departments"', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testMultipleWindowFunctionsRowNumberRankSum(): void
+    {
+        $result = (new Builder())
+            ->from('sales')
+            ->select(['employee_id', 'amount'])
+            ->selectWindow('ROW_NUMBER()', 'rn', null, ['date'])
+            ->selectWindow('RANK()', 'rnk', ['region'], ['-amount'])
+            ->selectWindow('SUM("amount")', 'running_total', ['region'], ['date'])
+            ->build();
+
+        $this->assertSame(
+            'SELECT "employee_id", "amount", ROW_NUMBER() OVER (ORDER BY "date" ASC) AS "rn", RANK() OVER (PARTITION BY "region" ORDER BY "amount" DESC) AS "rnk", SUM("amount") OVER (PARTITION BY "region" ORDER BY "date" ASC) AS "running_total" FROM "sales"',
+            $result->query
+        );
+        $this->assertBindingCount($result);
+    }
+
+    public function testExplainAnalyzeWithCteAndJoin(): void
+    {
+        $cteQuery = (new Builder())
+            ->from('orders')
+            ->select(['user_id', 'total'])
+            ->filter([Query::greaterThan('total', 100)]);
+
+        $result = (new Builder())
+            ->with('big_orders', $cteQuery)
+            ->from('users')
+            ->select(['users.name', 'big_orders.total'])
+            ->join('big_orders', 'users.id', 'big_orders.user_id')
+            ->explain(analyze: true, verbose: true, format: 'json');
+
+        $this->assertStringStartsWith('EXPLAIN (ANALYZE, VERBOSE, FORMAT JSON)', $result->query);
+        $this->assertStringContainsString('WITH "big_orders" AS (', $result->query);
+        $this->assertTrue($result->readOnly);
+        $this->assertBindingCount($result);
+    }
+
+    public function testVectorDistanceOrderByWithLimit(): void
+    {
+        $result = (new Builder())
+            ->from('items')
+            ->select(['id', 'title'])
+            ->orderByVectorDistance('embedding', [0.1, 0.2, 0.3], VectorMetric::Cosine)
+            ->limit(10)
+            ->build();
+
+        $this->assertSame(
+            'SELECT "id", "title" FROM "items" ORDER BY ("embedding" <=> ?::vector) ASC LIMIT ?',
+            $result->query
+        );
+        $this->assertEquals(['[0.1,0.2,0.3]', 10], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testUpsertWithReturning(): void
+    {
+        $result = (new Builder())
+            ->into('users')
+            ->set(['id' => 1, 'name' => 'Alice', 'email' => 'alice@test.com'])
+            ->onConflict(['id'], ['name', 'email'])
+            ->returning(['id', 'name', 'email'])
+            ->upsert();
+
+        $this->assertSame(
+            'INSERT INTO "users" ("id", "name", "email") VALUES (?, ?, ?) ON CONFLICT ("id") DO UPDATE SET "name" = EXCLUDED."name", "email" = EXCLUDED."email" RETURNING "id", "name", "email"',
+            $result->query
+        );
+        $this->assertBindingCount($result);
+    }
+
+    public function testUpsertConflictSetRawWithRegularOnConflict(): void
+    {
+        $result = (new Builder())
+            ->into('stats')
+            ->set(['id' => 'page', 'views' => 1, 'updated_at' => '2024-01-01'])
+            ->onConflict(['id'], ['views', 'updated_at'])
+            ->conflictSetRaw('views', '"stats"."views" + EXCLUDED."views"')
+            ->upsert();
+
+        $this->assertStringContainsString('"views" = "stats"."views" + EXCLUDED."views"', $result->query);
+        $this->assertStringContainsString('"updated_at" = EXCLUDED."updated_at"', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testInsertAsWithComplexCteQuery(): void
+    {
+        $cteQuery = (new Builder())
+            ->from('staging')
+            ->select(['id', 'name'])
+            ->filter([Query::equal('status', ['ready'])]);
+
+        $source = (new Builder())
+            ->with('ready', $cteQuery)
+            ->from('ready')
+            ->select(['id', 'name']);
+
+        $result = (new Builder())
+            ->into('users')
+            ->fromSelect(['id', 'name'], $source)
+            ->insertSelect();
+
+        $this->assertStringContainsString('INSERT INTO "users"', $result->query);
+        $this->assertStringContainsString('WITH "ready" AS (', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testForUpdateWithJoin(): void
+    {
+        $result = (new Builder())
+            ->from('accounts')
+            ->select(['accounts.id', 'accounts.balance'])
+            ->join('users', 'accounts.user_id', 'users.id')
+            ->filter([Query::equal('users.active', [true])])
+            ->forUpdate()
+            ->build();
+
+        $this->assertStringContainsString('JOIN "users"', $result->query);
+        $this->assertStringContainsString('FOR UPDATE', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testForShareWithSubquery(): void
+    {
+        $sub = (new Builder())
+            ->from('vip_users')
+            ->select(['id']);
+
+        $result = (new Builder())
+            ->from('accounts')
+            ->filterWhereIn('user_id', $sub)
+            ->forShare()
+            ->build();
+
+        $this->assertStringContainsString('IN (SELECT "id" FROM "vip_users")', $result->query);
+        $this->assertStringContainsString('FOR SHARE', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testNestedOrAndFilterParenthesization(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([
+                Query::or([
+                    Query::and([
+                        Query::equal('a', [1]),
+                        Query::greaterThan('b', 10),
+                    ]),
+                    Query::and([
+                        Query::lessThan('c', 5),
+                        Query::between('d', 100, 200),
+                    ]),
+                ]),
+            ])
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM "t" WHERE (("a" IN (?) AND "b" > ?) OR ("c" < ? AND "d" BETWEEN ? AND ?))',
+            $result->query
+        );
+        $this->assertEquals([1, 10, 5, 100, 200], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testTripleNestedAndOrFilter(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([
+                Query::and([
+                    Query::or([
+                        Query::equal('status', ['active']),
+                        Query::notEqual('status', 'banned'),
+                    ]),
+                    Query::or([
+                        Query::greaterThan('age', 18),
+                        Query::lessThan('age', 65),
+                    ]),
+                    Query::between('score', 0, 100),
+                ]),
+            ])
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM "t" WHERE (("status" IN (?) OR "status" != ?) AND ("age" > ? OR "age" < ?) AND "score" BETWEEN ? AND ?)',
+            $result->query
+        );
+        $this->assertEquals(['active', 'banned', 18, 65, 0, 100], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testIsNullAndIsNotNullSameQuery(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([
+                Query::isNull('deleted_at'),
+                Query::isNotNull('email'),
+            ])
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM "t" WHERE "deleted_at" IS NULL AND "email" IS NOT NULL',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testBetweenNotEqualGreaterThanCombined(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([
+                Query::between('price', 10, 100),
+                Query::notEqual('category', 'deprecated'),
+                Query::greaterThan('stock', 0),
+            ])
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM "t" WHERE "price" BETWEEN ? AND ? AND "category" != ? AND "stock" > ?',
+            $result->query
+        );
+        $this->assertEquals([10, 100, 'deprecated', 0], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testStartsWithAndContainsOnSameColumn(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([
+                Query::startsWith('name', 'John'),
+                Query::contains('name', ['Doe']),
+            ])
+            ->build();
+
+        $this->assertStringContainsString('"name" ILIKE ?', $result->query);
+        $this->assertCount(2, $result->bindings);
+        $this->assertEquals('John%', $result->bindings[0]);
+        $this->assertEquals('%Doe%', $result->bindings[1]);
+        $this->assertBindingCount($result);
+    }
+
+    public function testRegexAndEqualCombined(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([
+                Query::regex('slug', '^test-'),
+                Query::equal('status', ['active']),
+            ])
+            ->build();
+
+        $this->assertStringContainsString('"slug" ~ ?', $result->query);
+        $this->assertStringContainsString('"status" IN (?)', $result->query);
+        $this->assertEquals(['^test-', 'active'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testNotContainsAndContainsDifferentColumns(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([
+                Query::notContains('bio', ['spam']),
+                Query::contains('title', ['important']),
+            ])
+            ->build();
+
+        $this->assertStringContainsString('"bio" NOT ILIKE ?', $result->query);
+        $this->assertStringContainsString('"title" ILIKE ?', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testMultipleOrGroupsInSameFilter(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([
+                Query::or([
+                    Query::equal('color', ['red']),
+                    Query::equal('color', ['blue']),
+                ]),
+                Query::or([
+                    Query::equal('size', ['S']),
+                    Query::equal('size', ['M']),
+                ]),
+            ])
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM "t" WHERE ("color" IN (?) OR "color" IN (?)) AND ("size" IN (?) OR "size" IN (?))',
+            $result->query
+        );
+        $this->assertEquals(['red', 'blue', 'S', 'M'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testAndWrappingOrWrappingAnd(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([
+                Query::and([
+                    Query::or([
+                        Query::and([
+                            Query::equal('a', [1]),
+                            Query::equal('b', [2]),
+                        ]),
+                        Query::equal('c', [3]),
+                    ]),
+                ]),
+            ])
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM "t" WHERE ((("a" IN (?) AND "b" IN (?)) OR "c" IN (?)))',
+            $result->query
+        );
+        $this->assertEquals([1, 2, 3], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testFilterWithBooleanValues(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::equal('active', [true])])
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM "t" WHERE "active" IN (?)',
+            $result->query
+        );
+        $this->assertEquals([true], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testCteBindingsMainQueryBindingsHavingBindingsOrder(): void
+    {
+        $cteQuery = (new Builder())
+            ->from('orders')
+            ->select(['customer_id'])
+            ->filter([Query::equal('status', ['shipped'])]);
+
+        $result = (new Builder())
+            ->with('shipped', $cteQuery)
+            ->from('shipped')
+            ->count('*', 'cnt')
+            ->filter([Query::greaterThan('total', 50)])
+            ->groupBy(['customer_id'])
+            ->having([Query::greaterThan('cnt', 3)])
+            ->build();
+
+        $this->assertEquals('shipped', $result->bindings[0]);
+        $this->assertEquals(50, $result->bindings[1]);
+        $this->assertEquals(3, $result->bindings[2]);
+        $this->assertBindingCount($result);
+    }
+
+    public function testUnionBothBranchesBindingsOrder(): void
+    {
+        $other = (new Builder())
+            ->from('archived')
+            ->select(['id', 'name'])
+            ->filter([Query::equal('year', [2023])]);
+
+        $result = (new Builder())
+            ->from('current')
+            ->select(['id', 'name'])
+            ->filter([Query::equal('year', [2024])])
+            ->union($other)
+            ->build();
+
+        $this->assertEquals(2024, $result->bindings[0]);
+        $this->assertEquals(2023, $result->bindings[1]);
+        $this->assertBindingCount($result);
+    }
+
+    public function testSubqueryInWhereAndSelectBindingOrder(): void
+    {
+        $selectSub = (new Builder())
+            ->from('orders')
+            ->count('*', 'cnt')
+            ->filter([Query::equal('orders.user_id', [99])]);
+
+        $whereSub = (new Builder())
+            ->from('vip_users')
+            ->select(['id'])
+            ->filter([Query::equal('level', ['gold'])]);
+
+        $result = (new Builder())
+            ->from('users')
+            ->selectSub($selectSub, 'order_count')
+            ->filter([Query::equal('status', ['active'])])
+            ->filterWhereIn('id', $whereSub)
+            ->build();
+
+        $this->assertEquals(99, $result->bindings[0]);
+        $this->assertEquals('active', $result->bindings[1]);
+        $this->assertEquals('gold', $result->bindings[2]);
+        $this->assertBindingCount($result);
+    }
+
+    public function testJoinOnBindingsWhereBindingsHavingBindingsOrder(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->count('*', 'cnt')
+            ->joinWhere('orders', function (JoinBuilder $join): void {
+                $join->on('users.id', 'orders.user_id')
+                     ->where('orders.amount', '>', 50);
+            })
+            ->filter([Query::equal('users.active', [true])])
+            ->groupBy(['users.id'])
+            ->having([Query::greaterThan('cnt', 2)])
+            ->build();
+
+        $this->assertEquals(50, $result->bindings[0]);
+        $this->assertEquals(true, $result->bindings[1]);
+        $this->assertEquals(2, $result->bindings[2]);
+        $this->assertBindingCount($result);
+    }
+
+    public function testInsertAsBindings(): void
+    {
+        $source = (new Builder())
+            ->from('staging')
+            ->select(['id', 'name'])
+            ->filter([Query::equal('ready', [true])]);
+
+        $result = (new Builder())
+            ->into('users')
+            ->fromSelect(['id', 'name'], $source)
+            ->insertSelect();
+
+        $this->assertStringContainsString('INSERT INTO "users" ("id", "name") SELECT', $result->query);
+        $this->assertEquals([true], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testUpsertFilterValuesConflictUpdateBindingOrder(): void
+    {
+        $result = (new Builder())
+            ->into('counters')
+            ->set(['id' => 'views', 'count' => 1])
+            ->onConflict(['id'], ['count'])
+            ->conflictSetRaw('count', '"counters"."count" + ?', [1])
+            ->upsert();
+
+        $this->assertEquals('views', $result->bindings[0]);
+        $this->assertEquals(1, $result->bindings[1]);
+        $this->assertEquals(1, $result->bindings[2]);
+        $this->assertBindingCount($result);
+    }
+
+    public function testMergeSourceBindingsActionBindingsOrder(): void
+    {
+        $source = (new Builder())
+            ->from('staging')
+            ->filter([Query::equal('status', ['pending'])]);
+
+        $result = (new Builder())
+            ->mergeInto('users')
+            ->using($source, 'src')
+            ->on('users.id = src.id AND src.region = ?', 'US')
+            ->whenMatched('UPDATE SET count = users.count + ?', 1)
+            ->whenNotMatched('INSERT (id, count) VALUES (src.id, ?)', 0)
+            ->executeMerge();
+
+        $this->assertEquals('pending', $result->bindings[0]);
+        $this->assertEquals('US', $result->bindings[1]);
+        $this->assertEquals(1, $result->bindings[2]);
+        $this->assertEquals(0, $result->bindings[3]);
+        $this->assertBindingCount($result);
+    }
+
+    public function testSelectEmptyArray(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->select([])
+            ->build();
+
+        $this->assertStringContainsString('FROM "t"', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testGroupByThreeColumns(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->count('*', 'cnt')
+            ->groupBy(['a', 'b', 'c'])
+            ->build();
+
+        $this->assertSame(
+            'SELECT COUNT(*) AS "cnt" FROM "t" GROUP BY "a", "b", "c"',
+            $result->query
+        );
+        $this->assertBindingCount($result);
+    }
+
+    public function testInterleavedSortAscDesc(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->sortAsc('a')
+            ->sortDesc('b')
+            ->sortAsc('c')
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM "t" ORDER BY "a" ASC, "b" DESC, "c" ASC',
+            $result->query
+        );
+        $this->assertBindingCount($result);
+    }
+
+    public function testLimitOneOffsetZero(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->limit(1)
+            ->offset(0)
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM "t" LIMIT ? OFFSET ?',
+            $result->query
+        );
+        $this->assertEquals([1, 0], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testLimitZero(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->limit(0)
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM "t" LIMIT ?',
+            $result->query
+        );
+        $this->assertEquals([0], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testDistinctWithMultipleAggregates(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->distinct()
+            ->count('*', 'cnt')
+            ->sum('price', 'total')
+            ->build();
+
+        $this->assertStringContainsString('SELECT DISTINCT', $result->query);
+        $this->assertStringContainsString('COUNT(*) AS "cnt"', $result->query);
+        $this->assertStringContainsString('SUM("price") AS "total"', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testCountStarWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->count('*')
+            ->build();
+
+        $this->assertSame('SELECT COUNT(*) FROM "t"', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testCountStarWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->count('*', 'total')
+            ->build();
+
+        $this->assertSame('SELECT COUNT(*) AS "total" FROM "t"', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testSelfJoinWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('employees', 'e')
+            ->select(['e.name', 'm.name'])
+            ->leftJoin('employees', 'e.manager_id', 'm.id', '=', 'm')
+            ->build();
+
+        $this->assertSame(
+            'SELECT "e"."name", "m"."name" FROM "employees" AS "e" LEFT JOIN "employees" AS "m" ON "e"."manager_id" = "m"."id"',
+            $result->query
+        );
+        $this->assertBindingCount($result);
+    }
+
+    public function testThreeWayJoin(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->select(['users.name', 'orders.total', 'products.title'])
+            ->join('orders', 'users.id', 'orders.user_id')
+            ->join('products', 'orders.product_id', 'products.id')
+            ->build();
+
+        $this->assertSame(
+            'SELECT "users"."name", "orders"."total", "products"."title" FROM "users" JOIN "orders" ON "users"."id" = "orders"."user_id" JOIN "products" ON "orders"."product_id" = "products"."id"',
+            $result->query
+        );
+        $this->assertBindingCount($result);
+    }
+
+    public function testCrossJoinWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('colors')
+            ->select(['colors.name', 'sizes.label'])
+            ->crossJoin('sizes')
+            ->filter([Query::equal('colors.active', [true])])
+            ->build();
+
+        $this->assertStringContainsString('CROSS JOIN "sizes"', $result->query);
+        $this->assertStringContainsString('"colors"."active" IN (?)', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testLeftJoinWhereRightSideIsNull(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->select(['users.id', 'users.name'])
+            ->leftJoin('orders', 'users.id', 'orders.user_id')
+            ->filter([Query::isNull('orders.id')])
+            ->build();
+
+        $this->assertSame(
+            'SELECT "users"."id", "users"."name" FROM "users" LEFT JOIN "orders" ON "users"."id" = "orders"."user_id" WHERE "orders"."id" IS NULL',
+            $result->query
+        );
+        $this->assertBindingCount($result);
+    }
+
+    public function testBeforeBuildCallbackAddsFilter(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->beforeBuild(function (Builder $b): void {
+                $b->filter([Query::equal('tenant_id', [42])]);
+            })
+            ->build();
+
+        $this->assertStringContainsString('"tenant_id" IN (?)', $result->query);
+        $this->assertContains(42, $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testAfterBuildCallbackWrapsQuery(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->select(['id'])
+            ->afterBuild(function (\Utopia\Query\Builder\BuildResult $r): \Utopia\Query\Builder\BuildResult {
+                return new \Utopia\Query\Builder\BuildResult(
+                    'SELECT * FROM (' . $r->query . ') AS wrapped',
+                    $r->bindings,
+                    $r->readOnly,
+                );
+            })
+            ->build();
+
+        $this->assertStringContainsString('SELECT * FROM (SELECT "id" FROM "t") AS wrapped', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testCloneModifyOriginalUnchanged(): void
+    {
+        $original = (new Builder())
+            ->from('users')
+            ->select(['id', 'name']);
+
+        $cloned = $original->clone();
+        $cloned->filter([Query::equal('active', [true])]);
+
+        $originalResult = $original->build();
+        $clonedResult = $cloned->build();
+
+        $this->assertSame('SELECT "id", "name" FROM "users"', $originalResult->query);
+        $this->assertStringContainsString('"active" IN (?)', $clonedResult->query);
+        $this->assertBindingCount($originalResult);
+        $this->assertBindingCount($clonedResult);
+    }
+
+    public function testResetAndRebuild(): void
+    {
+        $builder = (new Builder())
+            ->from('users')
+            ->select(['id'])
+            ->filter([Query::equal('status', ['active'])])
+            ->sortAsc('name')
+            ->limit(10);
+
+        $builder->reset();
+
+        $result = $builder
+            ->from('orders')
+            ->select(['total'])
+            ->build();
+
+        $this->assertSame('SELECT "total" FROM "orders"', $result->query);
+        $this->assertEquals([], $result->bindings);
+        $this->assertStringNotContainsString('users', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testReadOnlyFlagSelectIsTrue(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->build();
+
+        $this->assertTrue($result->readOnly);
+    }
+
+    public function testReadOnlyFlagInsertImplicit(): void
+    {
+        $result = (new Builder())
+            ->into('t')
+            ->set(['a' => 1])
+            ->insert();
+
+        $this->assertFalse($result->readOnly);
+    }
+
+    public function testReadOnlyFlagUpdateImplicit(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->set(['a' => 1])
+            ->update();
+
+        $this->assertFalse($result->readOnly);
+    }
+
+    public function testReadOnlyFlagDeleteImplicit(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->delete();
+
+        $this->assertFalse($result->readOnly);
+    }
+
+    public function testMultipleSetCallsForMultiRowInsert(): void
+    {
+        $result = (new Builder())
+            ->into('users')
+            ->set(['name' => 'Alice', 'age' => 30])
+            ->set(['name' => 'Bob', 'age' => 25])
+            ->set(['name' => 'Charlie', 'age' => 35])
+            ->insert();
+
+        $this->assertSame(
+            'INSERT INTO "users" ("name", "age") VALUES (?, ?), (?, ?), (?, ?)',
+            $result->query
+        );
+        $this->assertEquals(['Alice', 30, 'Bob', 25, 'Charlie', 35], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testSetWithBooleanAndNullValues(): void
+    {
+        $result = (new Builder())
+            ->into('t')
+            ->set(['active' => true, 'deleted' => false, 'notes' => null])
+            ->insert();
+
+        $this->assertSame(
+            'INSERT INTO "t" ("active", "deleted", "notes") VALUES (?, ?, ?)',
+            $result->query
+        );
+        $this->assertEquals([true, false, null], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testInsertOrIgnorePostgreSQLSyntax(): void
+    {
+        $result = (new Builder())
+            ->into('users')
+            ->set(['id' => 1, 'name' => 'John', 'email' => 'john@test.com'])
+            ->insertOrIgnore();
+
+        $this->assertSame(
+            'INSERT INTO "users" ("id", "name", "email") VALUES (?, ?, ?) ON CONFLICT DO NOTHING',
+            $result->query
+        );
+        $this->assertEquals([1, 'John', 'john@test.com'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testNotStartsWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::notStartsWith('name', 'test')])
+            ->build();
+
+        $this->assertStringContainsString('"name" NOT ILIKE ?', $result->query);
+        $this->assertEquals(['test%'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testNotEndsWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::notEndsWith('name', 'test')])
+            ->build();
+
+        $this->assertStringContainsString('"name" NOT ILIKE ?', $result->query);
+        $this->assertEquals(['%test'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testNaturalJoin(): void
+    {
+        $result = (new Builder())
+            ->from('a')
+            ->naturalJoin('b')
+            ->build();
+
+        $this->assertStringContainsString('NATURAL JOIN "b"', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testNaturalJoinWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('a')
+            ->naturalJoin('b', 'b_alias')
+            ->build();
+
+        $this->assertStringContainsString('NATURAL JOIN "b" AS "b_alias"', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testFilterWhereNotIn(): void
+    {
+        $sub = (new Builder())
+            ->from('blocked')
+            ->select(['user_id']);
+
+        $result = (new Builder())
+            ->from('users')
+            ->filterWhereNotIn('id', $sub)
+            ->build();
+
+        $this->assertStringContainsString('"id" NOT IN (SELECT "user_id" FROM "blocked")', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExplainReadOnlyFlag(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->explain();
+
+        $this->assertTrue($result->readOnly);
+    }
+
+    public function testExplainAnalyzeReadOnlyFlag(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->explain(true);
+
+        $this->assertTrue($result->readOnly);
+    }
+
+    public function testUnionAllWithBindingsOrder(): void
+    {
+        $other = (new Builder())
+            ->from('b')
+            ->filter([Query::equal('type', ['beta'])]);
+
+        $result = (new Builder())
+            ->from('a')
+            ->filter([Query::equal('type', ['alpha'])])
+            ->unionAll($other)
+            ->build();
+
+        $this->assertStringContainsString('UNION ALL', $result->query);
+        $this->assertEquals('alpha', $result->bindings[0]);
+        $this->assertEquals('beta', $result->bindings[1]);
+        $this->assertBindingCount($result);
+    }
+
+    public function testExceptAll(): void
+    {
+        $other = (new Builder())->from('b');
+
+        $result = (new Builder())
+            ->from('a')
+            ->exceptAll($other)
+            ->build();
+
+        $this->assertStringContainsString('EXCEPT ALL', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testIntersectAll(): void
+    {
+        $other = (new Builder())->from('b');
+
+        $result = (new Builder())
+            ->from('a')
+            ->intersectAll($other)
+            ->build();
+
+        $this->assertStringContainsString('INTERSECT ALL', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testInsertAlias(): void
+    {
+        $result = (new Builder())
+            ->into('users')
+            ->insertAs('new_row')
+            ->set(['id' => 1, 'name' => 'Alice'])
+            ->onConflict(['id'], ['name'])
+            ->conflictSetRaw('name', 'COALESCE("new_row"."name", EXCLUDED."name")')
+            ->upsert();
+
+        $this->assertStringContainsString('INSERT INTO "users" AS "new_row"', $result->query);
+        $this->assertStringContainsString('COALESCE("new_row"."name", EXCLUDED."name")', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testFromNone(): void
+    {
+        $result = (new Builder())
+            ->fromNone()
+            ->selectRaw('1 AS one')
+            ->build();
+
+        $this->assertSame('SELECT 1 AS one', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testSelectRawWithBindings(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->selectRaw('COALESCE("name", ?) AS display_name', ['Unknown'])
+            ->build();
+
+        $this->assertStringContainsString('COALESCE("name", ?) AS display_name', $result->query);
+        $this->assertEquals(['Unknown'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testInsertColumnExpression(): void
+    {
+        $result = (new Builder())
+            ->into('locations')
+            ->set(['name' => 'NYC', 'coords' => 'POINT(40.7128 -74.0060)'])
+            ->insertColumnExpression('coords', 'ST_GeomFromText(?, 4326)')
+            ->insert();
+
+        $this->assertStringContainsString('ST_GeomFromText(?, 4326)', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testResetClearsReturningColumns(): void
+    {
+        $builder = (new Builder())
+            ->into('users')
+            ->set(['name' => 'Test'])
+            ->returning(['id']);
+
+        $builder->reset();
+
+        $result = $builder
+            ->into('users')
+            ->set(['name' => 'Test2'])
+            ->insert();
+
+        $this->assertStringNotContainsString('RETURNING', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testResetClearsLateralJoins(): void
+    {
+        $sub = (new Builder())->from('orders')->select(['id']);
+
+        $builder = (new Builder())
+            ->from('users')
+            ->joinLateral($sub, 'o');
+
+        $builder->reset();
+
+        $result = $builder->from('users')->build();
+        $this->assertStringNotContainsString('LATERAL', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testCteWithDeleteReturning(): void
+    {
+        $cteQuery = (new Builder())
+            ->from('users')
+            ->select(['id'])
+            ->filter([Query::equal('status', ['inactive'])]);
+
+        $result = (new Builder())
+            ->with('inactive_users', $cteQuery)
+            ->from('users')
+            ->filterWhereIn('id', (new Builder())->from('inactive_users')->select(['id']))
+            ->returning(['id', 'name'])
+            ->delete();
+
+        $this->assertStringContainsString('RETURNING "id", "name"', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testMultipleConditionalAggregates(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->countWhen('status = ?', 'active_count', 'active')
+            ->countWhen('status = ?', 'cancelled_count', 'cancelled')
+            ->sumWhen('amount', 'status = ?', 'active_total', 'active')
+            ->groupBy(['region'])
+            ->build();
+
+        $this->assertStringContainsString('COUNT(*) FILTER (WHERE status = ?) AS "active_count"', $result->query);
+        $this->assertStringContainsString('COUNT(*) FILTER (WHERE status = ?) AS "cancelled_count"', $result->query);
+        $this->assertStringContainsString('SUM("amount") FILTER (WHERE status = ?) AS "active_total"', $result->query);
+        $this->assertEquals(['active', 'cancelled', 'active'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testTableSampleWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->tablesample(5.0)
+            ->filter([Query::greaterThan('ts', '2024-01-01')])
+            ->limit(100)
+            ->build();
+
+        $this->assertStringContainsString('TABLESAMPLE BERNOULLI(5)', $result->query);
+        $this->assertStringContainsString('"ts" > ?', $result->query);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testLeftJoinLateralWithFilter(): void
+    {
+        $sub = (new Builder())
+            ->from('comments')
+            ->select(['body'])
+            ->filter([Query::equal('approved', [true])])
+            ->sortDesc('created_at')
+            ->limit(3);
+
+        $result = (new Builder())
+            ->from('posts')
+            ->select(['posts.title'])
+            ->leftJoinLateral($sub, 'recent_comments')
+            ->filter([Query::equal('posts.published', [true])])
+            ->build();
+
+        $this->assertStringContainsString('LEFT JOIN LATERAL (', $result->query);
+        $this->assertStringContainsString(') AS "recent_comments" ON true', $result->query);
+        $this->assertStringContainsString('"posts"."published" IN (?)', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testFullOuterJoinWithOperator(): void
+    {
+        $result = (new Builder())
+            ->from('a')
+            ->fullOuterJoin('b', 'a.key', 'b.key', '!=')
+            ->build();
+
+        $this->assertStringContainsString('FULL OUTER JOIN "b" ON "a"."key" != "b"."key"', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testJoinWhereWithLeftType(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->joinWhere('orders', function (JoinBuilder $join): void {
+                $join->on('users.id', 'orders.user_id')
+                     ->where('orders.status', '=', 'active');
+            }, JoinType::Left)
+            ->build();
+
+        $this->assertStringContainsString('LEFT JOIN "orders"', $result->query);
+        $this->assertStringContainsString('orders.status = ?', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testJoinWhereWithMultipleOnAndWhere(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->joinWhere('orders', function (JoinBuilder $join): void {
+                $join->on('users.id', 'orders.user_id')
+                     ->on('users.tenant_id', 'orders.tenant_id')
+                     ->where('orders.amount', '>', 100)
+                     ->where('orders.status', '=', 'active');
+            })
+            ->build();
+
+        $this->assertStringContainsString('"users"."id" = "orders"."user_id"', $result->query);
+        $this->assertStringContainsString('"users"."tenant_id" = "orders"."tenant_id"', $result->query);
+        $this->assertStringContainsString('orders.amount > ?', $result->query);
+        $this->assertStringContainsString('orders.status = ?', $result->query);
+        $this->assertEquals([100, 'active'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testEqualWithMultipleValues(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::equal('id', [1, 2, 3])])
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM "t" WHERE "id" IN (?, ?, ?)',
+            $result->query
+        );
+        $this->assertEquals([1, 2, 3], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testNotEqualSingleValue(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::notEqual('status', 'deleted')])
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM "t" WHERE "status" != ?',
+            $result->query
+        );
+        $this->assertEquals(['deleted'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testContainsAllArrayFilter(): void
+    {
+        $query = Query::containsAll('tags', ['php', 'go']);
+        $query->setOnArray(true);
+
+        $result = (new Builder())
+            ->from('docs')
+            ->filter([$query])
+            ->build();
+
+        $this->assertStringContainsString('"tags" @> ?::jsonb', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testContainsAnyArrayFilter(): void
+    {
+        $query = Query::containsAny('tags', ['php', 'go']);
+        $query->setOnArray(true);
+
+        $result = (new Builder())
+            ->from('docs')
+            ->filter([$query])
+            ->build();
+
+        $this->assertStringContainsString('"tags" @> ?::jsonb', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testNotContainsArrayFilter(): void
+    {
+        $query = Query::notContains('tags', ['deprecated']);
+        $query->setOnArray(true);
+
+        $result = (new Builder())
+            ->from('docs')
+            ->filter([$query])
+            ->build();
+
+        $this->assertStringContainsString('NOT (', $result->query);
+        $this->assertStringContainsString('"tags" @> ?::jsonb', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testSelectSubquery(): void
+    {
+        $sub = (new Builder())
+            ->from('orders')
+            ->count('*', 'cnt')
+            ->filter([Query::equal('orders.user_id', [1])]);
+
+        $result = (new Builder())
+            ->from('users')
+            ->select(['id', 'name'])
+            ->selectSub($sub, 'order_count')
+            ->filter([Query::equal('id', [1])])
+            ->build();
+
+        $this->assertStringContainsString('(SELECT COUNT(*) AS "cnt" FROM "orders" WHERE "orders"."user_id" IN (?)) AS "order_count"', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testRawFilterWithMultipleBindings(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::raw('score BETWEEN ? AND ?', [10, 90])])
+            ->build();
+
+        $this->assertStringContainsString('score BETWEEN ? AND ?', $result->query);
+        $this->assertEquals([10, 90], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testCursorBeforeDescOrder(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->sortDesc('id')
+            ->cursorBefore(100)
+            ->limit(25)
+            ->build();
+
+        $this->assertStringContainsString('< ?', $result->query);
+        $this->assertContains(100, $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testSetRawInUpdate(): void
+    {
+        $result = (new Builder())
+            ->from('counters')
+            ->setRaw('count', '"count" + ?', [1])
+            ->filter([Query::equal('id', ['page_views'])])
+            ->update();
+
+        $this->assertSame(
+            'UPDATE "counters" SET "count" = "count" + ? WHERE "id" IN (?)',
+            $result->query
+        );
+        $this->assertEquals([1, 'page_views'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testMultipleSetRawInUpdate(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->setRaw('count', '"count" + ?', [1])
+            ->setRaw('updated_at', 'NOW()')
+            ->filter([Query::equal('id', [1])])
+            ->update();
+
+        $this->assertStringContainsString('"count" = "count" + ?', $result->query);
+        $this->assertStringContainsString('"updated_at" = NOW()', $result->query);
+        $this->assertBindingCount($result);
+    }
+
+    public function testJsonPathInvalidOperatorThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->from('t')
+            ->filterJsonPath('data', 'key', 'INVALID', 'val')
+            ->build();
+    }
+
+    public function testJsonPathInvalidPathThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->from('t')
+            ->filterJsonPath('data', 'key; DROP TABLE users', '=', 'val')
+            ->build();
+    }
+
+    public function testDeleteWithoutConditions(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->delete();
+
+        $this->assertSame('DELETE FROM "t"', $result->query);
+        $this->assertEquals([], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testUpdateWithMultipleFilters(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->set(['status' => 'archived'])
+            ->filter([
+                Query::equal('active', [false]),
+                Query::lessThan('updated_at', '2023-01-01'),
+            ])
+            ->update();
+
+        $this->assertSame(
+            'UPDATE "t" SET "status" = ? WHERE "active" IN (?) AND "updated_at" < ?',
+            $result->query
+        );
+        $this->assertEquals(['archived', false, '2023-01-01'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testPageEdgeCasePageOne(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->page(1, 10)
+            ->build();
+
+        $this->assertEquals([10, 0], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testPageThrowsForPageZero(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->from('t')
+            ->page(0, 10);
+    }
+
+    public function testTransactionMethods(): void
+    {
+        $builder = new Builder();
+
+        $this->assertEquals('BEGIN', $builder->begin()->query);
+        $this->assertEquals('COMMIT', $builder->commit()->query);
+        $this->assertEquals('ROLLBACK', $builder->rollback()->query);
+        $this->assertEquals('ROLLBACK TO SAVEPOINT "sp1"', $builder->rollbackToSavepoint('sp1')->query);
+        $this->assertEquals('RELEASE SAVEPOINT "sp1"', $builder->releaseSavepoint('sp1')->query);
+    }
+
+    public function testSpatialDistanceWithMeters(): void
+    {
+        $result = (new Builder())
+            ->from('locations')
+            ->filterDistance('coords', [40.7128, -74.0060], '>', 10000.0, true)
+            ->build();
+
+        $this->assertStringContainsString('ST_Distance(("coords"::geography), ST_SetSRID(ST_GeomFromText(?), 4326)::geography) > ?', $result->query);
+        $this->assertEquals('POINT(40.7128 -74.006)', $result->bindings[0]);
+        $this->assertEquals(10000.0, $result->bindings[1]);
+        $this->assertBindingCount($result);
+    }
+
+    public function testCteUpdateReturning(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->set(['status' => 'processed'])
+            ->filter([Query::equal('status', ['pending'])])
+            ->returning(['id', 'status'])
+            ->update();
+
+        $this->assertSame(
+            'UPDATE "orders" SET "status" = ? WHERE "status" IN (?) RETURNING "id", "status"',
+            $result->query
+        );
+        $this->assertEquals(['processed', 'pending'], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testInsertOrIgnoreReturningPostgreSQL(): void
+    {
+        $result = (new Builder())
+            ->into('users')
+            ->set(['id' => 1, 'name' => 'Alice'])
+            ->returning(['id'])
+            ->insertOrIgnore();
+
+        $this->assertSame(
+            'INSERT INTO "users" ("id", "name") VALUES (?, ?) ON CONFLICT DO NOTHING RETURNING "id"',
+            $result->query
+        );
+        $this->assertBindingCount($result);
+    }
+
+    public function testUpsertSelectWithBindings(): void
+    {
+        $source = (new Builder())
+            ->from('staging')
+            ->select(['id', 'name', 'email'])
+            ->filter([Query::equal('status', ['ready'])]);
+
+        $result = (new Builder())
+            ->into('users')
+            ->fromSelect(['id', 'name', 'email'], $source)
+            ->onConflict(['id'], ['name', 'email'])
+            ->returning(['id'])
+            ->upsertSelect();
+
+        $this->assertStringContainsString('INSERT INTO "users"', $result->query);
+        $this->assertStringContainsString('ON CONFLICT ("id") DO UPDATE SET', $result->query);
+        $this->assertStringContainsString('RETURNING "id"', $result->query);
+        $this->assertContains('ready', $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testMultipleHooks(): void
+    {
+        $hook1 = new class () implements Filter {
+            public function filter(string $table): Condition
+            {
+                return new Condition('tenant_id = ?', [1]);
+            }
+        };
+
+        $hook2 = new class () implements Filter {
+            public function filter(string $table): Condition
+            {
+                return new Condition('deleted = ?', [false]);
+            }
+        };
+
+        $result = (new Builder())
+            ->from('users')
+            ->addHook($hook1)
+            ->addHook($hook2)
+            ->build();
+
+        $this->assertStringContainsString('tenant_id = ?', $result->query);
+        $this->assertStringContainsString('deleted = ?', $result->query);
+        $this->assertEquals([1, false], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testToRawSqlWithNullAndBooleans(): void
+    {
+        $raw = (new Builder())
+            ->from('t')
+            ->filter([
+                Query::equal('active', [true]),
+                Query::equal('deleted', [false]),
+            ])
+            ->toRawSql();
+
+        $this->assertStringContainsString('1', $raw);
+        $this->assertStringContainsString('0', $raw);
+        $this->assertStringNotContainsString('?', $raw);
+    }
+
+    public function testFromSubWithFilter(): void
+    {
+        $sub = (new Builder())
+            ->from('orders')
+            ->select(['user_id', 'total'])
+            ->filter([Query::greaterThan('total', 100)]);
+
+        $result = (new Builder())
+            ->fromSub($sub, 'big_orders')
+            ->select(['user_id'])
+            ->filter([Query::greaterThan('total', 500)])
+            ->build();
+
+        $this->assertStringContainsString('FROM (SELECT "user_id", "total" FROM "orders" WHERE "total" > ?) AS "big_orders"', $result->query);
+        $this->assertEquals([100, 500], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testHavingRawWithGroupByAndFilter(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->count('*', 'cnt')
+            ->sum('amount', 'total')
+            ->filter([Query::equal('status', ['active'])])
+            ->groupBy(['user_id'])
+            ->havingRaw('SUM("amount") > ? AND COUNT(*) > ?', [1000, 5])
+            ->build();
+
+        $this->assertStringContainsString('WHERE "status" IN (?)', $result->query);
+        $this->assertStringContainsString('GROUP BY "user_id"', $result->query);
+        $this->assertStringContainsString('HAVING SUM("amount") > ? AND COUNT(*) > ?', $result->query);
+        $this->assertEquals(['active', 1000, 5], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testNotBetweenWithOtherFilters(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([
+                Query::notBetween('price', 50, 100),
+                Query::equal('active', [true]),
+                Query::isNotNull('name'),
+            ])
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM "t" WHERE "price" NOT BETWEEN ? AND ? AND "active" IN (?) AND "name" IS NOT NULL',
+            $result->query
+        );
+        $this->assertEquals([50, 100, true], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testCaseExpressionWithBindingsInSelect(): void
+    {
+        $case = (new CaseBuilder())
+            ->when('price > ?', '?', [100], ['expensive'])
+            ->when('price > ?', '?', [50], ['moderate'])
+            ->elseResult('?', ['cheap'])
+            ->alias('price_tier')
+            ->build();
+
+        $result = (new Builder())
+            ->from('products')
+            ->select(['id', 'name'])
+            ->selectCase($case)
+            ->filter([Query::equal('active', [true])])
+            ->build();
+
+        $this->assertStringContainsString('CASE WHEN price > ? THEN ? WHEN price > ? THEN ? ELSE ? END AS price_tier', $result->query);
+        $this->assertEquals([100, 'expensive', 50, 'moderate', 'cheap', true], $result->bindings);
+        $this->assertBindingCount($result);
+    }
+
+    public function testMergeWithDeleteAction(): void
+    {
+        $source = (new Builder())->from('staging');
+
+        $result = (new Builder())
+            ->mergeInto('users')
+            ->using($source, 'src')
+            ->on('users.id = src.id')
+            ->whenMatched('DELETE')
+            ->whenNotMatched('INSERT (id, name) VALUES (src.id, src.name)')
+            ->executeMerge();
+
+        $this->assertStringContainsString('WHEN MATCHED THEN DELETE', $result->query);
+        $this->assertStringContainsString('WHEN NOT MATCHED THEN INSERT', $result->query);
         $this->assertBindingCount($result);
     }
 }

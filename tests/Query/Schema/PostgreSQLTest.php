@@ -7,10 +7,17 @@ use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\PostgreSQL as PgBuilder;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\Blueprint;
+use Utopia\Query\Schema\Feature\ColumnComments;
+use Utopia\Query\Schema\Feature\CreatePartition;
+use Utopia\Query\Schema\Feature\DropPartition;
 use Utopia\Query\Schema\Feature\ForeignKeys;
 use Utopia\Query\Schema\Feature\Procedures;
+use Utopia\Query\Schema\Feature\Sequences;
+use Utopia\Query\Schema\Feature\TableComments;
 use Utopia\Query\Schema\Feature\Triggers;
+use Utopia\Query\Schema\Feature\Types;
 use Utopia\Query\Schema\ForeignKeyAction;
+use Utopia\Query\Schema\IndexType;
 use Utopia\Query\Schema\ParameterDirection;
 use Utopia\Query\Schema\PostgreSQL as Schema;
 use Utopia\Query\Schema\TriggerEvent;
@@ -575,5 +582,459 @@ class PostgreSQLTest extends TestCase
         $this->assertSame('DROP TABLE "sessions"', $result->query);
         $this->assertEquals([], $result->bindings);
         $this->assertBindingCount($result);
+    }
+
+    public function testImplementsTypes(): void
+    {
+        $this->assertInstanceOf(Types::class, new Schema());
+    }
+
+    public function testImplementsSequences(): void
+    {
+        $this->assertInstanceOf(Sequences::class, new Schema());
+    }
+
+    public function testImplementsTableComments(): void
+    {
+        $this->assertInstanceOf(TableComments::class, new Schema());
+    }
+
+    public function testImplementsColumnComments(): void
+    {
+        $this->assertInstanceOf(ColumnComments::class, new Schema());
+    }
+
+    public function testImplementsCreatePartition(): void
+    {
+        $this->assertInstanceOf(CreatePartition::class, new Schema());
+    }
+
+    public function testImplementsDropPartition(): void
+    {
+        $this->assertInstanceOf(DropPartition::class, new Schema());
+    }
+
+    public function testCreateCollation(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createCollation('ci_collation', ['provider' => 'icu', 'locale' => 'und-u-ks-level1']);
+
+        $this->assertSame(
+            "CREATE COLLATION IF NOT EXISTS \"ci_collation\" (provider = 'icu', locale = 'und-u-ks-level1', deterministic = true)",
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testCreateCollationNonDeterministic(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createCollation('nd_collation', ['provider' => 'icu'], false);
+
+        $this->assertStringContainsString('deterministic = false', $result->query);
+    }
+
+    public function testRenameIndex(): void
+    {
+        $schema = new Schema();
+        $result = $schema->renameIndex('users', 'idx_old', 'idx_new');
+
+        $this->assertSame('ALTER INDEX "idx_old" RENAME TO "idx_new"', $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testCreateDatabase(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createDatabase('my_schema');
+
+        $this->assertSame('CREATE SCHEMA "my_schema"', $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testDropDatabase(): void
+    {
+        $schema = new Schema();
+        $result = $schema->dropDatabase('my_schema');
+
+        $this->assertSame('DROP SCHEMA IF EXISTS "my_schema" CASCADE', $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testAnalyzeTable(): void
+    {
+        $schema = new Schema();
+        $result = $schema->analyzeTable('users');
+
+        $this->assertSame('ANALYZE "users"', $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testAlterColumnType(): void
+    {
+        $schema = new Schema();
+        $result = $schema->alterColumnType('users', 'age', 'BIGINT');
+
+        $this->assertSame('ALTER TABLE "users" ALTER COLUMN "age" TYPE BIGINT', $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testAlterColumnTypeWithUsing(): void
+    {
+        $schema = new Schema();
+        $result = $schema->alterColumnType('users', 'age', 'INTEGER', '"age"::integer');
+
+        $this->assertSame('ALTER TABLE "users" ALTER COLUMN "age" TYPE INTEGER USING "age"::integer', $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testDropIndexConcurrently(): void
+    {
+        $schema = new Schema();
+        $result = $schema->dropIndexConcurrently('idx_email');
+
+        $this->assertSame('DROP INDEX CONCURRENTLY "idx_email"', $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testCreateType(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createType('mood', ['happy', 'sad', 'neutral']);
+
+        $this->assertSame("CREATE TYPE \"mood\" AS ENUM ('happy', 'sad', 'neutral')", $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testDropType(): void
+    {
+        $schema = new Schema();
+        $result = $schema->dropType('mood');
+
+        $this->assertSame('DROP TYPE "mood"', $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testCreateSequence(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createSequence('order_seq', 100, 5);
+
+        $this->assertSame('CREATE SEQUENCE "order_seq" START 100 INCREMENT BY 5', $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testCreateSequenceDefaults(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createSequence('seq');
+
+        $this->assertSame('CREATE SEQUENCE "seq" START 1 INCREMENT BY 1', $result->query);
+    }
+
+    public function testDropSequence(): void
+    {
+        $schema = new Schema();
+        $result = $schema->dropSequence('order_seq');
+
+        $this->assertSame('DROP SEQUENCE "order_seq"', $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testNextVal(): void
+    {
+        $schema = new Schema();
+        $result = $schema->nextVal('order_seq');
+
+        $this->assertSame("SELECT nextval('order_seq')", $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testCommentOnTable(): void
+    {
+        $schema = new Schema();
+        $result = $schema->commentOnTable('users', 'Main users table');
+
+        $this->assertSame("COMMENT ON TABLE \"users\" IS 'Main users table'", $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testCommentOnColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->commentOnColumn('users', 'email', 'Primary email address');
+
+        $this->assertSame("COMMENT ON COLUMN \"users\".\"email\" IS 'Primary email address'", $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testCreatePartition(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createPartition('orders', 'orders_2024', "IN ('2024')");
+
+        $this->assertSame("CREATE TABLE \"orders_2024\" PARTITION OF \"orders\" FOR VALUES IN ('2024')", $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testDropPartition(): void
+    {
+        $schema = new Schema();
+        $result = $schema->dropPartition('orders', 'orders_2024');
+
+        $this->assertSame('DROP TABLE "orders_2024"', $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testCreateIndexConcurrently(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createIndex('users', 'idx_email', ['email'], concurrently: true);
+
+        $this->assertSame('CREATE INDEX CONCURRENTLY "idx_email" ON "users" ("email")', $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testCreateUniqueIndexConcurrently(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createIndex('users', 'idx_email', ['email'], unique: true, concurrently: true);
+
+        $this->assertSame('CREATE UNIQUE INDEX CONCURRENTLY "idx_email" ON "users" ("email")', $result->query);
+    }
+
+    public function testCreateIndexInvalidMethodThrows(): void
+    {
+        $this->expectException(\Utopia\Query\Exception\ValidationException::class);
+
+        $schema = new Schema();
+        $schema->createIndex('t', 'idx', ['col'], method: 'DROP TABLE;--');
+    }
+
+    public function testCreateIndexInvalidOperatorClassThrows(): void
+    {
+        $this->expectException(\Utopia\Query\Exception\ValidationException::class);
+
+        $schema = new Schema();
+        $schema->createIndex('t', 'idx', ['col'], operatorClass: 'foo;bar');
+    }
+
+    public function testAlterAddColumnAndRenameAndDropCombined(): void
+    {
+        $schema = new Schema();
+        $result = $schema->alter('users', function (Blueprint $table) {
+            $table->addColumn('phone', 'string', 20);
+            $table->renameColumn('bio', 'biography');
+            $table->dropColumn('old_field');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ADD COLUMN "phone" VARCHAR(20)', $result->query);
+        $this->assertStringContainsString('RENAME COLUMN "bio" TO "biography"', $result->query);
+        $this->assertStringContainsString('DROP COLUMN "old_field"', $result->query);
+    }
+
+    public function testAlterAddForeignKeyWithOnUpdate(): void
+    {
+        $schema = new Schema();
+        $result = $schema->alter('orders', function (Blueprint $table) {
+            $table->addForeignKey('user_id')
+                ->references('id')
+                ->on('users')
+                ->onDelete(ForeignKeyAction::Cascade)
+                ->onUpdate(ForeignKeyAction::SetNull);
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ON DELETE CASCADE', $result->query);
+        $this->assertStringContainsString('ON UPDATE SET NULL', $result->query);
+    }
+
+    public function testAlterAddIndexWithMethod(): void
+    {
+        $schema = new Schema();
+        $result = $schema->alter('docs', function (Blueprint $table) {
+            $table->addIndex('idx_content', ['content'], IndexType::Index, method: 'gin');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('USING GIN', $result->query);
+    }
+
+    public function testColumnDefinitionUnsignedIgnored(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('t', function (Blueprint $table) {
+            $table->integer('val')->unsigned();
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString('UNSIGNED', $result->query);
+    }
+
+    public function testCreateIfNotExists(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createIfNotExists('users', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('CREATE TABLE IF NOT EXISTS "users"', $result->query);
+    }
+
+    public function testCreateTableWithRawColumnDefs(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('t', function (Blueprint $table) {
+            $table->id();
+            $table->rawColumn('"custom_col" TEXT NOT NULL DEFAULT \'\'');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('"custom_col" TEXT NOT NULL DEFAULT \'\'', $result->query);
+    }
+
+    public function testCreateTableWithRawIndexDefs(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('t', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->rawIndex('INDEX "idx_custom" ("name")');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('INDEX "idx_custom" ("name")', $result->query);
+    }
+
+    public function testCreateTableWithPartitionByRange(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Blueprint $table) {
+            $table->id();
+            $table->datetime('created_at');
+            $table->partitionByRange('created_at');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('PARTITION BY RANGE(created_at)', $result->query);
+    }
+
+    public function testCreateTableWithPartitionByList(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Blueprint $table) {
+            $table->id();
+            $table->string('region');
+            $table->partitionByList('region');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('PARTITION BY LIST(region)', $result->query);
+    }
+
+    public function testCreateTableWithPartitionByHash(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Blueprint $table) {
+            $table->id();
+            $table->partitionByHash('id');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('PARTITION BY HASH(id)', $result->query);
+    }
+
+    public function testAlterWithForeignKeyOnDeleteAndUpdate(): void
+    {
+        $schema = new Schema();
+        $result = $schema->alter('orders', function (Blueprint $table) {
+            $table->addForeignKey('user_id')
+                ->references('id')->on('users')
+                ->onDelete(ForeignKeyAction::Cascade)
+                ->onUpdate(ForeignKeyAction::SetNull);
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ON DELETE CASCADE', $result->query);
+        $this->assertStringContainsString('ON UPDATE SET NULL', $result->query);
+    }
+
+    public function testCreateIndexWithMethod(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createIndex('users', 'idx_name', ['name'], method: 'btree');
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('USING BTREE', $result->query);
+    }
+
+    public function testCompileIndexColumnsWithCollation(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createIndex(
+            'users',
+            'idx_name',
+            ['name'],
+            collations: ['name' => 'en_US']
+        );
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('COLLATE en_US', $result->query);
+    }
+
+    public function testCompileIndexColumnsWithLength(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createIndex(
+            'users',
+            'idx_name',
+            ['name'],
+            lengths: ['name' => 10]
+        );
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('"name"(10)', $result->query);
+    }
+
+    public function testCompileIndexColumnsWithOrder(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createIndex(
+            'users',
+            'idx_name',
+            ['name'],
+            orders: ['name' => 'desc']
+        );
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('"name" DESC', $result->query);
+    }
+
+    public function testCompileIndexColumnsWithRawColumns(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createIndex(
+            'docs',
+            'idx_mixed',
+            ['id'],
+            rawColumns: ['(data->>\'name\')']
+        );
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("(data->>'name')", $result->query);
+    }
+
+    public function testBlueprintAddIndexWithStringType(): void
+    {
+        $schema = new Schema();
+        $result = $schema->alter('users', function (Blueprint $table) {
+            $table->addIndex('idx_name', ['name'], 'unique');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('UNIQUE', $result->query);
     }
 }

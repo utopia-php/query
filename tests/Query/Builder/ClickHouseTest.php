@@ -4,12 +4,15 @@ namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
+use Utopia\Query\Builder\BuildResult;
 use Utopia\Query\Builder\Case\Builder as CaseBuilder;
 use Utopia\Query\Builder\ClickHouse as Builder;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\Feature\Aggregates;
+use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\CTEs;
 use Utopia\Query\Builder\Feature\Deletes;
+use Utopia\Query\Builder\Feature\FullOuterJoins;
 use Utopia\Query\Builder\Feature\Hints;
 use Utopia\Query\Builder\Feature\Hooks;
 use Utopia\Query\Builder\Feature\Inserts;
@@ -18,6 +21,7 @@ use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\Locking;
 use Utopia\Query\Builder\Feature\Selects;
 use Utopia\Query\Builder\Feature\Spatial;
+use Utopia\Query\Builder\Feature\TableSampling;
 use Utopia\Query\Builder\Feature\Transactions;
 use Utopia\Query\Builder\Feature\Unions;
 use Utopia\Query\Builder\Feature\Updates;
@@ -8342,5 +8346,1169 @@ class ClickHouseTest extends TestCase
         );
         $this->assertEquals([], $result->bindings);
         $this->assertBindingCount($result);
+    }
+
+    public function testImplementsConditionalAggregates(): void
+    {
+        $this->assertInstanceOf(ConditionalAggregates::class, new Builder());
+    }
+
+    public function testImplementsTableSampling(): void
+    {
+        $this->assertInstanceOf(TableSampling::class, new Builder());
+    }
+
+    public function testImplementsFullOuterJoins(): void
+    {
+        $this->assertInstanceOf(FullOuterJoins::class, new Builder());
+    }
+
+    public function testHintValidSetting(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->hint('max_threads=4')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('SETTINGS max_threads=4', $result->query);
+    }
+
+    public function testHintInvalidThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->from('events')
+            ->hint('DROP TABLE;--')
+            ->build();
+    }
+
+    public function testSettingsMultiple(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->settings(['max_threads' => '4', 'max_memory_usage' => '1000000'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('SETTINGS max_threads=4, max_memory_usage=1000000', $result->query);
+    }
+
+    public function testSettingsInvalidKeyThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->from('events')
+            ->settings(['1invalid' => '4'])
+            ->build();
+    }
+
+    public function testSettingsInvalidValueThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->from('events')
+            ->settings(['max_threads' => 'DROP;'])
+            ->build();
+    }
+
+    public function testTableSampleDelegatesToSample(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->tablesample(10.0)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('SAMPLE 0.1', $result->query);
+    }
+
+    public function testCountWhenWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->countWhen('status = ?', 'active_count', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('countIf(status = ?) AS `active_count`', $result->query);
+        $this->assertEquals(['active'], $result->bindings);
+    }
+
+    public function testCountWhenWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->countWhen('status = ?', '', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('countIf(status = ?)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testSumWhenWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->sumWhen('amount', 'status = ?', 'active_total', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('sumIf(`amount`, status = ?) AS `active_total`', $result->query);
+    }
+
+    public function testSumWhenWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->sumWhen('amount', 'status = ?', '', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testAvgWhenWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->avgWhen('amount', 'status = ?', 'avg_active', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('avgIf(`amount`, status = ?) AS `avg_active`', $result->query);
+    }
+
+    public function testAvgWhenWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->avgWhen('amount', 'status = ?', '', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testMinWhenWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->minWhen('amount', 'status = ?', 'min_active', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('minIf(`amount`, status = ?) AS `min_active`', $result->query);
+    }
+
+    public function testMinWhenWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->minWhen('amount', 'status = ?', '', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testMaxWhenWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->maxWhen('amount', 'status = ?', 'max_active', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('maxIf(`amount`, status = ?) AS `max_active`', $result->query);
+    }
+
+    public function testMaxWhenWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->maxWhen('amount', 'status = ?', '', 'active')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testFullOuterJoinBasic(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->fullOuterJoin('orders', 'users.id', 'orders.user_id')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('FULL OUTER JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $result->query);
+    }
+
+    public function testFullOuterJoinWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->fullOuterJoin('orders', 'users.id', 'o.user_id', '=', 'o')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('FULL OUTER JOIN `orders` AS `o`', $result->query);
+    }
+
+    public function testSampleValidationZeroThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())->from('events')->sample(0.0)->build();
+    }
+
+    public function testSampleValidationOneThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())->from('events')->sample(1.0)->build();
+    }
+
+    public function testSettingsWithBuild(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->filter([Query::equal('status', ['active'])])
+            ->settings(['max_threads' => '2'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'SELECT * FROM `events` WHERE `status` IN (?) SETTINGS max_threads=2',
+            $result->query
+        );
+    }
+
+    public function testLikeFallback(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->filter([Query::contains('name', ['mid'])])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('position(`name`, ?) > 0', $result->query);
+    }
+
+    public function testResetClearsSettings(): void
+    {
+        $builder = (new Builder())
+            ->from('events')
+            ->settings(['max_threads' => '4']);
+
+        $builder->build();
+        $builder->reset();
+
+        $result = $builder->from('events')->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString('SETTINGS', $result->query);
+    }
+
+    public function testCteJoinWhereGroupByHavingOrderLimit(): void
+    {
+        $cte = (new Builder())
+            ->from('raw_events')
+            ->select(['user_id', 'amount'])
+            ->filter([Query::greaterThan('amount', 0)]);
+
+        $result = (new Builder())
+            ->with('filtered', $cte)
+            ->from('filtered')
+            ->join('users', 'filtered.user_id', 'users.id')
+            ->filter([Query::equal('users.status', ['active'])])
+            ->sum('filtered.amount', 'total')
+            ->groupBy(['users.country'])
+            ->having([Query::greaterThan('total', 100)])
+            ->sortDesc('total')
+            ->limit(10)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('WITH `filtered` AS', $result->query);
+        $this->assertStringContainsString('JOIN `users`', $result->query);
+        $this->assertStringContainsString('WHERE `users`.`status` IN (?)', $result->query);
+        $this->assertStringContainsString('GROUP BY `users`.`country`', $result->query);
+        $this->assertStringContainsString('HAVING `total` > ?', $result->query);
+        $this->assertStringContainsString('ORDER BY `total` DESC', $result->query);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+    }
+
+    public function testMultipleCTEsWithComplexQuery(): void
+    {
+        $cte1 = (new Builder())
+            ->from('orders')
+            ->select(['customer_id'])
+            ->sum('total', 'order_total')
+            ->groupBy(['customer_id']);
+
+        $cte2 = (new Builder())
+            ->from('customers')
+            ->select(['id', 'name'])
+            ->filter([Query::equal('active', [1])]);
+
+        $result = (new Builder())
+            ->with('order_totals', $cte1)
+            ->with('active_customers', $cte2)
+            ->from('order_totals')
+            ->join('active_customers', 'order_totals.customer_id', 'active_customers.id')
+            ->filter([Query::greaterThan('order_total', 500)])
+            ->sortDesc('order_total')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('WITH `order_totals` AS', $result->query);
+        $this->assertStringContainsString('`active_customers` AS', $result->query);
+        $this->assertStringContainsString('JOIN `active_customers`', $result->query);
+    }
+
+    public function testWindowFunctionWithJoinAndWhere(): void
+    {
+        $result = (new Builder())
+            ->from('sales')
+            ->join('products', 'sales.product_id', 'products.id')
+            ->selectWindow('ROW_NUMBER()', 'rn', ['products.category'], ['sales.amount'])
+            ->select(['products.name', 'sales.amount'])
+            ->filter([Query::greaterThan('sales.amount', 0)])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ROW_NUMBER() OVER', $result->query);
+        $this->assertStringContainsString('JOIN `products`', $result->query);
+        $this->assertStringContainsString('WHERE `sales`.`amount` > ?', $result->query);
+    }
+
+    public function testWindowFunctionWithGroupBy(): void
+    {
+        $result = (new Builder())
+            ->from('sales')
+            ->selectWindow('SUM(amount)', 'running_total', ['category'], ['date'])
+            ->select(['category', 'date'])
+            ->groupBy(['category', 'date'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('SUM(amount) OVER', $result->query);
+        $this->assertStringContainsString('GROUP BY `category`, `date`', $result->query);
+    }
+
+    public function testMultipleWindowFunctionsInSameQuery(): void
+    {
+        $result = (new Builder())
+            ->from('employees')
+            ->selectWindow('ROW_NUMBER()', 'rn', ['department'], ['salary'])
+            ->selectWindow('RANK()', 'rnk', ['department'], ['-salary'])
+            ->selectWindow('SUM(salary)', 'dept_total', ['department'])
+            ->select(['name', 'department', 'salary'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ROW_NUMBER() OVER', $result->query);
+        $this->assertStringContainsString('RANK() OVER', $result->query);
+        $this->assertStringContainsString('SUM(salary) OVER', $result->query);
+    }
+
+    public function testNamedWindowDefinitionWithSelectWindow(): void
+    {
+        $result = (new Builder())
+            ->from('sales')
+            ->window('w', ['category'], ['date'])
+            ->selectWindow('SUM(amount)', 'running', null, null, 'w')
+            ->selectWindow('ROW_NUMBER()', 'rn', null, null, 'w')
+            ->select(['category', 'date', 'amount'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('WINDOW `w` AS', $result->query);
+        $this->assertStringContainsString('OVER `w`', $result->query);
+    }
+
+    public function testJoinAggregateGroupByHaving(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->join('customers', 'orders.customer_id', 'customers.id')
+            ->count('*', 'order_count')
+            ->sum('orders.total', 'revenue')
+            ->groupBy(['customers.country'])
+            ->having([Query::greaterThan('order_count', 5)])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('JOIN `customers`', $result->query);
+        $this->assertStringContainsString('COUNT(*) AS `order_count`', $result->query);
+        $this->assertStringContainsString('SUM(`orders`.`total`) AS `revenue`', $result->query);
+        $this->assertStringContainsString('GROUP BY `customers`.`country`', $result->query);
+        $this->assertStringContainsString('HAVING `order_count` > ?', $result->query);
+    }
+
+    public function testSelfJoinWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('employees', 'e')
+            ->leftJoin('employees', 'e.manager_id', 'm.id', '=', 'm')
+            ->select(['e.name', 'm.name'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('FROM `employees` AS `e`', $result->query);
+        $this->assertStringContainsString('LEFT JOIN `employees` AS `m`', $result->query);
+    }
+
+    public function testTripleJoin(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->join('customers', 'orders.customer_id', 'customers.id')
+            ->join('products', 'orders.product_id', 'products.id')
+            ->leftJoin('categories', 'products.category_id', 'categories.id')
+            ->select(['customers.name', 'products.title', 'categories.label'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('JOIN `customers`', $result->query);
+        $this->assertStringContainsString('JOIN `products`', $result->query);
+        $this->assertStringContainsString('LEFT JOIN `categories`', $result->query);
+    }
+
+    public function testUnionAllWithOrderLimit(): void
+    {
+        $archive = (new Builder())
+            ->from('events_archive')
+            ->select(['id', 'name', 'ts'])
+            ->filter([Query::greaterThan('ts', '2023-01-01')]);
+
+        $result = (new Builder())
+            ->from('events')
+            ->select(['id', 'name', 'ts'])
+            ->unionAll($archive)
+            ->sortDesc('ts')
+            ->limit(50)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('UNION ALL', $result->query);
+        $this->assertStringContainsString('ORDER BY `ts` DESC', $result->query);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+    }
+
+    public function testMultipleUnionAlls(): void
+    {
+        $q2 = (new Builder())->from('archive_2023')->filter([Query::equal('year', [2023])]);
+        $q3 = (new Builder())->from('archive_2022')->filter([Query::equal('year', [2022])]);
+        $q4 = (new Builder())->from('archive_2021')->filter([Query::equal('year', [2021])]);
+
+        $result = (new Builder())
+            ->from('events')
+            ->filter([Query::equal('year', [2024])])
+            ->unionAll($q2)
+            ->unionAll($q3)
+            ->unionAll($q4)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertEquals(3, substr_count($result->query, 'UNION ALL'));
+        $this->assertEquals([2024, 2023, 2022, 2021], $result->bindings);
+    }
+
+    public function testSubSelectWithJoinAndWhere(): void
+    {
+        $sub = (new Builder())
+            ->from('orders')
+            ->select(['customer_id'])
+            ->sum('total', 'customer_total')
+            ->groupBy(['customer_id']);
+
+        $result = (new Builder())
+            ->from('customers')
+            ->selectSub($sub, 'order_summary')
+            ->filter([Query::equal('active', [1])])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('SELECT', $result->query);
+        $this->assertStringContainsString('WHERE `active` IN (?)', $result->query);
+    }
+
+    public function testFromSubqueryWithFilter(): void
+    {
+        $sub = (new Builder())
+            ->from('events')
+            ->select(['user_id'])
+            ->count('*', 'event_count')
+            ->groupBy(['user_id']);
+
+        $result = (new Builder())
+            ->fromSub($sub, 'user_events')
+            ->filter([Query::greaterThan('event_count', 10)])
+            ->sortDesc('event_count')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('FROM (SELECT', $result->query);
+        $this->assertStringContainsString(') AS `user_events`', $result->query);
+        $this->assertStringContainsString('WHERE `event_count` > ?', $result->query);
+    }
+
+    public function testFilterWhereInSubqueryWithOtherFilters(): void
+    {
+        $sub = (new Builder())
+            ->from('premium_users')
+            ->select(['id'])
+            ->filter([Query::equal('tier', ['gold'])]);
+
+        $result = (new Builder())
+            ->from('orders')
+            ->filterWhereIn('user_id', $sub)
+            ->filter([Query::greaterThan('total', 100)])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('`user_id` IN (SELECT', $result->query);
+        $this->assertStringContainsString('WHERE `total` > ?', $result->query);
+    }
+
+    public function testExistsSubqueryWithFilter(): void
+    {
+        $sub = (new Builder())
+            ->from('orders')
+            ->filter([Query::raw('orders.customer_id = customers.id')])
+            ->filter([Query::greaterThan('total', 1000)]);
+
+        $result = (new Builder())
+            ->from('customers')
+            ->filterExists($sub)
+            ->filter([Query::equal('active', [1])])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('EXISTS (SELECT', $result->query);
+        $this->assertStringContainsString('`active` IN (?)', $result->query);
+    }
+
+    public function testConditionalAggregatesCountIfGroupByHaving(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->countWhen('status = ?', 'completed_count', 'completed')
+            ->countWhen('status = ?', 'pending_count', 'pending')
+            ->groupBy(['region'])
+            ->having([Query::greaterThan('completed_count', 10)])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('countIf(status = ?) AS `completed_count`', $result->query);
+        $this->assertStringContainsString('countIf(status = ?) AS `pending_count`', $result->query);
+        $this->assertStringContainsString('GROUP BY `region`', $result->query);
+        $this->assertStringContainsString('HAVING `completed_count` > ?', $result->query);
+    }
+
+    public function testSumIfWithGroupBy(): void
+    {
+        $result = (new Builder())
+            ->from('transactions')
+            ->sumWhen('amount', 'type = ?', 'credit_total', 'credit')
+            ->sumWhen('amount', 'type = ?', 'debit_total', 'debit')
+            ->groupBy(['account_id'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('sumIf(`amount`, type = ?) AS `credit_total`', $result->query);
+        $this->assertStringContainsString('sumIf(`amount`, type = ?) AS `debit_total`', $result->query);
+    }
+
+    public function testTableSamplingWithWhereAndOrder(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->tablesample(10.0)
+            ->filter([Query::equal('type', ['click'])])
+            ->sortDesc('timestamp')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('SAMPLE 0.1', $result->query);
+        $this->assertStringContainsString('WHERE `type` IN (?)', $result->query);
+        $this->assertStringContainsString('ORDER BY `timestamp` DESC', $result->query);
+    }
+
+    public function testSettingsWithComplexQuery(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->final()
+            ->join('users', 'events.uid', 'users.id')
+            ->filter([Query::greaterThan('count', 10)])
+            ->count('*', 'total')
+            ->groupBy(['users.country'])
+            ->settings(['max_threads' => '4', 'max_memory_usage' => '1000000000'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('SETTINGS max_threads=4, max_memory_usage=1000000000', $result->query);
+        $this->assertStringContainsString('FINAL', $result->query);
+        $this->assertStringContainsString('JOIN `users`', $result->query);
+    }
+
+    public function testInsertSelectFromSubquery(): void
+    {
+        $source = (new Builder())
+            ->from('staging')
+            ->select(['name', 'email'])
+            ->filter([Query::equal('imported', [0])]);
+
+        $result = (new Builder())
+            ->into('users')
+            ->fromSelect(['name', 'email'], $source)
+            ->insertSelect();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('INSERT INTO `users`', $result->query);
+        $this->assertStringContainsString('(`name`, `email`)', $result->query);
+        $this->assertStringContainsString('SELECT `name`, `email` FROM `staging`', $result->query);
+    }
+
+    public function testCaseExpressionWithAggregate(): void
+    {
+        $case = (new CaseBuilder())
+            ->when('status = ?', "'active'", ['active'])
+            ->when('status = ?', "'inactive'", ['inactive'])
+            ->elseResult("'unknown'")
+            ->alias('`status_label`')
+            ->build();
+
+        $result = (new Builder())
+            ->from('users')
+            ->selectCase($case)
+            ->count('*', 'total')
+            ->groupBy(['status'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('CASE WHEN status = ? THEN', $result->query);
+        $this->assertStringContainsString('COUNT(*) AS `total`', $result->query);
+    }
+
+    public function testExplainWithComplexQuery(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->final()
+            ->join('users', 'events.uid', 'users.id')
+            ->filter([Query::greaterThan('count', 5)])
+            ->count('*', 'total')
+            ->groupBy(['users.country'])
+            ->having([Query::greaterThan('total', 10)])
+            ->explain();
+
+        $this->assertStringStartsWith('EXPLAIN SELECT', $result->query);
+        $this->assertStringContainsString('FINAL', $result->query);
+        $this->assertTrue($result->readOnly);
+    }
+
+    public function testNestedOrAndFilters(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->filter([
+                Query::or([
+                    Query::and([
+                        Query::equal('status', ['active']),
+                        Query::greaterThan('age', 18),
+                    ]),
+                    Query::and([
+                        Query::lessThan('score', 50),
+                        Query::notEqual('role', 'admin'),
+                    ]),
+                ]),
+            ])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('(`status` IN (?) AND `age` > ?)', $result->query);
+        $this->assertStringContainsString('(`score` < ? AND `role` != ?)', $result->query);
+        $this->assertStringContainsString(' OR ', $result->query);
+    }
+
+    public function testTripleNestedLogicalOperators(): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([
+                Query::and([
+                    Query::or([
+                        Query::and([
+                            Query::equal('a', [1]),
+                            Query::equal('b', [2]),
+                        ]),
+                        Query::equal('c', [3]),
+                    ]),
+                    Query::greaterThan('d', 4),
+                ]),
+            ])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertEquals([1, 2, 3, 4], $result->bindings);
+    }
+
+    public function testIsNullIsNotNullEqualCombined(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->filter([
+                Query::isNull('deleted_at'),
+                Query::isNotNull('email'),
+                Query::equal('status', ['active']),
+            ])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('`deleted_at` IS NULL', $result->query);
+        $this->assertStringContainsString('`email` IS NOT NULL', $result->query);
+        $this->assertStringContainsString('`status` IN (?)', $result->query);
+    }
+
+    public function testBetweenAndNotEqualCombined(): void
+    {
+        $result = (new Builder())
+            ->from('products')
+            ->filter([
+                Query::between('price', 10, 100),
+                Query::notEqual('status', 'discontinued'),
+            ])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('`price` BETWEEN ? AND ?', $result->query);
+        $this->assertStringContainsString('`status` != ?', $result->query);
+        $this->assertEquals([10, 100, 'discontinued'], $result->bindings);
+    }
+
+    public function testMultipleSortDirectionsInterleaved(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->sortAsc('category')
+            ->sortDesc('priority')
+            ->sortAsc('name')
+            ->sortDesc('created_at')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertEquals(
+            'SELECT * FROM `events` ORDER BY `category` ASC, `priority` DESC, `name` ASC, `created_at` DESC',
+            $result->query
+        );
+    }
+
+    public function testDistinctWithCount(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->distinct()
+            ->countDistinct('user_id', 'unique_users')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('SELECT DISTINCT', $result->query);
+        $this->assertStringContainsString('COUNT(DISTINCT `user_id`)', $result->query);
+    }
+
+    public function testGroupByMultipleColumns(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->count('*', 'total')
+            ->groupBy(['region', 'category', 'year'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('GROUP BY `region`, `category`, `year`', $result->query);
+    }
+
+    public function testEmptySelect(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertEquals('SELECT * FROM `events`', $result->query);
+    }
+
+    public function testLimitOneOffsetZero(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->limit(1)
+            ->offset(0)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertEquals('SELECT * FROM `events` LIMIT ? OFFSET ?', $result->query);
+        $this->assertEquals([1, 0], $result->bindings);
+    }
+
+    public function testCloneAndModify(): void
+    {
+        $original = (new Builder())
+            ->from('events')
+            ->filter([Query::equal('status', ['active'])]);
+
+        $cloned = $original->clone();
+        $cloned->filter([Query::greaterThan('count', 10)]);
+
+        $originalResult = $original->build();
+        $clonedResult = $cloned->build();
+        $this->assertBindingCount($originalResult);
+        $this->assertBindingCount($clonedResult);
+
+        $this->assertStringNotContainsString('`count`', $originalResult->query);
+        $this->assertStringContainsString('`count` > ?', $clonedResult->query);
+    }
+
+    public function testResetAndRebuild(): void
+    {
+        $builder = (new Builder())
+            ->from('events')
+            ->final()
+            ->sample(0.5)
+            ->prewhere([Query::equal('type', ['click'])])
+            ->filter([Query::greaterThan('count', 5)])
+            ->settings(['max_threads' => '4']);
+
+        $builder->build();
+        $builder->reset();
+
+        $result = $builder
+            ->from('logs')
+            ->filter([Query::equal('level', ['error'])])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertEquals('SELECT * FROM `logs` WHERE `level` IN (?)', $result->query);
+        $this->assertEquals(['error'], $result->bindings);
+    }
+
+    public function testReadOnlyFlagOnBuild(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertTrue($result->readOnly);
+    }
+
+    public function testReadOnlyFlagOnInsert(): void
+    {
+        $result = (new Builder())
+            ->into('events')
+            ->set(['name' => 'test'])
+            ->insert();
+        $this->assertBindingCount($result);
+
+        $this->assertFalse($result->readOnly);
+    }
+
+    public function testBindingOrderCteWhereHaving(): void
+    {
+        $cte = (new Builder())
+            ->from('raw_data')
+            ->filter([Query::greaterThan('amount', 0)]);
+
+        $result = (new Builder())
+            ->with('filtered', $cte)
+            ->from('filtered')
+            ->filter([Query::equal('status', ['active'])])
+            ->count('*', 'cnt')
+            ->groupBy(['region'])
+            ->having([Query::greaterThan('cnt', 5)])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertEquals(0, $result->bindings[0]);
+        $this->assertEquals('active', $result->bindings[1]);
+        $this->assertEquals(5, $result->bindings[2]);
+    }
+
+    public function testContainsWithSpecialCharacters(): void
+    {
+        $result = (new Builder())
+            ->from('logs')
+            ->filter([Query::contains('message', ["it's a test"])])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('position(`message`, ?) > 0', $result->query);
+        $this->assertEquals(["it's a test"], $result->bindings);
+    }
+
+    public function testStartsWithSqlWildcardChars(): void
+    {
+        $result = (new Builder())
+            ->from('files')
+            ->filter([Query::startsWith('path', '/tmp/%test_')])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('startsWith(`path`, ?)', $result->query);
+        $this->assertEquals(['/tmp/%test_'], $result->bindings);
+    }
+
+    public function testMultipleSetForMultiRowInsert(): void
+    {
+        $result = (new Builder())
+            ->into('events')
+            ->set(['name' => 'a', 'value' => 1])
+            ->set(['name' => 'b', 'value' => 2])
+            ->set(['name' => 'c', 'value' => 3])
+            ->insert();
+        $this->assertBindingCount($result);
+
+        $this->assertEquals(
+            'INSERT INTO `events` (`name`, `value`) VALUES (?, ?), (?, ?), (?, ?)',
+            $result->query
+        );
+        $this->assertEquals(['a', 1, 'b', 2, 'c', 3], $result->bindings);
+    }
+
+    public function testBooleanFilterValues(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->filter([
+                Query::equal('active', [true]),
+                Query::equal('deleted', [false]),
+            ])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertEquals([true, false], $result->bindings);
+    }
+
+    public function testNullFilterViaRaw(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->filter([Query::isNull('email')])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('`email` IS NULL', $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testBeforeBuildCallback(): void
+    {
+        $callbackCalled = false;
+        $result = (new Builder())
+            ->from('events')
+            ->beforeBuild(function (Builder $b) use (&$callbackCalled) {
+                $callbackCalled = true;
+                $b->filter([Query::equal('injected', ['yes'])]);
+            })
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertTrue($callbackCalled);
+        $this->assertStringContainsString('`injected` IN (?)', $result->query);
+    }
+
+    public function testAfterBuildCallback(): void
+    {
+        $capturedQuery = '';
+        $result = (new Builder())
+            ->from('events')
+            ->filter([Query::equal('status', ['active'])])
+            ->afterBuild(function (BuildResult $r) use (&$capturedQuery) {
+                $capturedQuery = 'callback_executed';
+                return $r;
+            })
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertEquals('callback_executed', $capturedQuery);
+    }
+
+    public function testFullOuterJoinWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('left_table')
+            ->fullOuterJoin('right_table', 'left_table.id', 'right_table.ref_id')
+            ->filter([Query::isNotNull('left_table.id')])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('FULL OUTER JOIN `right_table`', $result->query);
+        $this->assertStringContainsString('`left_table`.`id` IS NOT NULL', $result->query);
+    }
+
+    public function testAvgIfWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->avgWhen('amount', 'region = ?', 'avg_east', 'east')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('avgIf(`amount`, region = ?) AS `avg_east`', $result->query);
+        $this->assertEquals(['east'], $result->bindings);
+    }
+
+    public function testMinIfWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('products')
+            ->minWhen('price', 'category = ?', 'min_electronics', 'electronics')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('minIf(`price`, category = ?) AS `min_electronics`', $result->query);
+    }
+
+    public function testMaxIfWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('products')
+            ->maxWhen('price', 'in_stock = ?', 'max_available', 1)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('maxIf(`price`, in_stock = ?) AS `max_available`', $result->query);
+    }
+
+    public function testSampleValidationZeroBoundary(): void
+    {
+        $this->expectException(ValidationException::class);
+        (new Builder())->from('t')->sample(0.0);
+    }
+
+    public function testSampleValidationOneBoundary(): void
+    {
+        $this->expectException(ValidationException::class);
+        (new Builder())->from('t')->sample(1.0);
+    }
+
+    public function testSettingsInvalidKeyThrowsOnSpecialChars(): void
+    {
+        $this->expectException(ValidationException::class);
+        (new Builder())->from('t')->settings(['invalid key!' => '1']);
+    }
+
+    public function testSettingsInvalidValueThrowsOnSqlInjection(): void
+    {
+        $this->expectException(ValidationException::class);
+        (new Builder())->from('t')->settings(['max_threads' => 'DROP TABLE']);
+    }
+
+    public function testUpdateWithoutWhereThrowsValidation(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('ClickHouse UPDATE requires a WHERE clause.');
+
+        (new Builder())
+            ->from('events')
+            ->set(['name' => 'updated'])
+            ->update();
+    }
+
+    public function testDeleteWithoutWhereThrowsValidation(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('ClickHouse DELETE requires a WHERE clause.');
+
+        (new Builder())
+            ->from('events')
+            ->delete();
+    }
+
+    public function testUpdateAlterTableWithMultipleAssignments(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->set(['status' => 'archived', 'updated_at' => '2024-06-01'])
+            ->filter([Query::equal('status', ['old'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $this->assertStringStartsWith('ALTER TABLE `events` UPDATE', $result->query);
+        $this->assertStringContainsString('`status` = ?', $result->query);
+        $this->assertStringContainsString('`updated_at` = ?', $result->query);
+    }
+
+    public function testDeleteAlterTableWithMultipleFilters(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->filter([
+                Query::lessThan('created_at', '2020-01-01'),
+                Query::equal('archived', [1]),
+            ])
+            ->delete();
+        $this->assertBindingCount($result);
+
+        $this->assertStringStartsWith('ALTER TABLE `events` DELETE', $result->query);
+        $this->assertStringContainsString('`created_at` < ?', $result->query);
+        $this->assertStringContainsString('`archived` IN (?)', $result->query);
+    }
+
+    public function testPrewhereWithSettings(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->prewhere([Query::equal('type', ['click'])])
+            ->filter([Query::greaterThan('count', 5)])
+            ->settings(['max_threads' => '2'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
+        $this->assertStringContainsString('WHERE `count` > ?', $result->query);
+        $this->assertStringContainsString('SETTINGS max_threads=2', $result->query);
+    }
+
+    public function testHintValidation(): void
+    {
+        $this->expectException(ValidationException::class);
+        (new Builder())->from('t')->hint('DROP TABLE; --');
+    }
+
+    public function testSelectRawWithBindings(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->selectRaw('toDate(?) AS ref_date', ['2024-01-01'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('toDate(?) AS ref_date', $result->query);
+        $this->assertEquals(['2024-01-01'], $result->bindings);
+    }
+
+    public function testFilterWhereNotInSubquery(): void
+    {
+        $sub = (new Builder())
+            ->from('blocked_users')
+            ->select(['id']);
+
+        $result = (new Builder())
+            ->from('users')
+            ->filterWhereNotIn('id', $sub)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('`id` NOT IN (SELECT', $result->query);
     }
 }

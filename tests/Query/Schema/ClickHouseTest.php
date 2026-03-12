@@ -9,8 +9,11 @@ use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\ClickHouse as Schema;
+use Utopia\Query\Schema\Feature\ColumnComments;
+use Utopia\Query\Schema\Feature\DropPartition;
 use Utopia\Query\Schema\Feature\ForeignKeys;
 use Utopia\Query\Schema\Feature\Procedures;
+use Utopia\Query\Schema\Feature\TableComments;
 use Utopia\Query\Schema\Feature\Triggers;
 
 class ClickHouseTest extends TestCase
@@ -438,5 +441,123 @@ class ClickHouseTest extends TestCase
         $this->assertSame('DROP TABLE `metrics`', $result->query);
         $this->assertEquals([], $result->bindings);
         $this->assertBindingCount($result);
+    }
+
+    public function testImplementsTableComments(): void
+    {
+        $this->assertInstanceOf(TableComments::class, new Schema());
+    }
+
+    public function testImplementsColumnComments(): void
+    {
+        $this->assertInstanceOf(ColumnComments::class, new Schema());
+    }
+
+    public function testImplementsDropPartition(): void
+    {
+        $this->assertInstanceOf(DropPartition::class, new Schema());
+    }
+
+    public function testCommentOnTable(): void
+    {
+        $schema = new Schema();
+        $result = $schema->commentOnTable('events', 'Main events table');
+
+        $this->assertSame("ALTER TABLE `events` MODIFY COMMENT 'Main events table'", $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testCommentOnColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->commentOnColumn('events', 'name', 'Event name');
+
+        $this->assertSame("ALTER TABLE `events` COMMENT COLUMN `name` 'Event name'", $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testDropPartition(): void
+    {
+        $schema = new Schema();
+        $result = $schema->dropPartition('events', '202401');
+
+        $this->assertSame("ALTER TABLE `events` DROP PARTITION '202401'", $result->query);
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testCreateTableWithPartition(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Blueprint $table) {
+            $table->bigInteger('id')->primary();
+            $table->string('name');
+            $table->datetime('created_at', 3);
+            $table->partitionByRange('toYYYYMM(created_at)');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('PARTITION BY toYYYYMM(created_at)', $result->query);
+        $this->assertStringContainsString('ENGINE = MergeTree()', $result->query);
+        $this->assertStringContainsString('ORDER BY (`id`)', $result->query);
+    }
+
+    public function testCreateTableIfNotExists(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Blueprint $table) {
+            $table->bigInteger('id')->primary();
+            $table->string('name');
+        }, ifNotExists: true);
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('CREATE TABLE IF NOT EXISTS `events`', $result->query);
+    }
+
+    public function testCompileAutoIncrementReturnsEmpty(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('t', function (Blueprint $table) {
+            $table->bigInteger('id')->primary()->autoIncrement();
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString('AUTO_INCREMENT', $result->query);
+        $this->assertStringNotContainsString('IDENTITY', $result->query);
+    }
+
+    public function testCompileUnsignedReturnsEmpty(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('t', function (Blueprint $table) {
+            $table->integer('val')->unsigned();
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('`val` UInt32', $result->query);
+        $this->assertStringNotContainsString('UNSIGNED', $result->query);
+    }
+
+    public function testCommentOnTableEscapesSingleQuotes(): void
+    {
+        $schema = new Schema();
+        $result = $schema->commentOnTable('events', "User's events");
+
+        $this->assertStringContainsString("'User''s events'", $result->query);
+    }
+
+    public function testCommentOnColumnEscapesSingleQuotes(): void
+    {
+        $schema = new Schema();
+        $result = $schema->commentOnColumn('events', 'name', "It's a name");
+
+        $this->assertStringContainsString("'It''s a name'", $result->query);
+    }
+
+    public function testDropPartitionEscapesSingleQuotes(): void
+    {
+        $schema = new Schema();
+        $result = $schema->dropPartition('events', "test'val");
+
+        $this->assertStringContainsString("'test''val'", $result->query);
     }
 }

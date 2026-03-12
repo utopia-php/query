@@ -6,12 +6,19 @@ use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\MySQL as SQLBuilder;
 use Utopia\Query\Exception\UnsupportedException;
+use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\Blueprint;
+use Utopia\Query\Schema\Column;
+use Utopia\Query\Schema\ColumnType;
+use Utopia\Query\Schema\Feature\CreatePartition;
+use Utopia\Query\Schema\Feature\DropPartition;
 use Utopia\Query\Schema\Feature\ForeignKeys;
 use Utopia\Query\Schema\Feature\Procedures;
+use Utopia\Query\Schema\Feature\TableComments;
 use Utopia\Query\Schema\Feature\Triggers;
 use Utopia\Query\Schema\ForeignKeyAction;
+use Utopia\Query\Schema\Index;
 use Utopia\Query\Schema\MySQL as Schema;
 use Utopia\Query\Schema\ParameterDirection;
 use Utopia\Query\Schema\TriggerEvent;
@@ -770,5 +777,383 @@ class MySQLTest extends TestCase
         $this->assertSame('DROP TABLE `sessions`', $result->query);
         $this->assertEquals([], $result->bindings);
         $this->assertBindingCount($result);
+    }
+
+    public function testImplementsTableComments(): void
+    {
+        $this->assertInstanceOf(TableComments::class, new Schema());
+    }
+
+    public function testImplementsCreatePartition(): void
+    {
+        $this->assertInstanceOf(CreatePartition::class, new Schema());
+    }
+
+    public function testImplementsDropPartition(): void
+    {
+        $this->assertInstanceOf(DropPartition::class, new Schema());
+    }
+
+    public function testCreateDatabase(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createDatabase('myapp');
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE DATABASE `myapp` /*!40100 DEFAULT CHARACTER SET utf8mb4 */',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testChangeColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->changeColumn('users', 'name', 'full_name', 'VARCHAR(500)');
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'ALTER TABLE `users` CHANGE COLUMN `name` `full_name` VARCHAR(500)',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testModifyColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->modifyColumn('users', 'email', 'TEXT');
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'ALTER TABLE `users` MODIFY `email` TEXT',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testCommentOnTable(): void
+    {
+        $schema = new Schema();
+        $result = $schema->commentOnTable('users', 'Main user table');
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            "ALTER TABLE `users` COMMENT = 'Main user table'",
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testCommentOnTableEscapesSingleQuotes(): void
+    {
+        $schema = new Schema();
+        $result = $schema->commentOnTable('users', "User's table");
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            "ALTER TABLE `users` COMMENT = 'User''s table'",
+            $result->query
+        );
+    }
+
+    public function testCreatePartition(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createPartition('events', 'p2024', "VALUES LESS THAN ('2025-01-01')");
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            "ALTER TABLE `events` ADD PARTITION (PARTITION `p2024` VALUES LESS THAN ('2025-01-01'))",
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testDropPartition(): void
+    {
+        $schema = new Schema();
+        $result = $schema->dropPartition('events', 'p2023');
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'ALTER TABLE `events` DROP PARTITION `p2023`',
+            $result->query
+        );
+        $this->assertEquals([], $result->bindings);
+    }
+
+    public function testCreateIfNotExists(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createIfNotExists('users', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('CREATE TABLE IF NOT EXISTS `users`', $result->query);
+    }
+
+    public function testCreateTableWithRawColumnDefs(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('t', function (Blueprint $table) {
+            $table->id();
+            $table->rawColumn('`custom_col` VARCHAR(255) NOT NULL DEFAULT ""');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('`custom_col` VARCHAR(255) NOT NULL DEFAULT ""', $result->query);
+    }
+
+    public function testCreateTableWithRawIndexDefs(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('t', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->rawIndex('INDEX `idx_custom` (`name`(10))');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('INDEX `idx_custom` (`name`(10))', $result->query);
+    }
+
+    public function testCreateTableWithPartitionByRange(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Blueprint $table) {
+            $table->id();
+            $table->datetime('created_at');
+            $table->partitionByRange('YEAR(created_at)');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('PARTITION BY RANGE(YEAR(created_at))', $result->query);
+    }
+
+    public function testCreateTableWithPartitionByList(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Blueprint $table) {
+            $table->id();
+            $table->string('region');
+            $table->partitionByList('region');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('PARTITION BY LIST(region)', $result->query);
+    }
+
+    public function testCreateTableWithPartitionByHash(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Blueprint $table) {
+            $table->id();
+            $table->partitionByHash('id');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('PARTITION BY HASH(id)', $result->query);
+    }
+
+    public function testAlterWithForeignKeyOnDeleteAndUpdate(): void
+    {
+        $schema = new Schema();
+        $result = $schema->alter('orders', function (Blueprint $table) {
+            $table->addForeignKey('user_id')
+                ->references('id')->on('users')
+                ->onDelete(ForeignKeyAction::Cascade)
+                ->onUpdate(ForeignKeyAction::SetNull);
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ON DELETE CASCADE', $result->query);
+        $this->assertStringContainsString('ON UPDATE SET NULL', $result->query);
+    }
+
+    public function testCreateIndexWithMethod(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createIndex('users', 'idx_email', ['email'], method: 'btree');
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('USING BTREE', $result->query);
+    }
+
+    public function testCompileIndexColumnsWithCollation(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createIndex(
+            'users',
+            'idx_name',
+            ['name'],
+            collations: ['name' => 'utf8mb4_bin']
+        );
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('COLLATE utf8mb4_bin', $result->query);
+    }
+
+    public function testCompileIndexColumnsWithLength(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createIndex(
+            'users',
+            'idx_name',
+            ['name'],
+            lengths: ['name' => 10]
+        );
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('`name`(10)', $result->query);
+    }
+
+    public function testCompileIndexColumnsWithOrder(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createIndex(
+            'users',
+            'idx_name',
+            ['name'],
+            orders: ['name' => 'desc']
+        );
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('`name` DESC', $result->query);
+    }
+
+    public function testCompileIndexColumnsWithOperatorClass(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createIndex(
+            'docs',
+            'idx_content',
+            ['content'],
+            operatorClass: 'gin_trgm_ops'
+        );
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('gin_trgm_ops', $result->query);
+    }
+
+    public function testCompileIndexColumnsWithRawColumns(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createIndex(
+            'docs',
+            'idx_mixed',
+            ['id'],
+            rawColumns: ['CAST(data AS CHAR(100))']
+        );
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('CAST(data AS CHAR(100))', $result->query);
+    }
+
+    public function testRenameIndexSql(): void
+    {
+        $schema = new Schema();
+        $result = $schema->renameIndex('users', 'idx_old', 'idx_new');
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'ALTER TABLE `users` RENAME INDEX `idx_old` TO `idx_new`',
+            $result->query
+        );
+    }
+
+    public function testDropDatabase(): void
+    {
+        $schema = new Schema();
+        $result = $schema->dropDatabase('mydb');
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('DROP DATABASE', $result->query);
+        $this->assertStringContainsString('mydb', $result->query);
+    }
+
+    public function testAnalyzeTable(): void
+    {
+        $schema = new Schema();
+        $result = $schema->analyzeTable('users');
+        $this->assertBindingCount($result);
+
+        $this->assertSame('ANALYZE TABLE `users`', $result->query);
+    }
+
+    public function testBlueprintJsonColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('t', function (Blueprint $table) {
+            $table->json('metadata');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('JSON NOT NULL', $result->query);
+    }
+
+    public function testBlueprintBinaryColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('t', function (Blueprint $table) {
+            $table->binary('data');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('BLOB NOT NULL', $result->query);
+    }
+
+    public function testColumnCollation(): void
+    {
+        $col = new Column('name', ColumnType::String, 255);
+        $col->collation('utf8mb4_unicode_ci');
+
+        $this->assertSame('utf8mb4_unicode_ci', $col->collation);
+    }
+
+    public function testColumnPrecision(): void
+    {
+        $col = new Column('amount', ColumnType::Float, precision: 10);
+
+        $this->assertSame(10, $col->precision);
+        $this->assertNull($col->length);
+    }
+
+    public function testBlueprintAddIndexWithStringType(): void
+    {
+        $schema = new Schema();
+        $result = $schema->alter('users', function (Blueprint $table) {
+            $table->addIndex('idx_name', ['name'], 'unique');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ADD UNIQUE INDEX', $result->query);
+    }
+
+    public function testIndexValidationInvalidMethod(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid index method');
+
+        new Index('idx', ['col'], method: 'DROP TABLE;');
+    }
+
+    public function testIndexValidationInvalidOperatorClass(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid operator class');
+
+        new Index('idx', ['col'], operatorClass: 'DROP;');
+    }
+
+    public function testIndexValidationInvalidCollation(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid collation');
+
+        new Index('idx', ['col'], collations: ['col' => 'DROP;']);
     }
 }
