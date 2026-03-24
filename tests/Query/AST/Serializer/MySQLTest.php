@@ -6,13 +6,14 @@ use PHPUnit\Framework\TestCase;
 use Utopia\Query\AST\Parser;
 use Utopia\Query\AST\Serializer\MySQL;
 use Utopia\Query\AST\Statement\Select;
+use Utopia\Query\Tokenizer\MySQL as MySQLTokenizer;
 use Utopia\Query\Tokenizer\Tokenizer;
 
 class MySQLTest extends TestCase
 {
     private function parse(string $sql): Select
     {
-        $tokenizer = new \Utopia\Query\Tokenizer\MySQL();
+        $tokenizer = new MySQLTokenizer();
         $tokens = Tokenizer::filter($tokenizer->tokenize($sql));
         $parser = new Parser();
         return $parser->parse($tokens);

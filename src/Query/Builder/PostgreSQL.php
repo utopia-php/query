@@ -2,6 +2,8 @@
 
 namespace Utopia\Query\Builder;
 
+use Utopia\Query\AST\Serializer;
+use Utopia\Query\AST\Serializer\PostgreSQL as PostgreSQLSerializer;
 use Utopia\Query\Builder as BaseBuilder;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\FullOuterJoins;
@@ -26,6 +28,11 @@ use Utopia\Query\Schema\ColumnType;
 class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf, ConditionalAggregates, Merge, LateralJoins, TableSampling, FullOuterJoins, StringAggregates, OrderedSetAggregates, DistinctOn, AggregateFilter, GroupByModifiers
 {
     protected string $wrapChar = '"';
+
+    protected function createAstSerializer(): Serializer
+    {
+        return new PostgreSQLSerializer();
+    }
 
     /** @var list<string> */
     protected array $returningColumns = [];

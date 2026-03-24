@@ -18,6 +18,7 @@ use Utopia\Query\AST\Reference\Column;
 use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\Specification\Window as WindowSpecification;
 use Utopia\Query\AST\Statement\Select;
+use Utopia\Query\Exception;
 
 class Serializer
 {
@@ -111,7 +112,7 @@ class Serializer
             $expression instanceof Conditional => $this->serializeConditional($expression),
             $expression instanceof Cast => $this->serializeCast($expression),
             $expression instanceof Subquery => '(' . $this->serialize($expression->query) . ')',
-            default => throw new \Utopia\Query\Exception('Unsupported expression type: ' . get_class($expression)),
+            default => throw new Exception('Unsupported expression type: ' . get_class($expression)),
         };
     }
 

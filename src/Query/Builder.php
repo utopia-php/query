@@ -14,6 +14,7 @@ use Utopia\Query\AST\Expression\Unary;
 use Utopia\Query\AST\JoinClause as AstJoinClause;
 use Utopia\Query\AST\Literal;
 use Utopia\Query\AST\OrderByItem;
+use Utopia\Query\AST\Parser;
 use Utopia\Query\AST\Raw;
 use Utopia\Query\AST\Reference\Column;
 use Utopia\Query\AST\Reference\Table;
@@ -45,6 +46,7 @@ use Utopia\Query\Hook\Attribute;
 use Utopia\Query\Hook\Filter;
 use Utopia\Query\Hook\Join\Filter as JoinFilter;
 use Utopia\Query\Hook\Join\Placement;
+use Utopia\Query\Tokenizer\Tokenizer;
 
 abstract class Builder implements
     Compiler,
@@ -2734,10 +2736,15 @@ abstract class Builder implements
 
     private function parseSqlToAst(string $sql): Select
     {
-        $tokenizer = new \Utopia\Query\Tokenizer\Tokenizer();
-        $tokens = \Utopia\Query\Tokenizer\Tokenizer::filter($tokenizer->tokenize($sql));
-        $parser = new \Utopia\Query\AST\Parser();
+        $tokenizer = new Tokenizer();
+        $tokens = Tokenizer::filter($tokenizer->tokenize($sql));
+        $parser = new Parser();
         return $parser->parse($tokens);
+    }
+
+    protected function createAstSerializer(): Serializer
+    {
+        return new Serializer();
     }
 
     public static function fromAst(Select $ast): static
@@ -2799,12 +2806,16 @@ abstract class Builder implements
             }
 
             if ($col instanceof Aliased && $col->expression instanceof Column) {
-                $selectCols[] = $this->astColumnReferenceToString($col->expression);
+                $colStr = $this->astColumnReferenceToString($col->expression);
+                if ($col->alias !== '') {
+                    $colStr .= ' AS ' . $col->alias;
+                }
+                $selectCols[] = $colStr;
                 $hasNonStar = true;
                 continue;
             }
 
-            $serializer = new Serializer();
+            $serializer = $this->createAstSerializer();
             $this->selectRaw($serializer->serializeExpression($col));
             $hasNonStar = true;
         }
@@ -2853,7 +2864,7 @@ abstract class Builder implements
             return;
         }
 
-        $serializer = new Serializer();
+        $serializer = $this->createAstSerializer();
         $this->selectRaw($serializer->serializeExpression($aliased));
     }
 
@@ -2881,7 +2892,7 @@ abstract class Builder implements
             return;
         }
 
-        $serializer = new Serializer();
+        $serializer = $this->createAstSerializer();
         $this->selectRaw($serializer->serializeExpression($fn));
     }
 
@@ -2968,7 +2979,7 @@ abstract class Builder implements
             return $this->astColumnReferenceToString($expression);
         }
 
-        $serializer = new Serializer();
+        $serializer = $this->createAstSerializer();
         return $serializer->serializeExpression($expression);
     }
 
@@ -3000,7 +3011,7 @@ abstract class Builder implements
             return [$query];
         }
 
-        $serializer = new Serializer();
+        $serializer = $this->createAstSerializer();
         return [Query::raw($serializer->serializeExpression($expression))];
     }
 
@@ -3163,7 +3174,7 @@ abstract class Builder implements
                     $this->sortAsc($attr, $nulls);
                 }
             } else {
-                $serializer = new Serializer();
+                $serializer = $this->createAstSerializer();
                 $rawExpr = $serializer->serializeExpression($item->expression);
                 $dir = \strtoupper($item->direction) === 'DESC' ? ' DESC' : ' ASC';
                 $this->orderByRaw($rawExpr . $dir);
@@ -3185,7 +3196,7 @@ abstract class Builder implements
     private function applyAstCtes(Select $ast): void
     {
         foreach ($ast->ctes as $cte) {
-            $serializer = new Serializer();
+            $serializer = $this->createAstSerializer();
             $cteSql = $serializer->serialize($cte->query);
 
             $this->ctes[] = new CteClause(

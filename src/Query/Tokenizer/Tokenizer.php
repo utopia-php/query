@@ -337,10 +337,8 @@ class Tokenizer
             $c = $this->sql[$this->pos];
             if ($c === 'e' || $c === 'E') {
                 $nextIdx = $this->pos + 1;
-                $hasSign = false;
                 if ($nextIdx < $this->length && ($this->sql[$nextIdx] === '+' || $this->sql[$nextIdx] === '-')) {
                     $nextIdx++;
-                    $hasSign = true;
                 }
                 if ($nextIdx < $this->length && $this->isDigit($this->sql[$nextIdx])) {
                     $isFloat = true;

@@ -2,6 +2,8 @@
 
 namespace Utopia\Query\Builder;
 
+use Utopia\Query\AST\Serializer;
+use Utopia\Query\AST\Serializer\SQLite as SQLiteSerializer;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\StringAggregates;
@@ -13,6 +15,11 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
 {
     /** @var array<string, Condition> */
     protected array $jsonSets = [];
+
+    protected function createAstSerializer(): Serializer
+    {
+        return new SQLiteSerializer();
+    }
 
     protected function compileRandom(): string
     {

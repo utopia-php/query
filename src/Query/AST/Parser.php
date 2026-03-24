@@ -28,6 +28,7 @@ class Parser
 {
     /** @var Token[] */
     private array $tokens;
+    private int $tokenCount;
     private int $pos;
     private bool $inColumnList = false;
 
@@ -38,6 +39,7 @@ class Parser
     public function parse(array $tokens): Select
     {
         $this->tokens = $tokens;
+        $this->tokenCount = count($tokens);
         $this->pos = 0;
         $this->inColumnList = false;
 
@@ -186,14 +188,14 @@ class Parser
     {
         $depth = 0;
 
-        for ($i = $this->pos; $i < count($this->tokens); $i++) {
+        for ($i = $this->pos; $i < $this->tokenCount; $i++) {
             $t = $this->tokens[$i];
             if ($t->type === TokenType::LeftParen) {
                 $depth++;
             } elseif ($t->type === TokenType::RightParen) {
                 $depth--;
                 if ($depth === 0) {
-                    $next = $i + 1 < count($this->tokens) ? $this->tokens[$i + 1] : null;
+                    $next = $i + 1 < $this->tokenCount ? $this->tokens[$i + 1] : null;
                     return $next !== null
                         && $next->type === TokenType::Keyword
                         && strtoupper($next->value) === 'AS';
@@ -1033,16 +1035,16 @@ class Parser
     private function peek(int $offset = 1): Token
     {
         $idx = $this->pos + $offset;
-        if ($idx < count($this->tokens)) {
+        if ($idx < $this->tokenCount) {
             return $this->tokens[$idx];
         }
-        return $this->tokens[count($this->tokens) - 1];
+        return $this->tokens[$this->tokenCount - 1];
     }
 
     private function advance(): Token
     {
         $token = $this->tokens[$this->pos];
-        if ($this->pos < count($this->tokens) - 1) {
+        if ($this->pos < $this->tokenCount - 1) {
             $this->pos++;
         }
         return $token;

@@ -24,6 +24,16 @@ class FilterInjector implements Visitor
         return $reference;
     }
 
+    /**
+     * Injects the condition into the SELECT's WHERE clause.
+     *
+     * When used with Walker, this applies to ALL Select nodes including subqueries
+     * (bottom-up traversal). For top-level-only injection, call this method directly
+     * on the outermost Select instead of using the Walker:
+     *
+     *     $injector = new FilterInjector($condition);
+     *     $result = $injector->visitSelect($stmt);
+     */
     public function visitSelect(Select $stmt): Select
     {
         if ($stmt->where === null) {

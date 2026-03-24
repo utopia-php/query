@@ -6,13 +6,14 @@ use PHPUnit\Framework\TestCase;
 use Utopia\Query\AST\Parser;
 use Utopia\Query\AST\Serializer\PostgreSQL;
 use Utopia\Query\AST\Statement\Select;
+use Utopia\Query\Tokenizer\PostgreSQL as PostgreSQLTokenizer;
 use Utopia\Query\Tokenizer\Tokenizer;
 
 class PostgreSQLTest extends TestCase
 {
     private function parse(string $sql): Select
     {
-        $tokenizer = new \Utopia\Query\Tokenizer\PostgreSQL();
+        $tokenizer = new PostgreSQLTokenizer();
         $tokens = Tokenizer::filter($tokenizer->tokenize($sql));
         $parser = new Parser();
         return $parser->parse($tokens);
