@@ -8,5 +8,6 @@ readonly class JoinClause
         public string $type,
         public TableRef|SubquerySource $table,
         public ?Expr $condition = null,
-    ) {}
+    ) {
+    }
 }

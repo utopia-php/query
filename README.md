@@ -5,7 +5,7 @@
 [![Linter](https://github.com/utopia-php/query/actions/workflows/linter.yml/badge.svg)](https://github.com/utopia-php/query/actions/workflows/linter.yml)
 [![Static Analysis](https://github.com/utopia-php/query/actions/workflows/static-analysis.yml/badge.svg)](https://github.com/utopia-php/query/actions/workflows/static-analysis.yml)
 
-A PHP library for building type-safe, dialect-aware SQL queries and DDL statements. Provides a fluent builder API with parameterized output for MySQL, MariaDB, PostgreSQL, SQLite, and ClickHouse, plus a serializable `Query` value object for passing query definitions between services.
+A PHP library for building type-safe, dialect-aware queries and DDL statements. Provides a fluent builder API with parameterized output for MySQL, MariaDB, PostgreSQL, SQLite, ClickHouse, and MongoDB, plus wire protocol parsers and a serializable `Query` value object for passing query definitions between services.
 
 ## Installation
 
@@ -31,7 +31,11 @@ composer require utopia-php/query
 - [Query Builder](#query-builder)
   - [Basic Usage](#basic-usage)
   - [Aggregations](#aggregations)
+  - [Statistical Aggregates](#statistical-aggregates)
+  - [Bitwise Aggregates](#bitwise-aggregates)
   - [Conditional Aggregates](#conditional-aggregates)
+  - [String Aggregates](#string-aggregates)
+  - [Group By Modifiers](#group-by-modifiers)
   - [Joins](#joins)
   - [Unions and Set Operations](#unions-and-set-operations)
   - [CTEs (Common Table Expressions)](#ctes-common-table-expressions)
@@ -54,6 +58,7 @@ composer require utopia-php/query
   - [PostgreSQL](#postgresql)
   - [SQLite](#sqlite)
   - [ClickHouse](#clickhouse)
+  - [MongoDB](#mongodb)
   - [Feature Matrix](#feature-matrix)
 - [Schema Builder](#schema-builder)
   - [Creating Tables](#creating-tables)
@@ -67,6 +72,12 @@ composer require utopia-php/query
   - [PostgreSQL Schema Extensions](#postgresql-schema-extensions)
   - [ClickHouse Schema](#clickhouse-schema)
   - [SQLite Schema](#sqlite-schema)
+  - [MongoDB Schema](#mongodb-schema)
+- [Wire Protocol Parsers](#wire-protocol-parsers)
+  - [SQL Parser](#sql-parser)
+  - [MySQL Parser](#mysql-parser)
+  - [PostgreSQL Parser](#postgresql-parser)
+  - [MongoDB Parser](#mongodb-parser)
 - [Compiler Interface](#compiler-interface)
 - [Contributing](#contributing)
 - [License](#license)
@@ -235,17 +246,18 @@ $errors = Query::validate($queries, ['name', 'age', 'status']);
 
 ## Query Builder
 
-The builder generates parameterized SQL from the fluent API. Every `build()`, `insert()`, `update()`, and `delete()` call returns a `BuildResult` with `->query` (the SQL string), `->bindings` (the parameter array), and `->readOnly` (whether the query is read-only).
+The builder generates parameterized queries from the fluent API. Every `build()`, `insert()`, `update()`, and `delete()` call returns a `BuildResult` with `->query` (the query string), `->bindings` (the parameter array), and `->readOnly` (whether the query is read-only).
 
-Five dialect implementations are provided:
+Six dialect implementations are provided:
 
 - `Utopia\Query\Builder\MySQL` — MySQL
 - `Utopia\Query\Builder\MariaDB` — MariaDB (extends MySQL with dialect-specific spatial handling)
 - `Utopia\Query\Builder\PostgreSQL` — PostgreSQL
 - `Utopia\Query\Builder\SQLite` — SQLite
 - `Utopia\Query\Builder\ClickHouse` — ClickHouse
+- `Utopia\Query\Builder\MongoDB` — MongoDB (generates JSON operation documents)
 
-MySQL, MariaDB, PostgreSQL, and SQLite extend `Builder\SQL` which adds locking, transactions, upsert, spatial queries, and full-text search. ClickHouse extends `Builder` directly with its own `ALTER TABLE` mutation syntax.
+MySQL, MariaDB, PostgreSQL, and SQLite extend `Builder\SQL` which adds locking, transactions, upsert, spatial queries, and full-text search. ClickHouse and MongoDB extend `Builder` directly with their own dialect-specific syntax.
 
 ### Basic Usage
 
@@ -326,6 +338,37 @@ $result = (new Builder())
 // SELECT DISTINCT `country` FROM `users`
 ```
 
+### Statistical Aggregates
+
+Available on MySQL, PostgreSQL, SQLite, and ClickHouse via the `StatisticalAggregates` interface:
+
+```php
+use Utopia\Query\Builder\PostgreSQL as Builder;
+
+$result = (new Builder())
+    ->from('measurements')
+    ->stddev('value', 'std_dev')
+    ->stddevPop('value', 'pop_std_dev')
+    ->stddevSamp('value', 'samp_std_dev')
+    ->variance('value', 'var')
+    ->varPop('value', 'pop_var')
+    ->varSamp('value', 'samp_var')
+    ->build();
+```
+
+### Bitwise Aggregates
+
+Available on MySQL, PostgreSQL, SQLite, and ClickHouse via the `BitwiseAggregates` interface:
+
+```php
+$result = (new Builder())
+    ->from('permissions')
+    ->bitAnd('flags', 'combined_and')
+    ->bitOr('flags', 'combined_or')
+    ->bitXor('flags', 'combined_xor')
+    ->build();
+```
+
 ### Conditional Aggregates
 
 Available on MySQL, PostgreSQL, SQLite, and ClickHouse via the `ConditionalAggregates` interface:
@@ -345,6 +388,73 @@ $result = (new Builder())
 ```
 
 Also available: `avgWhen()`, `minWhen()`, `maxWhen()`.
+
+### String Aggregates
+
+Available on MySQL, PostgreSQL, and ClickHouse via the `StringAggregates` interface:
+
+```php
+use Utopia\Query\Builder\MySQL as Builder;
+
+// Concatenate values into a string
+$result = (new Builder())
+    ->from('tags')
+    ->select(['post_id'])
+    ->groupConcat('name', ', ', 'tag_list', orderBy: ['name'])
+    ->groupBy(['post_id'])
+    ->build();
+
+// MySQL:      GROUP_CONCAT(`name` ORDER BY `name` ASC SEPARATOR ', ')
+// PostgreSQL: STRING_AGG("name", ', ' ORDER BY "name" ASC)
+// ClickHouse: arrayStringConcat(groupArray(`name`), ', ')
+
+// JSON array aggregation
+$result = (new Builder())
+    ->from('items')
+    ->jsonArrayAgg('name', 'names_json')
+    ->build();
+
+// JSON object aggregation from key/value pairs
+$result = (new Builder())
+    ->from('settings')
+    ->jsonObjectAgg('key', 'value', 'settings_json')
+    ->build();
+```
+
+### Group By Modifiers
+
+Available on MySQL, PostgreSQL, and ClickHouse via the `GroupByModifiers` interface:
+
+```php
+use Utopia\Query\Builder\MySQL as Builder;
+
+// WITH ROLLUP — adds subtotal and grand total rows
+$result = (new Builder())
+    ->from('sales')
+    ->select(['region', 'product'])
+    ->sum('amount', 'total')
+    ->groupBy(['region', 'product'])
+    ->withRollup()
+    ->build();
+
+// WITH CUBE — adds subtotals for all dimension combinations
+$result = (new Builder())
+    ->from('sales')
+    ->select(['region', 'product'])
+    ->sum('amount', 'total')
+    ->groupBy(['region', 'product'])
+    ->withCube()
+    ->build();
+
+// WITH TOTALS (ClickHouse) — adds a totals row
+$result = (new \Utopia\Query\Builder\ClickHouse())
+    ->from('events')
+    ->select(['event_type'])
+    ->count('*', 'cnt')
+    ->groupBy(['event_type'])
+    ->withTotals()
+    ->build();
+```
 
 ### Joins
 
@@ -963,6 +1073,48 @@ $result = (new Builder())
 // INSERT INTO "users" ("name") VALUES (?) RETURNING "id", "created_at"
 ```
 
+**DISTINCT ON** — select the first row per group:
+
+```php
+$result = (new Builder())
+    ->from('events')
+    ->distinctOn(['user_id'])
+    ->select(['user_id', 'event_type', 'created_at'])
+    ->sortDesc('created_at')
+    ->build();
+
+// SELECT DISTINCT ON ("user_id") "user_id", "event_type", "created_at"
+//   FROM "events" ORDER BY "created_at" DESC
+```
+
+**Aggregate FILTER** — per-aggregate WHERE clause (SQL standard):
+
+```php
+$result = (new Builder())
+    ->from('orders')
+    ->selectAggregateFilter('COUNT(*)', 'status = ?', 'active_count', ['active'])
+    ->selectAggregateFilter('SUM("amount")', 'status = ?', 'active_total', ['active'])
+    ->build();
+
+// SELECT COUNT(*) FILTER (WHERE status = ?) AS "active_count",
+//   SUM("amount") FILTER (WHERE status = ?) AS "active_total"
+//   FROM "orders"
+```
+
+**Ordered-set aggregates:**
+
+```php
+$result = (new Builder())
+    ->from('salaries')
+    ->arrayAgg('name', 'all_names')
+    ->percentileCont(0.5, 'salary', 'median_salary')
+    ->percentileDisc(0.9, 'salary', 'p90_salary')
+    ->boolAnd('is_active', 'all_active')
+    ->boolOr('is_admin', 'any_admin')
+    ->every('is_verified', 'all_verified')
+    ->build();
+```
+
 **MERGE** — SQL standard MERGE statement:
 
 ```php
@@ -1072,6 +1224,89 @@ $result = (new Builder())
 // SELECT * FROM `events` SETTINGS max_threads=4, optimize_read_in_order=1
 ```
 
+**LIMIT BY** — limit rows per group:
+
+```php
+$result = (new Builder())
+    ->from('events')
+    ->select(['user_id', 'event_type'])
+    ->limitBy(3, ['user_id'])
+    ->build();
+
+// SELECT `user_id`, `event_type` FROM `events` LIMIT 3 BY `user_id`
+```
+
+**ARRAY JOIN** — unnest array columns into rows:
+
+```php
+$result = (new Builder())
+    ->from('events')
+    ->select(['name'])
+    ->arrayJoin('tags', 'tag')
+    ->build();
+
+// SELECT `name`, `tags` AS `tag` FROM `events` ARRAY JOIN `tags` AS `tag`
+
+// LEFT variant preserves rows with empty arrays
+$result = (new Builder())
+    ->from('events')
+    ->leftArrayJoin('tags', 'tag')
+    ->build();
+```
+
+**ASOF JOIN** — join on the closest matching row (time-series):
+
+```php
+$result = (new Builder())
+    ->from('trades')
+    ->asofJoin('quotes', 'trades.timestamp', 'quotes.timestamp', 'q')
+    ->build();
+
+// SELECT * FROM `trades` ASOF JOIN `quotes` AS `q` ON `trades`.`timestamp` >= `quotes`.`timestamp`
+
+// LEFT variant
+$result = (new Builder())
+    ->from('trades')
+    ->asofLeftJoin('quotes', 'trades.timestamp', 'quotes.timestamp')
+    ->build();
+```
+
+**ORDER BY ... WITH FILL** — fill gaps in ordered results:
+
+```php
+$result = (new Builder())
+    ->from('daily_stats')
+    ->select(['date', 'count'])
+    ->orderWithFill('date', 'ASC', from: '2024-01-01', to: '2024-01-31', step: 1)
+    ->build();
+
+// SELECT `date`, `count` FROM `daily_stats` ORDER BY `date` ASC WITH FILL FROM '2024-01-01' TO '2024-01-31' STEP 1
+```
+
+**Approximate aggregates** — ClickHouse-native probabilistic functions:
+
+```php
+$result = (new Builder())
+    ->from('events')
+    ->quantile(0.95, 'response_time', 'p95')
+    ->quantileExact(0.99, 'response_time', 'p99')
+    ->median('response_time', 'med')
+    ->uniq('user_id', 'approx_users')
+    ->uniqExact('user_id', 'exact_users')
+    ->uniqCombined('user_id', 'combined_users')
+    ->build();
+
+// SELECT quantile(0.95)(`response_time`) AS `p95`,
+//   quantileExact(0.99)(`response_time`) AS `p99`,
+//   median(`response_time`) AS `med`,
+//   uniq(`user_id`) AS `approx_users`,
+//   uniqExact(`user_id`) AS `exact_users`,
+//   uniqCombined(`user_id`) AS `combined_users`
+//   FROM `events`
+```
+
+Additional approximate aggregates: `argMin()`, `argMax()`, `topK()`, `topKWeighted()`, `anyValue()`, `anyLastValue()`, `groupUniqArray()`, `groupArrayMovingAvg()`, `groupArrayMovingSum()`.
+
 **String matching** — uses native ClickHouse functions instead of LIKE:
 
 ```php
@@ -1099,26 +1334,252 @@ $result = (new Builder())
 
 > **Note:** Full-text search (`Query::search()`) is not supported in ClickHouse and throws `UnsupportedException`. The ClickHouse builder also forces all join filter hook conditions to WHERE placement, since ClickHouse does not support subqueries in JOIN ON.
 
+### MongoDB
+
+```php
+use Utopia\Query\Builder\MongoDB as Builder;
+```
+
+The MongoDB builder generates JSON operation documents instead of SQL. The `BuildResult->query` contains a JSON-encoded operation and `BuildResult->bindings` contains parameter values.
+
+**Basic queries:**
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->filter([
+        Query::equal('status', ['active']),
+        Query::greaterThan('age', 18),
+    ])
+    ->sortAsc('name')
+    ->limit(25)
+    ->build();
+
+// Generates a find operation with filter, sort, limit, and projection
+```
+
+**Array operations:**
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->filter([Query::equal('_id', ['user_1'])])
+    ->push('tags', 'new-tag')
+    ->update();
+
+$result = (new Builder())
+    ->from('users')
+    ->filter([Query::equal('_id', ['user_1'])])
+    ->pull('tags', 'old-tag')
+    ->addToSet('roles', 'editor')
+    ->increment('login_count', 1)
+    ->update();
+```
+
+**Field update operations:**
+
+```php
+$result = (new Builder())
+    ->from('users')
+    ->filter([Query::equal('_id', ['user_1'])])
+    ->rename('old_field', 'new_field')
+    ->multiply('score', 1.5)
+    ->updateMin('low_score', 10)
+    ->updateMax('high_score', 100)
+    ->currentDate('last_modified')
+    ->update();
+
+// Array element removal
+$result = (new Builder())
+    ->from('lists')
+    ->filter([Query::equal('_id', ['list_1'])])
+    ->popFirst('items')   // Remove first element
+    ->popLast('queue')    // Remove last element
+    ->pullAll('tags', ['deprecated', 'old'])
+    ->update();
+
+// Remove fields entirely
+$result = (new Builder())
+    ->from('users')
+    ->filter([Query::equal('_id', ['user_1'])])
+    ->unsetFields('legacy_field', 'temp_data')
+    ->update();
+```
+
+**Advanced array push** with position, slice, and sort modifiers:
+
+```php
+$result = (new Builder())
+    ->from('feeds')
+    ->filter([Query::equal('_id', ['feed_1'])])
+    ->pushEach('items', [['score' => 5], ['score' => 3]], position: 0, slice: 10, sort: ['score' => -1])
+    ->update();
+```
+
+**Conditional array updates** with array filters:
+
+```php
+$result = (new Builder())
+    ->from('orders')
+    ->filter([Query::equal('_id', ['order_1'])])
+    ->arrayFilter('elem', ['elem.status' => 'pending'])
+    ->set(['items.$[elem].status' => 'shipped'])
+    ->update();
+```
+
+**Upsert:**
+
+```php
+$result = (new Builder())
+    ->into('counters')
+    ->set(['key' => 'visits', 'value' => 1])
+    ->onConflict(['key'])
+    ->upsert();
+```
+
+**Pipeline aggregation stages:**
+
+```php
+// Bucket — group documents into fixed-size ranges
+$result = (new Builder())
+    ->from('sales')
+    ->bucket('price', [0, 50, 100, 500], defaultBucket: 'other', output: ['count' => ['$sum' => 1]])
+    ->build();
+
+// BucketAuto — automatically determine bucket boundaries
+$result = (new Builder())
+    ->from('sales')
+    ->bucketAuto('price', 5, output: ['count' => ['$sum' => 1]])
+    ->build();
+
+// Facet — run multiple aggregation pipelines in parallel
+$byStatus = (new Builder())->from('orders')->groupBy(['status'])->count('*', 'count');
+$byRegion = (new Builder())->from('orders')->groupBy(['region'])->sum('amount', 'total');
+
+$result = (new Builder())
+    ->from('orders')
+    ->facet(['by_status' => $byStatus, 'by_region' => $byRegion])
+    ->build();
+
+// GraphLookup — recursive graph traversal
+$result = (new Builder())
+    ->from('employees')
+    ->graphLookup(
+        from: 'employees',
+        startWith: '$manager_id',
+        connectFromField: 'manager_id',
+        connectToField: '_id',
+        as: 'reporting_chain',
+        maxDepth: 5,
+        depthField: 'level'
+    )
+    ->build();
+
+// Merge results into another collection
+$result = (new Builder())
+    ->from('daily_stats')
+    ->mergeIntoCollection('monthly_stats', on: ['month'], whenMatched: ['$set' => ['total' => '$total']])
+    ->build();
+
+// Output to a new collection
+$result = (new Builder())
+    ->from('raw_data')
+    ->outputToCollection('processed_data', database: 'analytics')
+    ->build();
+
+// Replace the root document
+$result = (new Builder())
+    ->from('orders')
+    ->replaceRoot('$shipping_address')
+    ->build();
+```
+
+**Atlas Search:**
+
+```php
+// Full-text search with Atlas Search
+$result = (new Builder())
+    ->from('articles')
+    ->search(['text' => ['query' => 'mongodb', 'path' => 'content']], index: 'default')
+    ->build();
+
+// Search metadata (facet counts, etc.)
+$result = (new Builder())
+    ->from('articles')
+    ->searchMeta(['facet' => ['facets' => ['categories' => ['type' => 'string', 'path' => 'category']]]], index: 'default')
+    ->build();
+
+// Atlas Vector Search
+$result = (new Builder())
+    ->from('documents')
+    ->vectorSearch(
+        path: 'embedding',
+        queryVector: [0.1, 0.2, 0.3],
+        numCandidates: 100,
+        limit: 10,
+        index: 'vector_index',
+        filter: ['category' => 'tech']
+    )
+    ->build();
+```
+
+**Table sampling:**
+
+```php
+$result = (new Builder())
+    ->from('large_collection')
+    ->tablesample(10.0)
+    ->build();
+```
+
+**Full-text search** (non-Atlas):
+
+```php
+$result = (new Builder())
+    ->from('articles')
+    ->filterSearch('content', 'hello world')
+    ->build();
+```
+
 ### Feature Matrix
 
 Unsupported features are not on the class — consumers type-hint the interface to check capability (e.g., `if ($builder instanceof Spatial)`).
 
-| Feature | Builder | SQL | MySQL | MariaDB | PostgreSQL | SQLite | ClickHouse |
-|---------|:-------:|:---:|:-----:|:-------:|:----------:|:------:|:----------:|
-| Selects, Filters, Aggregates, Joins, Unions, CTEs, Inserts, Updates, Deletes, Hooks | x | | | | | | |
-| Windows | x | | | | | | |
-| Locking, Transactions, Upsert | | x | | | | | |
-| Spatial, Full-Text Search | | x | | | | | |
-| Conditional Aggregates | | | x | x | x | x | x |
-| JSON | | | x | x | x | x | |
-| Hints | | | x | x | | | x |
-| Lateral Joins | | | x | x | x | | |
-| Full Outer Joins | | | | | x | | x |
-| Table Sampling | | | | | x | | x |
-| Merge | | | | | x | | |
-| Returning | | | | | x | | |
-| Vector Search | | | | | x | | |
-| PREWHERE, FINAL, SAMPLE | | | | | | | x |
+| Feature | Builder | SQL | MySQL | MariaDB | PostgreSQL | SQLite | ClickHouse | MongoDB |
+|---------|:-------:|:---:|:-----:|:-------:|:----------:|:------:|:----------:|:-------:|
+| Selects, Filters, Aggregates, Joins, Unions, CTEs, Inserts, Updates, Deletes, Hooks | x | | | | | | | |
+| Windows | x | | | | | | | |
+| Locking, Transactions, Upsert | | x | | | | | | |
+| Spatial, Full-Text Search | | x | | | | | | |
+| Statistical Aggregates | | x | | | | | x | |
+| Bitwise Aggregates | | x | | | | | x | |
+| Conditional Aggregates | | | x | x | x | x | x | |
+| JSON | | | x | x | x | x | | |
+| Hints | | | x | x | | | x | |
+| Lateral Joins | | | x | x | x | | | |
+| String Aggregates | | | x | x | x | | x | |
+| Group By Modifiers | | | x | x | x | | x | |
+| Full Outer Joins | | | | | x | | x | |
+| Table Sampling | | | | | x | | x | x |
+| Merge | | | | | x | | | |
+| Returning | | | | | x | | | |
+| Vector Search | | | | | x | | | |
+| DISTINCT ON | | | | | x | | | |
+| Aggregate FILTER | | | | | x | | | |
+| Ordered-Set Aggregates | | | | | x | | | |
+| PREWHERE, FINAL, SAMPLE | | | | | | | x | |
+| LIMIT BY | | | | | | | x | |
+| ARRAY JOIN | | | | | | | x | |
+| ASOF JOIN | | | | | | | x | |
+| WITH FILL | | | | | | | x | |
+| Approximate Aggregates | | | | | | | x | |
+| Upsert | | | | | | | | x |
+| Full-Text Search | | | | | | | | x |
+| Field Updates | | | | | | | | x |
+| Array Push Modifiers | | | | | | | | x |
+| Conditional Array Updates | | | | | | | | x |
+| Pipeline Stages | | | | | | | | x |
+| Atlas Search | | | | | | | | x |
 
 ## Schema Builder
 
@@ -1126,7 +1587,7 @@ The schema builder generates DDL statements for table creation, alteration, inde
 
 ```php
 use Utopia\Query\Schema\MySQL as Schema;
-// or: PostgreSQL, ClickHouse, SQLite
+// or: PostgreSQL, ClickHouse, SQLite, MongoDB
 ```
 
 ### Creating Tables
@@ -1342,6 +1803,146 @@ $schema = new \Utopia\Query\Schema\SQLite();
 ```
 
 SQLite uses simplified type mappings: `INTEGER` for booleans, `TEXT` for datetimes/JSON, `REAL` for floats, `BLOB` for binary. Auto-increment uses `AUTOINCREMENT`. Vector and spatial types are not supported. Foreign keys, stored procedures, and triggers throw `UnsupportedException`.
+
+### MongoDB Schema
+
+```php
+$schema = new \Utopia\Query\Schema\MongoDB();
+```
+
+The MongoDB schema generates JSON commands for collection management with BSON type validation.
+
+**Creating collections** with JSON Schema validation:
+
+```php
+$result = $schema->create('users', function ($table) {
+    $table->string('name', 255);
+    $table->string('email', 255)->unique();
+    $table->integer('age')->nullable();
+    $table->boolean('active')->default(true);
+    $table->json('metadata');
+});
+
+// Generates a create command with bsonType validators
+```
+
+**Altering collections:**
+
+```php
+$result = $schema->alter('users', function ($table) {
+    $table->string('phone', 20)->nullable();
+});
+
+// Generates a collMod command to update the validator
+```
+
+**Indexes:**
+
+```php
+$result = $schema->createIndex('users', 'idx_email', ['email'], unique: true);
+$result = $schema->dropIndex('users', 'idx_email');
+```
+
+**Collection operations:**
+
+```php
+$result = $schema->drop('users');
+$result = $schema->rename('old_name', 'new_name');
+$result = $schema->truncate('users');
+$result = $schema->analyzeTable('users');
+```
+
+**Views:**
+
+```php
+$query = (new \Utopia\Query\Builder\MongoDB())->from('users')->filter([Query::equal('active', [true])]);
+$result = $schema->createView('active_users', $query);
+```
+
+**Database management:**
+
+```php
+$result = $schema->createDatabase('analytics');
+$result = $schema->dropDatabase('analytics');
+```
+
+Column types map to BSON types: `string` → `string`, `integer`/`bigInteger` → `int`, `float`/`double` → `double`, `boolean` → `bool`, `datetime`/`timestamp` → `date`, `json` → `object`, `binary` → `binData`.
+
+## Wire Protocol Parsers
+
+The `Parser` interface classifies raw database traffic into query types (`Read`, `Write`, `TransactionBegin`, `TransactionEnd`, `Unknown`). This is useful for connection proxies, audit logging, and read/write splitting.
+
+```php
+use Utopia\Query\Parser;
+use Utopia\Query\Type;
+```
+
+### SQL Parser
+
+The abstract `Parser\SQL` class provides keyword-based classification for SQL dialects:
+
+```php
+use Utopia\Query\Parser\SQL;
+
+// Classify SQL text directly
+$type = $parser->classifySQL('SELECT * FROM users');  // Type::Read
+$type = $parser->classifySQL('INSERT INTO users ...');  // Type::Write
+$type = $parser->classifySQL('BEGIN');  // Type::TransactionBegin
+$type = $parser->classifySQL('COMMIT');  // Type::TransactionEnd
+```
+
+Read keywords: `SELECT`, `SHOW`, `DESCRIBE`, `DESC`, `EXPLAIN`, `WITH` (when followed by a read), `TABLE`, `VALUES`.
+
+Write keywords: `INSERT`, `UPDATE`, `DELETE`, `ALTER`, `DROP`, `CREATE`, `TRUNCATE`, `RENAME`, `REPLACE`, `LOAD`, `GRANT`, `REVOKE`, `MERGE`, `CALL`, `EXECUTE`, `DO`, `HANDLER`, `IMPORT`.
+
+Transaction keywords: `BEGIN`, `START` → `TransactionBegin`; `COMMIT`, `ROLLBACK`, `SAVEPOINT`, `RELEASE` → `TransactionEnd`.
+
+Special handling: `COPY` is classified based on direction (`FROM STDIN` = Write, `TO STDOUT` = Read). `SET` is classified as `TransactionEnd` (session configuration).
+
+### MySQL Parser
+
+Parses MySQL wire protocol binary packets:
+
+```php
+use Utopia\Query\Parser\MySQL;
+
+$parser = new MySQL();
+$type = $parser->parse($rawPacketData);  // Type::Read, Write, TransactionBegin, etc.
+```
+
+Recognizes MySQL command bytes including `COM_QUERY` (classifies via SQL text), `COM_STMT_PREPARE`, `COM_STMT_EXECUTE`, `COM_INIT_DB`, `COM_QUIT`, and others.
+
+### PostgreSQL Parser
+
+Parses PostgreSQL wire protocol messages:
+
+```php
+use Utopia\Query\Parser\PostgreSQL;
+
+$parser = new PostgreSQL();
+$type = $parser->parse($rawMessageData);  // Type::Read, Write, TransactionBegin, etc.
+```
+
+Handles message types including `Q` (simple query), `P` (parse/prepared statement), `X` (terminate), and startup messages.
+
+### MongoDB Parser
+
+Parses MongoDB OP_MSG binary protocol messages:
+
+```php
+use Utopia\Query\Parser\MongoDB;
+
+$parser = new MongoDB();
+$type = $parser->parse($rawOpMsgData);  // Type::Read, Write, TransactionBegin, etc.
+```
+
+Extracts the command name from BSON documents and classifies:
+
+Read commands: `find`, `aggregate`, `count`, `distinct`, `listCollections`, `listDatabases`, `listIndexes`, `dbStats`, `collStats`, `explain`, `getMore`, `serverStatus`, `buildInfo`, `connectionStatus`, `ping`, `isMaster`, `hello`.
+
+Write commands: `insert`, `update`, `delete`, `findAndModify`, `create`, `drop`, `createIndexes`, `dropIndexes`, `dropDatabase`, `renameCollection`.
+
+Transaction detection: checks for `startTransaction: true` in the BSON document (`TransactionBegin`) or `commitTransaction`/`abortTransaction` commands (`TransactionEnd`).
 
 ## Compiler Interface
 

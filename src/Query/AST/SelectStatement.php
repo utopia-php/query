@@ -25,13 +25,21 @@ readonly class SelectStatement
         public bool $distinct = false,
         public array $ctes = [],
         public array $windows = [],
-    ) {}
+    ) {
+    }
 
     /**
      * Create a copy with modified properties.
      *
      * Uses false as default for nullable properties to distinguish
      * "not passed" from "explicitly set to null".
+     *
+     * @param Expr[]|null $columns
+     * @param JoinClause[]|null $joins
+     * @param Expr[]|null $groupBy
+     * @param OrderByItem[]|null $orderBy
+     * @param CteDefinition[]|null $ctes
+     * @param WindowDefinition[]|null $windows
      */
     public function with(
         ?array $columns = null,

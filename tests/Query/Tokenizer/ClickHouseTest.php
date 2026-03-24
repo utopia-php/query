@@ -31,7 +31,7 @@ class ClickHouseTest extends TestCase
      */
     private function types(array $tokens): array
     {
-        return array_map(fn(Token $t) => $t->type, $tokens);
+        return array_map(fn (Token $t) => $t->type, $tokens);
     }
 
     /**
@@ -40,7 +40,7 @@ class ClickHouseTest extends TestCase
      */
     private function values(array $tokens): array
     {
-        return array_map(fn(Token $t) => $t->value, $tokens);
+        return array_map(fn (Token $t) => $t->value, $tokens);
     }
 
     public function testBasicTokenization(): void

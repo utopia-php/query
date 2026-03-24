@@ -14,5 +14,6 @@ readonly class WindowSpec
         public ?string $frameType = null,
         public ?string $frameStart = null,
         public ?string $frameEnd = null,
-    ) {}
+    ) {
+    }
 }

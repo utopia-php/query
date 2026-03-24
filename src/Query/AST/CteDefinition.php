@@ -12,5 +12,6 @@ readonly class CteDefinition
         public SelectStatement $query,
         public array $columns = [],
         public bool $recursive = false,
-    ) {}
+    ) {
+    }
 }

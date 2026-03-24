@@ -11,5 +11,6 @@ readonly class InExpr implements Expr
         public Expr $expr,
         public array|SelectStatement $list,
         public bool $negated = false,
-    ) {}
+    ) {
+    }
 }

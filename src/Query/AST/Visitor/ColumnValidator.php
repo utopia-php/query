@@ -12,7 +12,9 @@ use Utopia\Query\Exception;
 class ColumnValidator implements Visitor
 {
     /** @param string[] $allowedColumns */
-    public function __construct(private readonly array $allowedColumns) {}
+    public function __construct(private readonly array $allowedColumns)
+    {
+    }
 
     public function visitExpr(Expr $expr): Expr
     {

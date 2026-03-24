@@ -41,7 +41,6 @@ use Utopia\Query\Builder\WindowFrame;
 use Utopia\Query\Builder\WindowSelect;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
-use Utopia\Query\NullsPosition;
 use Utopia\Query\Hook\Attribute;
 use Utopia\Query\Hook\Filter;
 use Utopia\Query\Hook\Join\Filter as JoinFilter;
@@ -2425,6 +2424,7 @@ abstract class Builder implements
         return $funcCall;
     }
 
+    /** @phpstan-ignore return.unusedType */
     private function buildAstFrom(): TableRef|SubquerySource|null
     {
         if ($this->noTable) {
@@ -2519,26 +2519,49 @@ abstract class Builder implements
         return match ($method) {
             Method::Equal => $this->buildEqualAstExpr($attr, $values),
             Method::NotEqual => $this->buildNotEqualAstExpr($attr, $values),
-            Method::GreaterThan => new BinaryExpr(new ColumnRef($attr), '>', new Literal($values[0] ?? null)),
-            Method::GreaterThanEqual => new BinaryExpr(new ColumnRef($attr), '>=', new Literal($values[0] ?? null)),
-            Method::LessThan => new BinaryExpr(new ColumnRef($attr), '<', new Literal($values[0] ?? null)),
-            Method::LessThanEqual => new BinaryExpr(new ColumnRef($attr), '<=', new Literal($values[0] ?? null)),
-            Method::Between => new BetweenExpr(new ColumnRef($attr), new Literal($values[0] ?? null), new Literal($values[1] ?? null)),
-            Method::NotBetween => new BetweenExpr(new ColumnRef($attr), new Literal($values[0] ?? null), new Literal($values[1] ?? null), true),
+            Method::GreaterThan => new BinaryExpr(new ColumnRef($attr), '>', $this->toLiteral($values[0] ?? null)),
+            Method::GreaterThanEqual => new BinaryExpr(new ColumnRef($attr), '>=', $this->toLiteral($values[0] ?? null)),
+            Method::LessThan => new BinaryExpr(new ColumnRef($attr), '<', $this->toLiteral($values[0] ?? null)),
+            Method::LessThanEqual => new BinaryExpr(new ColumnRef($attr), '<=', $this->toLiteral($values[0] ?? null)),
+            Method::Between => new BetweenExpr(new ColumnRef($attr), $this->toLiteral($values[0] ?? null), $this->toLiteral($values[1] ?? null)),
+            Method::NotBetween => new BetweenExpr(new ColumnRef($attr), $this->toLiteral($values[0] ?? null), $this->toLiteral($values[1] ?? null), true),
             Method::IsNull => new UnaryExpr('IS NULL', new ColumnRef($attr), false),
             Method::IsNotNull => new UnaryExpr('IS NOT NULL', new ColumnRef($attr), false),
             Method::Contains => $this->buildContainsAstExpr($attr, $values, false),
             Method::ContainsAny => $this->buildContainsAstExpr($attr, $values, false),
             Method::NotContains => $this->buildContainsAstExpr($attr, $values, true),
-            Method::StartsWith => new BinaryExpr(new ColumnRef($attr), 'LIKE', new Literal(($values[0] ?? '') . '%')),
-            Method::NotStartsWith => new BinaryExpr(new ColumnRef($attr), 'NOT LIKE', new Literal(($values[0] ?? '') . '%')),
-            Method::EndsWith => new BinaryExpr(new ColumnRef($attr), 'LIKE', new Literal('%' . ($values[0] ?? ''))),
-            Method::NotEndsWith => new BinaryExpr(new ColumnRef($attr), 'NOT LIKE', new Literal('%' . ($values[0] ?? ''))),
+            Method::StartsWith => new BinaryExpr(new ColumnRef($attr), 'LIKE', new Literal($this->toScalar($values[0] ?? '') . '%')),
+            Method::NotStartsWith => new BinaryExpr(new ColumnRef($attr), 'NOT LIKE', new Literal($this->toScalar($values[0] ?? '') . '%')),
+            Method::EndsWith => new BinaryExpr(new ColumnRef($attr), 'LIKE', new Literal('%' . $this->toScalar($values[0] ?? ''))),
+            Method::NotEndsWith => new BinaryExpr(new ColumnRef($attr), 'NOT LIKE', new Literal('%' . $this->toScalar($values[0] ?? ''))),
             Method::And => $this->buildLogicalAstExpr($query, 'AND'),
             Method::Or => $this->buildLogicalAstExpr($query, 'OR'),
             Method::Raw => new Raw($attr),
             default => new Raw($attr !== '' ? $attr : '1 = 1'),
         };
+    }
+
+    private function toLiteral(mixed $value): Literal
+    {
+        if ($value === null || \is_string($value) || \is_int($value) || \is_float($value) || \is_bool($value)) {
+            return new Literal($value);
+        }
+
+        /** @var scalar $value */
+        return new Literal((string) $value);
+    }
+
+    private function toScalar(mixed $value): string
+    {
+        if (\is_string($value)) {
+            return $value;
+        }
+
+        if (\is_int($value) || \is_float($value) || \is_bool($value)) {
+            return (string) $value;
+        }
+
+        return '';
     }
 
     /**
@@ -2550,10 +2573,10 @@ abstract class Builder implements
             if ($values[0] === null) {
                 return new UnaryExpr('IS NULL', new ColumnRef($attr), false);
             }
-            return new BinaryExpr(new ColumnRef($attr), '=', new Literal($values[0]));
+            return new BinaryExpr(new ColumnRef($attr), '=', $this->toLiteral($values[0]));
         }
 
-        $literals = \array_map(fn ($v) => new Literal($v), $values);
+        $literals = \array_map(fn ($v) => $this->toLiteral($v), $values);
         return new InExpr(new ColumnRef($attr), $literals);
     }
 
@@ -2566,10 +2589,10 @@ abstract class Builder implements
             if ($values[0] === null) {
                 return new UnaryExpr('IS NOT NULL', new ColumnRef($attr), false);
             }
-            return new BinaryExpr(new ColumnRef($attr), '!=', new Literal($values[0]));
+            return new BinaryExpr(new ColumnRef($attr), '!=', $this->toLiteral($values[0]));
         }
 
-        $literals = \array_map(fn ($v) => new Literal($v), $values);
+        $literals = \array_map(fn ($v) => $this->toLiteral($v), $values);
         return new InExpr(new ColumnRef($attr), $literals, true);
     }
 
@@ -2580,13 +2603,13 @@ abstract class Builder implements
     {
         if (\count($values) === 1) {
             $op = $negated ? 'NOT LIKE' : 'LIKE';
-            return new BinaryExpr(new ColumnRef($attr), $op, new Literal('%' . $values[0] . '%'));
+            return new BinaryExpr(new ColumnRef($attr), $op, new Literal('%' . $this->toScalar($values[0]) . '%'));
         }
 
         $parts = [];
         $op = $negated ? 'NOT LIKE' : 'LIKE';
         foreach ($values as $value) {
-            $parts[] = new BinaryExpr(new ColumnRef($attr), $op, new Literal('%' . $value . '%'));
+            $parts[] = new BinaryExpr(new ColumnRef($attr), $op, new Literal('%' . $this->toScalar($value) . '%'));
         }
 
         $combinator = $negated ? 'AND' : 'OR';
@@ -2719,7 +2742,7 @@ abstract class Builder implements
 
     public static function fromAst(SelectStatement $ast): static
     {
-        $builder = new static();
+        $builder = new static(); // @phpstan-ignore new.static
 
         if ($ast->from instanceof TableRef) {
             $builder->from($ast->from->name, $ast->from->alias ?? '');
@@ -3011,17 +3034,18 @@ abstract class Builder implements
 
             if ($expr->left instanceof ColumnRef && $expr->right instanceof Literal) {
                 $attr = $this->astColumnRefToString($expr->left);
+                /** @var string|int|float|bool|null $val */
                 $val = $expr->right->value;
 
                 return match ($op) {
                     '=' => Query::equal($attr, [$val]),
-                    '!=' , '<>' => Query::notEqual($attr, $val),
-                    '>' => Query::greaterThan($attr, $val),
-                    '>=' => Query::greaterThanEqual($attr, $val),
-                    '<' => Query::lessThan($attr, $val),
-                    '<=' => Query::lessThanEqual($attr, $val),
-                    'LIKE' => $this->likeToQuery($attr, $val),
-                    'NOT LIKE' => $this->notLikeToQuery($attr, $val),
+                    '!=' , '<>' => Query::notEqual($attr, \is_bool($val) ? (int) $val : $val),
+                    '>' => Query::greaterThan($attr, \is_string($val) || \is_int($val) || \is_float($val) ? $val : (string) $val),
+                    '>=' => Query::greaterThanEqual($attr, \is_string($val) || \is_int($val) || \is_float($val) ? $val : (string) $val),
+                    '<' => Query::lessThan($attr, \is_string($val) || \is_int($val) || \is_float($val) ? $val : (string) $val),
+                    '<=' => Query::lessThanEqual($attr, \is_string($val) || \is_int($val) || \is_float($val) ? $val : (string) $val),
+                    'LIKE' => $this->likeToQuery($attr, (string) $val),
+                    'NOT LIKE' => $this->notLikeToQuery($attr, (string) $val),
                     default => null,
                 };
             }
@@ -3038,8 +3062,10 @@ abstract class Builder implements
 
         if ($expr instanceof BetweenExpr && $expr->expr instanceof ColumnRef) {
             $attr = $this->astColumnRefToString($expr->expr);
-            $low = $expr->low instanceof Literal ? $expr->low->value : 0;
-            $high = $expr->high instanceof Literal ? $expr->high->value : 0;
+            $lowRaw = $expr->low instanceof Literal ? $expr->low->value : 0;
+            $highRaw = $expr->high instanceof Literal ? $expr->high->value : 0;
+            $low = \is_string($lowRaw) || \is_int($lowRaw) || \is_float($lowRaw) ? $lowRaw : (string) $lowRaw;
+            $high = \is_string($highRaw) || \is_int($highRaw) || \is_float($highRaw) ? $highRaw : (string) $highRaw;
             if ($expr->negated) {
                 return Query::notBetween($attr, $low, $high);
             }
@@ -3061,9 +3087,9 @@ abstract class Builder implements
         return null;
     }
 
-    private function likeToQuery(string $attr, mixed $val): Query
+    private function likeToQuery(string $attr, string $val): Query
     {
-        $str = (string) $val;
+        $str = $val;
         if (\str_starts_with($str, '%') && \str_ends_with($str, '%') && \strlen($str) > 2) {
             return new Query(Method::Contains, $attr, [\substr($str, 1, -1)]);
         }
@@ -3076,9 +3102,9 @@ abstract class Builder implements
         return Query::raw($attr . ' LIKE ?', [$val]);
     }
 
-    private function notLikeToQuery(string $attr, mixed $val): Query
+    private function notLikeToQuery(string $attr, string $val): Query
     {
-        $str = (string) $val;
+        $str = $val;
         if (\str_starts_with($str, '%') && \str_ends_with($str, '%') && \strlen($str) > 2) {
             return new Query(Method::NotContains, $attr, [\substr($str, 1, -1)]);
         }
@@ -3167,7 +3193,7 @@ abstract class Builder implements
                 $cteSql,
                 [],
                 $cte->recursive,
-                $cte->columns,
+                array_values($cte->columns),
             );
         }
     }

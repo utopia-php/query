@@ -565,30 +565,35 @@ class Parser
         $name = $this->extractIdentifier($token);
         $this->advance();
 
-        if ($this->current()->type === TokenType::LeftParen) {
+        $next = $this->current();
+
+        if ($next->type === TokenType::LeftParen) {
             return $this->parseFunctionCallExpr($name);
         }
 
-        if ($this->current()->type === TokenType::Dot) {
+        if ($next->type === TokenType::Dot) {
             $this->advance();
+            $afterDot = $this->current();
 
-            if ($this->current()->type === TokenType::Star) {
+            if ($afterDot->type === TokenType::Star) {
                 $this->advance();
                 return new Star($name);
             }
 
-            $second = $this->extractIdentifier($this->current());
+            $second = $this->extractIdentifier($afterDot);
             $this->advance();
+            $afterSecond = $this->current();
 
-            if ($this->current()->type === TokenType::Dot) {
+            if ($afterSecond->type === TokenType::Dot) {
                 $this->advance();
+                $afterSecondDot = $this->current();
 
-                if ($this->current()->type === TokenType::Star) {
+                if ($afterSecondDot->type === TokenType::Star) {
                     $this->advance();
                     return new Star($second, $name);
                 }
 
-                $third = $this->extractIdentifier($this->current());
+                $third = $this->extractIdentifier($afterSecondDot);
                 $this->advance();
                 return new ColumnRef($third, $second, $name);
             }

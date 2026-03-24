@@ -11,5 +11,6 @@ readonly class CaseExpr implements Expr
         public ?Expr $operand,
         public array $whens,
         public ?Expr $else = null,
-    ) {}
+    ) {
+    }
 }

@@ -8,5 +8,6 @@ readonly class ColumnRef implements Expr
         public string $name,
         public ?string $table = null,
         public ?string $schema = null,
-    ) {}
+    ) {
+    }
 }

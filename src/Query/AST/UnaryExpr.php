@@ -8,5 +8,6 @@ readonly class UnaryExpr implements Expr
         public string $operator,
         public Expr $operand,
         public bool $prefix = true,
-    ) {}
+    ) {
+    }
 }

@@ -4,17 +4,9 @@ namespace Tests\Query\AST;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\AST\AliasedExpr;
-use Utopia\Query\AST\BetweenExpr;
 use Utopia\Query\AST\BinaryExpr;
-use Utopia\Query\AST\CaseExpr;
-use Utopia\Query\AST\CaseWhen;
-use Utopia\Query\AST\CastExpr;
 use Utopia\Query\AST\ColumnRef;
-use Utopia\Query\AST\CteDefinition;
-use Utopia\Query\AST\ExistsExpr;
 use Utopia\Query\AST\FunctionCall;
-use Utopia\Query\AST\InExpr;
-use Utopia\Query\AST\JoinClause;
 use Utopia\Query\AST\Literal;
 use Utopia\Query\AST\OrderByItem;
 use Utopia\Query\AST\Parser;
@@ -23,13 +15,8 @@ use Utopia\Query\AST\Raw;
 use Utopia\Query\AST\SelectStatement;
 use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Star;
-use Utopia\Query\AST\SubqueryExpr;
-use Utopia\Query\AST\SubquerySource;
 use Utopia\Query\AST\TableRef;
 use Utopia\Query\AST\UnaryExpr;
-use Utopia\Query\AST\WindowDefinition;
-use Utopia\Query\AST\WindowExpr;
-use Utopia\Query\AST\WindowSpec;
 use Utopia\Query\Tokenizer\Tokenizer;
 
 class SerializerTest extends TestCase

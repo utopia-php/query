@@ -10,7 +10,9 @@ use Utopia\Query\AST\Visitor;
 
 class FilterInjector implements Visitor
 {
-    public function __construct(private readonly Expr $condition) {}
+    public function __construct(private readonly Expr $condition)
+    {
+    }
 
     public function visitExpr(Expr $expr): Expr
     {

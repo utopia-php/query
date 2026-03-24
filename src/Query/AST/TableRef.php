@@ -8,5 +8,6 @@ readonly class TableRef
         public string $name,
         public ?string $alias = null,
         public ?string $schema = null,
-    ) {}
+    ) {
+    }
 }

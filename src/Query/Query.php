@@ -5,7 +5,6 @@ namespace Utopia\Query;
 use JsonException;
 use Utopia\Query\Builder\GroupedQueries;
 use Utopia\Query\Exception as QueryException;
-use Utopia\Query\NullsPosition;
 
 /** @phpstan-consistent-constructor */
 class Query

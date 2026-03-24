@@ -8,5 +8,6 @@ readonly class BinaryExpr implements Expr
         public Expr $left,
         public string $operator,
         public Expr $right,
-    ) {}
+    ) {
+    }
 }

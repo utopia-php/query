@@ -8,5 +8,6 @@ readonly class WindowExpr implements Expr
         public Expr $function,
         public ?string $windowName = null,
         public ?WindowSpec $spec = null,
-    ) {}
+    ) {
+    }
 }

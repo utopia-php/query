@@ -8,5 +8,6 @@ readonly class OrderByItem
         public Expr $expr,
         public string $direction = 'ASC',
         public ?string $nulls = null,
-    ) {}
+    ) {
+    }
 }

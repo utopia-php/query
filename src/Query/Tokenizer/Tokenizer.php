@@ -185,7 +185,7 @@ class Tokenizer
     {
         return array_values(array_filter(
             $tokens,
-            fn(Token $t) => $t->type !== TokenType::Whitespace
+            fn (Token $t) => $t->type !== TokenType::Whitespace
                 && $t->type !== TokenType::LineComment
                 && $t->type !== TokenType::BlockComment
         ));

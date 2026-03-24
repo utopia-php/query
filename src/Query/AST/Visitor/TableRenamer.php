@@ -12,7 +12,9 @@ use Utopia\Query\AST\Visitor;
 class TableRenamer implements Visitor
 {
     /** @param array<string, string> $renames map of old name to new name */
-    public function __construct(private readonly array $renames) {}
+    public function __construct(private readonly array $renames)
+    {
+    }
 
     public function visitExpr(Expr $expr): Expr
     {

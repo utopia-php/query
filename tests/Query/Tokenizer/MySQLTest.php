@@ -31,7 +31,7 @@ class MySQLTest extends TestCase
      */
     private function types(array $tokens): array
     {
-        return array_map(fn(Token $t) => $t->type, $tokens);
+        return array_map(fn (Token $t) => $t->type, $tokens);
     }
 
     /**
@@ -40,7 +40,7 @@ class MySQLTest extends TestCase
      */
     private function values(array $tokens): array
     {
-        return array_map(fn(Token $t) => $t->value, $tokens);
+        return array_map(fn (Token $t) => $t->value, $tokens);
     }
 
     public function testHashComment(): void
@@ -49,7 +49,7 @@ class MySQLTest extends TestCase
 
         $comments = array_values(array_filter(
             $all,
-            fn(Token $t) => $t->type === TokenType::LineComment
+            fn (Token $t) => $t->type === TokenType::LineComment
         ));
 
         $this->assertCount(1, $comments);

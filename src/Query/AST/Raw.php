@@ -6,5 +6,6 @@ readonly class Raw implements Expr
 {
     public function __construct(
         public string $sql,
-    ) {}
+    ) {
+    }
 }

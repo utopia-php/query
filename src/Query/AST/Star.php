@@ -7,5 +7,6 @@ readonly class Star implements Expr
     public function __construct(
         public ?string $table = null,
         public ?string $schema = null,
-    ) {}
+    ) {
+    }
 }

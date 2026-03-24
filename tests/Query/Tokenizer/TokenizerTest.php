@@ -34,7 +34,7 @@ class TokenizerTest extends TestCase
      */
     private function types(array $tokens): array
     {
-        return array_map(fn(Token $t) => $t->type, $tokens);
+        return array_map(fn (Token $t) => $t->type, $tokens);
     }
 
     /**
@@ -45,7 +45,7 @@ class TokenizerTest extends TestCase
      */
     private function values(array $tokens): array
     {
-        return array_map(fn(Token $t) => $t->value, $tokens);
+        return array_map(fn (Token $t) => $t->value, $tokens);
     }
 
     public function testSelectStar(): void
@@ -148,12 +148,12 @@ class TokenizerTest extends TestCase
 
         $operators = array_values(array_filter(
             $tokens,
-            fn(Token $t) => $t->type === TokenType::Operator
+            fn (Token $t) => $t->type === TokenType::Operator
         ));
 
         $this->assertSame(
             ['=', '!=', '<>', '<', '>', '<=', '>='],
-            array_map(fn(Token $t) => $t->value, $operators)
+            array_map(fn (Token $t) => $t->value, $operators)
         );
     }
 
@@ -260,9 +260,9 @@ class TokenizerTest extends TestCase
 
         $keywords = array_values(array_filter(
             $tokens,
-            fn(Token $t) => $t->type === TokenType::Keyword
+            fn (Token $t) => $t->type === TokenType::Keyword
         ));
-        $kwValues = array_map(fn(Token $t) => $t->value, $keywords);
+        $kwValues = array_map(fn (Token $t) => $t->value, $keywords);
 
         $this->assertContains('LEFT', $kwValues);
         $this->assertContains('RIGHT', $kwValues);
@@ -393,7 +393,7 @@ class TokenizerTest extends TestCase
 
         $comments = array_values(array_filter(
             $all,
-            fn(Token $t) => $t->type === TokenType::LineComment
+            fn (Token $t) => $t->type === TokenType::LineComment
         ));
 
         $this->assertCount(1, $comments);
@@ -410,7 +410,7 @@ class TokenizerTest extends TestCase
 
         $comments = array_values(array_filter(
             $all,
-            fn(Token $t) => $t->type === TokenType::BlockComment
+            fn (Token $t) => $t->type === TokenType::BlockComment
         ));
 
         $this->assertCount(1, $comments);
@@ -579,7 +579,7 @@ class TokenizerTest extends TestCase
 
         $pipes = array_values(array_filter(
             $tokens,
-            fn(Token $t) => $t->type === TokenType::Operator && $t->value === '||'
+            fn (Token $t) => $t->type === TokenType::Operator && $t->value === '||'
         ));
 
         $this->assertCount(2, $pipes);

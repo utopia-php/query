@@ -12,5 +12,6 @@ readonly class FunctionCall implements Expr
         public array $arguments = [],
         public bool $distinct = false,
         public ?Expr $filter = null,
-    ) {}
+    ) {
+    }
 }

@@ -9,5 +9,6 @@ readonly class BetweenExpr implements Expr
         public Expr $low,
         public Expr $high,
         public bool $negated = false,
-    ) {}
+    ) {
+    }
 }

@@ -31,16 +31,7 @@ class PostgreSQLTest extends TestCase
      */
     private function types(array $tokens): array
     {
-        return array_map(fn(Token $t) => $t->type, $tokens);
-    }
-
-    /**
-     * @param Token[] $tokens
-     * @return string[]
-     */
-    private function values(array $tokens): array
-    {
-        return array_map(fn(Token $t) => $t->value, $tokens);
+        return array_map(fn (Token $t) => $t->type, $tokens);
     }
 
     public function testDoubleQuoteIdentifier(): void
@@ -61,7 +52,7 @@ class PostgreSQLTest extends TestCase
 
         $operators = array_values(array_filter(
             $tokens,
-            fn(Token $t) => $t->type === TokenType::Operator
+            fn (Token $t) => $t->type === TokenType::Operator
         ));
 
         $this->assertCount(1, $operators);
@@ -74,7 +65,7 @@ class PostgreSQLTest extends TestCase
 
         $operators = array_values(array_filter(
             $tokens,
-            fn(Token $t) => $t->type === TokenType::Operator
+            fn (Token $t) => $t->type === TokenType::Operator
         ));
 
         $this->assertCount(1, $operators);
@@ -86,7 +77,7 @@ class PostgreSQLTest extends TestCase
         $tokens1 = $this->meaningful('embedding <=> query_vec');
         $ops1 = array_values(array_filter(
             $tokens1,
-            fn(Token $t) => $t->type === TokenType::Operator
+            fn (Token $t) => $t->type === TokenType::Operator
         ));
         $this->assertCount(1, $ops1);
         $this->assertSame('<=>', $ops1[0]->value);
@@ -94,7 +85,7 @@ class PostgreSQLTest extends TestCase
         $tokens2 = $this->meaningful('embedding <-> query_vec');
         $ops2 = array_values(array_filter(
             $tokens2,
-            fn(Token $t) => $t->type === TokenType::Operator
+            fn (Token $t) => $t->type === TokenType::Operator
         ));
         $this->assertCount(1, $ops2);
         $this->assertSame('<->', $ops2[0]->value);
@@ -102,7 +93,7 @@ class PostgreSQLTest extends TestCase
         $tokens3 = $this->meaningful('embedding <#> query_vec');
         $ops3 = array_values(array_filter(
             $tokens3,
-            fn(Token $t) => $t->type === TokenType::Operator
+            fn (Token $t) => $t->type === TokenType::Operator
         ));
         $this->assertCount(1, $ops3);
         $this->assertSame('<#>', $ops3[0]->value);

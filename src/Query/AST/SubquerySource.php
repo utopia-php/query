@@ -7,5 +7,6 @@ readonly class SubquerySource
     public function __construct(
         public SelectStatement $query,
         public string $alias,
-    ) {}
+    ) {
+    }
 }

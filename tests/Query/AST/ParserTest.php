@@ -21,7 +21,6 @@ use Utopia\Query\AST\Parser;
 use Utopia\Query\AST\Placeholder;
 use Utopia\Query\AST\SelectStatement;
 use Utopia\Query\AST\Star;
-use Utopia\Query\AST\SubqueryExpr;
 use Utopia\Query\AST\SubquerySource;
 use Utopia\Query\AST\TableRef;
 use Utopia\Query\AST\UnaryExpr;
