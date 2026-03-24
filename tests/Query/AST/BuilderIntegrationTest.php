@@ -3,13 +3,13 @@
 namespace Tests\Query\AST;
 
 use PHPUnit\Framework\TestCase;
-use Utopia\Query\AST\CteDefinition;
+use Utopia\Query\AST\Call\Func;
+use Utopia\Query\AST\Definition\Cte;
 use Utopia\Query\AST\Expression\Aliased;
 use Utopia\Query\AST\Expression\Between;
 use Utopia\Query\AST\Expression\Binary;
 use Utopia\Query\AST\Expression\In;
 use Utopia\Query\AST\Expression\Unary;
-use Utopia\Query\AST\FunctionCall;
 use Utopia\Query\AST\JoinClause;
 use Utopia\Query\AST\Literal;
 use Utopia\Query\AST\OrderByItem;
@@ -180,13 +180,13 @@ class BuilderIntegrationTest extends TestCase
         $countCol = $ast->columns[0];
         $this->assertInstanceOf(Aliased::class, $countCol);
         $this->assertSame('total_count', $countCol->alias);
-        $this->assertInstanceOf(FunctionCall::class, $countCol->expression);
+        $this->assertInstanceOf(Func::class, $countCol->expression);
         $this->assertSame('COUNT', $countCol->expression->name);
 
         $sumCol = $ast->columns[1];
         $this->assertInstanceOf(Aliased::class, $sumCol);
         $this->assertSame('total_amount', $sumCol->alias);
-        $this->assertInstanceOf(FunctionCall::class, $sumCol->expression);
+        $this->assertInstanceOf(Func::class, $sumCol->expression);
         $this->assertSame('SUM', $sumCol->expression->name);
     }
 
@@ -337,7 +337,7 @@ class BuilderIntegrationTest extends TestCase
         $ast = new Select(
             columns: [
                 new Column('id'),
-                new Aliased(new FunctionCall('COUNT', [new Star()]), 'order_count'),
+                new Aliased(new Func('COUNT', [new Star()]), 'order_count'),
             ],
             from: new Table('users', 'u'),
             joins: [
@@ -357,7 +357,7 @@ class BuilderIntegrationTest extends TestCase
                 new Literal('active'),
             ),
             groupBy: [new Column('id')],
-            orderBy: [new OrderByItem(new FunctionCall('COUNT', [new Star()]), 'DESC')],
+            orderBy: [new OrderByItem(new Func('COUNT', [new Star()]), 'DESC')],
             limit: new Literal(10),
         );
 
@@ -387,7 +387,7 @@ class BuilderIntegrationTest extends TestCase
             columns: [new Star()],
             from: new Table('active_users'),
             ctes: [
-                new CteDefinition('active_users', $innerStmt),
+                new Cte('active_users', $innerStmt),
             ],
         );
 
@@ -567,7 +567,7 @@ class BuilderIntegrationTest extends TestCase
         $ast = new Select(
             columns: [
                 new Column('department'),
-                new Aliased(new FunctionCall('COUNT', [new Star()]), 'cnt'),
+                new Aliased(new Func('COUNT', [new Star()]), 'cnt'),
             ],
             from: new Table('employees'),
             groupBy: [new Column('department')],
@@ -720,7 +720,7 @@ class BuilderIntegrationTest extends TestCase
         $col = $ast->columns[0];
         $this->assertInstanceOf(Aliased::class, $col);
         $this->assertSame('unique_users', $col->alias);
-        $this->assertInstanceOf(FunctionCall::class, $col->expression);
+        $this->assertInstanceOf(Func::class, $col->expression);
         $this->assertSame('COUNT', $col->expression->name);
         $this->assertTrue($col->expression->distinct);
     }

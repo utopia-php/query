@@ -1,8 +1,10 @@
 <?php
 
-namespace Utopia\Query\AST;
+namespace Utopia\Query\AST\Call;
 
-readonly class FunctionCall implements Expression
+use Utopia\Query\AST\Expression;
+
+readonly class Func implements Expression
 {
     /**
      * @param Expression[] $arguments

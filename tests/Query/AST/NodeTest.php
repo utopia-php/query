@@ -3,7 +3,9 @@
 namespace Tests\Query\AST;
 
 use PHPUnit\Framework\TestCase;
-use Utopia\Query\AST\CteDefinition;
+use Utopia\Query\AST\Call\Func;
+use Utopia\Query\AST\Definition\Cte;
+use Utopia\Query\AST\Definition\Window as WindowDefinition;
 use Utopia\Query\AST\Expression;
 use Utopia\Query\AST\Expression\Aliased;
 use Utopia\Query\AST\Expression\Between;
@@ -16,7 +18,6 @@ use Utopia\Query\AST\Expression\In;
 use Utopia\Query\AST\Expression\Subquery;
 use Utopia\Query\AST\Expression\Unary;
 use Utopia\Query\AST\Expression\Window;
-use Utopia\Query\AST\FunctionCall;
 use Utopia\Query\AST\JoinClause;
 use Utopia\Query\AST\Literal;
 use Utopia\Query\AST\OrderByItem;
@@ -28,7 +29,6 @@ use Utopia\Query\AST\Specification\Window as WindowSpecification;
 use Utopia\Query\AST\Star;
 use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\AST\SubquerySource;
-use Utopia\Query\AST\WindowDefinition;
 
 class NodeTest extends TestCase
 {
@@ -151,20 +151,20 @@ class NodeTest extends TestCase
 
     public function testFunctionCall(): void
     {
-        $fn = new FunctionCall('UPPER', [new Column('name')]);
+        $fn = new Func('UPPER', [new Column('name')]);
         $this->assertInstanceOf(Expression::class, $fn);
         $this->assertSame('UPPER', $fn->name);
         $this->assertCount(1, $fn->arguments);
         $this->assertFalse($fn->distinct);
 
-        $noArgs = new FunctionCall('NOW');
+        $noArgs = new Func('NOW');
         $this->assertSame('NOW', $noArgs->name);
         $this->assertSame([], $noArgs->arguments);
     }
 
     public function testFunctionCallDistinct(): void
     {
-        $count = new FunctionCall('COUNT', [new Column('id')], true);
+        $count = new Func('COUNT', [new Column('id')], true);
         $this->assertSame('COUNT', $count->name);
         $this->assertTrue($count->distinct);
         $this->assertCount(1, $count->arguments);
@@ -264,7 +264,7 @@ class NodeTest extends TestCase
 
     public function testAliasedExpression(): void
     {
-        $expression = new FunctionCall('COUNT', [new Star()]);
+        $expression = new Func('COUNT', [new Star()]);
         $aliased = new Aliased($expression, 'total');
 
         $this->assertInstanceOf(Expression::class, $aliased);
@@ -275,7 +275,7 @@ class NodeTest extends TestCase
     public function testSubqueryExpression(): void
     {
         $query = new Select(
-            columns: [new FunctionCall('MAX', [new Column('salary')])],
+            columns: [new Func('MAX', [new Column('salary')])],
             from: new Table('employees'),
         );
         $sub = new Subquery($query);
@@ -286,7 +286,7 @@ class NodeTest extends TestCase
 
     public function testWindowExpression(): void
     {
-        $fn = new FunctionCall('ROW_NUMBER');
+        $fn = new Func('ROW_NUMBER');
         $specification = new WindowSpecification(
             partitionBy: [new Column('department')],
             orderBy: [new OrderByItem(new Column('salary'), 'DESC')],
@@ -417,16 +417,16 @@ class NodeTest extends TestCase
             where: new Binary(new Column('active'), '=', new Literal(true)),
         );
 
-        $cte = new CteDefinition('active_employees', $query);
+        $cte = new Cte('active_employees', $query);
         $this->assertSame('active_employees', $cte->name);
         $this->assertSame($query, $cte->query);
         $this->assertSame([], $cte->columns);
         $this->assertFalse($cte->recursive);
 
-        $cteWithCols = new CteDefinition('ranked', $query, ['id', 'name', 'rank']);
+        $cteWithCols = new Cte('ranked', $query, ['id', 'name', 'rank']);
         $this->assertSame(['id', 'name', 'rank'], $cteWithCols->columns);
 
-        $recursive = new CteDefinition('hierarchy', $query, recursive: true);
+        $recursive = new Cte('hierarchy', $query, recursive: true);
         $this->assertTrue($recursive->recursive);
     }
 
@@ -435,7 +435,7 @@ class NodeTest extends TestCase
         $select = new Select(
             columns: [
                 new Column('name', 'u'),
-                new Aliased(new FunctionCall('COUNT', [new Star()]), 'order_count'),
+                new Aliased(new Func('COUNT', [new Star()]), 'order_count'),
             ],
             from: new Table('users', 'u'),
             joins: [
@@ -448,7 +448,7 @@ class NodeTest extends TestCase
             where: new Binary(new Column('active', 'u'), '=', new Literal(true)),
             groupBy: [new Column('name', 'u')],
             having: new Binary(
-                new FunctionCall('COUNT', [new Star()]),
+                new Func('COUNT', [new Star()]),
                 '>',
                 new Literal(5),
             ),
@@ -516,7 +516,7 @@ class NodeTest extends TestCase
 
         $withCtes = $original->with(
             ctes: [
-                new CteDefinition('sub', new Select(columns: [new Literal(1)])),
+                new Cte('sub', new Select(columns: [new Literal(1)])),
             ],
         );
         $this->assertCount(1, $withCtes->ctes);

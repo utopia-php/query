@@ -2,6 +2,9 @@
 
 namespace Utopia\Query\AST;
 
+use Utopia\Query\AST\Call\Func;
+use Utopia\Query\AST\Definition\Cte;
+use Utopia\Query\AST\Definition\Window as WindowDefinition;
 use Utopia\Query\AST\Expression\Aliased;
 use Utopia\Query\AST\Expression\Between;
 use Utopia\Query\AST\Expression\Binary;
@@ -143,7 +146,7 @@ class Parser
     }
 
     /**
-     * @return CteDefinition[]
+     * @return Cte[]
      */
     private function parseCteList(bool $recursive): array
     {
@@ -155,7 +158,7 @@ class Parser
         return $ctes;
     }
 
-    private function parseCteDefinition(bool $recursive): CteDefinition
+    private function parseCteDefinition(bool $recursive): Cte
     {
         $name = $this->expectIdentifier();
         $columns = [];
@@ -176,7 +179,7 @@ class Parser
         $query = $this->parseSelect();
         $this->expect(TokenType::RightParen);
 
-        return new CteDefinition($name, $query, $columns, $recursive);
+        return new Cte($name, $query, $columns, $recursive);
     }
 
     private function peekIsColumnList(): bool
@@ -627,13 +630,13 @@ class Parser
         if ($this->current()->type === TokenType::Star) {
             $this->advance();
             $this->expect(TokenType::RightParen);
-            $function = new FunctionCall($upperName, [new Star()]);
+            $function = new Func($upperName, [new Star()]);
             return $this->parseFunctionPostfix($function);
         }
 
         if ($this->current()->type === TokenType::RightParen) {
             $this->advance();
-            $function = new FunctionCall($upperName);
+            $function = new Func($upperName);
             return $this->parseFunctionPostfix($function);
         }
 
@@ -650,11 +653,11 @@ class Parser
         }
 
         $this->expect(TokenType::RightParen);
-        $function = new FunctionCall($upperName, $args, $distinct);
+        $function = new Func($upperName, $args, $distinct);
         return $this->parseFunctionPostfix($function);
     }
 
-    private function parseFunctionPostfix(FunctionCall $function): Expression
+    private function parseFunctionPostfix(Func $function): Expression
     {
         if ($this->matchKeyword('FILTER')) {
             $this->advance();
@@ -662,7 +665,7 @@ class Parser
             $this->consumeKeyword('WHERE');
             $filterExpression = $this->parseExpression();
             $this->expect(TokenType::RightParen);
-            $function = new FunctionCall($function->name, $function->arguments, $function->distinct, $filterExpression);
+            $function = new Func($function->name, $function->arguments, $function->distinct, $filterExpression);
         }
 
         if ($this->matchKeyword('OVER')) {

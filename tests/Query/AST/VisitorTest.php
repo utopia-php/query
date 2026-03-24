@@ -3,11 +3,11 @@
 namespace Tests\Query\AST;
 
 use PHPUnit\Framework\TestCase;
-use Utopia\Query\AST\CteDefinition;
+use Utopia\Query\AST\Call\Func;
+use Utopia\Query\AST\Definition\Cte;
 use Utopia\Query\AST\Expression\Aliased;
 use Utopia\Query\AST\Expression\Binary;
 use Utopia\Query\AST\Expression\In;
-use Utopia\Query\AST\FunctionCall;
 use Utopia\Query\AST\JoinClause;
 use Utopia\Query\AST\Literal;
 use Utopia\Query\AST\OrderByItem;
@@ -366,7 +366,7 @@ class VisitorTest extends TestCase
             columns: [new Star()],
             from: new Table('active_users'),
             ctes: [
-                new CteDefinition('active_users', $cteQuery),
+                new Cte('active_users', $cteQuery),
             ],
         );
 
@@ -385,7 +385,7 @@ class VisitorTest extends TestCase
         $stmt = new Select(
             columns: [
                 new Column('name', 'u'),
-                new Aliased(new FunctionCall('COUNT', [new Star()]), 'total'),
+                new Aliased(new Func('COUNT', [new Star()]), 'total'),
             ],
             from: new Table('users', 'u'),
             joins: [
@@ -406,7 +406,7 @@ class VisitorTest extends TestCase
             ),
             groupBy: [new Column('name', 'u')],
             having: new Binary(
-                new FunctionCall('COUNT', [new Star()]),
+                new Func('COUNT', [new Star()]),
                 '>',
                 new Literal(5),
             ),

@@ -2,6 +2,9 @@
 
 namespace Utopia\Query\AST;
 
+use Utopia\Query\AST\Call\Func;
+use Utopia\Query\AST\Definition\Cte;
+use Utopia\Query\AST\Definition\Window as WindowDefinition;
 use Utopia\Query\AST\Expression\Aliased;
 use Utopia\Query\AST\Expression\Between;
 use Utopia\Query\AST\Expression\Binary;
@@ -98,7 +101,7 @@ class Walker
                 $this->walkExpression($expression->operand, $visitor),
                 $expression->prefix,
             ),
-            $expression instanceof FunctionCall => $this->walkFunctionCall($expression, $visitor),
+            $expression instanceof Func => $this->walkFunctionCall($expression, $visitor),
             $expression instanceof Aliased => new Aliased(
                 $this->walkExpression($expression->expression, $visitor),
                 $expression->alias,
@@ -142,12 +145,12 @@ class Walker
         return $result;
     }
 
-    private function walkFunctionCall(FunctionCall $expression, Visitor $visitor): FunctionCall
+    private function walkFunctionCall(Func $expression, Visitor $visitor): Func
     {
         $args = $this->walkExpressionArray($expression->arguments, $visitor);
         $filter = $expression->filter !== null ? $this->walkExpression($expression->filter, $visitor) : null;
 
-        return new FunctionCall(
+        return new Func(
             $expression->name,
             $args,
             $expression->distinct,
@@ -250,11 +253,11 @@ class Walker
         );
     }
 
-    private function walkCte(CteDefinition $cte, Visitor $visitor): CteDefinition
+    private function walkCte(Cte $cte, Visitor $visitor): Cte
     {
         $walkedQuery = $this->walk($cte->query, $visitor);
 
-        return new CteDefinition(
+        return new Cte(
             $cte->name,
             $walkedQuery,
             $cte->columns,

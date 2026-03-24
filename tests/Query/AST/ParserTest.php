@@ -3,7 +3,9 @@
 namespace Tests\Query\AST;
 
 use PHPUnit\Framework\TestCase;
-use Utopia\Query\AST\CteDefinition;
+use Utopia\Query\AST\Call\Func;
+use Utopia\Query\AST\Definition\Cte;
+use Utopia\Query\AST\Definition\Window as WindowDefinition;
 use Utopia\Query\AST\Expression\Aliased;
 use Utopia\Query\AST\Expression\Between;
 use Utopia\Query\AST\Expression\Binary;
@@ -14,7 +16,6 @@ use Utopia\Query\AST\Expression\Exists;
 use Utopia\Query\AST\Expression\In;
 use Utopia\Query\AST\Expression\Unary;
 use Utopia\Query\AST\Expression\Window;
-use Utopia\Query\AST\FunctionCall;
 use Utopia\Query\AST\JoinClause;
 use Utopia\Query\AST\Literal;
 use Utopia\Query\AST\OrderByItem;
@@ -26,7 +27,6 @@ use Utopia\Query\AST\Specification\Window as WindowSpecification;
 use Utopia\Query\AST\Star;
 use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\AST\SubquerySource;
-use Utopia\Query\AST\WindowDefinition;
 use Utopia\Query\Tokenizer\Tokenizer;
 
 class ParserTest extends TestCase
@@ -339,7 +339,7 @@ class ParserTest extends TestCase
         $this->assertCount(1, $stmt->groupBy);
         $this->assertInstanceOf(Binary::class, $stmt->having);
         $this->assertSame('>', $stmt->having->operator);
-        $this->assertInstanceOf(FunctionCall::class, $stmt->having->left);
+        $this->assertInstanceOf(Func::class, $stmt->having->left);
         $this->assertSame('COUNT', $stmt->having->left->name);
     }
 
@@ -358,7 +358,7 @@ class ParserTest extends TestCase
         $stmt = $this->parse('SELECT COUNT(*) FROM users');
 
         $this->assertCount(1, $stmt->columns);
-        $this->assertInstanceOf(FunctionCall::class, $stmt->columns[0]);
+        $this->assertInstanceOf(Func::class, $stmt->columns[0]);
         $this->assertSame('COUNT', $stmt->columns[0]->name);
         $this->assertCount(1, $stmt->columns[0]->arguments);
         $this->assertInstanceOf(Star::class, $stmt->columns[0]->arguments[0]);
@@ -369,7 +369,7 @@ class ParserTest extends TestCase
         $stmt = $this->parse("SELECT COALESCE(name, 'unknown') FROM users");
 
         $this->assertCount(1, $stmt->columns);
-        $this->assertInstanceOf(FunctionCall::class, $stmt->columns[0]);
+        $this->assertInstanceOf(Func::class, $stmt->columns[0]);
         $this->assertSame('COALESCE', $stmt->columns[0]->name);
         $this->assertCount(2, $stmt->columns[0]->arguments);
         $this->assertInstanceOf(Column::class, $stmt->columns[0]->arguments[0]);
@@ -382,7 +382,7 @@ class ParserTest extends TestCase
         $stmt = $this->parse('SELECT COUNT(DISTINCT user_id) FROM orders');
 
         $this->assertCount(1, $stmt->columns);
-        $this->assertInstanceOf(FunctionCall::class, $stmt->columns[0]);
+        $this->assertInstanceOf(Func::class, $stmt->columns[0]);
         $this->assertSame('COUNT', $stmt->columns[0]->name);
         $this->assertTrue($stmt->columns[0]->distinct);
         $this->assertCount(1, $stmt->columns[0]->arguments);
@@ -396,12 +396,12 @@ class ParserTest extends TestCase
 
         $this->assertCount(1, $stmt->columns);
         $outer = $stmt->columns[0];
-        $this->assertInstanceOf(FunctionCall::class, $outer);
+        $this->assertInstanceOf(Func::class, $outer);
         $this->assertSame('UPPER', $outer->name);
         $this->assertCount(1, $outer->arguments);
 
         $inner = $outer->arguments[0];
-        $this->assertInstanceOf(FunctionCall::class, $inner);
+        $this->assertInstanceOf(Func::class, $inner);
         $this->assertSame('TRIM', $inner->name);
     }
 
@@ -559,7 +559,7 @@ class ParserTest extends TestCase
         $this->assertCount(1, $stmt->columns);
         $window = $stmt->columns[0];
         $this->assertInstanceOf(Window::class, $window);
-        $this->assertInstanceOf(FunctionCall::class, $window->function);
+        $this->assertInstanceOf(Func::class, $window->function);
         $this->assertSame('ROW_NUMBER', $window->function->name);
         $this->assertInstanceOf(WindowSpecification::class, $window->specification);
         $this->assertCount(1, $window->specification->partitionBy);
@@ -590,7 +590,7 @@ class ParserTest extends TestCase
 
         $this->assertCount(1, $stmt->ctes);
         $cte = $stmt->ctes[0];
-        $this->assertInstanceOf(CteDefinition::class, $cte);
+        $this->assertInstanceOf(Cte::class, $cte);
         $this->assertSame('active', $cte->name);
         $this->assertFalse($cte->recursive);
         $this->assertInstanceOf(Select::class, $cte->query);

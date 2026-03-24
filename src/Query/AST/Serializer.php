@@ -2,6 +2,8 @@
 
 namespace Utopia\Query\AST;
 
+use Utopia\Query\AST\Call\Func;
+use Utopia\Query\AST\Definition\Cte;
 use Utopia\Query\AST\Expression\Aliased;
 use Utopia\Query\AST\Expression\Between;
 use Utopia\Query\AST\Expression\Binary;
@@ -102,7 +104,7 @@ class Serializer
             $expression instanceof Star => $this->serializeStar($expression),
             $expression instanceof Placeholder => $expression->value,
             $expression instanceof Raw => $expression->sql,
-            $expression instanceof FunctionCall => $this->serializeFunctionCall($expression),
+            $expression instanceof Func => $this->serializeFunctionCall($expression),
             $expression instanceof In => $this->serializeIn($expression),
             $expression instanceof Between => $this->serializeBetween($expression),
             $expression instanceof Exists => $this->serializeExists($expression),
@@ -212,7 +214,7 @@ class Serializer
         return '*';
     }
 
-    private function serializeFunctionCall(FunctionCall $expression): string
+    private function serializeFunctionCall(Func $expression): string
     {
         if (count($expression->arguments) === 1 && $expression->arguments[0] instanceof Star) {
             return $expression->name . '(*)';
@@ -382,7 +384,7 @@ class Serializer
     }
 
     /**
-     * @param CteDefinition[] $ctes
+     * @param Cte[] $ctes
      */
     private function serializeCtes(array $ctes): string
     {

@@ -1,10 +1,10 @@
 <?php
 
-namespace Utopia\Query\AST;
+namespace Utopia\Query\AST\Definition;
 
 use Utopia\Query\AST\Statement\Select;
 
-readonly class CteDefinition
+readonly class Cte
 {
     /**
      * @param string[] $columns

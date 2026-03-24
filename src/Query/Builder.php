@@ -3,14 +3,14 @@
 namespace Utopia\Query;
 
 use Closure;
-use Utopia\Query\AST\CteDefinition;
+use Utopia\Query\AST\Call\Func;
+use Utopia\Query\AST\Definition\Cte as CteDefinition;
 use Utopia\Query\AST\Expression;
 use Utopia\Query\AST\Expression\Aliased;
 use Utopia\Query\AST\Expression\Between;
 use Utopia\Query\AST\Expression\Binary;
 use Utopia\Query\AST\Expression\In;
 use Utopia\Query\AST\Expression\Unary;
-use Utopia\Query\AST\FunctionCall;
 use Utopia\Query\AST\JoinClause as AstJoinClause;
 use Utopia\Query\AST\Literal;
 use Utopia\Query\AST\OrderByItem;
@@ -2415,7 +2415,7 @@ abstract class Builder implements
         $arg = ($attr === '*' || $attr === '') ? new Star() : new Column($attr);
         $distinct = $method === Method::CountDistinct;
 
-        $funcCall = new FunctionCall($funcName, [$arg], $distinct);
+        $funcCall = new Func($funcName, [$arg], $distinct);
 
         if ($alias !== '') {
             return new Aliased($funcCall, $alias);
@@ -2774,13 +2774,13 @@ abstract class Builder implements
                 continue;
             }
 
-            if ($col instanceof Aliased && $col->expression instanceof FunctionCall) {
+            if ($col instanceof Aliased && $col->expression instanceof Func) {
                 $this->applyAstAggregateColumn($col);
                 $hasNonStar = true;
                 continue;
             }
 
-            if ($col instanceof FunctionCall) {
+            if ($col instanceof Func) {
                 $this->applyAstUnaliasedFunctionColumn($col);
                 $hasNonStar = true;
                 continue;
@@ -2817,7 +2817,7 @@ abstract class Builder implements
     private function applyAstAggregateColumn(Aliased $aliased): void
     {
         $fn = $aliased->expression;
-        if (!$fn instanceof FunctionCall) {
+        if (!$fn instanceof Func) {
             return;
         }
 
@@ -2857,7 +2857,7 @@ abstract class Builder implements
         $this->selectRaw($serializer->serializeExpression($aliased));
     }
 
-    private function applyAstUnaliasedFunctionColumn(FunctionCall $fn): void
+    private function applyAstUnaliasedFunctionColumn(Func $fn): void
     {
         $name = \strtoupper($fn->name);
         $attr = $this->astFuncArgToAttribute($fn);
@@ -2885,7 +2885,7 @@ abstract class Builder implements
         $this->selectRaw($serializer->serializeExpression($fn));
     }
 
-    private function astFuncArgToAttribute(FunctionCall $fn): string
+    private function astFuncArgToAttribute(Func $fn): string
     {
         if (empty($fn->arguments)) {
             return '*';

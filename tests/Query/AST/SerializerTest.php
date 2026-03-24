@@ -3,10 +3,10 @@
 namespace Tests\Query\AST;
 
 use PHPUnit\Framework\TestCase;
+use Utopia\Query\AST\Call\Func;
 use Utopia\Query\AST\Expression\Aliased;
 use Utopia\Query\AST\Expression\Binary;
 use Utopia\Query\AST\Expression\Unary;
-use Utopia\Query\AST\FunctionCall;
 use Utopia\Query\AST\Literal;
 use Utopia\Query\AST\OrderByItem;
 use Utopia\Query\AST\Parser;
@@ -249,7 +249,7 @@ class SerializerTest extends TestCase
         $stmt = new Select(
             columns: [
                 new Aliased(new Column('name'), 'n'),
-                new FunctionCall('COUNT', [new Star()]),
+                new Func('COUNT', [new Star()]),
             ],
             from: new Table('users', 'u'),
             where: new Binary(
@@ -259,7 +259,7 @@ class SerializerTest extends TestCase
             ),
             groupBy: [new Column('name')],
             having: new Binary(
-                new FunctionCall('COUNT', [new Star()]),
+                new Func('COUNT', [new Star()]),
                 '>',
                 new Literal(5),
             ),

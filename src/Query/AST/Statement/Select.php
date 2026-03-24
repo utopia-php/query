@@ -2,13 +2,13 @@
 
 namespace Utopia\Query\AST\Statement;
 
-use Utopia\Query\AST\CteDefinition;
+use Utopia\Query\AST\Definition\Cte;
+use Utopia\Query\AST\Definition\Window;
 use Utopia\Query\AST\Expression;
 use Utopia\Query\AST\JoinClause;
 use Utopia\Query\AST\OrderByItem;
 use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\SubquerySource;
-use Utopia\Query\AST\WindowDefinition;
 
 readonly class Select
 {
@@ -17,8 +17,8 @@ readonly class Select
      * @param JoinClause[] $joins
      * @param Expression[] $groupBy
      * @param OrderByItem[] $orderBy
-     * @param CteDefinition[] $ctes
-     * @param WindowDefinition[] $windows
+     * @param Cte[] $ctes
+     * @param Window[] $windows
      */
     public function __construct(
         public array $columns = [],
@@ -46,8 +46,8 @@ readonly class Select
      * @param JoinClause[]|null $joins
      * @param Expression[]|null $groupBy
      * @param OrderByItem[]|null $orderBy
-     * @param CteDefinition[]|null $ctes
-     * @param WindowDefinition[]|null $windows
+     * @param Cte[]|null $ctes
+     * @param Window[]|null $windows
      */
     public function with(
         ?array $columns = null,
