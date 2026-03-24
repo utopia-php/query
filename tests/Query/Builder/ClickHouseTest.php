@@ -9,24 +9,33 @@ use Utopia\Query\Builder\Case\Builder as CaseBuilder;
 use Utopia\Query\Builder\ClickHouse as Builder;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\Feature\Aggregates;
+use Utopia\Query\Builder\Feature\BitwiseAggregates;
+use Utopia\Query\Builder\Feature\ClickHouse\ApproximateAggregates;
+use Utopia\Query\Builder\Feature\ClickHouse\ArrayJoins;
+use Utopia\Query\Builder\Feature\ClickHouse\AsofJoins;
+use Utopia\Query\Builder\Feature\ClickHouse\LimitBy;
+use Utopia\Query\Builder\Feature\ClickHouse\WithFill;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\CTEs;
 use Utopia\Query\Builder\Feature\Deletes;
 use Utopia\Query\Builder\Feature\FullOuterJoins;
+use Utopia\Query\Builder\Feature\GroupByModifiers;
 use Utopia\Query\Builder\Feature\Hints;
 use Utopia\Query\Builder\Feature\Hooks;
 use Utopia\Query\Builder\Feature\Inserts;
 use Utopia\Query\Builder\Feature\Joins;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\Locking;
+use Utopia\Query\Builder\Feature\PostgreSQL\VectorSearch;
 use Utopia\Query\Builder\Feature\Selects;
 use Utopia\Query\Builder\Feature\Spatial;
+use Utopia\Query\Builder\Feature\StatisticalAggregates;
+use Utopia\Query\Builder\Feature\StringAggregates;
 use Utopia\Query\Builder\Feature\TableSampling;
 use Utopia\Query\Builder\Feature\Transactions;
 use Utopia\Query\Builder\Feature\Unions;
 use Utopia\Query\Builder\Feature\Updates;
 use Utopia\Query\Builder\Feature\Upsert;
-use Utopia\Query\Builder\Feature\VectorSearch;
 use Utopia\Query\Builder\Feature\Windows;
 use Utopia\Query\Builder\JoinBuilder;
 use Utopia\Query\Builder\JoinType;
@@ -322,7 +331,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertEquals(
-            'SELECT COUNT(*) AS `total`, SUM(`duration`) AS `total_duration` FROM `events` GROUP BY `event_type` HAVING `total` > ?',
+            'SELECT COUNT(*) AS `total`, SUM(`duration`) AS `total_duration` FROM `events` GROUP BY `event_type` HAVING COUNT(*) > ?',
             $result->query
         );
         $this->assertEquals([10], $result->bindings);
@@ -501,14 +510,13 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('PREWHERE `event_type` IN (?)', $query);
         $this->assertStringContainsString('WHERE `events`.`amount` > ?', $query);
         $this->assertStringContainsString('GROUP BY `users`.`country`', $query);
-        $this->assertStringContainsString('HAVING `total` > ?', $query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ?', $query);
         $this->assertStringContainsString('ORDER BY `total` DESC', $query);
         $this->assertStringContainsString('LIMIT ?', $query);
 
         // Verify ordering: PREWHERE before WHERE
         $this->assertLessThan(strpos($query, 'WHERE'), strpos($query, 'PREWHERE'));
     }
-    // 1. PREWHERE comprehensive (40+ tests)
 
     public function testPrewhereEmptyArray(): void
     {
@@ -945,7 +953,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
-        $this->assertStringContainsString('HAVING `total` > ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
     }
 
     public function testPrewhereWithOrderBy(): void
@@ -1195,7 +1203,6 @@ class ClickHouseTest extends TestCase
             $sql
         );
     }
-    // 2. FINAL comprehensive (20+ tests)
 
     public function testFinalBasicSelect(): void
     {
@@ -1248,7 +1255,7 @@ class ClickHouseTest extends TestCase
 
         $this->assertStringContainsString('FROM `events` FINAL', $result->query);
         $this->assertStringContainsString('GROUP BY `type`', $result->query);
-        $this->assertStringContainsString('HAVING `cnt` > ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
     }
 
     public function testFinalWithDistinct(): void
@@ -1490,7 +1497,6 @@ class ClickHouseTest extends TestCase
 
         $this->assertStringNotContainsString('FINAL', $result2->query);
     }
-    // 3. SAMPLE comprehensive (23 tests)
 
     public function testSample10Percent(): void
     {
@@ -1786,7 +1792,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('SAMPLE 0.5', $result->query);
         $this->assertStringContainsString('`r_col`', $result->query);
     }
-    // 4. ClickHouse regex: match() function (20 tests)
 
     public function testRegexBasicPattern(): void
     {
@@ -2076,7 +2081,6 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals(['^/api', 'error', 'timeout'], $result->bindings);
     }
-    // 5. Search exception (10 tests)
 
     public function testSearchThrowsExceptionMessage(): void
     {
@@ -2193,7 +2197,6 @@ class ClickHouseTest extends TestCase
             ->filter([Query::search('content', 'hello')])
             ->build();
     }
-    // 6. ClickHouse rand() (10 tests)
 
     public function testRandomSortProducesLowercaseRand(): void
     {
@@ -2322,7 +2325,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('SELECT * FROM `events` ORDER BY rand()', $result->query);
         $this->assertEquals([], $result->bindings);
     }
-    // 7. All filter types work correctly (31 tests)
 
     public function testFilterEqualSingleValue(): void
     {
@@ -2575,7 +2577,6 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
         $this->assertEquals([''], $result->bindings);
     }
-    // 8. Aggregation with ClickHouse features (15 tests)
 
     public function testAggregationCountWithFinal(): void
     {
@@ -2661,7 +2662,7 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('SUM(`amount`) AS `total`', $result->query);
         $this->assertStringContainsString('PREWHERE', $result->query);
         $this->assertStringContainsString('GROUP BY `region`', $result->query);
-        $this->assertStringContainsString('HAVING `cnt` > ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
     }
 
     public function testAggregationWithJoinFinal(): void
@@ -2805,7 +2806,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('GROUP BY', $query);
         $this->assertStringContainsString('HAVING', $query);
     }
-    // 9. Join with ClickHouse features (15 tests)
 
     public function testJoinWithFinalFeature(): void
     {
@@ -3044,7 +3044,6 @@ class ClickHouseTest extends TestCase
         $this->assertLessThan($prewherePos, $joinPos);
         $this->assertLessThan($wherePos, $prewherePos);
     }
-    // 10. Union with ClickHouse features (10 tests)
 
     public function testUnionMainHasFinal(): void
     {
@@ -3210,7 +3209,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('LIMIT', $query);
         $this->assertStringContainsString('UNION', $query);
     }
-    // 11. toRawSql with ClickHouse features (15 tests)
 
     public function testToRawSqlWithFinalFeature(): void
     {
@@ -3391,7 +3389,6 @@ class ClickHouseTest extends TestCase
 
         $this->assertEquals("SELECT * FROM `logs` WHERE match(`path`, '^/api')", $sql);
     }
-    // 12. Reset comprehensive (15 tests)
 
     public function testResetClearsPrewhereState(): void
     {
@@ -3597,7 +3594,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('SELECT * FROM `d`', $result->query);
         $this->assertEquals([], $result->bindings);
     }
-    // 13. when() with ClickHouse features (10 tests)
 
     public function testWhenTrueAddsPrewhere(): void
     {
@@ -3730,7 +3726,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('FINAL', $result->query);
         $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
     }
-    // 14. Condition provider with ClickHouse (10 tests)
 
     public function testProviderWithPrewhere(): void
     {
@@ -3931,7 +3926,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('events.deleted = ?', $result->query);
         $this->assertStringContainsString('FINAL', $result->query);
     }
-    // 15. Cursor with ClickHouse features (8 tests)
 
     public function testCursorAfterWithPrewhere(): void
     {
@@ -4061,7 +4055,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('`_cursor` > ?', $query);
         $this->assertStringContainsString('LIMIT', $query);
     }
-    // 16. page() with ClickHouse features (5 tests)
 
     public function testPageWithPrewhere(): void
     {
@@ -4145,7 +4138,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('LIMIT', $query);
         $this->assertStringContainsString('OFFSET', $query);
     }
-    // 17. Fluent chaining comprehensive (5 tests)
 
     public function testAllClickHouseMethodsReturnSameInstance(): void
     {
@@ -4238,7 +4230,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('SELECT * FROM `logs` SAMPLE 0.5', $result->query);
         $this->assertStringNotContainsString('FINAL', $result->query);
     }
-    // 18. SQL clause ordering verification (10 tests)
 
     public function testClauseOrderSelectFromFinalSampleJoinPrewhereWhereGroupByHavingOrderByLimitOffset(): void
     {
@@ -4467,7 +4458,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('OFFSET', $query);
         $this->assertStringContainsString('UNION', $query);
     }
-    // 19. Batch mode with ClickHouse (5 tests)
 
     public function testQueriesMethodWithPrewhere(): void
     {
@@ -4561,7 +4551,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals($resultA->query, $resultB->query);
         $this->assertEquals($resultA->bindings, $resultB->bindings);
     }
-    // 20. Edge cases (10 tests)
 
     public function testEmptyTableNameWithFinal(): void
     {
@@ -4735,7 +4724,6 @@ class ClickHouseTest extends TestCase
         $joinPos = strpos($query, 'JOIN');
         $this->assertLessThan($joinPos, $finalSamplePos);
     }
-    // 1. Spatial/Vector/ElemMatch Exception Tests
 
     public function testFilterCrossesThrowsException(): void
     {
@@ -4832,7 +4820,6 @@ class ClickHouseTest extends TestCase
         $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->filter([Query::elemMatch('attr', [Query::equal('x', [1])])])->build();
     }
-    // 2. SAMPLE Boundary Values
 
     public function testSampleZero(): void
     {
@@ -4864,7 +4851,6 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
         $this->assertStringContainsString('SAMPLE 0.001', $result->query);
     }
-    // 3. Standalone Compiler Method Tests
 
     public function testCompileFilterStandalone(): void
     {
@@ -4996,7 +4982,6 @@ class ClickHouseTest extends TestCase
         $this->expectException(UnsupportedException::class);
         $builder->compileJoin(Query::equal('x', [1]));
     }
-    // 4. Union with ClickHouse Features on Both Sides
 
     public function testUnionBothWithClickHouseFeatures(): void
     {
@@ -5027,7 +5012,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('FROM `a` FINAL', $result->query);
         $this->assertStringContainsString('UNION ALL (SELECT * FROM `b` FINAL)', $result->query);
     }
-    // 5. PREWHERE Binding Order Exhaustive Tests
 
     public function testPrewhereBindingOrderWithFilterAndHaving(): void
     {
@@ -5075,7 +5059,6 @@ class ClickHouseTest extends TestCase
         // prewhere bindings first, then filter, then limit
         $this->assertEquals(['a', 3, 30, 10], $result->bindings);
     }
-    // 6. Search Exception in PREWHERE Interaction
 
     public function testSearchInFilterThrowsExceptionWithMessage(): void
     {
@@ -5089,7 +5072,6 @@ class ClickHouseTest extends TestCase
         $this->expectException(UnsupportedException::class);
         (new Builder())->from('t')->prewhere([Query::search('content', 'hello')])->build();
     }
-    // 7. Join Combinations with FINAL/SAMPLE
 
     public function testLeftJoinWithFinalAndSample(): void
     {
@@ -5136,7 +5118,6 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
         $this->assertStringContainsString('JOIN `other` ON `a` != `b`', $result->query);
     }
-    // 8. Condition Provider Position Verification
 
     public function testConditionProviderInWhereNotPrewhere(): void
     {
@@ -5174,7 +5155,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('SELECT * FROM `t` WHERE _deleted = ?', $result->query);
         $this->assertEquals([0], $result->bindings);
     }
-    // 9. Page Boundary Values
 
     public function testPageZero(): void
     {
@@ -5194,7 +5174,6 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
         $this->assertEquals([25, 24999975], $result->bindings);
     }
-    // 10. Build Without From
 
     public function testBuildWithoutFrom(): void
     {
@@ -5202,7 +5181,6 @@ class ClickHouseTest extends TestCase
         $this->expectExceptionMessage('No table specified');
         (new Builder())->filter([Query::equal('x', [1])])->build();
     }
-    // 11. toRawSql Edge Cases for ClickHouse
 
     public function testToRawSqlWithFinalAndSampleEdge(): void
     {
@@ -5262,7 +5240,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('42', $sql);
         $this->assertStringContainsString('9.99', $sql);
     }
-    // 12. Having with Multiple Sub-Queries
 
     public function testHavingMultipleSubQueries(): void
     {
@@ -5275,7 +5252,7 @@ class ClickHouseTest extends TestCase
             ])
             ->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('HAVING `total` > ? AND `total` < ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ? AND COUNT(*) < ?', $result->query);
         $this->assertContains(5, $result->bindings);
         $this->assertContains(100, $result->bindings);
     }
@@ -5293,7 +5270,6 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
         $this->assertStringContainsString('HAVING (`total` > ? OR `total` < ?)', $result->query);
     }
-    // 13. Reset Property-by-Property Verification
 
     public function testResetClearsClickHouseProperties(): void
     {
@@ -5348,7 +5324,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringNotContainsString('FINAL', $result->query);
         $this->assertStringContainsString('_tenant = ?', $result->query);
     }
-    // 14. Exact Full SQL Assertions
 
     public function testFinalSamplePrewhereFilterExactSql(): void
     {
@@ -5390,12 +5365,11 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
         $this->assertEquals(
-            '(SELECT DISTINCT COUNT(*) AS `total`, `event_type` FROM `events` FINAL SAMPLE 0.1 JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `event_type` IN (?) WHERE `amount` > ? GROUP BY `event_type` HAVING `total` > ? ORDER BY `total` DESC LIMIT ? OFFSET ?) UNION (SELECT * FROM `archive` FINAL WHERE `status` IN (?))',
+            '(SELECT DISTINCT COUNT(*) AS `total`, `event_type` FROM `events` FINAL SAMPLE 0.1 JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `event_type` IN (?) WHERE `amount` > ? GROUP BY `event_type` HAVING COUNT(*) > ? ORDER BY `total` DESC LIMIT ? OFFSET ?) UNION (SELECT * FROM `archive` FINAL WHERE `status` IN (?))',
             $result->query
         );
         $this->assertEquals(['purchase', 100, 5, 50, 10, 'closed'], $result->bindings);
     }
-    // 15. Query::compile() Integration Tests
 
     public function testQueryCompileFilterViaClickHouse(): void
     {
@@ -5446,7 +5420,6 @@ class ClickHouseTest extends TestCase
         $sql = Query::groupBy(['status'])->compile($builder);
         $this->assertEquals('`status`', $sql);
     }
-    // 16. Binding Type Assertions with assertSame
 
     public function testBindingTypesPreservedInt(): void
     {
@@ -5507,7 +5480,6 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
         $this->assertSame(['hello'], $result->bindings);
     }
-    // 17. Raw Inside Logical Groups
 
     public function testRawInsideLogicalAnd(): void
     {
@@ -5534,7 +5506,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?) OR b IS NOT NULL)', $result->query);
         $this->assertEquals([1], $result->bindings);
     }
-    // 18. Negative/Zero Limit and Offset
 
     public function testNegativeLimit(): void
     {
@@ -5560,7 +5531,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result->query);
         $this->assertEquals([0], $result->bindings);
     }
-    // 19. Multiple Limits/Offsets/Cursors First Wins
 
     public function testMultipleLimitsFirstWins(): void
     {
@@ -5583,7 +5553,6 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
         $this->assertStringContainsString('`_cursor` > ?', $result->query);
     }
-    // 20. Distinct + Union
 
     public function testDistinctWithUnion(): void
     {
@@ -5592,7 +5561,6 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
         $this->assertEquals('(SELECT DISTINCT * FROM `a`) UNION (SELECT * FROM `b`)', $result->query);
     }
-    // DML: INSERT (same as standard SQL)
 
     public function testInsertSingleRow(): void
     {
@@ -5624,7 +5592,6 @@ class ClickHouseTest extends TestCase
         );
         $this->assertEquals(['click', '2024-01-01', 'view', '2024-01-02'], $result->bindings);
     }
-    // ClickHouse does not implement Upsert
 
     public function testDoesNotImplementUpsert(): void
     {
@@ -5632,7 +5599,6 @@ class ClickHouseTest extends TestCase
         $this->assertIsArray($interfaces);
         $this->assertArrayNotHasKey(Upsert::class, $interfaces);
     }
-    // DML: UPDATE uses ALTER TABLE ... UPDATE
 
     public function testUpdateUsesAlterTable(): void
     {
@@ -5684,7 +5650,6 @@ class ClickHouseTest extends TestCase
             ->set(['status' => 'active'])
             ->update();
     }
-    // DML: DELETE uses ALTER TABLE ... DELETE
 
     public function testDeleteUsesAlterTable(): void
     {
@@ -5733,7 +5698,6 @@ class ClickHouseTest extends TestCase
             ->from('events')
             ->delete();
     }
-    //  INTERSECT / EXCEPT (supported in ClickHouse)
 
     public function testIntersect(): void
     {
@@ -5764,7 +5728,6 @@ class ClickHouseTest extends TestCase
             $result->query
         );
     }
-    //  Feature interfaces (not implemented)
 
     public function testDoesNotImplementLocking(): void
     {
@@ -5779,7 +5742,6 @@ class ClickHouseTest extends TestCase
         $this->assertIsArray($interfaces);
         $this->assertArrayNotHasKey(Transactions::class, $interfaces);
     }
-    //  INSERT...SELECT (supported in ClickHouse)
 
     public function testInsertSelect(): void
     {
@@ -5799,7 +5761,6 @@ class ClickHouseTest extends TestCase
         );
         $this->assertEquals(['click'], $result->bindings);
     }
-    //  CTEs (supported in ClickHouse)
 
     public function testCteWith(): void
     {
@@ -5819,7 +5780,6 @@ class ClickHouseTest extends TestCase
         );
         $this->assertEquals(['click'], $result->bindings);
     }
-    //  setRaw with bindings (ClickHouse)
 
     public function testSetRawWithBindings(): void
     {
@@ -5836,7 +5796,6 @@ class ClickHouseTest extends TestCase
         );
         $this->assertEquals([1, 42], $result->bindings);
     }
-    //  Hints feature interface
 
     public function testImplementsHints(): void
     {
@@ -5876,7 +5835,6 @@ class ClickHouseTest extends TestCase
 
         $this->assertStringContainsString('SETTINGS max_threads=4, max_memory_usage=1000000000', $result->query);
     }
-    //  Window functions
 
     public function testImplementsWindows(): void
     {
@@ -5893,7 +5851,6 @@ class ClickHouseTest extends TestCase
 
         $this->assertStringContainsString('ROW_NUMBER() OVER (PARTITION BY `user_id` ORDER BY `timestamp` ASC) AS `rn`', $result->query);
     }
-    //  Does NOT implement Spatial/VectorSearch/Json
 
     public function testDoesNotImplementSpatial(): void
     {
@@ -5912,7 +5869,6 @@ class ClickHouseTest extends TestCase
         $builder = new Builder();
         $this->assertNotInstanceOf(Json::class, $builder); // @phpstan-ignore method.alreadyNarrowedType
     }
-    //  Reset clears hints
 
     public function testResetClearsHints(): void
     {
@@ -7002,8 +6958,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('ORDER BY rand()', $result->query);
     }
 
-    // Feature 1: Table Aliases (ClickHouse - alias AFTER FINAL/SAMPLE)
-
     public function testTableAliasClickHouse(): void
     {
         $result = (new Builder())
@@ -7048,8 +7002,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('FROM `events` FINAL SAMPLE 0.5 AS `e`', $result->query);
     }
 
-    // Feature 2: Subqueries (ClickHouse)
-
     public function testFromSubClickHouse(): void
     {
         $sub = (new Builder())->from('events')->select(['user_id'])->groupBy(['user_id']);
@@ -7077,8 +7029,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('`id` IN (SELECT `user_id` FROM `orders`)', $result->query);
     }
 
-    // Feature 3: Raw ORDER BY / GROUP BY / HAVING (ClickHouse)
-
     public function testOrderByRawClickHouse(): void
     {
         $result = (new Builder())
@@ -7102,8 +7052,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('GROUP BY toDate(`created_at`)', $result->query);
     }
 
-    // Feature 4: countDistinct (ClickHouse)
-
     public function testCountDistinctClickHouse(): void
     {
         $result = (new Builder())
@@ -7118,8 +7066,6 @@ class ClickHouseTest extends TestCase
         );
     }
 
-    // Feature 5: JoinBuilder (ClickHouse)
-
     public function testJoinWhereClickHouse(): void
     {
         $result = (new Builder())
@@ -7133,8 +7079,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('JOIN `users` ON `events`.`user_id` = `users`.`id`', $result->query);
     }
 
-    // Feature 6: EXISTS Subquery (ClickHouse)
-
     public function testFilterExistsClickHouse(): void
     {
         $sub = (new Builder())->from('orders')->select(['id'])->filter([Query::raw('`orders`.`user_id` = `users`.`id`')]);
@@ -7146,8 +7090,6 @@ class ClickHouseTest extends TestCase
 
         $this->assertStringContainsString('EXISTS (SELECT `id` FROM `orders`', $result->query);
     }
-
-    // Feature 9: EXPLAIN (ClickHouse)
 
     public function testExplainClickHouse(): void
     {
@@ -7167,8 +7109,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringStartsWith('EXPLAIN ANALYZE SELECT', $result->query);
     }
 
-    // Feature: Cross Join Alias (ClickHouse)
-
     public function testCrossJoinAliasClickHouse(): void
     {
         $result = (new Builder())
@@ -7179,8 +7119,6 @@ class ClickHouseTest extends TestCase
 
         $this->assertStringContainsString('CROSS JOIN `dates` AS `d`', $result->query);
     }
-
-    // Subquery bindings (ClickHouse)
 
     public function testWhereInSubqueryClickHouse(): void
     {
@@ -7235,8 +7173,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString(') AS `sub`', $result->query);
     }
 
-    // NOT EXISTS (ClickHouse)
-
     public function testFilterNotExistsClickHouse(): void
     {
         $sub = (new Builder())->from('banned')->select(['id']);
@@ -7249,8 +7185,6 @@ class ClickHouseTest extends TestCase
 
         $this->assertStringContainsString('NOT EXISTS (SELECT', $result->query);
     }
-
-    // HavingRaw (ClickHouse)
 
     public function testHavingRawClickHouse(): void
     {
@@ -7266,8 +7200,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals([10], $result->bindings);
     }
 
-    // Table alias with FINAL and SAMPLE and alias combined
-
     public function testTableAliasWithFinalSampleAndAlias(): void
     {
         $result = (new Builder())
@@ -7281,8 +7213,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('SAMPLE', $result->query);
         $this->assertStringContainsString('AS `e`', $result->query);
     }
-
-    // JoinWhere LEFT JOIN (ClickHouse)
 
     public function testJoinWhereLeftJoinClickHouse(): void
     {
@@ -7299,8 +7229,6 @@ class ClickHouseTest extends TestCase
         $this->assertEquals([1], $result->bindings);
     }
 
-    // JoinWhere with alias (ClickHouse)
-
     public function testJoinWhereWithAliasClickHouse(): void
     {
         $result = (new Builder())
@@ -7313,8 +7241,6 @@ class ClickHouseTest extends TestCase
 
         $this->assertStringContainsString('JOIN `users` AS `u`', $result->query);
     }
-
-    // JoinWhere with multiple ON conditions (ClickHouse)
 
     public function testJoinWhereMultipleOnsClickHouse(): void
     {
@@ -7333,8 +7259,6 @@ class ClickHouseTest extends TestCase
         );
     }
 
-    // EXPLAIN preserves bindings (ClickHouse)
-
     public function testExplainPreservesBindings(): void
     {
         $result = (new Builder())
@@ -7345,8 +7269,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringStartsWith('EXPLAIN SELECT', $result->query);
         $this->assertEquals(['active'], $result->bindings);
     }
-
-    // countDistinct without alias (ClickHouse)
 
     public function testCountDistinctWithoutAliasClickHouse(): void
     {
@@ -7359,8 +7281,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('COUNT(DISTINCT `user_id`)', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
-
-    // Multiple subqueries combined (ClickHouse)
 
     public function testMultipleSubqueriesCombined(): void
     {
@@ -7378,8 +7298,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('NOT IN (SELECT', $result->query);
     }
 
-    // PREWHERE with subquery (ClickHouse)
-
     public function testPrewhereWithSubquery(): void
     {
         $sub = (new Builder())->from('active_users')->select(['id']);
@@ -7394,8 +7312,6 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('PREWHERE', $result->query);
         $this->assertStringContainsString('IN (SELECT', $result->query);
     }
-
-    // Settings with subquery (ClickHouse)
 
     public function testSettingsStillAppear(): void
     {
@@ -7672,7 +7588,7 @@ class ClickHouseTest extends TestCase
             ->build();
 
         $this->assertSame(
-            'SELECT COUNT(*) AS `order_count`, `customer_id` FROM `orders` GROUP BY `customer_id` HAVING `order_count` > ? ORDER BY `order_count` DESC',
+            'SELECT COUNT(*) AS `order_count`, `customer_id` FROM `orders` GROUP BY `customer_id` HAVING COUNT(*) > ? ORDER BY `order_count` DESC',
             $result->query
         );
         $this->assertEquals([5], $result->bindings);
@@ -8639,7 +8555,7 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('JOIN `users`', $result->query);
         $this->assertStringContainsString('WHERE `users`.`status` IN (?)', $result->query);
         $this->assertStringContainsString('GROUP BY `users`.`country`', $result->query);
-        $this->assertStringContainsString('HAVING `total` > ?', $result->query);
+        $this->assertStringContainsString('HAVING SUM(`filtered`.`amount`) > ?', $result->query);
         $this->assertStringContainsString('ORDER BY `total` DESC', $result->query);
         $this->assertStringContainsString('LIMIT ?', $result->query);
     }
@@ -8749,7 +8665,7 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('COUNT(*) AS `order_count`', $result->query);
         $this->assertStringContainsString('SUM(`orders`.`total`) AS `revenue`', $result->query);
         $this->assertStringContainsString('GROUP BY `customers`.`country`', $result->query);
-        $this->assertStringContainsString('HAVING `order_count` > ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
     }
 
     public function testSelfJoinWithAlias(): void
@@ -9510,5 +9426,1543 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`id` NOT IN (SELECT', $result->query);
+    }
+
+    public function testImplementsLimitBy(): void
+    {
+        $this->assertInstanceOf(LimitBy::class, new Builder());
+    }
+
+    public function testImplementsArrayJoins(): void
+    {
+        $this->assertInstanceOf(ArrayJoins::class, new Builder());
+    }
+
+    public function testImplementsAsofJoins(): void
+    {
+        $this->assertInstanceOf(AsofJoins::class, new Builder());
+    }
+
+    public function testImplementsWithFill(): void
+    {
+        $this->assertInstanceOf(WithFill::class, new Builder());
+    }
+
+    public function testImplementsGroupByModifiers(): void
+    {
+        $this->assertInstanceOf(GroupByModifiers::class, new Builder());
+    }
+
+    public function testImplementsApproximateAggregates(): void
+    {
+        $this->assertInstanceOf(ApproximateAggregates::class, new Builder());
+    }
+
+    public function testImplementsStringAggregates(): void
+    {
+        $this->assertInstanceOf(StringAggregates::class, new Builder());
+    }
+
+    public function testImplementsStatisticalAggregates(): void
+    {
+        $this->assertInstanceOf(StatisticalAggregates::class, new Builder());
+    }
+
+    public function testImplementsBitwiseAggregates(): void
+    {
+        $this->assertInstanceOf(BitwiseAggregates::class, new Builder());
+    }
+
+    public function testLimitByBasic(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->select(['user_id', 'event_type'])
+            ->sortDesc('timestamp')
+            ->limitBy(3, ['user_id'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('LIMIT ? BY `user_id`', $result->query);
+    }
+
+    public function testLimitByMultipleColumns(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->sortDesc('timestamp')
+            ->limitBy(5, ['user_id', 'event_type'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('LIMIT ? BY `user_id`, `event_type`', $result->query);
+    }
+
+    public function testLimitByWithLimit(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->sortDesc('timestamp')
+            ->limitBy(3, ['user_id'])
+            ->limit(100)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('LIMIT ? BY `user_id` LIMIT ?', $result->query);
+        // LIMIT BY count binding should come before the final LIMIT binding
+        $limitByIdx = \array_search(3, $result->bindings, true);
+        $limitIdx = \array_search(100, $result->bindings, true);
+        $this->assertNotFalse($limitByIdx);
+        $this->assertNotFalse($limitIdx);
+        $this->assertLessThan($limitIdx, $limitByIdx);
+    }
+
+    public function testLimitByWithLimitAndOffset(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->sortDesc('timestamp')
+            ->limitBy(3, ['user_id'])
+            ->limit(100)
+            ->offset(50)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('LIMIT ? BY `user_id`', $result->query);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertStringContainsString('OFFSET ?', $result->query);
+    }
+
+    public function testLimitByWithOrderBy(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->sortDesc('created_at')
+            ->limitBy(2, ['category'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ORDER BY `created_at` DESC', $result->query);
+        $this->assertStringContainsString('LIMIT ? BY `category`', $result->query);
+        $orderPos = \strpos($result->query, 'ORDER BY');
+        $limitByPos = \strpos($result->query, 'LIMIT ? BY');
+        $this->assertLessThan($limitByPos, $orderPos);
+    }
+
+    public function testLimitByWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->filter([Query::equal('status', ['active'])])
+            ->sortDesc('timestamp')
+            ->limitBy(3, ['user_id'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
+        $this->assertStringContainsString('LIMIT ? BY `user_id`', $result->query);
+    }
+
+    public function testLimitByWithSettings(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->limitBy(3, ['user_id'])
+            ->settings(['max_threads' => '2'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('LIMIT ? BY `user_id`', $result->query);
+        $this->assertStringContainsString('SETTINGS max_threads=2', $result->query);
+        $limitByPos = \strpos($result->query, 'LIMIT ? BY');
+        $settingsPos = \strpos($result->query, 'SETTINGS');
+        $this->assertLessThan($settingsPos, $limitByPos);
+    }
+
+    public function testLimitByFluentChaining(): void
+    {
+        $builder = new Builder();
+        $this->assertSame($builder, $builder->from('t')->limitBy(1, ['a']));
+    }
+
+    public function testLimitByReset(): void
+    {
+        $builder = (new Builder())
+            ->from('events')
+            ->limitBy(3, ['user_id']);
+
+        $builder->build();
+        $builder->reset();
+
+        $result = $builder->from('events')->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString('LIMIT ? BY', $result->query);
+    }
+
+    public function testArrayJoinBasic(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->arrayJoin('tags')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ARRAY JOIN `tags`', $result->query);
+    }
+
+    public function testArrayJoinWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->arrayJoin('tags', 'tag')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
+    }
+
+    public function testLeftArrayJoinBasic(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->leftArrayJoin('tags')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('LEFT ARRAY JOIN `tags`', $result->query);
+    }
+
+    public function testLeftArrayJoinWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->leftArrayJoin('tags', 'tag')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('LEFT ARRAY JOIN `tags` AS `tag`', $result->query);
+    }
+
+    public function testArrayJoinWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->arrayJoin('tags', 'tag')
+            ->filter([Query::equal('tag', ['important'])])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
+        $this->assertStringContainsString('WHERE `tag` IN (?)', $result->query);
+        $arrayJoinPos = \strpos($result->query, 'ARRAY JOIN');
+        $wherePos = \strpos($result->query, 'WHERE');
+        $this->assertLessThan($wherePos, $arrayJoinPos);
+    }
+
+    public function testArrayJoinWithPrewhere(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->arrayJoin('tags', 'tag')
+            ->prewhere([Query::equal('status', ['active'])])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
+        $this->assertStringContainsString('PREWHERE `status` IN (?)', $result->query);
+        $arrayJoinPos = \strpos($result->query, 'ARRAY JOIN');
+        $prewherePos = \strpos($result->query, 'PREWHERE');
+        $this->assertLessThan($prewherePos, $arrayJoinPos);
+    }
+
+    public function testArrayJoinWithGroupBy(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->arrayJoin('tags', 'tag')
+            ->count('*', 'cnt')
+            ->groupBy(['tag'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
+        $this->assertStringContainsString('GROUP BY `tag`', $result->query);
+    }
+
+    public function testMultipleArrayJoins(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->arrayJoin('tags', 'tag')
+            ->leftArrayJoin('metadata', 'meta')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
+        $this->assertStringContainsString('LEFT ARRAY JOIN `metadata` AS `meta`', $result->query);
+    }
+
+    public function testArrayJoinFluentChaining(): void
+    {
+        $builder = new Builder();
+        $this->assertSame($builder, $builder->from('t')->arrayJoin('a'));
+        $this->assertSame($builder, $builder->leftArrayJoin('b'));
+    }
+
+    public function testArrayJoinReset(): void
+    {
+        $builder = (new Builder())
+            ->from('events')
+            ->arrayJoin('tags');
+
+        $builder->build();
+        $builder->reset();
+
+        $result = $builder->from('events')->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString('ARRAY JOIN', $result->query);
+    }
+
+    public function testAsofJoinBasic(): void
+    {
+        $result = (new Builder())
+            ->from('trades')
+            ->asofJoin('quotes', 'trades.timestamp', 'quotes.timestamp')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ASOF JOIN `quotes` ON `trades`.`timestamp` = `quotes`.`timestamp`', $result->query);
+    }
+
+    public function testAsofJoinWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('trades')
+            ->asofJoin('quotes', 'trades.timestamp', 'q.timestamp', 'q')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ASOF JOIN `quotes` AS `q` ON `trades`.`timestamp` = `q`.`timestamp`', $result->query);
+    }
+
+    public function testAsofLeftJoinBasic(): void
+    {
+        $result = (new Builder())
+            ->from('trades')
+            ->asofLeftJoin('quotes', 'trades.timestamp', 'quotes.timestamp')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ASOF LEFT JOIN `quotes` ON `trades`.`timestamp` = `quotes`.`timestamp`', $result->query);
+    }
+
+    public function testAsofLeftJoinWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('trades')
+            ->asofLeftJoin('quotes', 'trades.timestamp', 'q.timestamp', 'q')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ASOF LEFT JOIN `quotes` AS `q` ON `trades`.`timestamp` = `q`.`timestamp`', $result->query);
+    }
+
+    public function testAsofJoinWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('trades')
+            ->asofJoin('quotes', 'trades.timestamp', 'quotes.timestamp')
+            ->filter([Query::equal('trades.symbol', ['AAPL'])])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ASOF JOIN `quotes`', $result->query);
+        $this->assertStringContainsString('WHERE `trades`.`symbol` IN (?)', $result->query);
+        $joinPos = \strpos($result->query, 'ASOF JOIN');
+        $wherePos = \strpos($result->query, 'WHERE');
+        $this->assertLessThan($wherePos, $joinPos);
+    }
+
+    public function testAsofJoinFluentChaining(): void
+    {
+        $builder = new Builder();
+        $this->assertSame($builder, $builder->from('t')->asofJoin('q', 'a', 'b'));
+        $this->assertSame($builder, $builder->asofLeftJoin('r', 'c', 'd'));
+    }
+
+    public function testAsofJoinReset(): void
+    {
+        $builder = (new Builder())
+            ->from('trades')
+            ->asofJoin('quotes', 'trades.ts', 'quotes.ts');
+
+        $builder->build();
+        $builder->reset();
+
+        $result = $builder->from('trades')->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString('ASOF', $result->query);
+    }
+
+    public function testOrderWithFillBasic(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->orderWithFill('date')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ORDER BY `date` ASC WITH FILL', $result->query);
+    }
+
+    public function testOrderWithFillDesc(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->orderWithFill('date', 'DESC')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ORDER BY `date` DESC WITH FILL', $result->query);
+    }
+
+    public function testOrderWithFillFrom(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->orderWithFill('value', 'ASC', 0)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ORDER BY `value` ASC WITH FILL FROM ?', $result->query);
+        $this->assertContains(0, $result->bindings);
+    }
+
+    public function testOrderWithFillFromTo(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->orderWithFill('value', 'ASC', 0, 100)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ORDER BY `value` ASC WITH FILL FROM ? TO ?', $result->query);
+        $this->assertContains(0, $result->bindings);
+        $this->assertContains(100, $result->bindings);
+    }
+
+    public function testOrderWithFillFromToStep(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->orderWithFill('value', 'ASC', 0, 100, 10)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ORDER BY `value` ASC WITH FILL FROM ? TO ? STEP ?', $result->query);
+        $this->assertEquals([0, 100, 10], $result->bindings);
+    }
+
+    public function testOrderWithFillWithRegularSort(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->orderWithFill('date', 'ASC', '2024-01-01', '2024-12-31')
+            ->sortDesc('count')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ORDER BY `date` ASC WITH FILL FROM ? TO ?, `count` DESC', $result->query);
+    }
+
+    public function testOrderWithFillFluentChaining(): void
+    {
+        $builder = new Builder();
+        $this->assertSame($builder, $builder->from('t')->orderWithFill('a'));
+    }
+
+    public function testWithTotalsBasic(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->count('*', 'cnt')
+            ->groupBy(['event_type'])
+            ->withTotals()
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('GROUP BY `event_type` WITH TOTALS', $result->query);
+    }
+
+    public function testWithRollupBasic(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->count('*', 'cnt')
+            ->groupBy(['year', 'month'])
+            ->withRollup()
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('GROUP BY `year`, `month` WITH ROLLUP', $result->query);
+    }
+
+    public function testWithCubeBasic(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->count('*', 'cnt')
+            ->groupBy(['city', 'category'])
+            ->withCube()
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('GROUP BY `city`, `category` WITH CUBE', $result->query);
+    }
+
+    public function testWithTotalsWithHaving(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->count('*', 'cnt')
+            ->groupBy(['event_type'])
+            ->withTotals()
+            ->having([Query::greaterThan('cnt', 10)])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('GROUP BY `event_type` WITH TOTALS HAVING', $result->query);
+        $groupByPos = \strpos($result->query, 'GROUP BY');
+        $totalsPos = \strpos($result->query, 'WITH TOTALS');
+        $havingPos = \strpos($result->query, 'HAVING');
+        $this->assertLessThan($totalsPos, $groupByPos);
+        $this->assertLessThan($havingPos, $totalsPos);
+    }
+
+    public function testWithTotalsWithOrderBy(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->count('*', 'cnt')
+            ->groupBy(['event_type'])
+            ->withTotals()
+            ->sortDesc('cnt')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('WITH TOTALS', $result->query);
+        $this->assertStringContainsString('ORDER BY', $result->query);
+        $totalsPos = \strpos($result->query, 'WITH TOTALS');
+        $orderByPos = \strpos($result->query, 'ORDER BY');
+        $this->assertLessThan($orderByPos, $totalsPos);
+    }
+
+    public function testGroupByModifierFluentChaining(): void
+    {
+        $builder = new Builder();
+        $this->assertSame($builder, $builder->from('t')->withTotals());
+        $builder->reset();
+        $this->assertSame($builder, $builder->from('t')->withRollup());
+        $builder->reset();
+        $this->assertSame($builder, $builder->from('t')->withCube());
+    }
+
+    public function testGroupByModifierReset(): void
+    {
+        $builder = (new Builder())
+            ->from('events')
+            ->count('*', 'cnt')
+            ->groupBy(['event_type'])
+            ->withTotals();
+
+        $builder->build();
+        $builder->reset();
+
+        $result = $builder->from('events')->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString('WITH TOTALS', $result->query);
+        $this->assertStringNotContainsString('WITH ROLLUP', $result->query);
+        $this->assertStringNotContainsString('WITH CUBE', $result->query);
+    }
+
+    public function testWithTotalsWithLimitBy(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->count('*', 'cnt')
+            ->groupBy(['event_type', 'user_id'])
+            ->withTotals()
+            ->sortDesc('cnt')
+            ->limitBy(3, ['user_id'])
+            ->limit(100)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('WITH TOTALS', $result->query);
+        $this->assertStringContainsString('LIMIT ? BY `user_id`', $result->query);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+    }
+
+    public function testQuantileWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->quantile(0.95, 'latency', 'p95')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('quantile(0.95)(`latency`) AS `p95`', $result->query);
+    }
+
+    public function testQuantileWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->quantile(0.5, 'latency')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('quantile(0.5)(`latency`)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testQuantileExactWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->quantileExact(0.99, 'response_time', 'p99_exact')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('quantileExact(0.99)(`response_time`) AS `p99_exact`', $result->query);
+    }
+
+    public function testQuantileExactWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->quantileExact(0.5, 'latency')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('quantileExact(0.5)(`latency`)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testMedianWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->median('latency', 'med')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('median(`latency`) AS `med`', $result->query);
+    }
+
+    public function testMedianWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->median('latency')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('median(`latency`)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testUniqWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->uniq('user_id', 'unique_users')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('uniq(`user_id`) AS `unique_users`', $result->query);
+    }
+
+    public function testUniqWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->uniq('user_id')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('uniq(`user_id`)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testUniqExactWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->uniqExact('user_id', 'exact_users')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('uniqExact(`user_id`) AS `exact_users`', $result->query);
+    }
+
+    public function testUniqExactWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->uniqExact('user_id')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('uniqExact(`user_id`)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testUniqCombinedWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->uniqCombined('user_id', 'approx_users')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('uniqCombined(`user_id`) AS `approx_users`', $result->query);
+    }
+
+    public function testUniqCombinedWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->uniqCombined('user_id')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('uniqCombined(`user_id`)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testArgMinWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->argMin('url', 'timestamp', 'first_url')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('argMin(`url`, `timestamp`) AS `first_url`', $result->query);
+    }
+
+    public function testArgMinWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->argMin('url', 'timestamp')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('argMin(`url`, `timestamp`)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testArgMaxWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->argMax('url', 'timestamp', 'last_url')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('argMax(`url`, `timestamp`) AS `last_url`', $result->query);
+    }
+
+    public function testArgMaxWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->argMax('url', 'timestamp')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('argMax(`url`, `timestamp`)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testTopKWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->topK(10, 'user_agent', 'top_agents')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('topK(10)(`user_agent`) AS `top_agents`', $result->query);
+    }
+
+    public function testTopKWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->topK(5, 'path')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('topK(5)(`path`)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testTopKWeightedWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->topKWeighted(10, 'path', 'visits', 'top_paths')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('topKWeighted(10)(`path`, `visits`) AS `top_paths`', $result->query);
+    }
+
+    public function testTopKWeightedWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->topKWeighted(3, 'url', 'weight')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('topKWeighted(3)(`url`, `weight`)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testAnyValueWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->anyValue('name', 'sample_name')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('any(`name`) AS `sample_name`', $result->query);
+    }
+
+    public function testAnyValueWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->anyValue('name')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('any(`name`)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testAnyLastValueWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->anyLastValue('name', 'last_name')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('anyLast(`name`) AS `last_name`', $result->query);
+    }
+
+    public function testAnyLastValueWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->anyLastValue('name')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('anyLast(`name`)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testGroupUniqArrayWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->groupUniqArray('tag', 'unique_tags')
+            ->groupBy(['user_id'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('groupUniqArray(`tag`) AS `unique_tags`', $result->query);
+    }
+
+    public function testGroupUniqArrayWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->groupUniqArray('tag')
+            ->groupBy(['user_id'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('groupUniqArray(`tag`)', $result->query);
+    }
+
+    public function testGroupArrayMovingAvgWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->groupArrayMovingAvg('value', 'moving_avg')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('groupArrayMovingAvg(`value`) AS `moving_avg`', $result->query);
+    }
+
+    public function testGroupArrayMovingAvgWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->groupArrayMovingAvg('value')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('groupArrayMovingAvg(`value`)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testGroupArrayMovingSumWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->groupArrayMovingSum('value', 'running_total')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('groupArrayMovingSum(`value`) AS `running_total`', $result->query);
+    }
+
+    public function testGroupArrayMovingSumWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->groupArrayMovingSum('value')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('groupArrayMovingSum(`value`)', $result->query);
+        $this->assertStringNotContainsString(' AS ', $result->query);
+    }
+
+    public function testQuantileWithGroupBy(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->quantile(0.95, 'latency', 'p95')
+            ->groupBy(['endpoint'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('quantile(0.95)(`latency`) AS `p95`', $result->query);
+        $this->assertStringContainsString('GROUP BY `endpoint`', $result->query);
+    }
+
+    public function testMultipleAggregatesCombined(): void
+    {
+        $result = (new Builder())
+            ->from('requests')
+            ->quantile(0.5, 'latency', 'p50')
+            ->quantile(0.95, 'latency', 'p95')
+            ->quantile(0.99, 'latency', 'p99')
+            ->uniq('user_id', 'unique_users')
+            ->count('*', 'total')
+            ->groupBy(['endpoint'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('quantile(0.5)(`latency`) AS `p50`', $result->query);
+        $this->assertStringContainsString('quantile(0.95)(`latency`) AS `p95`', $result->query);
+        $this->assertStringContainsString('quantile(0.99)(`latency`) AS `p99`', $result->query);
+        $this->assertStringContainsString('uniq(`user_id`) AS `unique_users`', $result->query);
+        $this->assertStringContainsString('COUNT(*) AS `total`', $result->query);
+    }
+
+    public function testArgMinWithGroupBy(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->argMin('url', 'timestamp', 'first_url')
+            ->groupBy(['user_id'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('argMin(`url`, `timestamp`) AS `first_url`', $result->query);
+        $this->assertStringContainsString('GROUP BY `user_id`', $result->query);
+    }
+
+    public function testTopKWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->topK(10, 'user_agent', 'top_agents')
+            ->filter([Query::greaterThan('timestamp', '2024-01-01')])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('topK(10)(`user_agent`) AS `top_agents`', $result->query);
+        $this->assertStringContainsString('WHERE `timestamp` > ?', $result->query);
+    }
+
+    public function testClickHouseAggregateFluentChaining(): void
+    {
+        $builder = new Builder();
+        $this->assertSame($builder, $builder->from('t')->quantile(0.5, 'a'));
+        $this->assertSame($builder, $builder->quantileExact(0.5, 'a'));
+        $this->assertSame($builder, $builder->median('a'));
+        $this->assertSame($builder, $builder->uniq('a'));
+        $this->assertSame($builder, $builder->uniqExact('a'));
+        $this->assertSame($builder, $builder->uniqCombined('a'));
+        $this->assertSame($builder, $builder->argMin('a', 'b'));
+        $this->assertSame($builder, $builder->argMax('a', 'b'));
+        $this->assertSame($builder, $builder->topK(5, 'a'));
+        $this->assertSame($builder, $builder->topKWeighted(5, 'a', 'b'));
+        $this->assertSame($builder, $builder->anyValue('a'));
+        $this->assertSame($builder, $builder->anyLastValue('a'));
+        $this->assertSame($builder, $builder->groupUniqArray('a'));
+        $this->assertSame($builder, $builder->groupArrayMovingAvg('a'));
+        $this->assertSame($builder, $builder->groupArrayMovingSum('a'));
+    }
+
+    public function testAllFeaturesCombined(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->final()
+            ->sample(0.1)
+            ->arrayJoin('tags', 'tag')
+            ->prewhere([Query::equal('event_type', ['click'])])
+            ->filter([Query::greaterThan('count', 5)])
+            ->count('*', 'total')
+            ->quantile(0.95, 'latency', 'p95')
+            ->groupBy(['tag'])
+            ->withTotals()
+            ->having([Query::greaterThan('total', 10)])
+            ->sortDesc('total')
+            ->limitBy(3, ['tag'])
+            ->limit(50)
+            ->settings(['max_threads' => '4'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('FROM `events` FINAL SAMPLE 0.1', $result->query);
+        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
+        $this->assertStringContainsString('PREWHERE `event_type` IN (?)', $result->query);
+        $this->assertStringContainsString('WHERE `count` > ?', $result->query);
+        $this->assertStringContainsString('COUNT(*) AS `total`', $result->query);
+        $this->assertStringContainsString('quantile(0.95)(`latency`) AS `p95`', $result->query);
+        $this->assertStringContainsString('GROUP BY `tag`', $result->query);
+        $this->assertStringContainsString('WITH TOTALS', $result->query);
+        $this->assertStringContainsString('HAVING', $result->query);
+        $this->assertStringContainsString('ORDER BY `total` DESC', $result->query);
+        $this->assertStringContainsString('LIMIT ? BY `tag`', $result->query);
+        $this->assertStringContainsString('SETTINGS max_threads=4', $result->query);
+    }
+
+    public function testLimitByNoFinalLimit(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->sortDesc('timestamp')
+            ->limitBy(5, ['user_id'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('LIMIT ? BY `user_id`', $result->query);
+        $this->assertEquals([5], $result->bindings);
+    }
+
+    public function testArrayJoinWithOrderBy(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->arrayJoin('tags', 'tag')
+            ->sortAsc('tag')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
+        $this->assertStringContainsString('ORDER BY `tag` ASC', $result->query);
+        $arrayPos = \strpos($result->query, 'ARRAY JOIN');
+        $orderPos = \strpos($result->query, 'ORDER BY');
+        $this->assertLessThan($orderPos, $arrayPos);
+    }
+
+    public function testAsofJoinWithPrewhere(): void
+    {
+        $result = (new Builder())
+            ->from('trades')
+            ->asofJoin('quotes', 'trades.ts', 'quotes.ts')
+            ->prewhere([Query::equal('trades.exchange', ['NYSE'])])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ASOF JOIN `quotes`', $result->query);
+        $this->assertStringContainsString('PREWHERE', $result->query);
+    }
+
+    public function testWithRollupWithOrderBy(): void
+    {
+        $result = (new Builder())
+            ->from('sales')
+            ->sum('amount', 'total_amount')
+            ->groupBy(['region', 'product'])
+            ->withRollup()
+            ->sortDesc('total_amount')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('GROUP BY `region`, `product` WITH ROLLUP', $result->query);
+        $this->assertStringContainsString('ORDER BY `total_amount` DESC', $result->query);
+    }
+
+    public function testWithCubeWithLimit(): void
+    {
+        $result = (new Builder())
+            ->from('sales')
+            ->sum('amount', 'total')
+            ->groupBy(['region', 'product'])
+            ->withCube()
+            ->limit(100)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('GROUP BY `region`, `product` WITH CUBE', $result->query);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+    }
+
+    public function testOrderWithFillWithLimitBy(): void
+    {
+        $result = (new Builder())
+            ->from('metrics')
+            ->orderWithFill('date', 'ASC', '2024-01-01', '2024-12-31', 1)
+            ->limitBy(10, ['metric_name'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('WITH FILL FROM ? TO ? STEP ?', $result->query);
+        $this->assertStringContainsString('LIMIT ? BY `metric_name`', $result->query);
+    }
+
+    public function testGroupByModifierOverwrite(): void
+    {
+        $builder = (new Builder())
+            ->from('events')
+            ->count('*', 'cnt')
+            ->groupBy(['type'])
+            ->withTotals()
+            ->withRollup();
+
+        $result = $builder->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('WITH ROLLUP', $result->query);
+        $this->assertStringNotContainsString('WITH TOTALS', $result->query);
+    }
+
+    public function testLimitByBindingCount(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->filter([Query::equal('status', ['active'])])
+            ->sortDesc('timestamp')
+            ->limitBy(3, ['user_id'])
+            ->limit(100)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertCount(3, $result->bindings);
+        $this->assertEquals('active', $result->bindings[0]);
+        $this->assertEquals(3, $result->bindings[1]);
+        $this->assertEquals(100, $result->bindings[2]);
+    }
+
+    public function testDottedColumnInArrayJoin(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->arrayJoin('nested.tags', 'tag')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ARRAY JOIN `nested`.`tags` AS `tag`', $result->query);
+    }
+
+    public function testAsofJoinWithRegularJoin(): void
+    {
+        $result = (new Builder())
+            ->from('trades')
+            ->join('instruments', 'trades.symbol', 'instruments.symbol')
+            ->asofJoin('quotes', 'trades.timestamp', 'quotes.timestamp')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('JOIN `instruments`', $result->query);
+        $this->assertStringContainsString('ASOF JOIN `quotes`', $result->query);
+    }
+
+    public function testWithTotalsNoHavingNoOrderBy(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->count('*', 'cnt')
+            ->groupBy(['type'])
+            ->withTotals()
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` GROUP BY `type` WITH TOTALS', $result->query);
+    }
+
+    public function testWithRollupNoLimit(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->count('*', 'cnt')
+            ->groupBy(['type'])
+            ->withRollup()
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` GROUP BY `type` WITH ROLLUP', $result->query);
+    }
+
+    public function testArrayJoinNoFilterNoOrder(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->select(['name'])
+            ->arrayJoin('tags', 'tag')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertSame('SELECT `name` FROM `events` ARRAY JOIN `tags` AS `tag`', $result->query);
+    }
+
+    public function testLimitByWithGroupByAndHaving(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->count('*', 'cnt')
+            ->groupBy(['user_id', 'event_type'])
+            ->having([Query::greaterThan('cnt', 5)])
+            ->sortDesc('cnt')
+            ->limitBy(2, ['user_id'])
+            ->limit(50)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('GROUP BY', $result->query);
+        $this->assertStringContainsString('HAVING', $result->query);
+        $this->assertStringContainsString('ORDER BY', $result->query);
+        $this->assertStringContainsString('LIMIT ? BY `user_id`', $result->query);
+        $this->assertStringContainsString('LIMIT ?', $result->query);
+    }
+
+    public function testGroupConcatWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->groupConcat('name', ',', 'names')
+            ->groupBy(['type'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('arrayStringConcat(groupArray(`name`), ?) AS `names`', $result->query);
+    }
+
+    public function testGroupConcatWithoutAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->groupConcat('name', ',')
+            ->groupBy(['type'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('arrayStringConcat(groupArray(`name`), ?)', $result->query);
+        $this->assertEquals([','], $result->bindings);
+    }
+
+    public function testJsonArrayAggWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->jsonArrayAgg('value', 'values_json')
+            ->groupBy(['type'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('toJSONString(groupArray(`value`)) AS `values_json`', $result->query);
+    }
+
+    public function testJsonObjectAggWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->jsonObjectAgg('key', 'value', 'kv_json')
+            ->groupBy(['type'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('toJSONString(CAST((groupArray(`key`), groupArray(`value`)) AS Map(String, String))) AS `kv_json`', $result->query);
+    }
+
+    public function testStddevWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->stddev('value', 'sd')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('STDDEV(`value`) AS `sd`', $result->query);
+    }
+
+    public function testStddevPopWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->stddevPop('value', 'sd_pop')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('STDDEV_POP(`value`) AS `sd_pop`', $result->query);
+    }
+
+    public function testStddevSampWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->stddevSamp('value', 'sd_samp')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('STDDEV_SAMP(`value`) AS `sd_samp`', $result->query);
+    }
+
+    public function testVarianceWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->variance('value', 'var')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('VARIANCE(`value`) AS `var`', $result->query);
+    }
+
+    public function testVarPopWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->varPop('value', 'vp')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('VAR_POP(`value`) AS `vp`', $result->query);
+    }
+
+    public function testVarSampWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->varSamp('value', 'vs')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('VAR_SAMP(`value`) AS `vs`', $result->query);
+    }
+
+    public function testBitAndWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->bitAnd('flags', 'and_flags')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('BIT_AND(`flags`) AS `and_flags`', $result->query);
+    }
+
+    public function testBitOrWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->bitOr('flags', 'or_flags')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('BIT_OR(`flags`) AS `or_flags`', $result->query);
+    }
+
+    public function testBitXorWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->bitXor('flags', 'xor_flags')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('BIT_XOR(`flags`) AS `xor_flags`', $result->query);
+    }
+
+    public function testUniqWithGroupByAndFilter(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->uniq('user_id', 'unique_users')
+            ->filter([Query::greaterThan('timestamp', '2024-01-01')])
+            ->groupBy(['event_type'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('uniq(`user_id`) AS `unique_users`', $result->query);
+        $this->assertStringContainsString('WHERE `timestamp` > ?', $result->query);
+        $this->assertStringContainsString('GROUP BY `event_type`', $result->query);
+    }
+
+    public function testAnyValueWithGroupBy(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->anyValue('name', 'any_name')
+            ->count('*', 'cnt')
+            ->groupBy(['type'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('any(`name`) AS `any_name`', $result->query);
+        $this->assertStringContainsString('COUNT(*) AS `cnt`', $result->query);
+    }
+
+    public function testGroupUniqArrayWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->groupUniqArray('tag', 'unique_tags')
+            ->filter([Query::equal('status', ['active'])])
+            ->groupBy(['user_id'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('groupUniqArray(`tag`) AS `unique_tags`', $result->query);
+        $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
+    }
+
+    public function testOrderWithFillToOnly(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->orderWithFill('value', 'ASC', null, 100)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ORDER BY `value` ASC WITH FILL TO ?', $result->query);
+        $this->assertStringNotContainsString('FROM ?', $result->query);
+        $this->assertEquals([100], $result->bindings);
+    }
+
+    public function testOrderWithFillStepOnly(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->orderWithFill('value', 'ASC', null, null, 5)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ORDER BY `value` ASC WITH FILL STEP ?', $result->query);
+        $this->assertStringNotContainsString('FROM ?', $result->query);
+        $this->assertStringNotContainsString('TO ?', $result->query);
+        $this->assertEquals([5], $result->bindings);
+    }
+
+    public function testWithTotalsWithSettings(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->count('*', 'cnt')
+            ->groupBy(['type'])
+            ->withTotals()
+            ->settings(['max_threads' => '2'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('WITH TOTALS', $result->query);
+        $this->assertStringContainsString('SETTINGS max_threads=2', $result->query);
+        $totalsPos = \strpos($result->query, 'WITH TOTALS');
+        $settingsPos = \strpos($result->query, 'SETTINGS');
+        $this->assertLessThan($settingsPos, $totalsPos);
+    }
+
+    public function testArrayJoinWithSettings(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->arrayJoin('tags', 'tag')
+            ->settings(['max_threads' => '2'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
+        $this->assertStringContainsString('SETTINGS max_threads=2', $result->query);
+    }
+
+    public function testAsofJoinWithSettings(): void
+    {
+        $result = (new Builder())
+            ->from('trades')
+            ->asofJoin('quotes', 'trades.ts', 'quotes.ts')
+            ->settings(['max_threads' => '2'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ASOF JOIN', $result->query);
+        $this->assertStringContainsString('SETTINGS max_threads=2', $result->query);
+    }
+
+    public function testLimitByWithLimitAndSettings(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->limitBy(3, ['user_id'])
+            ->limit(100)
+            ->settings(['max_threads' => '2'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('LIMIT ? BY `user_id`', $result->query);
+        $this->assertStringContainsString('SETTINGS max_threads=2', $result->query);
+    }
+
+    public function testResetClearsAllNewState(): void
+    {
+        $builder = (new Builder())
+            ->from('events')
+            ->final()
+            ->sample(0.5)
+            ->prewhere([Query::equal('type', ['click'])])
+            ->arrayJoin('tags', 'tag')
+            ->asofJoin('quotes', 'a', 'b')
+            ->limitBy(3, ['user_id'])
+            ->withTotals()
+            ->settings(['max_threads' => '4']);
+
+        $builder->build();
+        $builder->reset();
+
+        $result = $builder->from('clean')->build();
+        $this->assertBindingCount($result);
+
+        $this->assertSame('SELECT * FROM `clean`', $result->query);
+        $this->assertEquals([], $result->bindings);
     }
 }
