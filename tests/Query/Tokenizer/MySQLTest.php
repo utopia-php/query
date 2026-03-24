@@ -81,4 +81,143 @@ class MySQLTest extends TestCase
         $this->assertSame('`name`', $tokens[1]->value);
         $this->assertSame('`users`', $tokens[3]->value);
     }
+
+    public function testHashCommentInsideSingleQuotedString(): void
+    {
+        $tokens = $this->meaningful("SELECT '#not-a-comment' FROM t");
+
+        $values = $this->values($tokens);
+        $this->assertContains("'#not-a-comment'", $values);
+
+        $stringToken = null;
+        foreach ($tokens as $t) {
+            if ($t->type === TokenType::String) {
+                $stringToken = $t;
+                break;
+            }
+        }
+        $this->assertNotNull($stringToken);
+        $this->assertSame("'#not-a-comment'", $stringToken->value);
+    }
+
+    public function testHashCommentInsideBacktickIdentifier(): void
+    {
+        $tokens = $this->meaningful('SELECT `col#name` FROM t');
+
+        $quotedId = null;
+        foreach ($tokens as $t) {
+            if ($t->type === TokenType::QuotedIdentifier) {
+                $quotedId = $t;
+                break;
+            }
+        }
+        $this->assertNotNull($quotedId);
+        $this->assertSame('`col#name`', $quotedId->value);
+    }
+
+    public function testHashCommentInsideDoubleQuotedIdentifier(): void
+    {
+        $tokens = $this->meaningful('SELECT "col#name" FROM t');
+
+        $found = false;
+        foreach ($tokens as $t) {
+            if ($t->value === '"col#name"') {
+                $found = true;
+                break;
+            }
+        }
+        $this->assertTrue($found, 'Double-quoted identifier with # should be preserved');
+    }
+
+    public function testHashCommentWithEscapedQuote(): void
+    {
+        $tokens = $this->meaningful("SELECT 'it''s a #test' FROM t");
+
+        $stringToken = null;
+        foreach ($tokens as $t) {
+            if ($t->type === TokenType::String) {
+                $stringToken = $t;
+                break;
+            }
+        }
+        $this->assertNotNull($stringToken);
+        $this->assertSame("'it''s a #test'", $stringToken->value);
+    }
+
+    public function testHashCommentWithBackslashEscape(): void
+    {
+        $tokens = $this->meaningful("SELECT 'it\\'s a #test' FROM t");
+
+        $stringToken = null;
+        foreach ($tokens as $t) {
+            if ($t->type === TokenType::String) {
+                $stringToken = $t;
+                break;
+            }
+        }
+        $this->assertNotNull($stringToken);
+        $this->assertStringContainsString('#test', $stringToken->value);
+    }
+
+    public function testMultipleHashComments(): void
+    {
+        $all = $this->tokenizer->tokenize("SELECT 1 #first\nSELECT 2 #second\nSELECT 3");
+
+        $comments = array_values(array_filter(
+            $all,
+            fn (Token $t) => $t->type === TokenType::LineComment
+        ));
+
+        $this->assertCount(2, $comments);
+        $this->assertSame('--first', $comments[0]->value);
+        $this->assertSame('--second', $comments[1]->value);
+    }
+
+    public function testHashCommentAtEndOfInput(): void
+    {
+        $all = $this->tokenizer->tokenize('SELECT 1 #comment');
+
+        $comments = array_values(array_filter(
+            $all,
+            fn (Token $t) => $t->type === TokenType::LineComment
+        ));
+
+        $this->assertCount(1, $comments);
+        $this->assertSame('--comment', $comments[0]->value);
+
+        $filtered = Tokenizer::filter($all);
+        $this->assertSame(
+            [TokenType::Keyword, TokenType::Integer, TokenType::Eof],
+            $this->types($filtered)
+        );
+    }
+
+    public function testHashCommentInsideEscapedBacktickIdentifier(): void
+    {
+        $tokens = $this->meaningful('SELECT `col``#name` FROM t');
+
+        $quotedId = null;
+        foreach ($tokens as $t) {
+            if ($t->type === TokenType::QuotedIdentifier) {
+                $quotedId = $t;
+                break;
+            }
+        }
+        $this->assertNotNull($quotedId);
+        $this->assertSame('`col``#name`', $quotedId->value);
+    }
+
+    public function testHashCommentInsideEscapedDoubleQuotedIdentifier(): void
+    {
+        $tokens = $this->meaningful('SELECT "col""#name" FROM t');
+
+        $found = false;
+        foreach ($tokens as $t) {
+            if (str_contains($t->value, '#name')) {
+                $found = true;
+                break;
+            }
+        }
+        $this->assertTrue($found, 'Escaped double-quoted identifier with # should be preserved');
+    }
 }
