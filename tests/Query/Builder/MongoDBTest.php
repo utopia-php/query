@@ -16,6 +16,11 @@ use Utopia\Query\Builder\Feature\Selects;
 use Utopia\Query\Builder\Feature\TableSampling;
 use Utopia\Query\Builder\Feature\Unions;
 use Utopia\Query\Builder\Feature\Updates;
+use Utopia\Query\Builder\Feature\MongoDB\ArrayPushModifiers;
+use Utopia\Query\Builder\Feature\MongoDB\AtlasSearch;
+use Utopia\Query\Builder\Feature\MongoDB\ConditionalArrayUpdates;
+use Utopia\Query\Builder\Feature\MongoDB\FieldUpdates;
+use Utopia\Query\Builder\Feature\MongoDB\PipelineStages;
 use Utopia\Query\Builder\Feature\Upsert;
 use Utopia\Query\Builder\Feature\Windows;
 use Utopia\Query\Builder\MongoDB as Builder;
@@ -4108,5 +4113,1147 @@ class MongoDBTest extends TestCase
         $sortBody = $sortStage['$sort'];
         $this->assertEquals(1, $sortBody['name']);
         $this->assertEquals(1, $sortBody['_rand']);
+    }
+
+    public function testImplementsFieldUpdates(): void
+    {
+        $this->assertInstanceOf(FieldUpdates::class, new Builder());
+    }
+
+    public function testImplementsArrayPushModifiers(): void
+    {
+        $this->assertInstanceOf(ArrayPushModifiers::class, new Builder());
+    }
+
+    public function testImplementsConditionalArrayUpdates(): void
+    {
+        $this->assertInstanceOf(ConditionalArrayUpdates::class, new Builder());
+    }
+
+    public function testImplementsPipelineStages(): void
+    {
+        $this->assertInstanceOf(PipelineStages::class, new Builder());
+    }
+
+    public function testImplementsAtlasSearch(): void
+    {
+        $this->assertInstanceOf(AtlasSearch::class, new Builder());
+    }
+
+    public function testRenameField(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->rename('old_name', 'new_name')
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertEquals('updateMany', $op['operation']);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        $this->assertArrayHasKey('$rename', $update);
+        $this->assertEquals(['old_name' => 'new_name'], $update['$rename']);
+    }
+
+    public function testMultiply(): void
+    {
+        $result = (new Builder())
+            ->from('products')
+            ->multiply('price', 1.1)
+            ->filter([Query::equal('category', ['sale'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        $this->assertArrayHasKey('$mul', $update);
+        $this->assertEquals(['price' => 1.1], $update['$mul']);
+    }
+
+    public function testPopFirst(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->popFirst('tags')
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        $this->assertArrayHasKey('$pop', $update);
+        $this->assertEquals(['tags' => -1], $update['$pop']);
+    }
+
+    public function testPopLast(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->popLast('tags')
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        $this->assertArrayHasKey('$pop', $update);
+        $this->assertEquals(['tags' => 1], $update['$pop']);
+    }
+
+    public function testPullAll(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->pullAll('scores', [0, 5])
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        $this->assertArrayHasKey('$pullAll', $update);
+        /** @var array<string, array<string>> $pullAll */
+        $pullAll = $update['$pullAll'];
+        $this->assertEquals(['?', '?'], $pullAll['scores']);
+        $this->assertContains(0, $result->bindings);
+        $this->assertContains(5, $result->bindings);
+    }
+
+    public function testUpdateMin(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->updateMin('low_score', 50)
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        $this->assertArrayHasKey('$min', $update);
+        $this->assertEquals(['low_score' => '?'], $update['$min']);
+        $this->assertContains(50, $result->bindings);
+    }
+
+    public function testUpdateMax(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->updateMax('high_score', 100)
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        $this->assertArrayHasKey('$max', $update);
+        $this->assertEquals(['high_score' => '?'], $update['$max']);
+        $this->assertContains(100, $result->bindings);
+    }
+
+    public function testCurrentDate(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->currentDate('lastModified', 'date')
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        $this->assertArrayHasKey('$currentDate', $update);
+        $this->assertEquals(['lastModified' => ['$type' => 'date']], $update['$currentDate']);
+    }
+
+    public function testCurrentDateTimestamp(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->currentDate('lastModified', 'timestamp')
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        $this->assertEquals(['lastModified' => ['$type' => 'timestamp']], $update['$currentDate']);
+    }
+
+    public function testMultipleUpdateOperators(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->rename('old_field', 'new_field')
+            ->multiply('score', 2)
+            ->popLast('queue')
+            ->updateMin('min_val', 10)
+            ->updateMax('max_val', 100)
+            ->currentDate('updated_at')
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        $this->assertArrayHasKey('$rename', $update);
+        $this->assertArrayHasKey('$mul', $update);
+        $this->assertArrayHasKey('$pop', $update);
+        $this->assertArrayHasKey('$min', $update);
+        $this->assertArrayHasKey('$max', $update);
+        $this->assertArrayHasKey('$currentDate', $update);
+    }
+
+    public function testPushEachBasic(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->pushEach('tags', ['a', 'b', 'c'])
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        $this->assertArrayHasKey('$push', $update);
+        /** @var array<string, mixed> $pushDoc */
+        $pushDoc = $update['$push'];
+        /** @var array<string, mixed> $tagsModifier */
+        $tagsModifier = $pushDoc['tags'];
+        $this->assertEquals(['?', '?', '?'], $tagsModifier['$each']);
+        $this->assertArrayNotHasKey('$position', $tagsModifier);
+        $this->assertArrayNotHasKey('$slice', $tagsModifier);
+        $this->assertArrayNotHasKey('$sort', $tagsModifier);
+    }
+
+    public function testPushEachWithAllModifiers(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->pushEach('scores', [85, 92], 0, 5, ['score' => -1])
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        /** @var array<string, mixed> $pushDoc */
+        $pushDoc = $update['$push'];
+        /** @var array<string, mixed> $scoresModifier */
+        $scoresModifier = $pushDoc['scores'];
+        $this->assertEquals(['?', '?'], $scoresModifier['$each']);
+        $this->assertEquals(0, $scoresModifier['$position']);
+        $this->assertEquals(5, $scoresModifier['$slice']);
+        $this->assertEquals(['score' => -1], $scoresModifier['$sort']);
+    }
+
+    public function testPushEachWithPosition(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->pushEach('items', ['x'], 2)
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        /** @var array<string, mixed> $pushDoc */
+        $pushDoc = $update['$push'];
+        /** @var array<string, mixed> $itemsModifier */
+        $itemsModifier = $pushDoc['items'];
+        $this->assertEquals(2, $itemsModifier['$position']);
+        $this->assertArrayNotHasKey('$slice', $itemsModifier);
+    }
+
+    public function testPushEachWithSlice(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->pushEach('items', ['a', 'b'], null, 10)
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        /** @var array<string, mixed> $pushDoc */
+        $pushDoc = $update['$push'];
+        /** @var array<string, mixed> $itemsModifier */
+        $itemsModifier = $pushDoc['items'];
+        $this->assertEquals(10, $itemsModifier['$slice']);
+        $this->assertArrayNotHasKey('$position', $itemsModifier);
+    }
+
+    public function testPushAndPushEachCombined(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->push('simple_field', 'value')
+            ->pushEach('array_field', ['a', 'b'])
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        /** @var array<string, mixed> $pushDoc */
+        $pushDoc = $update['$push'];
+        $this->assertEquals('?', $pushDoc['simple_field']);
+        $this->assertIsArray($pushDoc['array_field']);
+    }
+
+    public function testArrayFilter(): void
+    {
+        $result = (new Builder())
+            ->from('students')
+            ->set(['grades.$[elem].mean' => 0])
+            ->arrayFilter('elem', ['elem.grade' => ['$gte' => 85]])
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertEquals('updateMany', $op['operation']);
+        $this->assertArrayHasKey('options', $op);
+        /** @var array<string, mixed> $options */
+        $options = $op['options'];
+        $this->assertArrayHasKey('arrayFilters', $options);
+        /** @var list<array<string, mixed>> $filters */
+        $filters = $options['arrayFilters'];
+        $this->assertCount(1, $filters);
+        $this->assertArrayHasKey('elem', $filters[0]);
+    }
+
+    public function testMultipleArrayFilters(): void
+    {
+        $result = (new Builder())
+            ->from('students')
+            ->set(['grades.$[elem].adjusted' => true])
+            ->arrayFilter('elem', ['elem.grade' => ['$gte' => 85]])
+            ->arrayFilter('other', ['other.type' => 'test'])
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $options */
+        $options = $op['options'];
+        /** @var list<array<string, mixed>> $filters */
+        $filters = $options['arrayFilters'];
+        $this->assertCount(2, $filters);
+    }
+
+    public function testBucket(): void
+    {
+        $result = (new Builder())
+            ->from('sales')
+            ->bucket('price', [0, 100, 200, 300], 'Other', ['count' => ['$sum' => 1]])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertEquals('aggregate', $op['operation']);
+
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $bucketStage = $this->findStage($pipeline, '$bucket');
+        $this->assertNotNull($bucketStage);
+        /** @var array<string, mixed> $bucketBody */
+        $bucketBody = $bucketStage['$bucket'];
+        $this->assertEquals('$price', $bucketBody['groupBy']);
+        $this->assertEquals([0, 100, 200, 300], $bucketBody['boundaries']);
+        $this->assertEquals('Other', $bucketBody['default']);
+        $this->assertEquals(['count' => ['$sum' => 1]], $bucketBody['output']);
+    }
+
+    public function testBucketWithoutDefault(): void
+    {
+        $result = (new Builder())
+            ->from('sales')
+            ->bucket('amount', [0, 50, 100])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $bucketStage = $this->findStage($pipeline, '$bucket');
+        $this->assertNotNull($bucketStage);
+        /** @var array<string, mixed> $bucketBody */
+        $bucketBody = $bucketStage['$bucket'];
+        $this->assertArrayNotHasKey('default', $bucketBody);
+        $this->assertArrayNotHasKey('output', $bucketBody);
+    }
+
+    public function testBucketAuto(): void
+    {
+        $result = (new Builder())
+            ->from('sales')
+            ->bucketAuto('price', 5, ['count' => ['$sum' => 1]])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $bucketAutoStage = $this->findStage($pipeline, '$bucketAuto');
+        $this->assertNotNull($bucketAutoStage);
+        /** @var array<string, mixed> $bucketAutoBody */
+        $bucketAutoBody = $bucketAutoStage['$bucketAuto'];
+        $this->assertEquals('$price', $bucketAutoBody['groupBy']);
+        $this->assertEquals(5, $bucketAutoBody['buckets']);
+        $this->assertEquals(['count' => ['$sum' => 1]], $bucketAutoBody['output']);
+    }
+
+    public function testBucketAutoWithoutOutput(): void
+    {
+        $result = (new Builder())
+            ->from('sales')
+            ->bucketAuto('amount', 10)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $bucketAutoStage = $this->findStage($pipeline, '$bucketAuto');
+        $this->assertNotNull($bucketAutoStage);
+        /** @var array<string, mixed> $bucketAutoBody */
+        $bucketAutoBody = $bucketAutoStage['$bucketAuto'];
+        $this->assertArrayNotHasKey('output', $bucketAutoBody);
+    }
+
+    public function testFacet(): void
+    {
+        $priceFacet = (new Builder())
+            ->from('products')
+            ->bucket('price', [0, 100, 200]);
+
+        $categoryFacet = (new Builder())
+            ->from('products')
+            ->count('*', 'total')
+            ->groupBy(['category']);
+
+        $result = (new Builder())
+            ->from('products')
+            ->facet([
+                'priceFacet' => $priceFacet,
+                'categoryFacet' => $categoryFacet,
+            ])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertEquals('aggregate', $op['operation']);
+
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $facetStage = $this->findStage($pipeline, '$facet');
+        $this->assertNotNull($facetStage);
+        /** @var array<string, mixed> $facetBody */
+        $facetBody = $facetStage['$facet'];
+        $this->assertArrayHasKey('priceFacet', $facetBody);
+        $this->assertArrayHasKey('categoryFacet', $facetBody);
+        $this->assertIsArray($facetBody['priceFacet']);
+        $this->assertIsArray($facetBody['categoryFacet']);
+    }
+
+    public function testGraphLookup(): void
+    {
+        $result = (new Builder())
+            ->from('employees')
+            ->graphLookup('employees', 'managerId', 'managerId', '_id', 'reportingHierarchy', 5, 'depth')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertEquals('aggregate', $op['operation']);
+
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $graphLookupStage = $this->findStage($pipeline, '$graphLookup');
+        $this->assertNotNull($graphLookupStage);
+        /** @var array<string, mixed> $graphLookupBody */
+        $graphLookupBody = $graphLookupStage['$graphLookup'];
+        $this->assertEquals('employees', $graphLookupBody['from']);
+        $this->assertEquals('$managerId', $graphLookupBody['startWith']);
+        $this->assertEquals('managerId', $graphLookupBody['connectFromField']);
+        $this->assertEquals('_id', $graphLookupBody['connectToField']);
+        $this->assertEquals('reportingHierarchy', $graphLookupBody['as']);
+        $this->assertEquals(5, $graphLookupBody['maxDepth']);
+        $this->assertEquals('depth', $graphLookupBody['depthField']);
+    }
+
+    public function testGraphLookupWithoutOptionalFields(): void
+    {
+        $result = (new Builder())
+            ->from('categories')
+            ->graphLookup('categories', 'parentId', 'parentId', '_id', 'ancestors')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $graphLookupStage = $this->findStage($pipeline, '$graphLookup');
+        $this->assertNotNull($graphLookupStage);
+        /** @var array<string, mixed> $graphLookupBody */
+        $graphLookupBody = $graphLookupStage['$graphLookup'];
+        $this->assertArrayNotHasKey('maxDepth', $graphLookupBody);
+        $this->assertArrayNotHasKey('depthField', $graphLookupBody);
+    }
+
+    public function testMergeIntoCollection(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->count('*', 'total')
+            ->groupBy(['region'])
+            ->mergeIntoCollection('order_summary', ['_id'], ['replace'], ['insert'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $mergeStage = $this->findStage($pipeline, '$merge');
+        $this->assertNotNull($mergeStage);
+        /** @var array<string, mixed> $mergeBody */
+        $mergeBody = $mergeStage['$merge'];
+        $this->assertEquals('order_summary', $mergeBody['into']);
+        $this->assertEquals(['_id'], $mergeBody['on']);
+        $this->assertEquals(['replace'], $mergeBody['whenMatched']);
+        $this->assertEquals(['insert'], $mergeBody['whenNotMatched']);
+    }
+
+    public function testMergeIntoCollectionMinimal(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->count('*', 'total')
+            ->mergeIntoCollection('summary')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $mergeStage = $this->findStage($pipeline, '$merge');
+        $this->assertNotNull($mergeStage);
+        /** @var array<string, mixed> $mergeBody */
+        $mergeBody = $mergeStage['$merge'];
+        $this->assertEquals('summary', $mergeBody['into']);
+        $this->assertArrayNotHasKey('on', $mergeBody);
+        $this->assertArrayNotHasKey('whenMatched', $mergeBody);
+    }
+
+    public function testMergeIsLastPipelineStage(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->count('*', 'total')
+            ->sortDesc('total')
+            ->limit(10)
+            ->mergeIntoCollection('output')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $lastStage = $pipeline[\count($pipeline) - 1];
+        $this->assertArrayHasKey('$merge', $lastStage);
+    }
+
+    public function testOutputToCollection(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->count('*', 'total')
+            ->outputToCollection('order_results')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $outStage = $this->findStage($pipeline, '$out');
+        $this->assertNotNull($outStage);
+        $this->assertEquals('order_results', $outStage['$out']);
+    }
+
+    public function testOutputToCollectionWithDatabase(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->count('*', 'total')
+            ->outputToCollection('results', 'analytics_db')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $outStage = $this->findStage($pipeline, '$out');
+        $this->assertNotNull($outStage);
+        /** @var array<string, string> $outBody */
+        $outBody = $outStage['$out'];
+        $this->assertEquals('analytics_db', $outBody['db']);
+        $this->assertEquals('results', $outBody['coll']);
+    }
+
+    public function testOutputIsLastPipelineStage(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->count('*', 'total')
+            ->limit(5)
+            ->outputToCollection('output')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $lastStage = $pipeline[\count($pipeline) - 1];
+        $this->assertArrayHasKey('$out', $lastStage);
+    }
+
+    public function testMergeTakesPrecedenceOverOut(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->count('*', 'total')
+            ->mergeIntoCollection('merge_target')
+            ->outputToCollection('out_target')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $mergeStage = $this->findStage($pipeline, '$merge');
+        $this->assertNotNull($mergeStage);
+        $outStage = $this->findStage($pipeline, '$out');
+        $this->assertNull($outStage);
+    }
+
+    public function testReplaceRoot(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->replaceRoot('$profile')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertEquals('aggregate', $op['operation']);
+
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $replaceRootStage = $this->findStage($pipeline, '$replaceRoot');
+        $this->assertNotNull($replaceRootStage);
+        /** @var array<string, mixed> $replaceRootBody */
+        $replaceRootBody = $replaceRootStage['$replaceRoot'];
+        $this->assertEquals('$profile', $replaceRootBody['newRoot']);
+    }
+
+    public function testAtlasSearch(): void
+    {
+        $result = (new Builder())
+            ->from('articles')
+            ->search(['text' => ['query' => 'mongodb', 'path' => 'content']], 'default')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertEquals('aggregate', $op['operation']);
+
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $this->assertArrayHasKey('$search', $pipeline[0]);
+        /** @var array<string, mixed> $searchBody */
+        $searchBody = $pipeline[0]['$search'];
+        $this->assertEquals('default', $searchBody['index']);
+        $this->assertEquals(['query' => 'mongodb', 'path' => 'content'], $searchBody['text']);
+    }
+
+    public function testAtlasSearchWithoutIndex(): void
+    {
+        $result = (new Builder())
+            ->from('articles')
+            ->search(['text' => ['query' => 'test', 'path' => 'title']])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        /** @var array<string, mixed> $searchBody */
+        $searchBody = $pipeline[0]['$search'];
+        $this->assertArrayNotHasKey('index', $searchBody);
+    }
+
+    public function testAtlasSearchIsFirstStage(): void
+    {
+        $result = (new Builder())
+            ->from('articles')
+            ->filter([Query::equal('status', ['published'])])
+            ->search(['text' => ['query' => 'test', 'path' => 'content']], 'default')
+            ->sortDesc('score')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $this->assertArrayHasKey('$search', $pipeline[0]);
+    }
+
+    public function testSearchMeta(): void
+    {
+        $result = (new Builder())
+            ->from('articles')
+            ->searchMeta(['facet' => ['operator' => ['text' => ['query' => 'test', 'path' => 'content']], 'facets' => ['categories' => ['type' => 'string', 'path' => 'category']]]], 'default')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertEquals('aggregate', $op['operation']);
+
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $this->assertCount(1, $pipeline);
+        $this->assertArrayHasKey('$searchMeta', $pipeline[0]);
+    }
+
+    public function testVectorSearch(): void
+    {
+        $result = (new Builder())
+            ->from('products')
+            ->vectorSearch('embedding', [0.1, 0.2, 0.3], 100, 10, 'vector_index', ['category' => 'electronics'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertEquals('aggregate', $op['operation']);
+
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $this->assertArrayHasKey('$vectorSearch', $pipeline[0]);
+        /** @var array<string, mixed> $vectorSearchBody */
+        $vectorSearchBody = $pipeline[0]['$vectorSearch'];
+        $this->assertEquals('embedding', $vectorSearchBody['path']);
+        $this->assertEquals([0.1, 0.2, 0.3], $vectorSearchBody['queryVector']);
+        $this->assertEquals(100, $vectorSearchBody['numCandidates']);
+        $this->assertEquals(10, $vectorSearchBody['limit']);
+        $this->assertEquals('vector_index', $vectorSearchBody['index']);
+        $this->assertEquals(['category' => 'electronics'], $vectorSearchBody['filter']);
+    }
+
+    public function testVectorSearchWithoutOptionalFields(): void
+    {
+        $result = (new Builder())
+            ->from('products')
+            ->vectorSearch('embedding', [0.5, 0.5], 50, 5)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        /** @var array<string, mixed> $vectorSearchBody */
+        $vectorSearchBody = $pipeline[0]['$vectorSearch'];
+        $this->assertArrayNotHasKey('index', $vectorSearchBody);
+        $this->assertArrayNotHasKey('filter', $vectorSearchBody);
+    }
+
+    public function testVectorSearchIsFirstStage(): void
+    {
+        $result = (new Builder())
+            ->from('products')
+            ->filter([Query::equal('active', [true])])
+            ->vectorSearch('embedding', [0.1, 0.2], 100, 10)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $this->assertArrayHasKey('$vectorSearch', $pipeline[0]);
+    }
+
+    public function testHintStringOnFind(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->hint('idx_name')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertEquals('find', $op['operation']);
+        $this->assertEquals('idx_name', $op['hint']);
+    }
+
+    public function testHintArrayOnFind(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->hint(['name' => 1, 'age' => -1])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertEquals('find', $op['operation']);
+        $this->assertEquals(['name' => 1, 'age' => -1], $op['hint']);
+    }
+
+    public function testHintOnAggregate(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->count('*', 'total')
+            ->hint('idx_name')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertEquals('idx_name', $op['hint']);
+    }
+
+    public function testResetClearsNewProperties(): void
+    {
+        $builder = (new Builder())
+            ->from('users')
+            ->rename('a', 'b')
+            ->multiply('c', 2)
+            ->popFirst('d')
+            ->pullAll('e', [1])
+            ->updateMin('f', 0)
+            ->updateMax('g', 100)
+            ->currentDate('h')
+            ->pushEach('i', [1, 2])
+            ->arrayFilter('elem', ['elem.x' => 1])
+            ->hint('idx');
+
+        $builder->reset();
+        $builder->from('items')->set(['name' => 'item1']);
+
+        $result = $builder->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        $this->assertArrayHasKey('$set', $update);
+        $this->assertArrayNotHasKey('$rename', $update);
+        $this->assertArrayNotHasKey('$mul', $update);
+        $this->assertArrayNotHasKey('$pop', $update);
+        $this->assertArrayNotHasKey('$pullAll', $update);
+        $this->assertArrayNotHasKey('$min', $update);
+        $this->assertArrayNotHasKey('$max', $update);
+        $this->assertArrayNotHasKey('$currentDate', $update);
+        $this->assertArrayNotHasKey('options', $op);
+        $this->assertArrayNotHasKey('hint', $op);
+    }
+
+    public function testResetClearsPipelineStages(): void
+    {
+        $builder = (new Builder())
+            ->from('products')
+            ->bucket('price', [0, 100])
+            ->replaceRoot('$data')
+            ->mergeIntoCollection('output');
+
+        $builder->reset();
+        $builder->from('items');
+
+        $result = $builder->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertEquals('find', $op['operation']);
+    }
+
+    public function testResetClearsSearchStages(): void
+    {
+        $builder = (new Builder())
+            ->from('articles')
+            ->search(['text' => ['query' => 'test', 'path' => 'content']]);
+
+        $builder->reset();
+        $builder->from('articles');
+
+        $result = $builder->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertEquals('find', $op['operation']);
+    }
+
+    public function testBucketReplacesGroupBy(): void
+    {
+        $result = (new Builder())
+            ->from('sales')
+            ->bucket('price', [0, 50, 100, 200])
+            ->filter([Query::greaterThan('quantity', 0)])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+
+        $matchIdx = $this->findStageIndex($pipeline, '$match');
+        $bucketIdx = $this->findStageIndex($pipeline, '$bucket');
+        $this->assertNotNull($matchIdx);
+        $this->assertNotNull($bucketIdx);
+        $this->assertLessThan($bucketIdx, $matchIdx);
+
+        $groupStage = $this->findStage($pipeline, '$group');
+        $this->assertNull($groupStage);
+    }
+
+    public function testGraphLookupWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('employees')
+            ->graphLookup('employees', 'reportsTo', 'reportsTo', '_id', 'hierarchy', 3)
+            ->filter([Query::equal('department', ['engineering'])])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+
+        $graphLookupIdx = $this->findStageIndex($pipeline, '$graphLookup');
+        $matchIdx = $this->findStageIndex($pipeline, '$match');
+        $this->assertNotNull($graphLookupIdx);
+        $this->assertNotNull($matchIdx);
+        $this->assertLessThan($matchIdx, $graphLookupIdx);
+    }
+
+    public function testSearchWithFilterAndSort(): void
+    {
+        $result = (new Builder())
+            ->from('articles')
+            ->search(['text' => ['query' => 'mongodb', 'path' => 'content']], 'default')
+            ->filter([Query::equal('status', ['published'])])
+            ->sortDesc('score')
+            ->limit(10)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+
+        $searchIdx = $this->findStageIndex($pipeline, '$search');
+        $matchIdx = $this->findStageIndex($pipeline, '$match');
+        $sortIdx = $this->findStageIndex($pipeline, '$sort');
+        $limitIdx = $this->findStageIndex($pipeline, '$limit');
+
+        $this->assertNotNull($searchIdx);
+        $this->assertNotNull($matchIdx);
+        $this->assertNotNull($sortIdx);
+        $this->assertNotNull($limitIdx);
+
+        $this->assertEquals(0, $searchIdx);
+        $this->assertLessThan($matchIdx, $searchIdx);
+        $this->assertLessThan($sortIdx, $matchIdx);
+        $this->assertLessThan($limitIdx, $sortIdx);
+    }
+
+    public function testAllUpdateOperatorsCombined(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->set(['name' => 'Updated'])
+            ->increment('counter', 1)
+            ->push('log', 'entry')
+            ->pull('obsolete', 'old')
+            ->addToSet('roles', 'editor')
+            ->unsetFields('temp')
+            ->rename('oldField', 'newField')
+            ->multiply('score', 1.5)
+            ->popFirst('queue')
+            ->pullAll('tags', ['a', 'b'])
+            ->updateMin('min_val', 0)
+            ->updateMax('max_val', 999)
+            ->currentDate('modified_at', 'timestamp')
+            ->pushEach('items', ['x', 'y'], 0, 10)
+            ->filter([Query::equal('_id', ['test'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        $this->assertArrayHasKey('$set', $update);
+        $this->assertArrayHasKey('$inc', $update);
+        $this->assertArrayHasKey('$push', $update);
+        $this->assertArrayHasKey('$pull', $update);
+        $this->assertArrayHasKey('$addToSet', $update);
+        $this->assertArrayHasKey('$unset', $update);
+        $this->assertArrayHasKey('$rename', $update);
+        $this->assertArrayHasKey('$mul', $update);
+        $this->assertArrayHasKey('$pop', $update);
+        $this->assertArrayHasKey('$pullAll', $update);
+        $this->assertArrayHasKey('$min', $update);
+        $this->assertArrayHasKey('$max', $update);
+        $this->assertArrayHasKey('$currentDate', $update);
+    }
+
+    public function testBucketWithFilterAndSort(): void
+    {
+        $result = (new Builder())
+            ->from('products')
+            ->filter([Query::equal('active', [true])])
+            ->bucket('price', [0, 25, 50, 100, 200], 'expensive', ['count' => ['$sum' => 1], 'avgPrice' => ['$avg' => '$price']])
+            ->sortDesc('count')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+
+        $matchIdx = $this->findStageIndex($pipeline, '$match');
+        $bucketIdx = $this->findStageIndex($pipeline, '$bucket');
+        $sortIdx = $this->findStageIndex($pipeline, '$sort');
+
+        $this->assertNotNull($matchIdx);
+        $this->assertNotNull($bucketIdx);
+        $this->assertNotNull($sortIdx);
+
+        $this->assertLessThan($bucketIdx, $matchIdx);
+        $this->assertLessThan($sortIdx, $bucketIdx);
+    }
+
+    public function testHintOnSearchMeta(): void
+    {
+        $result = (new Builder())
+            ->from('articles')
+            ->searchMeta(['count' => ['type' => 'total']], 'default')
+            ->hint('search_idx')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertEquals('search_idx', $op['hint']);
+    }
+
+    public function testReplaceRootAfterGroupBy(): void
+    {
+        $result = (new Builder())
+            ->from('sales')
+            ->count('*', 'total')
+            ->groupBy(['region'])
+            ->replaceRoot('$stats')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+
+        $groupIdx = $this->findStageIndex($pipeline, '$group');
+        $replaceRootIdx = $this->findStageIndex($pipeline, '$replaceRoot');
+
+        $this->assertNotNull($groupIdx);
+        $this->assertNotNull($replaceRootIdx);
+        $this->assertLessThan($replaceRootIdx, $groupIdx);
+    }
+
+    public function testUpdateWithNoArrayFiltersHasNoOptions(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->set(['name' => 'test'])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertArrayNotHasKey('options', $op);
+    }
+
+    public function testMultiplyWithInteger(): void
+    {
+        $result = (new Builder())
+            ->from('products')
+            ->multiply('quantity', 2)
+            ->filter([Query::equal('_id', ['abc'])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $update */
+        $update = $op['update'];
+        $this->assertEquals(['quantity' => 2], $update['$mul']);
+    }
+
+    public function testBucketAutoWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->filter([Query::greaterThan('amount', 0)])
+            ->bucketAuto('amount', 4)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+
+        $matchIdx = $this->findStageIndex($pipeline, '$match');
+        $bucketAutoIdx = $this->findStageIndex($pipeline, '$bucketAuto');
+
+        $this->assertNotNull($matchIdx);
+        $this->assertNotNull($bucketAutoIdx);
+        $this->assertLessThan($bucketAutoIdx, $matchIdx);
+    }
+
+    public function testNoHintOnFindByDefault(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertArrayNotHasKey('hint', $op);
+    }
+
+    public function testNoHintOnAggregateByDefault(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->count('*', 'total')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertArrayNotHasKey('hint', $op);
     }
 }

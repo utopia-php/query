@@ -4,6 +4,11 @@ namespace Utopia\Query\Builder;
 
 use Utopia\Query\Builder as BaseBuilder;
 use Utopia\Query\Builder\Feature\FullTextSearch;
+use Utopia\Query\Builder\Feature\MongoDB\ArrayPushModifiers;
+use Utopia\Query\Builder\Feature\MongoDB\AtlasSearch;
+use Utopia\Query\Builder\Feature\MongoDB\ConditionalArrayUpdates;
+use Utopia\Query\Builder\Feature\MongoDB\FieldUpdates;
+use Utopia\Query\Builder\Feature\MongoDB\PipelineStages;
 use Utopia\Query\Builder\Feature\TableSampling;
 use Utopia\Query\Builder\Feature\Upsert;
 use Utopia\Query\Exception\UnsupportedException;
@@ -11,7 +16,15 @@ use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
 
-class MongoDB extends BaseBuilder implements Upsert, FullTextSearch, TableSampling
+class MongoDB extends BaseBuilder implements
+    Upsert,
+    FullTextSearch,
+    TableSampling,
+    FieldUpdates,
+    ArrayPushModifiers,
+    ConditionalArrayUpdates,
+    PipelineStages,
+    AtlasSearch
 {
     /** @var array<string, mixed> */
     protected array $pushOps = [];
@@ -31,6 +44,65 @@ class MongoDB extends BaseBuilder implements Upsert, FullTextSearch, TableSampli
     protected ?string $textSearchTerm = null;
 
     protected ?float $sampleSize = null;
+
+    /** @var array<string, string> */
+    protected array $renameOps = [];
+
+    /** @var array<string, int|float> */
+    protected array $mulOps = [];
+
+    /** @var array<string, int> */
+    protected array $popOps = [];
+
+    /** @var array<string, array<mixed>> */
+    protected array $pullAllOps = [];
+
+    /** @var array<string, mixed> */
+    protected array $minOps = [];
+
+    /** @var array<string, mixed> */
+    protected array $maxOps = [];
+
+    /** @var array<string, array<string, string>> */
+    protected array $currentDateOps = [];
+
+    /** @var array<string, array<string, mixed>> */
+    protected array $pushEachOps = [];
+
+    /** @var list<array<string, mixed>> */
+    protected array $arrayFilters = [];
+
+    /** @var array<string, mixed>|null */
+    protected ?array $bucketStage = null;
+
+    /** @var array<string, mixed>|null */
+    protected ?array $bucketAutoStage = null;
+
+    /** @var array<string, array<string, mixed>>|null */
+    protected ?array $facetStages = null;
+
+    /** @var array<string, mixed>|null */
+    protected ?array $graphLookupStage = null;
+
+    /** @var array<string, mixed>|null */
+    protected ?array $mergeStage = null;
+
+    /** @var array<string, mixed>|null */
+    protected ?array $outStage = null;
+
+    protected ?string $replaceRootExpr = null;
+
+    /** @var array<string, mixed>|null */
+    protected ?array $searchStage = null;
+
+    /** @var array<string, mixed>|null */
+    protected ?array $searchMetaStage = null;
+
+    /** @var array<string, mixed>|null */
+    protected ?array $vectorSearchStage = null;
+
+    /** @var string|array<string, int>|null */
+    protected string|array|null $indexHint = null;
 
     protected function quote(string $identifier): string
     {
@@ -108,6 +180,242 @@ class MongoDB extends BaseBuilder implements Upsert, FullTextSearch, TableSampli
         return $this;
     }
 
+    public function rename(string $oldField, string $newField): static
+    {
+        $this->renameOps[$oldField] = $newField;
+
+        return $this;
+    }
+
+    public function multiply(string $field, int|float $factor): static
+    {
+        $this->mulOps[$field] = $factor;
+
+        return $this;
+    }
+
+    public function popFirst(string $field): static
+    {
+        $this->popOps[$field] = -1;
+
+        return $this;
+    }
+
+    public function popLast(string $field): static
+    {
+        $this->popOps[$field] = 1;
+
+        return $this;
+    }
+
+    public function pullAll(string $field, array $values): static
+    {
+        $this->pullAllOps[$field] = $values;
+
+        return $this;
+    }
+
+    public function updateMin(string $field, mixed $value): static
+    {
+        $this->minOps[$field] = $value;
+
+        return $this;
+    }
+
+    public function updateMax(string $field, mixed $value): static
+    {
+        $this->maxOps[$field] = $value;
+
+        return $this;
+    }
+
+    public function currentDate(string $field, string $type = 'date'): static
+    {
+        $this->currentDateOps[$field] = ['$type' => $type];
+
+        return $this;
+    }
+
+    public function pushEach(string $field, array $values, ?int $position = null, ?int $slice = null, ?array $sort = null): static
+    {
+        $modifier = ['values' => $values];
+        if ($position !== null) {
+            $modifier['position'] = $position;
+        }
+        if ($slice !== null) {
+            $modifier['slice'] = $slice;
+        }
+        if ($sort !== null) {
+            $modifier['sort'] = $sort;
+        }
+        $this->pushEachOps[$field] = $modifier;
+
+        return $this;
+    }
+
+    public function arrayFilter(string $identifier, array $condition): static
+    {
+        $this->arrayFilters[] = [$identifier => $condition];
+
+        return $this;
+    }
+
+    public function bucket(string $groupBy, array $boundaries, ?string $defaultBucket = null, array $output = []): static
+    {
+        $stage = [
+            'groupBy' => '$' . $groupBy,
+            'boundaries' => $boundaries,
+        ];
+        if ($defaultBucket !== null) {
+            $stage['default'] = $defaultBucket;
+        }
+        if (! empty($output)) {
+            $stage['output'] = $output;
+        }
+        $this->bucketStage = $stage;
+
+        return $this;
+    }
+
+    public function bucketAuto(string $groupBy, int $buckets, array $output = []): static
+    {
+        $stage = [
+            'groupBy' => '$' . $groupBy,
+            'buckets' => $buckets,
+        ];
+        if (! empty($output)) {
+            $stage['output'] = $output;
+        }
+        $this->bucketAutoStage = $stage;
+
+        return $this;
+    }
+
+    public function facet(array $facets): static
+    {
+        $this->facetStages = [];
+        foreach ($facets as $name => $builder) {
+            $result = $builder->build();
+            /** @var array<string, mixed>|null $subOp */
+            $subOp = \json_decode($result->query, true);
+            if ($subOp === null) {
+                throw new UnsupportedException('Cannot parse facet query for MongoDB.');
+            }
+            $this->facetStages[$name] = [
+                'pipeline' => $this->operationToPipeline($subOp),
+                'bindings' => $result->bindings,
+            ];
+        }
+
+        return $this;
+    }
+
+    public function graphLookup(string $from, mixed $startWith, string $connectFromField, string $connectToField, string $as, ?int $maxDepth = null, ?string $depthField = null): static
+    {
+        $stage = [
+            'from' => $from,
+            'startWith' => '$' . $startWith,
+            'connectFromField' => $connectFromField,
+            'connectToField' => $connectToField,
+            'as' => $as,
+        ];
+        if ($maxDepth !== null) {
+            $stage['maxDepth'] = $maxDepth;
+        }
+        if ($depthField !== null) {
+            $stage['depthField'] = $depthField;
+        }
+        $this->graphLookupStage = $stage;
+
+        return $this;
+    }
+
+    public function mergeIntoCollection(string $collection, ?array $on = null, ?array $whenMatched = null, ?array $whenNotMatched = null): static
+    {
+        $stage = ['into' => $collection];
+        if ($on !== null) {
+            $stage['on'] = $on;
+        }
+        if ($whenMatched !== null) {
+            $stage['whenMatched'] = $whenMatched;
+        }
+        if ($whenNotMatched !== null) {
+            $stage['whenNotMatched'] = $whenNotMatched;
+        }
+        $this->mergeStage = $stage;
+
+        return $this;
+    }
+
+    public function outputToCollection(string $collection, ?string $database = null): static
+    {
+        if ($database !== null) {
+            $this->outStage = ['db' => $database, 'coll' => $collection];
+        } else {
+            $this->outStage = ['coll' => $collection];
+        }
+
+        return $this;
+    }
+
+    public function replaceRoot(string $newRootExpression): static
+    {
+        $this->replaceRootExpr = $newRootExpression;
+
+        return $this;
+    }
+
+    public function search(array $searchDefinition, ?string $index = null): static
+    {
+        $stage = $searchDefinition;
+        if ($index !== null) {
+            $stage['index'] = $index;
+        }
+        $this->searchStage = $stage;
+
+        return $this;
+    }
+
+    public function searchMeta(array $searchDefinition, ?string $index = null): static
+    {
+        $stage = $searchDefinition;
+        if ($index !== null) {
+            $stage['index'] = $index;
+        }
+        $this->searchMetaStage = $stage;
+
+        return $this;
+    }
+
+    public function vectorSearch(string $path, array $queryVector, int $numCandidates, int $limit, ?string $index = null, ?array $filter = null): static
+    {
+        $stage = [
+            'path' => $path,
+            'queryVector' => $queryVector,
+            'numCandidates' => $numCandidates,
+            'limit' => $limit,
+        ];
+        if ($index !== null) {
+            $stage['index'] = $index;
+        }
+        if ($filter !== null) {
+            $stage['filter'] = $filter;
+        }
+        $this->vectorSearchStage = $stage;
+
+        return $this;
+    }
+
+    /**
+     * @param string|array<string, int> $hint
+     */
+    public function hint(string|array $hint): static
+    {
+        $this->indexHint = $hint;
+
+        return $this;
+    }
+
     public function reset(): static
     {
         parent::reset();
@@ -118,6 +426,26 @@ class MongoDB extends BaseBuilder implements Upsert, FullTextSearch, TableSampli
         $this->unsetOps = [];
         $this->textSearchTerm = null;
         $this->sampleSize = null;
+        $this->renameOps = [];
+        $this->mulOps = [];
+        $this->popOps = [];
+        $this->pullAllOps = [];
+        $this->minOps = [];
+        $this->maxOps = [];
+        $this->currentDateOps = [];
+        $this->pushEachOps = [];
+        $this->arrayFilters = [];
+        $this->bucketStage = null;
+        $this->bucketAutoStage = null;
+        $this->facetStages = null;
+        $this->graphLookupStage = null;
+        $this->mergeStage = null;
+        $this->outStage = null;
+        $this->replaceRootExpr = null;
+        $this->searchStage = null;
+        $this->searchMetaStage = null;
+        $this->vectorSearchStage = null;
+        $this->indexHint = null;
 
         return $this;
     }
@@ -195,6 +523,10 @@ class MongoDB extends BaseBuilder implements Upsert, FullTextSearch, TableSampli
             'filter' => ! empty($filter) ? $filter : new \stdClass(),
             'update' => $update,
         ];
+
+        if (! empty($this->arrayFilters)) {
+            $operation['options'] = ['arrayFilters' => $this->arrayFilters];
+        }
 
         return new BuildResult(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
@@ -302,7 +634,17 @@ class MongoDB extends BaseBuilder implements Upsert, FullTextSearch, TableSampli
             || ! empty($this->existsSubqueries)
             || $grouped->distinct
             || $this->textSearchTerm !== null
-            || $this->sampleSize !== null;
+            || $this->sampleSize !== null
+            || $this->bucketStage !== null
+            || $this->bucketAutoStage !== null
+            || $this->facetStages !== null
+            || $this->graphLookupStage !== null
+            || $this->mergeStage !== null
+            || $this->outStage !== null
+            || $this->replaceRootExpr !== null
+            || $this->searchStage !== null
+            || $this->searchMetaStage !== null
+            || $this->vectorSearchStage !== null;
     }
 
     private function buildFind(GroupedQueries $grouped): BuildResult
@@ -336,6 +678,10 @@ class MongoDB extends BaseBuilder implements Upsert, FullTextSearch, TableSampli
             $operation['limit'] = $grouped->limit;
         }
 
+        if ($this->indexHint !== null) {
+            $operation['hint'] = $this->indexHint;
+        }
+
         return new BuildResult(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             $this->bindings,
@@ -347,7 +693,38 @@ class MongoDB extends BaseBuilder implements Upsert, FullTextSearch, TableSampli
     {
         $pipeline = [];
 
-        // Text search must be first
+        // $searchMeta replaces other stages (returns metadata only)
+        if ($this->searchMetaStage !== null) {
+            $pipeline[] = ['$searchMeta' => $this->searchMetaStage];
+
+            $operation = [
+                'collection' => $this->table,
+                'operation' => 'aggregate',
+                'pipeline' => $pipeline,
+            ];
+
+            if ($this->indexHint !== null) {
+                $operation['hint'] = $this->indexHint;
+            }
+
+            return new BuildResult(
+                \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+                $this->bindings,
+                readOnly: true
+            );
+        }
+
+        // Atlas $search must be FIRST stage
+        if ($this->searchStage !== null) {
+            $pipeline[] = ['$search' => $this->searchStage];
+        }
+
+        // $vectorSearch must be FIRST stage
+        if ($this->vectorSearchStage !== null) {
+            $pipeline[] = ['$vectorSearch' => $this->vectorSearchStage];
+        }
+
+        // Text search must be first (after Atlas search)
         if ($this->textSearchTerm !== null) {
             $this->addBinding($this->textSearchTerm);
             $pipeline[] = ['$match' => ['$text' => ['$search' => '?']]];
@@ -365,6 +742,11 @@ class MongoDB extends BaseBuilder implements Upsert, FullTextSearch, TableSampli
             foreach ($stages as $stage) {
                 $pipeline[] = $stage;
             }
+        }
+
+        // $graphLookup (after $match, similar position to $lookup)
+        if ($this->graphLookupStage !== null) {
+            $pipeline[] = ['$graphLookup' => $this->graphLookupStage];
         }
 
         // WHERE IN subqueries
@@ -397,14 +779,24 @@ class MongoDB extends BaseBuilder implements Upsert, FullTextSearch, TableSampli
             }
         }
 
-        // GROUP BY + Aggregation
-        if (! empty($grouped->groupBy) || ! empty($grouped->aggregations)) {
+        // $bucket replaces $group
+        if ($this->bucketStage !== null) {
+            $pipeline[] = ['$bucket' => $this->bucketStage];
+        } elseif ($this->bucketAutoStage !== null) {
+            $pipeline[] = ['$bucketAuto' => $this->bucketAutoStage];
+        } elseif (! empty($grouped->groupBy) || ! empty($grouped->aggregations)) {
+            // GROUP BY + Aggregation
             $pipeline[] = ['$group' => $this->buildGroup($grouped)];
 
             $reshape = $this->buildProjectFromGroup($grouped);
             if (! empty($reshape)) {
                 $pipeline[] = ['$project' => $reshape];
             }
+        }
+
+        // $replaceRoot (after $group or as needed)
+        if ($this->replaceRootExpr !== null) {
+            $pipeline[] = ['$replaceRoot' => ['newRoot' => $this->replaceRootExpr]];
         }
 
         // HAVING
@@ -423,18 +815,26 @@ class MongoDB extends BaseBuilder implements Upsert, FullTextSearch, TableSampli
             }
         }
 
-        // SELECT / $project (if not using group or distinct)
-        if (empty($grouped->groupBy) && empty($grouped->aggregations) && ! $grouped->distinct) {
+        // SELECT / $project (if not using group, distinct, or bucket)
+        if (empty($grouped->groupBy) && empty($grouped->aggregations) && ! $grouped->distinct
+            && $this->bucketStage === null && $this->bucketAutoStage === null) {
             $projection = $this->buildProjection($grouped);
             if (! empty($projection)) {
                 $pipeline[] = ['$project' => $projection];
             }
         }
 
-        // CTEs (limited support via $lookup with pipeline)
-        // CTEs in the base class are pre-built query strings;
-        // for MongoDB they'd be JSON. This is handled automatically
-        // since the CTE query was built by a MongoDB builder.
+        // $facet (typically last or after $match)
+        if ($this->facetStages !== null) {
+            $facetDoc = [];
+            foreach ($this->facetStages as $name => $data) {
+                $facetDoc[$name] = $data['pipeline'];
+                foreach ($data['bindings'] as $binding) {
+                    $this->addBinding($binding);
+                }
+            }
+            $pipeline[] = ['$facet' => $facetDoc];
+        }
 
         // UNION ($unionWith)
         foreach ($this->unions as $union) {
@@ -487,11 +887,29 @@ class MongoDB extends BaseBuilder implements Upsert, FullTextSearch, TableSampli
             $pipeline[] = ['$limit' => $grouped->limit];
         }
 
+        // $merge at the very end of pipeline
+        if ($this->mergeStage !== null) {
+            $pipeline[] = ['$merge' => $this->mergeStage];
+        }
+
+        // $out at the very end of pipeline (only one of $merge/$out allowed)
+        if ($this->outStage !== null && $this->mergeStage === null) {
+            if (isset($this->outStage['db'])) {
+                $pipeline[] = ['$out' => $this->outStage];
+            } else {
+                $pipeline[] = ['$out' => $this->outStage['coll']];
+            }
+        }
+
         $operation = [
             'collection' => $this->table,
             'operation' => 'aggregate',
             'pipeline' => $pipeline,
         ];
+
+        if ($this->indexHint !== null) {
+            $operation['hint'] = $this->indexHint;
+        }
 
         return new BuildResult(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
@@ -1246,12 +1664,31 @@ class MongoDB extends BaseBuilder implements Upsert, FullTextSearch, TableSampli
             $update['$set'] = $setDoc;
         }
 
-        if (! empty($this->pushOps)) {
-            $pushDoc = [];
-            foreach ($this->pushOps as $field => $value) {
-                $this->addBinding($value);
-                $pushDoc[$field] = '?';
+        // Build $push with support for $each modifiers
+        $pushDoc = [];
+        foreach ($this->pushOps as $field => $value) {
+            $this->addBinding($value);
+            $pushDoc[$field] = '?';
+        }
+        foreach ($this->pushEachOps as $field => $modifier) {
+            $eachValues = [];
+            foreach ($modifier['values'] as $val) {
+                $this->addBinding($val);
+                $eachValues[] = '?';
             }
+            $eachDoc = ['$each' => $eachValues];
+            if (isset($modifier['position'])) {
+                $eachDoc['$position'] = $modifier['position'];
+            }
+            if (isset($modifier['slice'])) {
+                $eachDoc['$slice'] = $modifier['slice'];
+            }
+            if (isset($modifier['sort'])) {
+                $eachDoc['$sort'] = $modifier['sort'];
+            }
+            $pushDoc[$field] = $eachDoc;
+        }
+        if (! empty($pushDoc)) {
             $update['$push'] = $pushDoc;
         }
 
@@ -1283,6 +1720,53 @@ class MongoDB extends BaseBuilder implements Upsert, FullTextSearch, TableSampli
                 $unsetDoc[$field] = '';
             }
             $update['$unset'] = $unsetDoc;
+        }
+
+        if (! empty($this->renameOps)) {
+            $update['$rename'] = $this->renameOps;
+        }
+
+        if (! empty($this->mulOps)) {
+            $update['$mul'] = $this->mulOps;
+        }
+
+        if (! empty($this->popOps)) {
+            $update['$pop'] = $this->popOps;
+        }
+
+        if (! empty($this->pullAllOps)) {
+            $pullAllDoc = [];
+            foreach ($this->pullAllOps as $field => $values) {
+                $placeholders = [];
+                foreach ($values as $val) {
+                    $this->addBinding($val);
+                    $placeholders[] = '?';
+                }
+                $pullAllDoc[$field] = $placeholders;
+            }
+            $update['$pullAll'] = $pullAllDoc;
+        }
+
+        if (! empty($this->minOps)) {
+            $minDoc = [];
+            foreach ($this->minOps as $field => $value) {
+                $this->addBinding($value);
+                $minDoc[$field] = '?';
+            }
+            $update['$min'] = $minDoc;
+        }
+
+        if (! empty($this->maxOps)) {
+            $maxDoc = [];
+            foreach ($this->maxOps as $field => $value) {
+                $this->addBinding($value);
+                $maxDoc[$field] = '?';
+            }
+            $update['$max'] = $maxDoc;
+        }
+
+        if (! empty($this->currentDateOps)) {
+            $update['$currentDate'] = $this->currentDateOps;
         }
 
         return $update;
