@@ -21,6 +21,7 @@ class Parser
     {
         $this->tokens = $tokens;
         $this->pos = 0;
+        $this->inColumnList = false;
 
         return $this->parseSelect();
     }
@@ -367,14 +368,6 @@ class Parser
             }
         }
 
-        // PostgreSQL cast ::
-        if ($this->current()->type === TokenType::Operator && $this->current()->value === '::') {
-            $this->advance();
-            $type = $this->expectIdentifier();
-            $result = new CastExpr($left, $type);
-            return $this->parsePostfixModifiers($result);
-        }
-
         return $left;
     }
 
@@ -460,7 +453,16 @@ class Parser
             return new UnaryExpr($op, $operand);
         }
 
-        return $this->parsePrimary();
+        $expr = $this->parsePrimary();
+
+        // Handle PostgreSQL-style :: cast at this level so it works everywhere
+        while ($this->current()->type === TokenType::Operator && $this->current()->value === '::') {
+            $this->advance();
+            $type = $this->expectIdentifier();
+            $expr = new CastExpr($expr, $type);
+        }
+
+        return $expr;
     }
 
     private function parsePrimary(): Expr
@@ -583,7 +585,7 @@ class Parser
 
                 if ($this->current()->type === TokenType::Star) {
                     $this->advance();
-                    return new Star($second);
+                    return new Star($second, $name);
                 }
 
                 $third = $this->extractIdentifier($this->current());
@@ -638,8 +640,9 @@ class Parser
             $this->advance();
             $this->expect(TokenType::LeftParen);
             $this->consumeKeyword('WHERE');
-            $this->parseExpression();
+            $filterExpr = $this->parseExpression();
             $this->expect(TokenType::RightParen);
+            $fn = new FunctionCall($fn->name, $fn->arguments, $fn->distinct, $filterExpr);
         }
 
         if ($this->matchKeyword('OVER')) {
