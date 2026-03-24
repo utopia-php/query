@@ -3,6 +3,24 @@
 namespace Utopia\Query;
 
 use Closure;
+use Utopia\Query\AST\AliasedExpr;
+use Utopia\Query\AST\BetweenExpr;
+use Utopia\Query\AST\BinaryExpr;
+use Utopia\Query\AST\ColumnRef;
+use Utopia\Query\AST\CteDefinition;
+use Utopia\Query\AST\Expr;
+use Utopia\Query\AST\FunctionCall;
+use Utopia\Query\AST\InExpr;
+use Utopia\Query\AST\JoinClause as AstJoinClause;
+use Utopia\Query\AST\Literal;
+use Utopia\Query\AST\OrderByItem;
+use Utopia\Query\AST\Raw;
+use Utopia\Query\AST\SelectStatement;
+use Utopia\Query\AST\Serializer;
+use Utopia\Query\AST\Star;
+use Utopia\Query\AST\SubquerySource;
+use Utopia\Query\AST\TableRef;
+use Utopia\Query\AST\UnaryExpr;
 use Utopia\Query\Builder\BuildResult;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\Condition;
@@ -2288,5 +2306,869 @@ abstract class Builder implements
         }
 
         return $attribute;
+    }
+
+    public function toAst(): SelectStatement
+    {
+        $grouped = Query::groupByType($this->pendingQueries);
+
+        $columns = $this->buildAstColumns($grouped);
+        $from = $this->buildAstFrom();
+        $joins = $this->buildAstJoins($grouped);
+        $where = $this->buildAstWhere($grouped);
+        $groupByExprs = $this->buildAstGroupBy($grouped);
+        $having = $this->buildAstHaving($grouped);
+        $orderByItems = $this->buildAstOrderBy();
+        $limit = $grouped->limit !== null ? new Literal($grouped->limit) : null;
+        $offset = $grouped->offset !== null ? new Literal($grouped->offset) : null;
+        $cteDefinitions = $this->buildAstCtes();
+
+        return new SelectStatement(
+            columns: $columns,
+            from: $from,
+            joins: $joins,
+            where: $where,
+            groupBy: $groupByExprs,
+            having: $having,
+            orderBy: $orderByItems,
+            limit: $limit,
+            offset: $offset,
+            distinct: $grouped->distinct,
+            ctes: $cteDefinitions,
+        );
+    }
+
+    /**
+     * @return Expr[]
+     */
+    private function buildAstColumns(GroupedQueries $grouped): array
+    {
+        $columns = [];
+
+        foreach ($grouped->aggregations as $agg) {
+            $columns[] = $this->aggregateQueryToAstExpr($agg);
+        }
+
+        if (!empty($grouped->selections)) {
+            /** @var array<string> $selectedCols */
+            $selectedCols = $grouped->selections[0]->getValues();
+            foreach ($selectedCols as $col) {
+                $columns[] = $this->columnNameToAstExpr($col);
+            }
+        }
+
+        if (empty($columns)) {
+            $columns[] = new Star();
+        }
+
+        return $columns;
+    }
+
+    private function columnNameToAstExpr(string $col): Expr
+    {
+        if ($col === '*') {
+            return new Star();
+        }
+
+        if (\str_contains($col, '.')) {
+            $parts = \explode('.', $col, 3);
+            if (\count($parts) === 3) {
+                if ($parts[2] === '*') {
+                    return new Star($parts[1], $parts[0]);
+                }
+                return new ColumnRef($parts[2], $parts[1], $parts[0]);
+            }
+            if ($parts[1] === '*') {
+                return new Star($parts[0]);
+            }
+            return new ColumnRef($parts[1], $parts[0]);
+        }
+
+        return new ColumnRef($col);
+    }
+
+    private function aggregateQueryToAstExpr(Query $query): Expr
+    {
+        $method = $query->getMethod();
+        $attr = $query->getAttribute();
+        /** @var string $alias */
+        $alias = $query->getValue('');
+
+        $funcName = match ($method) {
+            Method::Count => 'COUNT',
+            Method::CountDistinct => 'COUNT',
+            Method::Sum => 'SUM',
+            Method::Avg => 'AVG',
+            Method::Min => 'MIN',
+            Method::Max => 'MAX',
+            Method::Stddev => 'STDDEV',
+            Method::StddevPop => 'STDDEV_POP',
+            Method::StddevSamp => 'STDDEV_SAMP',
+            Method::Variance => 'VARIANCE',
+            Method::VarPop => 'VAR_POP',
+            Method::VarSamp => 'VAR_SAMP',
+            Method::BitAnd => 'BIT_AND',
+            Method::BitOr => 'BIT_OR',
+            Method::BitXor => 'BIT_XOR',
+            default => \strtoupper($method->value),
+        };
+
+        $arg = ($attr === '*' || $attr === '') ? new Star() : new ColumnRef($attr);
+        $distinct = $method === Method::CountDistinct;
+
+        $funcCall = new FunctionCall($funcName, [$arg], $distinct);
+
+        if ($alias !== '') {
+            return new AliasedExpr($funcCall, $alias);
+        }
+
+        return $funcCall;
+    }
+
+    private function buildAstFrom(): TableRef|SubquerySource|null
+    {
+        if ($this->noTable) {
+            return null;
+        }
+
+        if ($this->table === '') {
+            return null;
+        }
+
+        $alias = $this->tableAlias !== '' ? $this->tableAlias : null;
+        return new TableRef($this->table, $alias);
+    }
+
+    /**
+     * @return AstJoinClause[]
+     */
+    private function buildAstJoins(GroupedQueries $grouped): array
+    {
+        $joins = [];
+
+        foreach ($grouped->joins as $joinQuery) {
+            $joinMethod = $joinQuery->getMethod();
+            $table = $joinQuery->getAttribute();
+            $values = $joinQuery->getValues();
+
+            $type = match ($joinMethod) {
+                Method::Join => 'JOIN',
+                Method::LeftJoin => 'LEFT JOIN',
+                Method::RightJoin => 'RIGHT JOIN',
+                Method::CrossJoin => 'CROSS JOIN',
+                Method::FullOuterJoin => 'FULL OUTER JOIN',
+                Method::NaturalJoin => 'NATURAL JOIN',
+                default => 'JOIN',
+            };
+
+            $isCrossOrNatural = $joinMethod === Method::CrossJoin || $joinMethod === Method::NaturalJoin;
+
+            if ($isCrossOrNatural) {
+                /** @var string $joinAlias */
+                $joinAlias = $values[0] ?? '';
+                $tableRef = new TableRef($table, $joinAlias !== '' ? $joinAlias : null);
+                $joins[] = new AstJoinClause($type, $tableRef, null);
+            } else {
+                /** @var string $leftCol */
+                $leftCol = $values[0] ?? '';
+                /** @var string $operator */
+                $operator = $values[1] ?? '=';
+                /** @var string $rightCol */
+                $rightCol = $values[2] ?? '';
+                /** @var string $joinAlias */
+                $joinAlias = $values[3] ?? '';
+
+                $tableRef = new TableRef($table, $joinAlias !== '' ? $joinAlias : null);
+
+                $condition = null;
+                if ($leftCol !== '' && $rightCol !== '') {
+                    $condition = new BinaryExpr(
+                        $this->columnNameToAstExpr($leftCol),
+                        $operator,
+                        $this->columnNameToAstExpr($rightCol),
+                    );
+                }
+
+                $joins[] = new AstJoinClause($type, $tableRef, $condition);
+            }
+        }
+
+        return $joins;
+    }
+
+    private function buildAstWhere(GroupedQueries $grouped): ?Expr
+    {
+        if (empty($grouped->filters)) {
+            return null;
+        }
+
+        $exprs = [];
+        foreach ($grouped->filters as $filter) {
+            $exprs[] = $this->queryToAstExpr($filter);
+        }
+
+        return $this->combineAstExprs($exprs, 'AND');
+    }
+
+    private function queryToAstExpr(Query $query): Expr
+    {
+        $method = $query->getMethod();
+        $attr = $query->getAttribute();
+        $values = $query->getValues();
+
+        return match ($method) {
+            Method::Equal => $this->buildEqualAstExpr($attr, $values),
+            Method::NotEqual => $this->buildNotEqualAstExpr($attr, $values),
+            Method::GreaterThan => new BinaryExpr(new ColumnRef($attr), '>', new Literal($values[0] ?? null)),
+            Method::GreaterThanEqual => new BinaryExpr(new ColumnRef($attr), '>=', new Literal($values[0] ?? null)),
+            Method::LessThan => new BinaryExpr(new ColumnRef($attr), '<', new Literal($values[0] ?? null)),
+            Method::LessThanEqual => new BinaryExpr(new ColumnRef($attr), '<=', new Literal($values[0] ?? null)),
+            Method::Between => new BetweenExpr(new ColumnRef($attr), new Literal($values[0] ?? null), new Literal($values[1] ?? null)),
+            Method::NotBetween => new BetweenExpr(new ColumnRef($attr), new Literal($values[0] ?? null), new Literal($values[1] ?? null), true),
+            Method::IsNull => new UnaryExpr('IS NULL', new ColumnRef($attr), false),
+            Method::IsNotNull => new UnaryExpr('IS NOT NULL', new ColumnRef($attr), false),
+            Method::Contains => $this->buildContainsAstExpr($attr, $values, false),
+            Method::ContainsAny => $this->buildContainsAstExpr($attr, $values, false),
+            Method::NotContains => $this->buildContainsAstExpr($attr, $values, true),
+            Method::StartsWith => new BinaryExpr(new ColumnRef($attr), 'LIKE', new Literal(($values[0] ?? '') . '%')),
+            Method::NotStartsWith => new BinaryExpr(new ColumnRef($attr), 'NOT LIKE', new Literal(($values[0] ?? '') . '%')),
+            Method::EndsWith => new BinaryExpr(new ColumnRef($attr), 'LIKE', new Literal('%' . ($values[0] ?? ''))),
+            Method::NotEndsWith => new BinaryExpr(new ColumnRef($attr), 'NOT LIKE', new Literal('%' . ($values[0] ?? ''))),
+            Method::And => $this->buildLogicalAstExpr($query, 'AND'),
+            Method::Or => $this->buildLogicalAstExpr($query, 'OR'),
+            Method::Raw => new Raw($attr),
+            default => new Raw($attr !== '' ? $attr : '1 = 1'),
+        };
+    }
+
+    /**
+     * @param array<mixed> $values
+     */
+    private function buildEqualAstExpr(string $attr, array $values): Expr
+    {
+        if (\count($values) === 1) {
+            if ($values[0] === null) {
+                return new UnaryExpr('IS NULL', new ColumnRef($attr), false);
+            }
+            return new BinaryExpr(new ColumnRef($attr), '=', new Literal($values[0]));
+        }
+
+        $literals = \array_map(fn ($v) => new Literal($v), $values);
+        return new InExpr(new ColumnRef($attr), $literals);
+    }
+
+    /**
+     * @param array<mixed> $values
+     */
+    private function buildNotEqualAstExpr(string $attr, array $values): Expr
+    {
+        if (\count($values) === 1) {
+            if ($values[0] === null) {
+                return new UnaryExpr('IS NOT NULL', new ColumnRef($attr), false);
+            }
+            return new BinaryExpr(new ColumnRef($attr), '!=', new Literal($values[0]));
+        }
+
+        $literals = \array_map(fn ($v) => new Literal($v), $values);
+        return new InExpr(new ColumnRef($attr), $literals, true);
+    }
+
+    /**
+     * @param array<mixed> $values
+     */
+    private function buildContainsAstExpr(string $attr, array $values, bool $negated): Expr
+    {
+        if (\count($values) === 1) {
+            $op = $negated ? 'NOT LIKE' : 'LIKE';
+            return new BinaryExpr(new ColumnRef($attr), $op, new Literal('%' . $values[0] . '%'));
+        }
+
+        $parts = [];
+        $op = $negated ? 'NOT LIKE' : 'LIKE';
+        foreach ($values as $value) {
+            $parts[] = new BinaryExpr(new ColumnRef($attr), $op, new Literal('%' . $value . '%'));
+        }
+
+        $combinator = $negated ? 'AND' : 'OR';
+        return $this->combineAstExprs($parts, $combinator);
+    }
+
+    private function buildLogicalAstExpr(Query $query, string $operator): Expr
+    {
+        $parts = [];
+        foreach ($query->getValues() as $subQuery) {
+            if ($subQuery instanceof Query) {
+                $parts[] = $this->queryToAstExpr($subQuery);
+            }
+        }
+
+        if (empty($parts)) {
+            return new Literal($operator === 'OR' ? false : true);
+        }
+
+        return $this->combineAstExprs($parts, $operator);
+    }
+
+    /**
+     * @param Expr[] $exprs
+     */
+    private function combineAstExprs(array $exprs, string $operator): Expr
+    {
+        if (\count($exprs) === 1) {
+            return $exprs[0];
+        }
+
+        $result = $exprs[0];
+        for ($i = 1; $i < \count($exprs); $i++) {
+            $result = new BinaryExpr($result, $operator, $exprs[$i]);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return Expr[]
+     */
+    private function buildAstGroupBy(GroupedQueries $grouped): array
+    {
+        $exprs = [];
+        foreach ($grouped->groupBy as $col) {
+            $exprs[] = $this->columnNameToAstExpr($col);
+        }
+        return $exprs;
+    }
+
+    private function buildAstHaving(GroupedQueries $grouped): ?Expr
+    {
+        if (empty($grouped->having)) {
+            return null;
+        }
+
+        $parts = [];
+        foreach ($grouped->having as $havingQuery) {
+            foreach ($havingQuery->getValues() as $subQuery) {
+                if ($subQuery instanceof Query) {
+                    $parts[] = $this->queryToAstExpr($subQuery);
+                }
+            }
+        }
+
+        if (empty($parts)) {
+            return null;
+        }
+
+        return $this->combineAstExprs($parts, 'AND');
+    }
+
+    /**
+     * @return OrderByItem[]
+     */
+    private function buildAstOrderBy(): array
+    {
+        $items = [];
+        $orderQueries = Query::getByType($this->pendingQueries, [
+            Method::OrderAsc,
+            Method::OrderDesc,
+            Method::OrderRandom,
+        ], false);
+
+        foreach ($orderQueries as $orderQuery) {
+            $method = $orderQuery->getMethod();
+
+            if ($method === Method::OrderRandom) {
+                $items[] = new OrderByItem(new Raw('RAND()'), 'ASC');
+                continue;
+            }
+
+            $direction = $method === Method::OrderAsc ? 'ASC' : 'DESC';
+            $attr = $orderQuery->getAttribute();
+            $expr = $this->columnNameToAstExpr($attr);
+
+            $nulls = null;
+            $nullsVal = $orderQuery->getValue(null);
+            if ($nullsVal instanceof NullsPosition) {
+                $nulls = $nullsVal->value;
+            }
+
+            $items[] = new OrderByItem($expr, $direction, $nulls);
+        }
+
+        return $items;
+    }
+
+    /**
+     * @return CteDefinition[]
+     */
+    private function buildAstCtes(): array
+    {
+        $defs = [];
+        foreach ($this->ctes as $cte) {
+            $innerStmt = $this->parseSqlToAst($cte->query);
+            $defs[] = new CteDefinition($cte->name, $innerStmt, $cte->columns, $cte->recursive);
+        }
+        return $defs;
+    }
+
+    private function parseSqlToAst(string $sql): SelectStatement
+    {
+        $tokenizer = new \Utopia\Query\Tokenizer\Tokenizer();
+        $tokens = \Utopia\Query\Tokenizer\Tokenizer::filter($tokenizer->tokenize($sql));
+        $parser = new \Utopia\Query\AST\Parser();
+        return $parser->parse($tokens);
+    }
+
+    public static function fromAst(SelectStatement $ast): static
+    {
+        $builder = new static();
+
+        if ($ast->from instanceof TableRef) {
+            $builder->from($ast->from->name, $ast->from->alias ?? '');
+        }
+
+        $builder->applyAstColumns($ast);
+        $builder->applyAstJoins($ast);
+        $builder->applyAstWhere($ast);
+        $builder->applyAstGroupBy($ast);
+        $builder->applyAstHaving($ast);
+        $builder->applyAstOrderBy($ast);
+        $builder->applyAstLimitOffset($ast);
+        $builder->applyAstCtes($ast);
+
+        if ($ast->distinct) {
+            $builder->distinct();
+        }
+
+        return $builder;
+    }
+
+    private function applyAstColumns(SelectStatement $ast): void
+    {
+        $selectCols = [];
+        $hasNonStar = false;
+
+        foreach ($ast->columns as $col) {
+            if ($col instanceof Star && $col->table === null) {
+                continue;
+            }
+
+            if ($col instanceof AliasedExpr && $col->expr instanceof FunctionCall) {
+                $this->applyAstAggregateColumn($col);
+                $hasNonStar = true;
+                continue;
+            }
+
+            if ($col instanceof FunctionCall) {
+                $this->applyAstUnaliasedFunctionColumn($col);
+                $hasNonStar = true;
+                continue;
+            }
+
+            if ($col instanceof ColumnRef) {
+                $selectCols[] = $this->astColumnRefToString($col);
+                $hasNonStar = true;
+                continue;
+            }
+
+            if ($col instanceof Star) {
+                $selectCols[] = $col->table !== null ? $col->table . '.*' : '*';
+                $hasNonStar = true;
+                continue;
+            }
+
+            if ($col instanceof AliasedExpr && $col->expr instanceof ColumnRef) {
+                $selectCols[] = $this->astColumnRefToString($col->expr);
+                $hasNonStar = true;
+                continue;
+            }
+
+            $serializer = new Serializer();
+            $this->selectRaw($serializer->serializeExpr($col));
+            $hasNonStar = true;
+        }
+
+        if (!empty($selectCols)) {
+            $this->select($selectCols);
+        }
+    }
+
+    private function applyAstAggregateColumn(AliasedExpr $aliased): void
+    {
+        $fn = $aliased->expr;
+        if (!$fn instanceof FunctionCall) {
+            return;
+        }
+
+        $name = \strtoupper($fn->name);
+        $attr = $this->astFuncArgToAttribute($fn);
+        $alias = $aliased->alias;
+
+        if ($fn->distinct && $name === 'COUNT') {
+            $this->pendingQueries[] = Query::countDistinct($attr, $alias);
+            return;
+        }
+
+        $method = match ($name) {
+            'COUNT' => Method::Count,
+            'SUM' => Method::Sum,
+            'AVG' => Method::Avg,
+            'MIN' => Method::Min,
+            'MAX' => Method::Max,
+            'STDDEV' => Method::Stddev,
+            'STDDEV_POP' => Method::StddevPop,
+            'STDDEV_SAMP' => Method::StddevSamp,
+            'VARIANCE' => Method::Variance,
+            'VAR_POP' => Method::VarPop,
+            'VAR_SAMP' => Method::VarSamp,
+            'BIT_AND' => Method::BitAnd,
+            'BIT_OR' => Method::BitOr,
+            'BIT_XOR' => Method::BitXor,
+            default => null,
+        };
+
+        if ($method !== null) {
+            $this->pendingQueries[] = new Query($method, $attr, $alias !== '' ? [$alias] : []);
+            return;
+        }
+
+        $serializer = new Serializer();
+        $this->selectRaw($serializer->serializeExpr($aliased));
+    }
+
+    private function applyAstUnaliasedFunctionColumn(FunctionCall $fn): void
+    {
+        $name = \strtoupper($fn->name);
+        $attr = $this->astFuncArgToAttribute($fn);
+
+        if ($fn->distinct && $name === 'COUNT') {
+            $this->pendingQueries[] = Query::countDistinct($attr);
+            return;
+        }
+
+        $method = match ($name) {
+            'COUNT' => Method::Count,
+            'SUM' => Method::Sum,
+            'AVG' => Method::Avg,
+            'MIN' => Method::Min,
+            'MAX' => Method::Max,
+            default => null,
+        };
+
+        if ($method !== null) {
+            $this->pendingQueries[] = new Query($method, $attr, []);
+            return;
+        }
+
+        $serializer = new Serializer();
+        $this->selectRaw($serializer->serializeExpr($fn));
+    }
+
+    private function astFuncArgToAttribute(FunctionCall $fn): string
+    {
+        if (empty($fn->arguments)) {
+            return '*';
+        }
+
+        $firstArg = $fn->arguments[0];
+        if ($firstArg instanceof Star) {
+            return '*';
+        }
+        if ($firstArg instanceof ColumnRef) {
+            return $this->astColumnRefToString($firstArg);
+        }
+
+        return '*';
+    }
+
+    private function astColumnRefToString(ColumnRef $ref): string
+    {
+        $parts = [];
+        if ($ref->schema !== null) {
+            $parts[] = $ref->schema;
+        }
+        if ($ref->table !== null) {
+            $parts[] = $ref->table;
+        }
+        $parts[] = $ref->name;
+        return \implode('.', $parts);
+    }
+
+    private function applyAstJoins(SelectStatement $ast): void
+    {
+        foreach ($ast->joins as $join) {
+            if (!$join->table instanceof TableRef) {
+                continue;
+            }
+
+            $table = $join->table->name;
+            $alias = $join->table->alias ?? '';
+            $type = \strtoupper($join->type);
+
+            if ($type === 'CROSS JOIN') {
+                $this->crossJoin($table, $alias);
+                continue;
+            }
+
+            if ($type === 'NATURAL JOIN') {
+                $this->naturalJoin($table, $alias);
+                continue;
+            }
+
+            $leftCol = '';
+            $operator = '=';
+            $rightCol = '';
+
+            if ($join->condition instanceof BinaryExpr) {
+                $leftCol = $this->astExprToColumnString($join->condition->left);
+                $operator = $join->condition->operator;
+                $rightCol = $this->astExprToColumnString($join->condition->right);
+            }
+
+            $method = match ($type) {
+                'LEFT JOIN', 'LEFT OUTER JOIN' => Method::LeftJoin,
+                'RIGHT JOIN', 'RIGHT OUTER JOIN' => Method::RightJoin,
+                'FULL OUTER JOIN', 'FULL JOIN' => Method::FullOuterJoin,
+                'INNER JOIN', 'JOIN' => Method::Join,
+                default => Method::Join,
+            };
+
+            $values = [$leftCol, $operator, $rightCol];
+            if ($alias !== '') {
+                $values[] = $alias;
+            }
+            $this->pendingQueries[] = new Query($method, $table, $values);
+        }
+    }
+
+    private function astExprToColumnString(Expr $expr): string
+    {
+        if ($expr instanceof ColumnRef) {
+            return $this->astColumnRefToString($expr);
+        }
+
+        $serializer = new Serializer();
+        return $serializer->serializeExpr($expr);
+    }
+
+    private function applyAstWhere(SelectStatement $ast): void
+    {
+        if ($ast->where === null) {
+            return;
+        }
+
+        $queries = $this->astWhereToQueries($ast->where);
+        foreach ($queries as $query) {
+            $this->pendingQueries[] = $query;
+        }
+    }
+
+    /**
+     * @return Query[]
+     */
+    private function astWhereToQueries(Expr $expr): array
+    {
+        if ($expr instanceof BinaryExpr && \strtoupper($expr->operator) === 'AND') {
+            $left = $this->astWhereToQueries($expr->left);
+            $right = $this->astWhereToQueries($expr->right);
+            return \array_merge($left, $right);
+        }
+
+        $query = $this->astExprToSingleQuery($expr);
+        if ($query !== null) {
+            return [$query];
+        }
+
+        $serializer = new Serializer();
+        return [Query::raw($serializer->serializeExpr($expr))];
+    }
+
+    private function astExprToSingleQuery(Expr $expr): ?Query
+    {
+        if ($expr instanceof BinaryExpr) {
+            $op = \strtoupper($expr->operator);
+
+            if ($op === 'AND') {
+                $leftQueries = $this->astWhereToQueries($expr->left);
+                $rightQueries = $this->astWhereToQueries($expr->right);
+                $all = \array_merge($leftQueries, $rightQueries);
+                return Query::and($all);
+            }
+
+            if ($op === 'OR') {
+                $leftQ = $this->astExprToSingleQuery($expr->left);
+                $rightQ = $this->astExprToSingleQuery($expr->right);
+                $parts = [];
+                if ($leftQ !== null) {
+                    $parts[] = $leftQ;
+                }
+                if ($rightQ !== null) {
+                    $parts[] = $rightQ;
+                }
+                if (!empty($parts)) {
+                    return Query::or($parts);
+                }
+                return null;
+            }
+
+            if ($expr->left instanceof ColumnRef && $expr->right instanceof Literal) {
+                $attr = $this->astColumnRefToString($expr->left);
+                $val = $expr->right->value;
+
+                return match ($op) {
+                    '=' => Query::equal($attr, [$val]),
+                    '!=' , '<>' => Query::notEqual($attr, $val),
+                    '>' => Query::greaterThan($attr, $val),
+                    '>=' => Query::greaterThanEqual($attr, $val),
+                    '<' => Query::lessThan($attr, $val),
+                    '<=' => Query::lessThanEqual($attr, $val),
+                    'LIKE' => $this->likeToQuery($attr, $val),
+                    'NOT LIKE' => $this->notLikeToQuery($attr, $val),
+                    default => null,
+                };
+            }
+        }
+
+        if ($expr instanceof InExpr && $expr->expr instanceof ColumnRef && \is_array($expr->list)) {
+            $attr = $this->astColumnRefToString($expr->expr);
+            $values = \array_map(fn (Expr $item) => $item instanceof Literal ? $item->value : null, $expr->list);
+            if ($expr->negated) {
+                return Query::notEqual($attr, $values);
+            }
+            return Query::equal($attr, $values);
+        }
+
+        if ($expr instanceof BetweenExpr && $expr->expr instanceof ColumnRef) {
+            $attr = $this->astColumnRefToString($expr->expr);
+            $low = $expr->low instanceof Literal ? $expr->low->value : 0;
+            $high = $expr->high instanceof Literal ? $expr->high->value : 0;
+            if ($expr->negated) {
+                return Query::notBetween($attr, $low, $high);
+            }
+            return Query::between($attr, $low, $high);
+        }
+
+        if ($expr instanceof UnaryExpr) {
+            $op = \strtoupper($expr->operator);
+            if ($expr->operand instanceof ColumnRef) {
+                $attr = $this->astColumnRefToString($expr->operand);
+                return match ($op) {
+                    'IS NULL' => Query::isNull($attr),
+                    'IS NOT NULL' => Query::isNotNull($attr),
+                    default => null,
+                };
+            }
+        }
+
+        return null;
+    }
+
+    private function likeToQuery(string $attr, mixed $val): Query
+    {
+        $str = (string) $val;
+        if (\str_starts_with($str, '%') && \str_ends_with($str, '%') && \strlen($str) > 2) {
+            return new Query(Method::Contains, $attr, [\substr($str, 1, -1)]);
+        }
+        if (\str_ends_with($str, '%') && !\str_starts_with($str, '%')) {
+            return Query::startsWith($attr, \substr($str, 0, -1));
+        }
+        if (\str_starts_with($str, '%') && !\str_ends_with($str, '%')) {
+            return Query::endsWith($attr, \substr($str, 1));
+        }
+        return Query::raw($attr . ' LIKE ?', [$val]);
+    }
+
+    private function notLikeToQuery(string $attr, mixed $val): Query
+    {
+        $str = (string) $val;
+        if (\str_starts_with($str, '%') && \str_ends_with($str, '%') && \strlen($str) > 2) {
+            return new Query(Method::NotContains, $attr, [\substr($str, 1, -1)]);
+        }
+        if (\str_ends_with($str, '%') && !\str_starts_with($str, '%')) {
+            return Query::notStartsWith($attr, \substr($str, 0, -1));
+        }
+        if (\str_starts_with($str, '%') && !\str_ends_with($str, '%')) {
+            return Query::notEndsWith($attr, \substr($str, 1));
+        }
+        return Query::raw($attr . ' NOT LIKE ?', [$val]);
+    }
+
+    private function applyAstGroupBy(SelectStatement $ast): void
+    {
+        if (empty($ast->groupBy)) {
+            return;
+        }
+
+        $cols = [];
+        foreach ($ast->groupBy as $expr) {
+            if ($expr instanceof ColumnRef) {
+                $cols[] = $this->astColumnRefToString($expr);
+            }
+        }
+
+        if (!empty($cols)) {
+            $this->groupBy($cols);
+        }
+    }
+
+    private function applyAstHaving(SelectStatement $ast): void
+    {
+        if ($ast->having === null) {
+            return;
+        }
+
+        $queries = $this->astWhereToQueries($ast->having);
+        if (!empty($queries)) {
+            $this->having($queries);
+        }
+    }
+
+    private function applyAstOrderBy(SelectStatement $ast): void
+    {
+        foreach ($ast->orderBy as $item) {
+            if ($item->expr instanceof ColumnRef) {
+                $attr = $this->astColumnRefToString($item->expr);
+                $nulls = null;
+                if ($item->nulls !== null) {
+                    $nulls = NullsPosition::tryFrom($item->nulls);
+                }
+
+                if (\strtoupper($item->direction) === 'DESC') {
+                    $this->sortDesc($attr, $nulls);
+                } else {
+                    $this->sortAsc($attr, $nulls);
+                }
+            } else {
+                $serializer = new Serializer();
+                $rawExpr = $serializer->serializeExpr($item->expr);
+                $dir = \strtoupper($item->direction) === 'DESC' ? ' DESC' : ' ASC';
+                $this->orderByRaw($rawExpr . $dir);
+            }
+        }
+    }
+
+    private function applyAstLimitOffset(SelectStatement $ast): void
+    {
+        if ($ast->limit instanceof Literal && ($ast->limit->value !== null)) {
+            $this->limit((int) $ast->limit->value);
+        }
+
+        if ($ast->offset instanceof Literal && ($ast->offset->value !== null)) {
+            $this->offset((int) $ast->offset->value);
+        }
+    }
+
+    private function applyAstCtes(SelectStatement $ast): void
+    {
+        foreach ($ast->ctes as $cte) {
+            $serializer = new Serializer();
+            $cteSql = $serializer->serialize($cte->query);
+
+            $this->ctes[] = new CteClause(
+                $cte->name,
+                $cteSql,
+                [],
+                $cte->recursive,
+                $cte->columns,
+            );
+        }
     }
 }
