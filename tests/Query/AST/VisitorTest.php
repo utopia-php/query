@@ -3,20 +3,20 @@
 namespace Tests\Query\AST;
 
 use PHPUnit\Framework\TestCase;
-use Utopia\Query\AST\AliasedExpr;
-use Utopia\Query\AST\BinaryExpr;
-use Utopia\Query\AST\ColumnRef;
 use Utopia\Query\AST\CteDefinition;
+use Utopia\Query\AST\Expression\Aliased;
+use Utopia\Query\AST\Expression\Binary;
+use Utopia\Query\AST\Expression\In;
 use Utopia\Query\AST\FunctionCall;
-use Utopia\Query\AST\InExpr;
 use Utopia\Query\AST\JoinClause;
 use Utopia\Query\AST\Literal;
 use Utopia\Query\AST\OrderByItem;
 use Utopia\Query\AST\Parser;
+use Utopia\Query\AST\Reference\Column;
+use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\SelectStatement;
 use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Star;
-use Utopia\Query\AST\TableRef;
 use Utopia\Query\AST\Visitor\ColumnValidator;
 use Utopia\Query\AST\Visitor\FilterInjector;
 use Utopia\Query\AST\Visitor\TableRenamer;
@@ -44,7 +44,7 @@ class VisitorTest extends TestCase
     {
         $stmt = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users'),
+            from: new Table('users'),
         );
 
         $walker = new Walker();
@@ -58,15 +58,15 @@ class VisitorTest extends TestCase
     {
         $stmt = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users', 'u'),
+            from: new Table('users', 'u'),
             joins: [
                 new JoinClause(
                     'JOIN',
-                    new TableRef('orders', 'o'),
-                    new BinaryExpr(
-                        new ColumnRef('id', 'u'),
+                    new Table('orders', 'o'),
+                    new Binary(
+                        new Column('id', 'u'),
                         '=',
-                        new ColumnRef('user_id', 'o'),
+                        new Column('user_id', 'o'),
                     ),
                 ),
             ],
@@ -82,14 +82,14 @@ class VisitorTest extends TestCase
         );
     }
 
-    public function testTableRenamerInColumnRef(): void
+    public function testTableRenamerInColumnReference(): void
     {
         $stmt = new SelectStatement(
             columns: [
-                new ColumnRef('name', 'u'),
-                new ColumnRef('email', 'u'),
+                new Column('name', 'u'),
+                new Column('email', 'u'),
             ],
-            from: new TableRef('users', 'u'),
+            from: new Table('users', 'u'),
         );
 
         $walker = new Walker();
@@ -103,7 +103,7 @@ class VisitorTest extends TestCase
     {
         $stmt = new SelectStatement(
             columns: [new Star('users')],
-            from: new TableRef('users'),
+            from: new Table('users'),
         );
 
         $walker = new Walker();
@@ -117,18 +117,18 @@ class VisitorTest extends TestCase
     {
         $stmt = new SelectStatement(
             columns: [
-                new ColumnRef('name', 'users'),
-                new ColumnRef('title', 'orders'),
+                new Column('name', 'users'),
+                new Column('title', 'orders'),
             ],
-            from: new TableRef('users'),
+            from: new Table('users'),
             joins: [
                 new JoinClause(
                     'JOIN',
-                    new TableRef('orders'),
-                    new BinaryExpr(
-                        new ColumnRef('id', 'users'),
+                    new Table('orders'),
+                    new Binary(
+                        new Column('id', 'users'),
                         '=',
-                        new ColumnRef('user_id', 'orders'),
+                        new Column('user_id', 'orders'),
                     ),
                 ),
             ],
@@ -148,7 +148,7 @@ class VisitorTest extends TestCase
     {
         $stmt = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users'),
+            from: new Table('users'),
         );
 
         $walker = new Walker();
@@ -162,10 +162,10 @@ class VisitorTest extends TestCase
     {
         $stmt = new SelectStatement(
             columns: [
-                new ColumnRef('name'),
-                new ColumnRef('email'),
+                new Column('name'),
+                new Column('email'),
             ],
-            from: new TableRef('users'),
+            from: new Table('users'),
         );
 
         $walker = new Walker();
@@ -179,10 +179,10 @@ class VisitorTest extends TestCase
     {
         $stmt = new SelectStatement(
             columns: [
-                new ColumnRef('name'),
-                new ColumnRef('password'),
+                new Column('name'),
+                new Column('password'),
             ],
-            from: new TableRef('users'),
+            from: new Table('users'),
         );
 
         $walker = new Walker();
@@ -196,10 +196,10 @@ class VisitorTest extends TestCase
     public function testColumnValidatorInWhere(): void
     {
         $stmt = new SelectStatement(
-            columns: [new ColumnRef('name')],
-            from: new TableRef('users'),
-            where: new BinaryExpr(
-                new ColumnRef('secret'),
+            columns: [new Column('name')],
+            from: new Table('users'),
+            where: new Binary(
+                new Column('secret'),
                 '=',
                 new Literal('foo'),
             ),
@@ -216,10 +216,10 @@ class VisitorTest extends TestCase
     public function testColumnValidatorInOrderBy(): void
     {
         $stmt = new SelectStatement(
-            columns: [new ColumnRef('name')],
-            from: new TableRef('users'),
+            columns: [new Column('name')],
+            from: new Table('users'),
             orderBy: [
-                new OrderByItem(new ColumnRef('hidden')),
+                new OrderByItem(new Column('hidden')),
             ],
         );
 
@@ -235,11 +235,11 @@ class VisitorTest extends TestCase
     {
         $stmt = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users'),
+            from: new Table('users'),
         );
 
-        $condition = new BinaryExpr(
-            new ColumnRef('active'),
+        $condition = new Binary(
+            new Column('active'),
             '=',
             new Literal(true),
         );
@@ -255,16 +255,16 @@ class VisitorTest extends TestCase
     {
         $stmt = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users'),
-            where: new BinaryExpr(
-                new ColumnRef('age'),
+            from: new Table('users'),
+            where: new Binary(
+                new Column('age'),
                 '>',
                 new Literal(18),
             ),
         );
 
-        $condition = new BinaryExpr(
-            new ColumnRef('active'),
+        $condition = new Binary(
+            new Column('active'),
             '=',
             new Literal(true),
         );
@@ -282,14 +282,14 @@ class VisitorTest extends TestCase
     public function testFilterInjectorPreservesOther(): void
     {
         $stmt = new SelectStatement(
-            columns: [new ColumnRef('name')],
-            from: new TableRef('users'),
-            orderBy: [new OrderByItem(new ColumnRef('name'))],
+            columns: [new Column('name')],
+            from: new Table('users'),
+            orderBy: [new OrderByItem(new Column('name'))],
             limit: new Literal(10),
         );
 
-        $condition = new BinaryExpr(
-            new ColumnRef('active'),
+        $condition = new Binary(
+            new Column('active'),
             '=',
             new Literal(true),
         );
@@ -307,15 +307,15 @@ class VisitorTest extends TestCase
     public function testComposedVisitors(): void
     {
         $stmt = new SelectStatement(
-            columns: [new ColumnRef('name')],
-            from: new TableRef('users'),
+            columns: [new Column('name')],
+            from: new Table('users'),
         );
 
         $walker = new Walker();
 
         $result = $walker->walk($stmt, new TableRenamer(['users' => 'accounts']));
         $result = $walker->walk($result, new FilterInjector(
-            new BinaryExpr(new ColumnRef('active'), '=', new Literal(true)),
+            new Binary(new Column('active'), '=', new Literal(true)),
         ));
 
         $this->assertSame(
@@ -327,15 +327,15 @@ class VisitorTest extends TestCase
     public function testVisitorWithSubquery(): void
     {
         $subquery = new SelectStatement(
-            columns: [new ColumnRef('id')],
-            from: new TableRef('orders'),
+            columns: [new Column('id')],
+            from: new Table('orders'),
         );
 
         $stmt = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users'),
-            where: new InExpr(
-                new ColumnRef('id'),
+            from: new Table('users'),
+            where: new In(
+                new Column('id'),
                 $subquery,
             ),
         );
@@ -353,10 +353,10 @@ class VisitorTest extends TestCase
     public function testVisitorWithCte(): void
     {
         $cteQuery = new SelectStatement(
-            columns: [new ColumnRef('id'), new ColumnRef('name')],
-            from: new TableRef('users'),
-            where: new BinaryExpr(
-                new ColumnRef('active'),
+            columns: [new Column('id'), new Column('name')],
+            from: new Table('users'),
+            where: new Binary(
+                new Column('active'),
                 '=',
                 new Literal(true),
             ),
@@ -364,7 +364,7 @@ class VisitorTest extends TestCase
 
         $stmt = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('active_users'),
+            from: new Table('active_users'),
             ctes: [
                 new CteDefinition('active_users', $cteQuery),
             ],
@@ -384,33 +384,33 @@ class VisitorTest extends TestCase
     {
         $stmt = new SelectStatement(
             columns: [
-                new ColumnRef('name', 'u'),
-                new AliasedExpr(new FunctionCall('COUNT', [new Star()]), 'total'),
+                new Column('name', 'u'),
+                new Aliased(new FunctionCall('COUNT', [new Star()]), 'total'),
             ],
-            from: new TableRef('users', 'u'),
+            from: new Table('users', 'u'),
             joins: [
                 new JoinClause(
                     'LEFT JOIN',
-                    new TableRef('orders', 'o'),
-                    new BinaryExpr(
-                        new ColumnRef('id', 'u'),
+                    new Table('orders', 'o'),
+                    new Binary(
+                        new Column('id', 'u'),
                         '=',
-                        new ColumnRef('user_id', 'o'),
+                        new Column('user_id', 'o'),
                     ),
                 ),
             ],
-            where: new BinaryExpr(
-                new ColumnRef('active', 'u'),
+            where: new Binary(
+                new Column('active', 'u'),
                 '=',
                 new Literal(true),
             ),
-            groupBy: [new ColumnRef('name', 'u')],
-            having: new BinaryExpr(
+            groupBy: [new Column('name', 'u')],
+            having: new Binary(
                 new FunctionCall('COUNT', [new Star()]),
                 '>',
                 new Literal(5),
             ),
-            orderBy: [new OrderByItem(new ColumnRef('name', 'u'))],
+            orderBy: [new OrderByItem(new Column('name', 'u'))],
             limit: new Literal(10),
             offset: new Literal(0),
         );

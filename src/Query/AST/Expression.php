@@ -2,6 +2,6 @@
 
 namespace Utopia\Query\AST;
 
-interface Expr
+interface Expression
 {
 }

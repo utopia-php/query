@@ -3,24 +3,24 @@
 namespace Utopia\Query;
 
 use Closure;
-use Utopia\Query\AST\AliasedExpr;
-use Utopia\Query\AST\BetweenExpr;
-use Utopia\Query\AST\BinaryExpr;
-use Utopia\Query\AST\ColumnRef;
 use Utopia\Query\AST\CteDefinition;
-use Utopia\Query\AST\Expr;
+use Utopia\Query\AST\Expression;
+use Utopia\Query\AST\Expression\Aliased;
+use Utopia\Query\AST\Expression\Between;
+use Utopia\Query\AST\Expression\Binary;
+use Utopia\Query\AST\Expression\In;
+use Utopia\Query\AST\Expression\Unary;
 use Utopia\Query\AST\FunctionCall;
-use Utopia\Query\AST\InExpr;
 use Utopia\Query\AST\JoinClause as AstJoinClause;
 use Utopia\Query\AST\Literal;
 use Utopia\Query\AST\OrderByItem;
 use Utopia\Query\AST\Raw;
+use Utopia\Query\AST\Reference\Column;
+use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\SelectStatement;
 use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Star;
 use Utopia\Query\AST\SubquerySource;
-use Utopia\Query\AST\TableRef;
-use Utopia\Query\AST\UnaryExpr;
 use Utopia\Query\Builder\BuildResult;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\Condition;
@@ -2338,21 +2338,21 @@ abstract class Builder implements
     }
 
     /**
-     * @return Expr[]
+     * @return Expression[]
      */
     private function buildAstColumns(GroupedQueries $grouped): array
     {
         $columns = [];
 
         foreach ($grouped->aggregations as $agg) {
-            $columns[] = $this->aggregateQueryToAstExpr($agg);
+            $columns[] = $this->aggregateQueryToAstExpression($agg);
         }
 
         if (!empty($grouped->selections)) {
             /** @var array<string> $selectedCols */
             $selectedCols = $grouped->selections[0]->getValues();
             foreach ($selectedCols as $col) {
-                $columns[] = $this->columnNameToAstExpr($col);
+                $columns[] = $this->columnNameToAstExpression($col);
             }
         }
 
@@ -2363,7 +2363,7 @@ abstract class Builder implements
         return $columns;
     }
 
-    private function columnNameToAstExpr(string $col): Expr
+    private function columnNameToAstExpression(string $col): Expression
     {
         if ($col === '*') {
             return new Star();
@@ -2375,18 +2375,18 @@ abstract class Builder implements
                 if ($parts[2] === '*') {
                     return new Star($parts[1], $parts[0]);
                 }
-                return new ColumnRef($parts[2], $parts[1], $parts[0]);
+                return new Column($parts[2], $parts[1], $parts[0]);
             }
             if ($parts[1] === '*') {
                 return new Star($parts[0]);
             }
-            return new ColumnRef($parts[1], $parts[0]);
+            return new Column($parts[1], $parts[0]);
         }
 
-        return new ColumnRef($col);
+        return new Column($col);
     }
 
-    private function aggregateQueryToAstExpr(Query $query): Expr
+    private function aggregateQueryToAstExpression(Query $query): Expression
     {
         $method = $query->getMethod();
         $attr = $query->getAttribute();
@@ -2412,20 +2412,20 @@ abstract class Builder implements
             default => \strtoupper($method->value),
         };
 
-        $arg = ($attr === '*' || $attr === '') ? new Star() : new ColumnRef($attr);
+        $arg = ($attr === '*' || $attr === '') ? new Star() : new Column($attr);
         $distinct = $method === Method::CountDistinct;
 
         $funcCall = new FunctionCall($funcName, [$arg], $distinct);
 
         if ($alias !== '') {
-            return new AliasedExpr($funcCall, $alias);
+            return new Aliased($funcCall, $alias);
         }
 
         return $funcCall;
     }
 
     /** @phpstan-ignore return.unusedType */
-    private function buildAstFrom(): TableRef|SubquerySource|null
+    private function buildAstFrom(): Table|SubquerySource|null
     {
         if ($this->noTable) {
             return null;
@@ -2436,7 +2436,7 @@ abstract class Builder implements
         }
 
         $alias = $this->tableAlias !== '' ? $this->tableAlias : null;
-        return new TableRef($this->table, $alias);
+        return new Table($this->table, $alias);
     }
 
     /**
@@ -2466,7 +2466,7 @@ abstract class Builder implements
             if ($isCrossOrNatural) {
                 /** @var string $joinAlias */
                 $joinAlias = $values[0] ?? '';
-                $tableRef = new TableRef($table, $joinAlias !== '' ? $joinAlias : null);
+                $tableRef = new Table($table, $joinAlias !== '' ? $joinAlias : null);
                 $joins[] = new AstJoinClause($type, $tableRef, null);
             } else {
                 /** @var string $leftCol */
@@ -2478,14 +2478,14 @@ abstract class Builder implements
                 /** @var string $joinAlias */
                 $joinAlias = $values[3] ?? '';
 
-                $tableRef = new TableRef($table, $joinAlias !== '' ? $joinAlias : null);
+                $tableRef = new Table($table, $joinAlias !== '' ? $joinAlias : null);
 
                 $condition = null;
                 if ($leftCol !== '' && $rightCol !== '') {
-                    $condition = new BinaryExpr(
-                        $this->columnNameToAstExpr($leftCol),
+                    $condition = new Binary(
+                        $this->columnNameToAstExpression($leftCol),
                         $operator,
-                        $this->columnNameToAstExpr($rightCol),
+                        $this->columnNameToAstExpression($rightCol),
                     );
                 }
 
@@ -2496,7 +2496,7 @@ abstract class Builder implements
         return $joins;
     }
 
-    private function buildAstWhere(GroupedQueries $grouped): ?Expr
+    private function buildAstWhere(GroupedQueries $grouped): ?Expression
     {
         if (empty($grouped->filters)) {
             return null;
@@ -2504,38 +2504,38 @@ abstract class Builder implements
 
         $exprs = [];
         foreach ($grouped->filters as $filter) {
-            $exprs[] = $this->queryToAstExpr($filter);
+            $exprs[] = $this->queryToAstExpression($filter);
         }
 
-        return $this->combineAstExprs($exprs, 'AND');
+        return $this->combineAstExpressions($exprs, 'AND');
     }
 
-    private function queryToAstExpr(Query $query): Expr
+    private function queryToAstExpression(Query $query): Expression
     {
         $method = $query->getMethod();
         $attr = $query->getAttribute();
         $values = $query->getValues();
 
         return match ($method) {
-            Method::Equal => $this->buildEqualAstExpr($attr, $values),
-            Method::NotEqual => $this->buildNotEqualAstExpr($attr, $values),
-            Method::GreaterThan => new BinaryExpr(new ColumnRef($attr), '>', $this->toLiteral($values[0] ?? null)),
-            Method::GreaterThanEqual => new BinaryExpr(new ColumnRef($attr), '>=', $this->toLiteral($values[0] ?? null)),
-            Method::LessThan => new BinaryExpr(new ColumnRef($attr), '<', $this->toLiteral($values[0] ?? null)),
-            Method::LessThanEqual => new BinaryExpr(new ColumnRef($attr), '<=', $this->toLiteral($values[0] ?? null)),
-            Method::Between => new BetweenExpr(new ColumnRef($attr), $this->toLiteral($values[0] ?? null), $this->toLiteral($values[1] ?? null)),
-            Method::NotBetween => new BetweenExpr(new ColumnRef($attr), $this->toLiteral($values[0] ?? null), $this->toLiteral($values[1] ?? null), true),
-            Method::IsNull => new UnaryExpr('IS NULL', new ColumnRef($attr), false),
-            Method::IsNotNull => new UnaryExpr('IS NOT NULL', new ColumnRef($attr), false),
-            Method::Contains => $this->buildContainsAstExpr($attr, $values, false),
-            Method::ContainsAny => $this->buildContainsAstExpr($attr, $values, false),
-            Method::NotContains => $this->buildContainsAstExpr($attr, $values, true),
-            Method::StartsWith => new BinaryExpr(new ColumnRef($attr), 'LIKE', new Literal($this->toScalar($values[0] ?? '') . '%')),
-            Method::NotStartsWith => new BinaryExpr(new ColumnRef($attr), 'NOT LIKE', new Literal($this->toScalar($values[0] ?? '') . '%')),
-            Method::EndsWith => new BinaryExpr(new ColumnRef($attr), 'LIKE', new Literal('%' . $this->toScalar($values[0] ?? ''))),
-            Method::NotEndsWith => new BinaryExpr(new ColumnRef($attr), 'NOT LIKE', new Literal('%' . $this->toScalar($values[0] ?? ''))),
-            Method::And => $this->buildLogicalAstExpr($query, 'AND'),
-            Method::Or => $this->buildLogicalAstExpr($query, 'OR'),
+            Method::Equal => $this->buildEqualAstExpression($attr, $values),
+            Method::NotEqual => $this->buildNotEqualAstExpression($attr, $values),
+            Method::GreaterThan => new Binary(new Column($attr), '>', $this->toLiteral($values[0] ?? null)),
+            Method::GreaterThanEqual => new Binary(new Column($attr), '>=', $this->toLiteral($values[0] ?? null)),
+            Method::LessThan => new Binary(new Column($attr), '<', $this->toLiteral($values[0] ?? null)),
+            Method::LessThanEqual => new Binary(new Column($attr), '<=', $this->toLiteral($values[0] ?? null)),
+            Method::Between => new Between(new Column($attr), $this->toLiteral($values[0] ?? null), $this->toLiteral($values[1] ?? null)),
+            Method::NotBetween => new Between(new Column($attr), $this->toLiteral($values[0] ?? null), $this->toLiteral($values[1] ?? null), true),
+            Method::IsNull => new Unary('IS NULL', new Column($attr), false),
+            Method::IsNotNull => new Unary('IS NOT NULL', new Column($attr), false),
+            Method::Contains => $this->buildContainsAstExpression($attr, $values, false),
+            Method::ContainsAny => $this->buildContainsAstExpression($attr, $values, false),
+            Method::NotContains => $this->buildContainsAstExpression($attr, $values, true),
+            Method::StartsWith => new Binary(new Column($attr), 'LIKE', new Literal($this->toScalar($values[0] ?? '') . '%')),
+            Method::NotStartsWith => new Binary(new Column($attr), 'NOT LIKE', new Literal($this->toScalar($values[0] ?? '') . '%')),
+            Method::EndsWith => new Binary(new Column($attr), 'LIKE', new Literal('%' . $this->toScalar($values[0] ?? ''))),
+            Method::NotEndsWith => new Binary(new Column($attr), 'NOT LIKE', new Literal('%' . $this->toScalar($values[0] ?? ''))),
+            Method::And => $this->buildLogicalAstExpression($query, 'AND'),
+            Method::Or => $this->buildLogicalAstExpression($query, 'OR'),
             Method::Raw => new Raw($attr),
             default => new Raw($attr !== '' ? $attr : '1 = 1'),
         };
@@ -2567,61 +2567,61 @@ abstract class Builder implements
     /**
      * @param array<mixed> $values
      */
-    private function buildEqualAstExpr(string $attr, array $values): Expr
+    private function buildEqualAstExpression(string $attr, array $values): Expression
     {
         if (\count($values) === 1) {
             if ($values[0] === null) {
-                return new UnaryExpr('IS NULL', new ColumnRef($attr), false);
+                return new Unary('IS NULL', new Column($attr), false);
             }
-            return new BinaryExpr(new ColumnRef($attr), '=', $this->toLiteral($values[0]));
+            return new Binary(new Column($attr), '=', $this->toLiteral($values[0]));
         }
 
         $literals = \array_map(fn ($v) => $this->toLiteral($v), $values);
-        return new InExpr(new ColumnRef($attr), $literals);
+        return new In(new Column($attr), $literals);
     }
 
     /**
      * @param array<mixed> $values
      */
-    private function buildNotEqualAstExpr(string $attr, array $values): Expr
+    private function buildNotEqualAstExpression(string $attr, array $values): Expression
     {
         if (\count($values) === 1) {
             if ($values[0] === null) {
-                return new UnaryExpr('IS NOT NULL', new ColumnRef($attr), false);
+                return new Unary('IS NOT NULL', new Column($attr), false);
             }
-            return new BinaryExpr(new ColumnRef($attr), '!=', $this->toLiteral($values[0]));
+            return new Binary(new Column($attr), '!=', $this->toLiteral($values[0]));
         }
 
         $literals = \array_map(fn ($v) => $this->toLiteral($v), $values);
-        return new InExpr(new ColumnRef($attr), $literals, true);
+        return new In(new Column($attr), $literals, true);
     }
 
     /**
      * @param array<mixed> $values
      */
-    private function buildContainsAstExpr(string $attr, array $values, bool $negated): Expr
+    private function buildContainsAstExpression(string $attr, array $values, bool $negated): Expression
     {
         if (\count($values) === 1) {
             $op = $negated ? 'NOT LIKE' : 'LIKE';
-            return new BinaryExpr(new ColumnRef($attr), $op, new Literal('%' . $this->toScalar($values[0]) . '%'));
+            return new Binary(new Column($attr), $op, new Literal('%' . $this->toScalar($values[0]) . '%'));
         }
 
         $parts = [];
         $op = $negated ? 'NOT LIKE' : 'LIKE';
         foreach ($values as $value) {
-            $parts[] = new BinaryExpr(new ColumnRef($attr), $op, new Literal('%' . $this->toScalar($value) . '%'));
+            $parts[] = new Binary(new Column($attr), $op, new Literal('%' . $this->toScalar($value) . '%'));
         }
 
         $combinator = $negated ? 'AND' : 'OR';
-        return $this->combineAstExprs($parts, $combinator);
+        return $this->combineAstExpressions($parts, $combinator);
     }
 
-    private function buildLogicalAstExpr(Query $query, string $operator): Expr
+    private function buildLogicalAstExpression(Query $query, string $operator): Expression
     {
         $parts = [];
         foreach ($query->getValues() as $subQuery) {
             if ($subQuery instanceof Query) {
-                $parts[] = $this->queryToAstExpr($subQuery);
+                $parts[] = $this->queryToAstExpression($subQuery);
             }
         }
 
@@ -2629,39 +2629,39 @@ abstract class Builder implements
             return new Literal($operator === 'OR' ? false : true);
         }
 
-        return $this->combineAstExprs($parts, $operator);
+        return $this->combineAstExpressions($parts, $operator);
     }
 
     /**
-     * @param Expr[] $exprs
+     * @param Expression[] $expressions
      */
-    private function combineAstExprs(array $exprs, string $operator): Expr
+    private function combineAstExpressions(array $expressions, string $operator): Expression
     {
-        if (\count($exprs) === 1) {
-            return $exprs[0];
+        if (\count($expressions) === 1) {
+            return $expressions[0];
         }
 
-        $result = $exprs[0];
-        for ($i = 1; $i < \count($exprs); $i++) {
-            $result = new BinaryExpr($result, $operator, $exprs[$i]);
+        $result = $expressions[0];
+        for ($i = 1; $i < \count($expressions); $i++) {
+            $result = new Binary($result, $operator, $expressions[$i]);
         }
 
         return $result;
     }
 
     /**
-     * @return Expr[]
+     * @return Expression[]
      */
     private function buildAstGroupBy(GroupedQueries $grouped): array
     {
         $exprs = [];
         foreach ($grouped->groupBy as $col) {
-            $exprs[] = $this->columnNameToAstExpr($col);
+            $exprs[] = $this->columnNameToAstExpression($col);
         }
         return $exprs;
     }
 
-    private function buildAstHaving(GroupedQueries $grouped): ?Expr
+    private function buildAstHaving(GroupedQueries $grouped): ?Expression
     {
         if (empty($grouped->having)) {
             return null;
@@ -2671,7 +2671,7 @@ abstract class Builder implements
         foreach ($grouped->having as $havingQuery) {
             foreach ($havingQuery->getValues() as $subQuery) {
                 if ($subQuery instanceof Query) {
-                    $parts[] = $this->queryToAstExpr($subQuery);
+                    $parts[] = $this->queryToAstExpression($subQuery);
                 }
             }
         }
@@ -2680,7 +2680,7 @@ abstract class Builder implements
             return null;
         }
 
-        return $this->combineAstExprs($parts, 'AND');
+        return $this->combineAstExpressions($parts, 'AND');
     }
 
     /**
@@ -2705,7 +2705,7 @@ abstract class Builder implements
 
             $direction = $method === Method::OrderAsc ? 'ASC' : 'DESC';
             $attr = $orderQuery->getAttribute();
-            $expr = $this->columnNameToAstExpr($attr);
+            $expr = $this->columnNameToAstExpression($attr);
 
             $nulls = null;
             $nullsVal = $orderQuery->getValue(null);
@@ -2744,7 +2744,7 @@ abstract class Builder implements
     {
         $builder = new static(); // @phpstan-ignore new.static
 
-        if ($ast->from instanceof TableRef) {
+        if ($ast->from instanceof Table) {
             $builder->from($ast->from->name, $ast->from->alias ?? '');
         }
 
@@ -2774,7 +2774,7 @@ abstract class Builder implements
                 continue;
             }
 
-            if ($col instanceof AliasedExpr && $col->expr instanceof FunctionCall) {
+            if ($col instanceof Aliased && $col->expression instanceof FunctionCall) {
                 $this->applyAstAggregateColumn($col);
                 $hasNonStar = true;
                 continue;
@@ -2786,8 +2786,8 @@ abstract class Builder implements
                 continue;
             }
 
-            if ($col instanceof ColumnRef) {
-                $selectCols[] = $this->astColumnRefToString($col);
+            if ($col instanceof Column) {
+                $selectCols[] = $this->astColumnReferenceToString($col);
                 $hasNonStar = true;
                 continue;
             }
@@ -2798,14 +2798,14 @@ abstract class Builder implements
                 continue;
             }
 
-            if ($col instanceof AliasedExpr && $col->expr instanceof ColumnRef) {
-                $selectCols[] = $this->astColumnRefToString($col->expr);
+            if ($col instanceof Aliased && $col->expression instanceof Column) {
+                $selectCols[] = $this->astColumnReferenceToString($col->expression);
                 $hasNonStar = true;
                 continue;
             }
 
             $serializer = new Serializer();
-            $this->selectRaw($serializer->serializeExpr($col));
+            $this->selectRaw($serializer->serializeExpression($col));
             $hasNonStar = true;
         }
 
@@ -2814,9 +2814,9 @@ abstract class Builder implements
         }
     }
 
-    private function applyAstAggregateColumn(AliasedExpr $aliased): void
+    private function applyAstAggregateColumn(Aliased $aliased): void
     {
-        $fn = $aliased->expr;
+        $fn = $aliased->expression;
         if (!$fn instanceof FunctionCall) {
             return;
         }
@@ -2854,7 +2854,7 @@ abstract class Builder implements
         }
 
         $serializer = new Serializer();
-        $this->selectRaw($serializer->serializeExpr($aliased));
+        $this->selectRaw($serializer->serializeExpression($aliased));
     }
 
     private function applyAstUnaliasedFunctionColumn(FunctionCall $fn): void
@@ -2882,7 +2882,7 @@ abstract class Builder implements
         }
 
         $serializer = new Serializer();
-        $this->selectRaw($serializer->serializeExpr($fn));
+        $this->selectRaw($serializer->serializeExpression($fn));
     }
 
     private function astFuncArgToAttribute(FunctionCall $fn): string
@@ -2895,30 +2895,30 @@ abstract class Builder implements
         if ($firstArg instanceof Star) {
             return '*';
         }
-        if ($firstArg instanceof ColumnRef) {
-            return $this->astColumnRefToString($firstArg);
+        if ($firstArg instanceof Column) {
+            return $this->astColumnReferenceToString($firstArg);
         }
 
         return '*';
     }
 
-    private function astColumnRefToString(ColumnRef $ref): string
+    private function astColumnReferenceToString(Column $reference): string
     {
         $parts = [];
-        if ($ref->schema !== null) {
-            $parts[] = $ref->schema;
+        if ($reference->schema !== null) {
+            $parts[] = $reference->schema;
         }
-        if ($ref->table !== null) {
-            $parts[] = $ref->table;
+        if ($reference->table !== null) {
+            $parts[] = $reference->table;
         }
-        $parts[] = $ref->name;
+        $parts[] = $reference->name;
         return \implode('.', $parts);
     }
 
     private function applyAstJoins(SelectStatement $ast): void
     {
         foreach ($ast->joins as $join) {
-            if (!$join->table instanceof TableRef) {
+            if (!$join->table instanceof Table) {
                 continue;
             }
 
@@ -2940,10 +2940,10 @@ abstract class Builder implements
             $operator = '=';
             $rightCol = '';
 
-            if ($join->condition instanceof BinaryExpr) {
-                $leftCol = $this->astExprToColumnString($join->condition->left);
+            if ($join->condition instanceof Binary) {
+                $leftCol = $this->astExpressionToColumnString($join->condition->left);
                 $operator = $join->condition->operator;
-                $rightCol = $this->astExprToColumnString($join->condition->right);
+                $rightCol = $this->astExpressionToColumnString($join->condition->right);
             }
 
             $method = match ($type) {
@@ -2962,14 +2962,14 @@ abstract class Builder implements
         }
     }
 
-    private function astExprToColumnString(Expr $expr): string
+    private function astExpressionToColumnString(Expression $expression): string
     {
-        if ($expr instanceof ColumnRef) {
-            return $this->astColumnRefToString($expr);
+        if ($expression instanceof Column) {
+            return $this->astColumnReferenceToString($expression);
         }
 
         $serializer = new Serializer();
-        return $serializer->serializeExpr($expr);
+        return $serializer->serializeExpression($expression);
     }
 
     private function applyAstWhere(SelectStatement $ast): void
@@ -2987,38 +2987,38 @@ abstract class Builder implements
     /**
      * @return Query[]
      */
-    private function astWhereToQueries(Expr $expr): array
+    private function astWhereToQueries(Expression $expression): array
     {
-        if ($expr instanceof BinaryExpr && \strtoupper($expr->operator) === 'AND') {
-            $left = $this->astWhereToQueries($expr->left);
-            $right = $this->astWhereToQueries($expr->right);
+        if ($expression instanceof Binary && \strtoupper($expression->operator) === 'AND') {
+            $left = $this->astWhereToQueries($expression->left);
+            $right = $this->astWhereToQueries($expression->right);
             return \array_merge($left, $right);
         }
 
-        $query = $this->astExprToSingleQuery($expr);
+        $query = $this->astExpressionToSingleQuery($expression);
         if ($query !== null) {
             return [$query];
         }
 
         $serializer = new Serializer();
-        return [Query::raw($serializer->serializeExpr($expr))];
+        return [Query::raw($serializer->serializeExpression($expression))];
     }
 
-    private function astExprToSingleQuery(Expr $expr): ?Query
+    private function astExpressionToSingleQuery(Expression $expression): ?Query
     {
-        if ($expr instanceof BinaryExpr) {
-            $op = \strtoupper($expr->operator);
+        if ($expression instanceof Binary) {
+            $op = \strtoupper($expression->operator);
 
             if ($op === 'AND') {
-                $leftQueries = $this->astWhereToQueries($expr->left);
-                $rightQueries = $this->astWhereToQueries($expr->right);
+                $leftQueries = $this->astWhereToQueries($expression->left);
+                $rightQueries = $this->astWhereToQueries($expression->right);
                 $all = \array_merge($leftQueries, $rightQueries);
                 return Query::and($all);
             }
 
             if ($op === 'OR') {
-                $leftQ = $this->astExprToSingleQuery($expr->left);
-                $rightQ = $this->astExprToSingleQuery($expr->right);
+                $leftQ = $this->astExpressionToSingleQuery($expression->left);
+                $rightQ = $this->astExpressionToSingleQuery($expression->right);
                 $parts = [];
                 if ($leftQ !== null) {
                     $parts[] = $leftQ;
@@ -3032,10 +3032,10 @@ abstract class Builder implements
                 return null;
             }
 
-            if ($expr->left instanceof ColumnRef && $expr->right instanceof Literal) {
-                $attr = $this->astColumnRefToString($expr->left);
+            if ($expression->left instanceof Column && $expression->right instanceof Literal) {
+                $attr = $this->astColumnReferenceToString($expression->left);
                 /** @var string|int|float|bool|null $val */
-                $val = $expr->right->value;
+                $val = $expression->right->value;
 
                 return match ($op) {
                     '=' => Query::equal($attr, [$val]),
@@ -3051,31 +3051,31 @@ abstract class Builder implements
             }
         }
 
-        if ($expr instanceof InExpr && $expr->expr instanceof ColumnRef && \is_array($expr->list)) {
-            $attr = $this->astColumnRefToString($expr->expr);
-            $values = \array_map(fn (Expr $item) => $item instanceof Literal ? $item->value : null, $expr->list);
-            if ($expr->negated) {
+        if ($expression instanceof In && $expression->expression instanceof Column && \is_array($expression->list)) {
+            $attr = $this->astColumnReferenceToString($expression->expression);
+            $values = \array_map(fn (Expression $item) => $item instanceof Literal ? $item->value : null, $expression->list);
+            if ($expression->negated) {
                 return Query::notEqual($attr, $values);
             }
             return Query::equal($attr, $values);
         }
 
-        if ($expr instanceof BetweenExpr && $expr->expr instanceof ColumnRef) {
-            $attr = $this->astColumnRefToString($expr->expr);
-            $lowRaw = $expr->low instanceof Literal ? $expr->low->value : 0;
-            $highRaw = $expr->high instanceof Literal ? $expr->high->value : 0;
+        if ($expression instanceof Between && $expression->expression instanceof Column) {
+            $attr = $this->astColumnReferenceToString($expression->expression);
+            $lowRaw = $expression->low instanceof Literal ? $expression->low->value : 0;
+            $highRaw = $expression->high instanceof Literal ? $expression->high->value : 0;
             $low = \is_string($lowRaw) || \is_int($lowRaw) || \is_float($lowRaw) ? $lowRaw : (string) $lowRaw;
             $high = \is_string($highRaw) || \is_int($highRaw) || \is_float($highRaw) ? $highRaw : (string) $highRaw;
-            if ($expr->negated) {
+            if ($expression->negated) {
                 return Query::notBetween($attr, $low, $high);
             }
             return Query::between($attr, $low, $high);
         }
 
-        if ($expr instanceof UnaryExpr) {
-            $op = \strtoupper($expr->operator);
-            if ($expr->operand instanceof ColumnRef) {
-                $attr = $this->astColumnRefToString($expr->operand);
+        if ($expression instanceof Unary) {
+            $op = \strtoupper($expression->operator);
+            if ($expression->operand instanceof Column) {
+                $attr = $this->astColumnReferenceToString($expression->operand);
                 return match ($op) {
                     'IS NULL' => Query::isNull($attr),
                     'IS NOT NULL' => Query::isNotNull($attr),
@@ -3124,9 +3124,9 @@ abstract class Builder implements
         }
 
         $cols = [];
-        foreach ($ast->groupBy as $expr) {
-            if ($expr instanceof ColumnRef) {
-                $cols[] = $this->astColumnRefToString($expr);
+        foreach ($ast->groupBy as $expression) {
+            if ($expression instanceof Column) {
+                $cols[] = $this->astColumnReferenceToString($expression);
             }
         }
 
@@ -3150,8 +3150,8 @@ abstract class Builder implements
     private function applyAstOrderBy(SelectStatement $ast): void
     {
         foreach ($ast->orderBy as $item) {
-            if ($item->expr instanceof ColumnRef) {
-                $attr = $this->astColumnRefToString($item->expr);
+            if ($item->expression instanceof Column) {
+                $attr = $this->astColumnReferenceToString($item->expression);
                 $nulls = null;
                 if ($item->nulls !== null) {
                     $nulls = NullsPosition::tryFrom($item->nulls);
@@ -3164,7 +3164,7 @@ abstract class Builder implements
                 }
             } else {
                 $serializer = new Serializer();
-                $rawExpr = $serializer->serializeExpr($item->expr);
+                $rawExpr = $serializer->serializeExpression($item->expression);
                 $dir = \strtoupper($item->direction) === 'DESC' ? ' DESC' : ' ASC';
                 $this->orderByRaw($rawExpr . $dir);
             }

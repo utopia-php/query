@@ -6,7 +6,7 @@ readonly class WindowDefinition
 {
     public function __construct(
         public string $name,
-        public WindowSpec $spec,
+        public WindowSpecification $specification,
     ) {
     }
 }

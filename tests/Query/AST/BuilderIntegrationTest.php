@@ -3,20 +3,20 @@
 namespace Tests\Query\AST;
 
 use PHPUnit\Framework\TestCase;
-use Utopia\Query\AST\AliasedExpr;
-use Utopia\Query\AST\BetweenExpr;
-use Utopia\Query\AST\BinaryExpr;
-use Utopia\Query\AST\ColumnRef;
 use Utopia\Query\AST\CteDefinition;
+use Utopia\Query\AST\Expression\Aliased;
+use Utopia\Query\AST\Expression\Between;
+use Utopia\Query\AST\Expression\Binary;
+use Utopia\Query\AST\Expression\In;
+use Utopia\Query\AST\Expression\Unary;
 use Utopia\Query\AST\FunctionCall;
-use Utopia\Query\AST\InExpr;
 use Utopia\Query\AST\JoinClause;
 use Utopia\Query\AST\Literal;
 use Utopia\Query\AST\OrderByItem;
+use Utopia\Query\AST\Reference\Column;
+use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\SelectStatement;
 use Utopia\Query\AST\Star;
-use Utopia\Query\AST\TableRef;
-use Utopia\Query\AST\UnaryExpr;
 use Utopia\Query\Builder\MySQL;
 use Utopia\Query\Builder\PostgreSQL;
 use Utopia\Query\Query;
@@ -32,14 +32,14 @@ class BuilderIntegrationTest extends TestCase
         $ast = $builder->toAst();
 
         $this->assertInstanceOf(SelectStatement::class, $ast);
-        $this->assertInstanceOf(TableRef::class, $ast->from);
+        $this->assertInstanceOf(Table::class, $ast->from);
         $this->assertSame('users', $ast->from->name);
         $this->assertCount(3, $ast->columns);
-        $this->assertInstanceOf(ColumnRef::class, $ast->columns[0]);
+        $this->assertInstanceOf(Column::class, $ast->columns[0]);
         $this->assertSame('id', $ast->columns[0]->name);
-        $this->assertInstanceOf(ColumnRef::class, $ast->columns[1]);
+        $this->assertInstanceOf(Column::class, $ast->columns[1]);
         $this->assertSame('name', $ast->columns[1]->name);
-        $this->assertInstanceOf(ColumnRef::class, $ast->columns[2]);
+        $this->assertInstanceOf(Column::class, $ast->columns[2]);
         $this->assertSame('email', $ast->columns[2]->name);
     }
 
@@ -55,19 +55,19 @@ class BuilderIntegrationTest extends TestCase
         $ast = $builder->toAst();
 
         $this->assertNotNull($ast->where);
-        $this->assertInstanceOf(BinaryExpr::class, $ast->where);
+        $this->assertInstanceOf(Binary::class, $ast->where);
         $this->assertSame('AND', $ast->where->operator);
 
         $left = $ast->where->left;
-        $this->assertInstanceOf(BinaryExpr::class, $left);
+        $this->assertInstanceOf(Binary::class, $left);
         $this->assertSame('=', $left->operator);
-        $this->assertInstanceOf(ColumnRef::class, $left->left);
+        $this->assertInstanceOf(Column::class, $left->left);
         $this->assertSame('status', $left->left->name);
         $this->assertInstanceOf(Literal::class, $left->right);
         $this->assertSame('active', $left->right->value);
 
         $right = $ast->where->right;
-        $this->assertInstanceOf(BinaryExpr::class, $right);
+        $this->assertInstanceOf(Binary::class, $right);
         $this->assertSame('>', $right->operator);
     }
 
@@ -83,7 +83,7 @@ class BuilderIntegrationTest extends TestCase
         $join = $ast->joins[0];
         $this->assertInstanceOf(JoinClause::class, $join);
         $this->assertSame('JOIN', $join->type);
-        $this->assertInstanceOf(TableRef::class, $join->table);
+        $this->assertInstanceOf(Table::class, $join->table);
         $this->assertSame('orders', $join->table->name);
         $this->assertNotNull($join->condition);
     }
@@ -100,12 +100,12 @@ class BuilderIntegrationTest extends TestCase
         $this->assertCount(2, $ast->orderBy);
         $this->assertInstanceOf(OrderByItem::class, $ast->orderBy[0]);
         $this->assertSame('ASC', $ast->orderBy[0]->direction);
-        $this->assertInstanceOf(ColumnRef::class, $ast->orderBy[0]->expr);
-        $this->assertSame('name', $ast->orderBy[0]->expr->name);
+        $this->assertInstanceOf(Column::class, $ast->orderBy[0]->expression);
+        $this->assertSame('name', $ast->orderBy[0]->expression->name);
 
         $this->assertSame('DESC', $ast->orderBy[1]->direction);
-        $this->assertInstanceOf(ColumnRef::class, $ast->orderBy[1]->expr);
-        $this->assertSame('created_at', $ast->orderBy[1]->expr->name);
+        $this->assertInstanceOf(Column::class, $ast->orderBy[1]->expression);
+        $this->assertSame('created_at', $ast->orderBy[1]->expression->name);
     }
 
     public function testToAstWithGroupBy(): void
@@ -117,9 +117,9 @@ class BuilderIntegrationTest extends TestCase
         $ast = $builder->toAst();
 
         $this->assertCount(2, $ast->groupBy);
-        $this->assertInstanceOf(ColumnRef::class, $ast->groupBy[0]);
+        $this->assertInstanceOf(Column::class, $ast->groupBy[0]);
         $this->assertSame('status', $ast->groupBy[0]->name);
-        $this->assertInstanceOf(ColumnRef::class, $ast->groupBy[1]);
+        $this->assertInstanceOf(Column::class, $ast->groupBy[1]);
         $this->assertSame('region', $ast->groupBy[1]->name);
     }
 
@@ -178,23 +178,23 @@ class BuilderIntegrationTest extends TestCase
         $this->assertCount(2, $ast->columns);
 
         $countCol = $ast->columns[0];
-        $this->assertInstanceOf(AliasedExpr::class, $countCol);
+        $this->assertInstanceOf(Aliased::class, $countCol);
         $this->assertSame('total_count', $countCol->alias);
-        $this->assertInstanceOf(FunctionCall::class, $countCol->expr);
-        $this->assertSame('COUNT', $countCol->expr->name);
+        $this->assertInstanceOf(FunctionCall::class, $countCol->expression);
+        $this->assertSame('COUNT', $countCol->expression->name);
 
         $sumCol = $ast->columns[1];
-        $this->assertInstanceOf(AliasedExpr::class, $sumCol);
+        $this->assertInstanceOf(Aliased::class, $sumCol);
         $this->assertSame('total_amount', $sumCol->alias);
-        $this->assertInstanceOf(FunctionCall::class, $sumCol->expr);
-        $this->assertSame('SUM', $sumCol->expr->name);
+        $this->assertInstanceOf(FunctionCall::class, $sumCol->expression);
+        $this->assertSame('SUM', $sumCol->expression->name);
     }
 
     public function testFromAstSimpleSelect(): void
     {
         $ast = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users'),
+            from: new Table('users'),
         );
 
         $builder = MySQL::fromAst($ast);
@@ -207,9 +207,9 @@ class BuilderIntegrationTest extends TestCase
     {
         $ast = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users'),
-            where: new BinaryExpr(
-                new ColumnRef('status'),
+            from: new Table('users'),
+            where: new Binary(
+                new Column('status'),
                 '=',
                 new Literal('active'),
             ),
@@ -226,15 +226,15 @@ class BuilderIntegrationTest extends TestCase
     {
         $ast = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users'),
+            from: new Table('users'),
             joins: [
                 new JoinClause(
                     'LEFT JOIN',
-                    new TableRef('orders'),
-                    new BinaryExpr(
-                        new ColumnRef('id', 'users'),
+                    new Table('orders'),
+                    new Binary(
+                        new Column('id', 'users'),
                         '=',
-                        new ColumnRef('user_id', 'orders'),
+                        new Column('user_id', 'orders'),
                     ),
                 ),
             ],
@@ -251,10 +251,10 @@ class BuilderIntegrationTest extends TestCase
     {
         $ast = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users'),
+            from: new Table('users'),
             orderBy: [
-                new OrderByItem(new ColumnRef('name'), 'ASC'),
-                new OrderByItem(new ColumnRef('age'), 'DESC'),
+                new OrderByItem(new Column('name'), 'ASC'),
+                new OrderByItem(new Column('age'), 'DESC'),
             ],
         );
 
@@ -270,7 +270,7 @@ class BuilderIntegrationTest extends TestCase
     {
         $ast = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users'),
+            from: new Table('users'),
             limit: new Literal(25),
             offset: new Literal(50),
         );
@@ -310,14 +310,14 @@ class BuilderIntegrationTest extends TestCase
     public function testRoundTripAstToBuilder(): void
     {
         $ast = new SelectStatement(
-            columns: [new ColumnRef('id'), new ColumnRef('name')],
-            from: new TableRef('users'),
-            where: new BinaryExpr(
-                new ColumnRef('age'),
+            columns: [new Column('id'), new Column('name')],
+            from: new Table('users'),
+            where: new Binary(
+                new Column('age'),
                 '>',
                 new Literal(18),
             ),
-            orderBy: [new OrderByItem(new ColumnRef('name'), 'ASC')],
+            orderBy: [new OrderByItem(new Column('name'), 'ASC')],
             limit: new Literal(10),
         );
 
@@ -336,27 +336,27 @@ class BuilderIntegrationTest extends TestCase
     {
         $ast = new SelectStatement(
             columns: [
-                new ColumnRef('id'),
-                new AliasedExpr(new FunctionCall('COUNT', [new Star()]), 'order_count'),
+                new Column('id'),
+                new Aliased(new FunctionCall('COUNT', [new Star()]), 'order_count'),
             ],
-            from: new TableRef('users', 'u'),
+            from: new Table('users', 'u'),
             joins: [
                 new JoinClause(
                     'LEFT JOIN',
-                    new TableRef('orders', 'o'),
-                    new BinaryExpr(
-                        new ColumnRef('id', 'u'),
+                    new Table('orders', 'o'),
+                    new Binary(
+                        new Column('id', 'u'),
                         '=',
-                        new ColumnRef('user_id', 'o'),
+                        new Column('user_id', 'o'),
                     ),
                 ),
             ],
-            where: new BinaryExpr(
-                new ColumnRef('status'),
+            where: new Binary(
+                new Column('status'),
                 '=',
                 new Literal('active'),
             ),
-            groupBy: [new ColumnRef('id')],
+            groupBy: [new Column('id')],
             orderBy: [new OrderByItem(new FunctionCall('COUNT', [new Star()]), 'DESC')],
             limit: new Literal(10),
         );
@@ -375,9 +375,9 @@ class BuilderIntegrationTest extends TestCase
     {
         $innerStmt = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users'),
-            where: new BinaryExpr(
-                new ColumnRef('active'),
+            from: new Table('users'),
+            where: new Binary(
+                new Column('active'),
                 '=',
                 new Literal(true),
             ),
@@ -385,7 +385,7 @@ class BuilderIntegrationTest extends TestCase
 
         $ast = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('active_users'),
+            from: new Table('active_users'),
             ctes: [
                 new CteDefinition('active_users', $innerStmt),
             ],
@@ -445,7 +445,7 @@ class BuilderIntegrationTest extends TestCase
         $ast = $builder->toAst();
 
         $this->assertNotNull($ast->where);
-        $this->assertInstanceOf(InExpr::class, $ast->where);
+        $this->assertInstanceOf(In::class, $ast->where);
         $this->assertFalse($ast->where->negated);
     }
 
@@ -469,7 +469,7 @@ class BuilderIntegrationTest extends TestCase
         $ast = $builder->toAst();
 
         $this->assertNotNull($ast->where);
-        $this->assertInstanceOf(BetweenExpr::class, $ast->where);
+        $this->assertInstanceOf(Between::class, $ast->where);
         $this->assertFalse($ast->where->negated);
     }
 
@@ -482,7 +482,7 @@ class BuilderIntegrationTest extends TestCase
         $ast = $builder->toAst();
 
         $this->assertNotNull($ast->where);
-        $this->assertInstanceOf(UnaryExpr::class, $ast->where);
+        $this->assertInstanceOf(Unary::class, $ast->where);
         $this->assertSame('IS NULL', $ast->where->operator);
     }
 
@@ -495,7 +495,7 @@ class BuilderIntegrationTest extends TestCase
         $ast = $builder->toAst();
 
         $this->assertNotNull($ast->where);
-        $this->assertInstanceOf(UnaryExpr::class, $ast->where);
+        $this->assertInstanceOf(Unary::class, $ast->where);
         $this->assertSame('IS NOT NULL', $ast->where->operator);
     }
 
@@ -507,7 +507,7 @@ class BuilderIntegrationTest extends TestCase
 
         $ast = $builder->toAst();
 
-        $this->assertInstanceOf(TableRef::class, $ast->from);
+        $this->assertInstanceOf(Table::class, $ast->from);
         $this->assertSame('users', $ast->from->name);
         $this->assertSame('u', $ast->from->alias);
     }
@@ -551,8 +551,8 @@ class BuilderIntegrationTest extends TestCase
     public function testFromAstWithDistinct(): void
     {
         $ast = new SelectStatement(
-            columns: [new ColumnRef('email')],
-            from: new TableRef('users'),
+            columns: [new Column('email')],
+            from: new Table('users'),
             distinct: true,
         );
 
@@ -566,11 +566,11 @@ class BuilderIntegrationTest extends TestCase
     {
         $ast = new SelectStatement(
             columns: [
-                new ColumnRef('department'),
-                new AliasedExpr(new FunctionCall('COUNT', [new Star()]), 'cnt'),
+                new Column('department'),
+                new Aliased(new FunctionCall('COUNT', [new Star()]), 'cnt'),
             ],
-            from: new TableRef('employees'),
-            groupBy: [new ColumnRef('department')],
+            from: new Table('employees'),
+            groupBy: [new Column('department')],
         );
 
         $builder = MySQL::fromAst($ast);
@@ -584,9 +584,9 @@ class BuilderIntegrationTest extends TestCase
     {
         $ast = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users'),
-            where: new BetweenExpr(
-                new ColumnRef('age'),
+            from: new Table('users'),
+            where: new Between(
+                new Column('age'),
                 new Literal(18),
                 new Literal(65),
             ),
@@ -598,13 +598,13 @@ class BuilderIntegrationTest extends TestCase
         $this->assertStringContainsString('BETWEEN', $result->query);
     }
 
-    public function testFromAstWithInExpr(): void
+    public function testFromAstWithInExpression(): void
     {
         $ast = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users'),
-            where: new InExpr(
-                new ColumnRef('status'),
+            from: new Table('users'),
+            where: new In(
+                new Column('status'),
                 [new Literal('active'), new Literal('pending')],
             ),
         );
@@ -619,11 +619,11 @@ class BuilderIntegrationTest extends TestCase
     {
         $ast = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users'),
-            where: new BinaryExpr(
-                new BinaryExpr(new ColumnRef('age'), '>', new Literal(18)),
+            from: new Table('users'),
+            where: new Binary(
+                new Binary(new Column('age'), '>', new Literal(18)),
                 'AND',
-                new BinaryExpr(new ColumnRef('status'), '=', new Literal('active')),
+                new Binary(new Column('status'), '=', new Literal('active')),
             ),
         );
 
@@ -642,7 +642,7 @@ class BuilderIntegrationTest extends TestCase
         $ast = $builder->toAst();
 
         $this->assertNotNull($ast->where);
-        $this->assertInstanceOf(BetweenExpr::class, $ast->where);
+        $this->assertInstanceOf(Between::class, $ast->where);
         $this->assertTrue($ast->where->negated);
     }
 
@@ -655,7 +655,7 @@ class BuilderIntegrationTest extends TestCase
         $ast = $builder->toAst();
 
         $this->assertNotNull($ast->where);
-        $this->assertInstanceOf(BinaryExpr::class, $ast->where);
+        $this->assertInstanceOf(Binary::class, $ast->where);
         $this->assertSame('LIKE', $ast->where->operator);
     }
 
@@ -668,7 +668,7 @@ class BuilderIntegrationTest extends TestCase
         $ast = $builder->toAst();
 
         $this->assertNotNull($ast->where);
-        $this->assertInstanceOf(BinaryExpr::class, $ast->where);
+        $this->assertInstanceOf(Binary::class, $ast->where);
         $this->assertSame('LIKE', $ast->where->operator);
     }
 
@@ -686,7 +686,7 @@ class BuilderIntegrationTest extends TestCase
         $ast = $builder->toAst();
 
         $this->assertNotNull($ast->where);
-        $this->assertInstanceOf(BinaryExpr::class, $ast->where);
+        $this->assertInstanceOf(Binary::class, $ast->where);
         $this->assertSame('OR', $ast->where->operator);
     }
 
@@ -704,7 +704,7 @@ class BuilderIntegrationTest extends TestCase
         $ast = $builder->toAst();
 
         $this->assertNotNull($ast->where);
-        $this->assertInstanceOf(BinaryExpr::class, $ast->where);
+        $this->assertInstanceOf(Binary::class, $ast->where);
         $this->assertSame('AND', $ast->where->operator);
     }
 
@@ -718,10 +718,10 @@ class BuilderIntegrationTest extends TestCase
 
         $this->assertCount(1, $ast->columns);
         $col = $ast->columns[0];
-        $this->assertInstanceOf(AliasedExpr::class, $col);
+        $this->assertInstanceOf(Aliased::class, $col);
         $this->assertSame('unique_users', $col->alias);
-        $this->assertInstanceOf(FunctionCall::class, $col->expr);
-        $this->assertSame('COUNT', $col->expr->name);
-        $this->assertTrue($col->expr->distinct);
+        $this->assertInstanceOf(FunctionCall::class, $col->expression);
+        $this->assertSame('COUNT', $col->expression->name);
+        $this->assertTrue($col->expression->distinct);
     }
 }

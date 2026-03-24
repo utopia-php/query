@@ -2,10 +2,10 @@
 
 namespace Utopia\Query\AST;
 
-readonly class WindowSpec
+readonly class WindowSpecification
 {
     /**
-     * @param Expr[] $partitionBy
+     * @param Expression[] $partitionBy
      * @param OrderByItem[] $orderBy
      */
     public function __construct(

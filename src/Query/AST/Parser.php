@@ -2,6 +2,19 @@
 
 namespace Utopia\Query\AST;
 
+use Utopia\Query\AST\Expression\Aliased;
+use Utopia\Query\AST\Expression\Between;
+use Utopia\Query\AST\Expression\Binary;
+use Utopia\Query\AST\Expression\CaseWhen;
+use Utopia\Query\AST\Expression\Cast;
+use Utopia\Query\AST\Expression\Conditional;
+use Utopia\Query\AST\Expression\Exists;
+use Utopia\Query\AST\Expression\In;
+use Utopia\Query\AST\Expression\Subquery;
+use Utopia\Query\AST\Expression\Unary;
+use Utopia\Query\AST\Expression\Window;
+use Utopia\Query\AST\Reference\Column;
+use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\Exception;
 use Utopia\Query\Tokenizer\Token;
 use Utopia\Query\Tokenizer\TokenType;
@@ -187,7 +200,7 @@ class Parser
     }
 
     /**
-     * @return Expr[]
+     * @return Expression[]
      */
     private function parseColumnList(): array
     {
@@ -203,22 +216,22 @@ class Parser
         return $columns;
     }
 
-    private function parseSelectColumn(): Expr
+    private function parseSelectColumn(): Expression
     {
-        $expr = $this->parseExpression();
+        $expression = $this->parseExpression();
 
         if ($this->matchKeyword('AS')) {
             $this->advance();
             $alias = $this->expectIdentifier();
-            return new AliasedExpr($expr, $alias);
+            return new Aliased($expression, $alias);
         }
 
         if ($this->inColumnList && $this->isImplicitAlias()) {
             $alias = $this->expectIdentifier();
-            return new AliasedExpr($expr, $alias);
+            return new Aliased($expression, $alias);
         }
 
-        return $expr;
+        return $expression;
     }
 
     private function isImplicitAlias(): bool
@@ -233,38 +246,38 @@ class Parser
         return false;
     }
 
-    private function parseExpression(): Expr
+    private function parseExpression(): Expression
     {
         return $this->parseOr();
     }
 
-    private function parseOr(): Expr
+    private function parseOr(): Expression
     {
         $left = $this->parseAnd();
 
         while ($this->matchKeyword('OR')) {
             $this->advance();
             $right = $this->parseAnd();
-            $left = new BinaryExpr($left, 'OR', $right);
+            $left = new Binary($left, 'OR', $right);
         }
 
         return $left;
     }
 
-    private function parseAnd(): Expr
+    private function parseAnd(): Expression
     {
         $left = $this->parseNot();
 
         while ($this->matchKeyword('AND')) {
             $this->advance();
             $right = $this->parseNot();
-            $left = new BinaryExpr($left, 'AND', $right);
+            $left = new Binary($left, 'AND', $right);
         }
 
         return $left;
     }
 
-    private function parseNot(): Expr
+    private function parseNot(): Expression
     {
         if ($this->matchKeyword('NOT')) {
             if ($this->peekKeyword(1, 'EXISTS')) {
@@ -273,18 +286,18 @@ class Parser
                 $this->expect(TokenType::LeftParen);
                 $subquery = $this->parseSelect();
                 $this->expect(TokenType::RightParen);
-                return new ExistsExpr($subquery, true);
+                return new Exists($subquery, true);
             }
 
             $this->advance();
             $operand = $this->parseNot();
-            return new UnaryExpr('NOT', $operand);
+            return new Unary('NOT', $operand);
         }
 
         return $this->parseComparison();
     }
 
-    private function parseComparison(): Expr
+    private function parseComparison(): Expression
     {
         $left = $this->parseAddition();
 
@@ -293,7 +306,7 @@ class Parser
         return $left;
     }
 
-    private function parsePostfixModifiers(Expr $left): Expr
+    private function parsePostfixModifiers(Expression $left): Expression
     {
         // IS [NOT] NULL
         if ($this->matchKeyword('IS')) {
@@ -301,10 +314,10 @@ class Parser
             if ($this->matchKeyword('NOT')) {
                 $this->advance();
                 $this->expectNull();
-                return new UnaryExpr('IS NOT NULL', $left, false);
+                return new Unary('IS NOT NULL', $left, false);
             }
             $this->expectNull();
-            return new UnaryExpr('IS NULL', $left, false);
+            return new Unary('IS NULL', $left, false);
         }
 
         // NOT IN / NOT BETWEEN / NOT LIKE / NOT ILIKE
@@ -323,13 +336,13 @@ class Parser
                 $this->advance(); // NOT
                 $this->advance(); // LIKE
                 $right = $this->parseAddition();
-                return new BinaryExpr($left, 'NOT LIKE', $right);
+                return new Binary($left, 'NOT LIKE', $right);
             }
             if ($this->peekKeyword(1, 'ILIKE')) {
                 $this->advance(); // NOT
                 $this->advance(); // ILIKE
                 $right = $this->parseAddition();
-                return new BinaryExpr($left, 'NOT ILIKE', $right);
+                return new Binary($left, 'NOT ILIKE', $right);
             }
         }
 
@@ -349,12 +362,12 @@ class Parser
         if ($this->matchKeyword('LIKE')) {
             $this->advance();
             $right = $this->parseAddition();
-            return new BinaryExpr($left, 'LIKE', $right);
+            return new Binary($left, 'LIKE', $right);
         }
         if ($this->matchKeyword('ILIKE')) {
             $this->advance();
             $right = $this->parseAddition();
-            return new BinaryExpr($left, 'ILIKE', $right);
+            return new Binary($left, 'ILIKE', $right);
         }
 
         // Comparison operators: =, !=, <>, <, >, <=, >=
@@ -363,7 +376,7 @@ class Parser
             if (in_array($op, ['=', '!=', '<>', '<', '>', '<=', '>='], true)) {
                 $this->advance();
                 $right = $this->parseAddition();
-                $result = new BinaryExpr($left, $op, $right);
+                $result = new Binary($left, $op, $right);
                 return $this->parsePostfixModifiers($result);
             }
         }
@@ -371,14 +384,14 @@ class Parser
         return $left;
     }
 
-    private function parseInList(Expr $left, bool $negated): InExpr
+    private function parseInList(Expression $left, bool $negated): In
     {
         $this->expect(TokenType::LeftParen);
 
         if ($this->matchKeyword('SELECT') || $this->matchKeyword('WITH')) {
             $subquery = $this->parseSelect();
             $this->expect(TokenType::RightParen);
-            return new InExpr($left, $subquery, $negated);
+            return new In($left, $subquery, $negated);
         }
 
         $list = [];
@@ -388,19 +401,19 @@ class Parser
         }
         $this->expect(TokenType::RightParen);
 
-        return new InExpr($left, $list, $negated);
+        return new In($left, $list, $negated);
     }
 
-    private function parseBetween(Expr $left, bool $negated): BetweenExpr
+    private function parseBetween(Expression $left, bool $negated): Between
     {
         $low = $this->parseAddition();
         $this->consumeKeyword('AND');
         $high = $this->parseAddition();
 
-        return new BetweenExpr($left, $low, $high, $negated);
+        return new Between($left, $low, $high, $negated);
     }
 
-    private function parseAddition(): Expr
+    private function parseAddition(): Expression
     {
         $left = $this->parseMultiplication();
 
@@ -410,7 +423,7 @@ class Parser
                 $op = $token->value;
                 $this->advance();
                 $right = $this->parseMultiplication();
-                $left = new BinaryExpr($left, $op, $right);
+                $left = new Binary($left, $op, $right);
             } else {
                 break;
             }
@@ -419,7 +432,7 @@ class Parser
         return $left;
     }
 
-    private function parseMultiplication(): Expr
+    private function parseMultiplication(): Expression
     {
         $left = $this->parseUnary();
 
@@ -428,12 +441,12 @@ class Parser
             if ($token->type === TokenType::Star) {
                 $this->advance();
                 $right = $this->parseUnary();
-                $left = new BinaryExpr($left, '*', $right);
+                $left = new Binary($left, '*', $right);
             } elseif ($token->type === TokenType::Operator && in_array($token->value, ['/', '%'], true)) {
                 $op = $token->value;
                 $this->advance();
                 $right = $this->parseUnary();
-                $left = new BinaryExpr($left, $op, $right);
+                $left = new Binary($left, $op, $right);
             } else {
                 break;
             }
@@ -442,7 +455,7 @@ class Parser
         return $left;
     }
 
-    private function parseUnary(): Expr
+    private function parseUnary(): Expression
     {
         $token = $this->current();
 
@@ -450,22 +463,22 @@ class Parser
             $op = $token->value;
             $this->advance();
             $operand = $this->parseUnary();
-            return new UnaryExpr($op, $operand);
+            return new Unary($op, $operand);
         }
 
-        $expr = $this->parsePrimary();
+        $expression = $this->parsePrimary();
 
         // Handle PostgreSQL-style :: cast at this level so it works everywhere
         while ($this->current()->type === TokenType::Operator && $this->current()->value === '::') {
             $this->advance();
             $type = $this->expectIdentifier();
-            $expr = new CastExpr($expr, $type);
+            $expression = new Cast($expression, $type);
         }
 
-        return $expr;
+        return $expression;
     }
 
-    private function parsePrimary(): Expr
+    private function parsePrimary(): Expression
     {
         $token = $this->current();
 
@@ -521,19 +534,19 @@ class Parser
             if ($this->matchKeyword('SELECT') || $this->matchKeyword('WITH')) {
                 $subquery = $this->parseSelect();
                 $this->expect(TokenType::RightParen);
-                return new SubqueryExpr($subquery);
+                return new Subquery($subquery);
             }
-            $expr = $this->parseExpression();
+            $expression = $this->parseExpression();
             $this->expect(TokenType::RightParen);
-            return $expr;
+            return $expression;
         }
 
         if ($this->matchKeyword('CASE')) {
-            return $this->parseCaseExpr();
+            return $this->parseCaseExpression();
         }
 
         if ($this->matchKeyword('CAST')) {
-            return $this->parseCastExpr();
+            return $this->parseCastExpression();
         }
 
         if ($this->matchKeyword('EXISTS')) {
@@ -541,16 +554,16 @@ class Parser
             $this->expect(TokenType::LeftParen);
             $subquery = $this->parseSelect();
             $this->expect(TokenType::RightParen);
-            return new ExistsExpr($subquery);
+            return new Exists($subquery);
         }
 
         if ($token->type === TokenType::Identifier || $token->type === TokenType::QuotedIdentifier) {
-            return $this->parseIdentifierExpr();
+            return $this->parseIdentifierExpression();
         }
 
         if ($token->type === TokenType::Keyword) {
             if ($this->peek(1)->type === TokenType::LeftParen) {
-                return $this->parseIdentifierExpr();
+                return $this->parseIdentifierExpression();
             }
         }
 
@@ -559,7 +572,7 @@ class Parser
         );
     }
 
-    private function parseIdentifierExpr(): Expr
+    private function parseIdentifierExpression(): Expression
     {
         $token = $this->current();
         $name = $this->extractIdentifier($token);
@@ -568,7 +581,7 @@ class Parser
         $next = $this->current();
 
         if ($next->type === TokenType::LeftParen) {
-            return $this->parseFunctionCallExpr($name);
+            return $this->parseFunctionCallExpression($name);
         }
 
         if ($next->type === TokenType::Dot) {
@@ -595,16 +608,16 @@ class Parser
 
                 $third = $this->extractIdentifier($afterSecondDot);
                 $this->advance();
-                return new ColumnRef($third, $second, $name);
+                return new Column($third, $second, $name);
             }
 
-            return new ColumnRef($second, $name);
+            return new Column($second, $name);
         }
 
-        return new ColumnRef($name);
+        return new Column($name);
     }
 
-    private function parseFunctionCallExpr(string $name): Expr
+    private function parseFunctionCallExpression(string $name): Expression
     {
         $upperName = strtoupper($name);
         $this->expect(TokenType::LeftParen);
@@ -612,14 +625,14 @@ class Parser
         if ($this->current()->type === TokenType::Star) {
             $this->advance();
             $this->expect(TokenType::RightParen);
-            $fn = new FunctionCall($upperName, [new Star()]);
-            return $this->parseFunctionPostfix($fn);
+            $function = new FunctionCall($upperName, [new Star()]);
+            return $this->parseFunctionPostfix($function);
         }
 
         if ($this->current()->type === TokenType::RightParen) {
             $this->advance();
-            $fn = new FunctionCall($upperName);
-            return $this->parseFunctionPostfix($fn);
+            $function = new FunctionCall($upperName);
+            return $this->parseFunctionPostfix($function);
         }
 
         $distinct = false;
@@ -635,19 +648,19 @@ class Parser
         }
 
         $this->expect(TokenType::RightParen);
-        $fn = new FunctionCall($upperName, $args, $distinct);
-        return $this->parseFunctionPostfix($fn);
+        $function = new FunctionCall($upperName, $args, $distinct);
+        return $this->parseFunctionPostfix($function);
     }
 
-    private function parseFunctionPostfix(FunctionCall $fn): Expr
+    private function parseFunctionPostfix(FunctionCall $function): Expression
     {
         if ($this->matchKeyword('FILTER')) {
             $this->advance();
             $this->expect(TokenType::LeftParen);
             $this->consumeKeyword('WHERE');
-            $filterExpr = $this->parseExpression();
+            $filterExpression = $this->parseExpression();
             $this->expect(TokenType::RightParen);
-            $fn = new FunctionCall($fn->name, $fn->arguments, $fn->distinct, $filterExpr);
+            $function = new FunctionCall($function->name, $function->arguments, $function->distinct, $filterExpression);
         }
 
         if ($this->matchKeyword('OVER')) {
@@ -656,19 +669,19 @@ class Parser
             if ($this->current()->type === TokenType::Identifier) {
                 $windowName = $this->extractIdentifier($this->current());
                 $this->advance();
-                return new WindowExpr($fn, windowName: $windowName);
+                return new Window($function, windowName: $windowName);
             }
 
             $this->expect(TokenType::LeftParen);
-            $spec = $this->parseWindowSpec();
+            $specification = $this->parseWindowSpecification();
             $this->expect(TokenType::RightParen);
-            return new WindowExpr($fn, spec: $spec);
+            return new Window($function, specification: $specification);
         }
 
-        return $fn;
+        return $function;
     }
 
-    private function parseCaseExpr(): CaseExpr
+    private function parseCaseExpression(): Conditional
     {
         $this->consumeKeyword('CASE');
 
@@ -694,25 +707,25 @@ class Parser
 
         $this->consumeKeyword('END');
 
-        return new CaseExpr($operand, $whens, $else);
+        return new Conditional($operand, $whens, $else);
     }
 
-    private function parseCastExpr(): CastExpr
+    private function parseCastExpression(): Cast
     {
         $this->consumeKeyword('CAST');
         $this->expect(TokenType::LeftParen);
-        $expr = $this->parseExpression();
+        $expression = $this->parseExpression();
         $this->consumeKeyword('AS');
         $type = $this->expectIdentifier();
         $this->expect(TokenType::RightParen);
 
-        return new CastExpr($expr, $type);
+        return new Cast($expression, $type);
     }
 
     /**
-     * @return TableRef|SubquerySource
+     * @return Table|SubquerySource
      */
-    private function parseTableSource(): TableRef|SubquerySource
+    private function parseTableSource(): Table|SubquerySource
     {
         if ($this->current()->type === TokenType::LeftParen) {
             $this->advance();
@@ -727,10 +740,10 @@ class Parser
             return new SubquerySource($subquery, $alias);
         }
 
-        return $this->parseTableRef();
+        return $this->parseTableReference();
     }
 
-    private function parseTableRef(): TableRef
+    private function parseTableReference(): Table
     {
         $name = $this->expectIdentifier();
         $schema = null;
@@ -749,7 +762,7 @@ class Parser
             $alias = $this->expectIdentifier();
         }
 
-        return new TableRef($name, $alias, $schema);
+        return new Table($name, $alias, $schema);
     }
 
     private function isTableAlias(): bool
@@ -846,18 +859,18 @@ class Parser
     }
 
     /**
-     * @return Expr[]
+     * @return Expression[]
      */
     private function parseExpressionList(): array
     {
-        $exprs = [];
-        $exprs[] = $this->parseExpression();
+        $expressions = [];
+        $expressions[] = $this->parseExpression();
 
         while ($this->matchAndConsume(TokenType::Comma)) {
-            $exprs[] = $this->parseExpression();
+            $expressions[] = $this->parseExpression();
         }
 
-        return $exprs;
+        return $expressions;
     }
 
     /**
@@ -877,7 +890,7 @@ class Parser
 
     private function parseOrderByItem(): OrderByItem
     {
-        $expr = $this->parseExpression();
+        $expression = $this->parseExpression();
 
         $direction = 'ASC';
         if ($this->matchKeyword('ASC')) {
@@ -904,7 +917,7 @@ class Parser
             }
         }
 
-        return new OrderByItem($expr, $direction, $nulls);
+        return new OrderByItem($expression, $direction, $nulls);
     }
 
     /**
@@ -918,15 +931,15 @@ class Parser
             $name = $this->expectIdentifier();
             $this->consumeKeyword('AS');
             $this->expect(TokenType::LeftParen);
-            $spec = $this->parseWindowSpec();
+            $specification = $this->parseWindowSpecification();
             $this->expect(TokenType::RightParen);
-            $defs[] = new WindowDefinition($name, $spec);
+            $defs[] = new WindowDefinition($name, $specification);
         } while ($this->matchAndConsume(TokenType::Comma));
 
         return $defs;
     }
 
-    private function parseWindowSpec(): WindowSpec
+    private function parseWindowSpecification(): WindowSpecification
     {
         $partitionBy = [];
         $orderBy = [];
@@ -960,7 +973,7 @@ class Parser
             }
         }
 
-        return new WindowSpec($partitionBy, $orderBy, $frameType, $frameStart, $frameEnd);
+        return new WindowSpecification($partitionBy, $orderBy, $frameType, $frameStart, $frameEnd);
     }
 
     private function parseFrameBound(): string

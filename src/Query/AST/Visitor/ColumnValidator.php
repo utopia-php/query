@@ -2,10 +2,10 @@
 
 namespace Utopia\Query\AST\Visitor;
 
-use Utopia\Query\AST\ColumnRef;
-use Utopia\Query\AST\Expr;
+use Utopia\Query\AST\Expression;
+use Utopia\Query\AST\Reference\Column;
+use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\SelectStatement;
-use Utopia\Query\AST\TableRef;
 use Utopia\Query\AST\Visitor;
 use Utopia\Query\Exception;
 
@@ -16,19 +16,19 @@ class ColumnValidator implements Visitor
     {
     }
 
-    public function visitExpr(Expr $expr): Expr
+    public function visitExpression(Expression $expression): Expression
     {
-        if ($expr instanceof ColumnRef) {
-            if (!in_array($expr->name, $this->allowedColumns, true)) {
-                throw new Exception("Column '{$expr->name}' is not in the allowed list");
+        if ($expression instanceof Column) {
+            if (!in_array($expression->name, $this->allowedColumns, true)) {
+                throw new Exception("Column '{$expression->name}' is not in the allowed list");
             }
         }
-        return $expr;
+        return $expression;
     }
 
-    public function visitTableRef(TableRef $ref): TableRef
+    public function visitTableReference(Table $reference): Table
     {
-        return $ref;
+        return $reference;
     }
 
     public function visitSelect(SelectStatement $stmt): SelectStatement

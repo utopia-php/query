@@ -2,6 +2,19 @@
 
 namespace Utopia\Query\AST;
 
+use Utopia\Query\AST\Expression\Aliased;
+use Utopia\Query\AST\Expression\Between;
+use Utopia\Query\AST\Expression\Binary;
+use Utopia\Query\AST\Expression\Cast;
+use Utopia\Query\AST\Expression\Conditional;
+use Utopia\Query\AST\Expression\Exists;
+use Utopia\Query\AST\Expression\In;
+use Utopia\Query\AST\Expression\Subquery;
+use Utopia\Query\AST\Expression\Unary;
+use Utopia\Query\AST\Expression\Window;
+use Utopia\Query\AST\Reference\Column;
+use Utopia\Query\AST\Reference\Table;
+
 class Serializer
 {
     public function serialize(SelectStatement $stmt): string
@@ -19,7 +32,7 @@ class Serializer
 
         $columns = [];
         foreach ($stmt->columns as $col) {
-            $columns[] = $this->serializeExpr($col);
+            $columns[] = $this->serializeExpression($col);
         }
         $select .= ' ' . implode(', ', $columns);
         $parts[] = $select;
@@ -33,25 +46,25 @@ class Serializer
         }
 
         if ($stmt->where !== null) {
-            $parts[] = 'WHERE ' . $this->serializeExpr($stmt->where);
+            $parts[] = 'WHERE ' . $this->serializeExpression($stmt->where);
         }
 
         if (!empty($stmt->groupBy)) {
-            $exprs = [];
-            foreach ($stmt->groupBy as $expr) {
-                $exprs[] = $this->serializeExpr($expr);
+            $expressions = [];
+            foreach ($stmt->groupBy as $expression) {
+                $expressions[] = $this->serializeExpression($expression);
             }
-            $parts[] = 'GROUP BY ' . implode(', ', $exprs);
+            $parts[] = 'GROUP BY ' . implode(', ', $expressions);
         }
 
         if ($stmt->having !== null) {
-            $parts[] = 'HAVING ' . $this->serializeExpr($stmt->having);
+            $parts[] = 'HAVING ' . $this->serializeExpression($stmt->having);
         }
 
         if (!empty($stmt->windows)) {
             $defs = [];
             foreach ($stmt->windows as $win) {
-                $defs[] = $this->quoteIdentifier($win->name) . ' AS (' . $this->serializeWindowSpec($win->spec) . ')';
+                $defs[] = $this->quoteIdentifier($win->name) . ' AS (' . $this->serializeWindowSpecification($win->specification) . ')';
             }
             $parts[] = 'WINDOW ' . implode(', ', $defs);
         }
@@ -65,36 +78,36 @@ class Serializer
         }
 
         if ($stmt->limit !== null) {
-            $parts[] = 'LIMIT ' . $this->serializeExpr($stmt->limit);
+            $parts[] = 'LIMIT ' . $this->serializeExpression($stmt->limit);
         }
 
         if ($stmt->offset !== null) {
-            $parts[] = 'OFFSET ' . $this->serializeExpr($stmt->offset);
+            $parts[] = 'OFFSET ' . $this->serializeExpression($stmt->offset);
         }
 
         return implode(' ', $parts);
     }
 
-    public function serializeExpr(Expr $expr): string
+    public function serializeExpression(Expression $expression): string
     {
         return match (true) {
-            $expr instanceof AliasedExpr => $this->serializeExpr($expr->expr) . ' AS ' . $this->quoteIdentifier($expr->alias),
-            $expr instanceof WindowExpr => $this->serializeWindowExpr($expr),
-            $expr instanceof BinaryExpr => $this->serializeBinary($expr, null),
-            $expr instanceof UnaryExpr => $this->serializeUnary($expr),
-            $expr instanceof ColumnRef => $this->serializeColumnRef($expr),
-            $expr instanceof Literal => $this->serializeLiteral($expr),
-            $expr instanceof Star => $this->serializeStar($expr),
-            $expr instanceof Placeholder => $expr->value,
-            $expr instanceof Raw => $expr->sql,
-            $expr instanceof FunctionCall => $this->serializeFunctionCall($expr),
-            $expr instanceof InExpr => $this->serializeIn($expr),
-            $expr instanceof BetweenExpr => $this->serializeBetween($expr),
-            $expr instanceof ExistsExpr => $this->serializeExists($expr),
-            $expr instanceof CaseExpr => $this->serializeCase($expr),
-            $expr instanceof CastExpr => $this->serializeCast($expr),
-            $expr instanceof SubqueryExpr => '(' . $this->serialize($expr->query) . ')',
-            default => throw new \Utopia\Query\Exception('Unsupported expression type: ' . get_class($expr)),
+            $expression instanceof Aliased => $this->serializeExpression($expression->expression) . ' AS ' . $this->quoteIdentifier($expression->alias),
+            $expression instanceof Window => $this->serializeWindowExpression($expression),
+            $expression instanceof Binary => $this->serializeBinary($expression, null),
+            $expression instanceof Unary => $this->serializeUnary($expression),
+            $expression instanceof Column => $this->serializeColumnReference($expression),
+            $expression instanceof Literal => $this->serializeLiteral($expression),
+            $expression instanceof Star => $this->serializeStar($expression),
+            $expression instanceof Placeholder => $expression->value,
+            $expression instanceof Raw => $expression->sql,
+            $expression instanceof FunctionCall => $this->serializeFunctionCall($expression),
+            $expression instanceof In => $this->serializeIn($expression),
+            $expression instanceof Between => $this->serializeBetween($expression),
+            $expression instanceof Exists => $this->serializeExists($expression),
+            $expression instanceof Conditional => $this->serializeConditional($expression),
+            $expression instanceof Cast => $this->serializeCast($expression),
+            $expression instanceof Subquery => '(' . $this->serialize($expression->query) . ')',
+            default => throw new \Utopia\Query\Exception('Unsupported expression type: ' . get_class($expression)),
         };
     }
 
@@ -116,14 +129,14 @@ class Serializer
         };
     }
 
-    private function serializeBinary(BinaryExpr $expr, ?int $parentPrecedence): string
+    private function serializeBinary(Binary $expression, ?int $parentPrecedence): string
     {
-        $prec = $this->operatorPrecedence($expr->operator);
+        $prec = $this->operatorPrecedence($expression->operator);
 
-        $left = $this->serializeBinaryChild($expr->left, $prec);
-        $right = $this->serializeBinaryChild($expr->right, $prec);
+        $left = $this->serializeBinaryChild($expression->left, $prec);
+        $right = $this->serializeBinaryChild($expression->right, $prec);
 
-        $sql = $left . ' ' . $expr->operator . ' ' . $right;
+        $sql = $left . ' ' . $expression->operator . ' ' . $right;
 
         if ($parentPrecedence !== null && $prec < $parentPrecedence) {
             return '(' . $sql . ')';
@@ -132,193 +145,193 @@ class Serializer
         return $sql;
     }
 
-    private function serializeBinaryChild(Expr $child, int $parentPrecedence): string
+    private function serializeBinaryChild(Expression $child, int $parentPrecedence): string
     {
-        if ($child instanceof BinaryExpr) {
+        if ($child instanceof Binary) {
             return $this->serializeBinary($child, $parentPrecedence);
         }
 
-        return $this->serializeExpr($child);
+        return $this->serializeExpression($child);
     }
 
-    private function serializeUnary(UnaryExpr $expr): string
+    private function serializeUnary(Unary $expression): string
     {
-        if ($expr->prefix) {
-            $op = $expr->operator;
-            $operand = $this->serializeExpr($expr->operand);
+        if ($expression->prefix) {
+            $op = $expression->operator;
+            $operand = $this->serializeExpression($expression->operand);
             if (strlen($op) === 1) {
                 return $op . '(' . $operand . ')';
             }
             return $op . ' (' . $operand . ')';
         }
 
-        $operand = $this->serializeExpr($expr->operand);
-        return $operand . ' ' . $expr->operator;
+        $operand = $this->serializeExpression($expression->operand);
+        return $operand . ' ' . $expression->operator;
     }
 
-    private function serializeColumnRef(ColumnRef $expr): string
+    private function serializeColumnReference(Column $expression): string
     {
         $parts = [];
-        if ($expr->schema !== null) {
-            $parts[] = $this->quoteIdentifier($expr->schema);
+        if ($expression->schema !== null) {
+            $parts[] = $this->quoteIdentifier($expression->schema);
         }
-        if ($expr->table !== null) {
-            $parts[] = $this->quoteIdentifier($expr->table);
+        if ($expression->table !== null) {
+            $parts[] = $this->quoteIdentifier($expression->table);
         }
-        $parts[] = $this->quoteIdentifier($expr->name);
+        $parts[] = $this->quoteIdentifier($expression->name);
         return implode('.', $parts);
     }
 
-    private function serializeLiteral(Literal $expr): string
+    private function serializeLiteral(Literal $expression): string
     {
-        if ($expr->value === null) {
+        if ($expression->value === null) {
             return 'NULL';
         }
-        if (is_bool($expr->value)) {
-            return $expr->value ? 'TRUE' : 'FALSE';
+        if (is_bool($expression->value)) {
+            return $expression->value ? 'TRUE' : 'FALSE';
         }
-        if (is_int($expr->value)) {
-            return (string) $expr->value;
+        if (is_int($expression->value)) {
+            return (string) $expression->value;
         }
-        if (is_float($expr->value)) {
-            return (string) $expr->value;
+        if (is_float($expression->value)) {
+            return (string) $expression->value;
         }
-        return "'" . str_replace("'", "''", $expr->value) . "'";
+        return "'" . str_replace("'", "''", $expression->value) . "'";
     }
 
-    private function serializeStar(Star $expr): string
+    private function serializeStar(Star $expression): string
     {
-        if ($expr->schema !== null && $expr->table !== null) {
-            return $this->quoteIdentifier($expr->schema) . '.' . $this->quoteIdentifier($expr->table) . '.*';
+        if ($expression->schema !== null && $expression->table !== null) {
+            return $this->quoteIdentifier($expression->schema) . '.' . $this->quoteIdentifier($expression->table) . '.*';
         }
-        if ($expr->table !== null) {
-            return $this->quoteIdentifier($expr->table) . '.*';
+        if ($expression->table !== null) {
+            return $this->quoteIdentifier($expression->table) . '.*';
         }
         return '*';
     }
 
-    private function serializeFunctionCall(FunctionCall $expr): string
+    private function serializeFunctionCall(FunctionCall $expression): string
     {
-        if (count($expr->arguments) === 1 && $expr->arguments[0] instanceof Star) {
-            return $expr->name . '(*)';
+        if (count($expression->arguments) === 1 && $expression->arguments[0] instanceof Star) {
+            return $expression->name . '(*)';
         }
 
-        if (empty($expr->arguments)) {
-            return $expr->name . '()';
+        if (empty($expression->arguments)) {
+            return $expression->name . '()';
         }
 
         $args = [];
-        foreach ($expr->arguments as $arg) {
-            $args[] = $this->serializeExpr($arg);
+        foreach ($expression->arguments as $arg) {
+            $args[] = $this->serializeExpression($arg);
         }
 
-        $prefix = $expr->distinct ? 'DISTINCT ' : '';
-        $sql = $expr->name . '(' . $prefix . implode(', ', $args) . ')';
+        $prefix = $expression->distinct ? 'DISTINCT ' : '';
+        $sql = $expression->name . '(' . $prefix . implode(', ', $args) . ')';
 
-        if ($expr->filter !== null) {
-            $sql .= ' FILTER (WHERE ' . $this->serializeExpr($expr->filter) . ')';
+        if ($expression->filter !== null) {
+            $sql .= ' FILTER (WHERE ' . $this->serializeExpression($expression->filter) . ')';
         }
 
         return $sql;
     }
 
-    private function serializeIn(InExpr $expr): string
+    private function serializeIn(In $expression): string
     {
-        $left = $this->serializeExpr($expr->expr);
-        $keyword = $expr->negated ? 'NOT IN' : 'IN';
+        $left = $this->serializeExpression($expression->expression);
+        $keyword = $expression->negated ? 'NOT IN' : 'IN';
 
-        if ($expr->list instanceof SelectStatement) {
-            return $left . ' ' . $keyword . ' (' . $this->serialize($expr->list) . ')';
+        if ($expression->list instanceof SelectStatement) {
+            return $left . ' ' . $keyword . ' (' . $this->serialize($expression->list) . ')';
         }
 
         $items = [];
-        foreach ($expr->list as $item) {
-            $items[] = $this->serializeExpr($item);
+        foreach ($expression->list as $item) {
+            $items[] = $this->serializeExpression($item);
         }
         return $left . ' ' . $keyword . ' (' . implode(', ', $items) . ')';
     }
 
-    private function serializeBetween(BetweenExpr $expr): string
+    private function serializeBetween(Between $expression): string
     {
-        $left = $this->serializeExpr($expr->expr);
-        $keyword = $expr->negated ? 'NOT BETWEEN' : 'BETWEEN';
-        $low = $this->serializeExpr($expr->low);
-        $high = $this->serializeExpr($expr->high);
+        $left = $this->serializeExpression($expression->expression);
+        $keyword = $expression->negated ? 'NOT BETWEEN' : 'BETWEEN';
+        $low = $this->serializeExpression($expression->low);
+        $high = $this->serializeExpression($expression->high);
         return $left . ' ' . $keyword . ' ' . $low . ' AND ' . $high;
     }
 
-    private function serializeExists(ExistsExpr $expr): string
+    private function serializeExists(Exists $expression): string
     {
-        $keyword = $expr->negated ? 'NOT EXISTS' : 'EXISTS';
-        return $keyword . ' (' . $this->serialize($expr->subquery) . ')';
+        $keyword = $expression->negated ? 'NOT EXISTS' : 'EXISTS';
+        return $keyword . ' (' . $this->serialize($expression->subquery) . ')';
     }
 
-    private function serializeCase(CaseExpr $expr): string
+    private function serializeConditional(Conditional $expression): string
     {
         $sql = 'CASE';
-        if ($expr->operand !== null) {
-            $sql .= ' ' . $this->serializeExpr($expr->operand);
+        if ($expression->operand !== null) {
+            $sql .= ' ' . $this->serializeExpression($expression->operand);
         }
 
-        foreach ($expr->whens as $when) {
-            $sql .= ' WHEN ' . $this->serializeExpr($when->condition);
-            $sql .= ' THEN ' . $this->serializeExpr($when->result);
+        foreach ($expression->whens as $when) {
+            $sql .= ' WHEN ' . $this->serializeExpression($when->condition);
+            $sql .= ' THEN ' . $this->serializeExpression($when->result);
         }
 
-        if ($expr->else !== null) {
-            $sql .= ' ELSE ' . $this->serializeExpr($expr->else);
+        if ($expression->else !== null) {
+            $sql .= ' ELSE ' . $this->serializeExpression($expression->else);
         }
 
         $sql .= ' END';
         return $sql;
     }
 
-    private function serializeCast(CastExpr $expr): string
+    private function serializeCast(Cast $expression): string
     {
-        return 'CAST(' . $this->serializeExpr($expr->expr) . ' AS ' . $expr->type . ')';
+        return 'CAST(' . $this->serializeExpression($expression->expression) . ' AS ' . $expression->type . ')';
     }
 
-    private function serializeWindowExpr(WindowExpr $expr): string
+    private function serializeWindowExpression(Window $expression): string
     {
-        $fn = $this->serializeExpr($expr->function);
+        $function = $this->serializeExpression($expression->function);
 
-        if ($expr->windowName !== null) {
-            return $fn . ' OVER ' . $this->quoteIdentifier($expr->windowName);
+        if ($expression->windowName !== null) {
+            return $function . ' OVER ' . $this->quoteIdentifier($expression->windowName);
         }
 
-        if ($expr->spec !== null) {
-            return $fn . ' OVER (' . $this->serializeWindowSpec($expr->spec) . ')';
+        if ($expression->specification !== null) {
+            return $function . ' OVER (' . $this->serializeWindowSpecification($expression->specification) . ')';
         }
 
-        return $fn . ' OVER ()';
+        return $function . ' OVER ()';
     }
 
-    private function serializeWindowSpec(WindowSpec $spec): string
+    private function serializeWindowSpecification(WindowSpecification $specification): string
     {
         $parts = [];
 
-        if (!empty($spec->partitionBy)) {
-            $exprs = [];
-            foreach ($spec->partitionBy as $expr) {
-                $exprs[] = $this->serializeExpr($expr);
+        if (!empty($specification->partitionBy)) {
+            $expressions = [];
+            foreach ($specification->partitionBy as $expression) {
+                $expressions[] = $this->serializeExpression($expression);
             }
-            $parts[] = 'PARTITION BY ' . implode(', ', $exprs);
+            $parts[] = 'PARTITION BY ' . implode(', ', $expressions);
         }
 
-        if (!empty($spec->orderBy)) {
+        if (!empty($specification->orderBy)) {
             $items = [];
-            foreach ($spec->orderBy as $item) {
+            foreach ($specification->orderBy as $item) {
                 $items[] = $this->serializeOrderByItem($item);
             }
             $parts[] = 'ORDER BY ' . implode(', ', $items);
         }
 
-        if ($spec->frameType !== null) {
-            $frame = $spec->frameType;
-            if ($spec->frameEnd !== null) {
-                $frame .= ' BETWEEN ' . $spec->frameStart . ' AND ' . $spec->frameEnd;
+        if ($specification->frameType !== null) {
+            $frame = $specification->frameType;
+            if ($specification->frameEnd !== null) {
+                $frame .= ' BETWEEN ' . $specification->frameStart . ' AND ' . $specification->frameEnd;
             } else {
-                $frame .= ' ' . $spec->frameStart;
+                $frame .= ' ' . $specification->frameStart;
             }
             $parts[] = $frame;
         }
@@ -328,31 +341,31 @@ class Serializer
 
     private function serializeOrderByItem(OrderByItem $item): string
     {
-        $sql = $this->serializeExpr($item->expr) . ' ' . $item->direction;
+        $sql = $this->serializeExpression($item->expression) . ' ' . $item->direction;
         if ($item->nulls !== null) {
             $sql .= ' NULLS ' . $item->nulls;
         }
         return $sql;
     }
 
-    private function serializeTableSource(TableRef|SubquerySource $source): string
+    private function serializeTableSource(Table|SubquerySource $source): string
     {
         if ($source instanceof SubquerySource) {
             return '(' . $this->serialize($source->query) . ') AS ' . $this->quoteIdentifier($source->alias);
         }
 
-        return $this->serializeTableRef($source);
+        return $this->serializeTableReference($source);
     }
 
-    private function serializeTableRef(TableRef $ref): string
+    private function serializeTableReference(Table $reference): string
     {
         $sql = '';
-        if ($ref->schema !== null) {
-            $sql .= $this->quoteIdentifier($ref->schema) . '.';
+        if ($reference->schema !== null) {
+            $sql .= $this->quoteIdentifier($reference->schema) . '.';
         }
-        $sql .= $this->quoteIdentifier($ref->name);
-        if ($ref->alias !== null) {
-            $sql .= ' AS ' . $this->quoteIdentifier($ref->alias);
+        $sql .= $this->quoteIdentifier($reference->name);
+        if ($reference->alias !== null) {
+            $sql .= ' AS ' . $this->quoteIdentifier($reference->alias);
         }
         return $sql;
     }
@@ -361,7 +374,7 @@ class Serializer
     {
         $sql = $join->type . ' ' . $this->serializeTableSource($join->table);
         if ($join->condition !== null) {
-            $sql .= ' ON ' . $this->serializeExpr($join->condition);
+            $sql .= ' ON ' . $this->serializeExpression($join->condition);
         }
         return $sql;
     }

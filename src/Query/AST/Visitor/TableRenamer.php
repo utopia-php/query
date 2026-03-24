@@ -2,11 +2,11 @@
 
 namespace Utopia\Query\AST\Visitor;
 
-use Utopia\Query\AST\ColumnRef;
-use Utopia\Query\AST\Expr;
+use Utopia\Query\AST\Expression;
+use Utopia\Query\AST\Reference\Column;
+use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\SelectStatement;
 use Utopia\Query\AST\Star;
-use Utopia\Query\AST\TableRef;
 use Utopia\Query\AST\Visitor;
 
 class TableRenamer implements Visitor
@@ -16,39 +16,39 @@ class TableRenamer implements Visitor
     {
     }
 
-    public function visitExpr(Expr $expr): Expr
+    public function visitExpression(Expression $expression): Expression
     {
-        if ($expr instanceof ColumnRef && $expr->table !== null) {
-            $newTable = $this->renames[$expr->table] ?? null;
+        if ($expression instanceof Column && $expression->table !== null) {
+            $newTable = $this->renames[$expression->table] ?? null;
             if ($newTable !== null) {
-                return new ColumnRef($expr->name, $newTable, $expr->schema);
+                return new Column($expression->name, $newTable, $expression->schema);
             }
         }
 
-        if ($expr instanceof Star && $expr->table !== null) {
-            $newTable = $this->renames[$expr->table] ?? null;
+        if ($expression instanceof Star && $expression->table !== null) {
+            $newTable = $this->renames[$expression->table] ?? null;
             if ($newTable !== null) {
-                return new Star($newTable, $expr->schema);
+                return new Star($newTable, $expression->schema);
             }
         }
 
-        return $expr;
+        return $expression;
     }
 
-    public function visitTableRef(TableRef $ref): TableRef
+    public function visitTableReference(Table $reference): Table
     {
-        $newName = $this->renames[$ref->name] ?? null;
-        $newAlias = $ref->alias !== null ? ($this->renames[$ref->alias] ?? null) : null;
+        $newName = $this->renames[$reference->name] ?? null;
+        $newAlias = $reference->alias !== null ? ($this->renames[$reference->alias] ?? null) : null;
 
         if ($newName !== null || $newAlias !== null) {
-            return new TableRef(
-                $newName ?? $ref->name,
-                $newAlias ?? $ref->alias,
-                $ref->schema,
+            return new Table(
+                $newName ?? $reference->name,
+                $newAlias ?? $reference->alias,
+                $reference->schema,
             );
         }
 
-        return $ref;
+        return $reference;
     }
 
     public function visitSelect(SelectStatement $stmt): SelectStatement

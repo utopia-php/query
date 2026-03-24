@@ -3,49 +3,49 @@
 namespace Tests\Query\AST;
 
 use PHPUnit\Framework\TestCase;
-use Utopia\Query\AST\AliasedExpr;
-use Utopia\Query\AST\BetweenExpr;
-use Utopia\Query\AST\BinaryExpr;
-use Utopia\Query\AST\CaseExpr;
-use Utopia\Query\AST\CaseWhen;
-use Utopia\Query\AST\CastExpr;
-use Utopia\Query\AST\ColumnRef;
 use Utopia\Query\AST\CteDefinition;
-use Utopia\Query\AST\ExistsExpr;
-use Utopia\Query\AST\Expr;
+use Utopia\Query\AST\Expression;
+use Utopia\Query\AST\Expression\Aliased;
+use Utopia\Query\AST\Expression\Between;
+use Utopia\Query\AST\Expression\Binary;
+use Utopia\Query\AST\Expression\CaseWhen;
+use Utopia\Query\AST\Expression\Cast;
+use Utopia\Query\AST\Expression\Conditional;
+use Utopia\Query\AST\Expression\Exists;
+use Utopia\Query\AST\Expression\In;
+use Utopia\Query\AST\Expression\Subquery;
+use Utopia\Query\AST\Expression\Unary;
+use Utopia\Query\AST\Expression\Window;
 use Utopia\Query\AST\FunctionCall;
-use Utopia\Query\AST\InExpr;
 use Utopia\Query\AST\JoinClause;
 use Utopia\Query\AST\Literal;
 use Utopia\Query\AST\OrderByItem;
 use Utopia\Query\AST\Placeholder;
 use Utopia\Query\AST\Raw;
+use Utopia\Query\AST\Reference\Column;
+use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\SelectStatement;
 use Utopia\Query\AST\Star;
-use Utopia\Query\AST\SubqueryExpr;
 use Utopia\Query\AST\SubquerySource;
-use Utopia\Query\AST\TableRef;
-use Utopia\Query\AST\UnaryExpr;
 use Utopia\Query\AST\WindowDefinition;
-use Utopia\Query\AST\WindowExpr;
-use Utopia\Query\AST\WindowSpec;
+use Utopia\Query\AST\WindowSpecification;
 
 class NodeTest extends TestCase
 {
-    public function testColumnRef(): void
+    public function testColumnReference(): void
     {
-        $col = new ColumnRef('id');
-        $this->assertInstanceOf(Expr::class, $col);
+        $col = new Column('id');
+        $this->assertInstanceOf(Expression::class, $col);
         $this->assertSame('id', $col->name);
         $this->assertNull($col->table);
         $this->assertNull($col->schema);
 
-        $col = new ColumnRef('id', 'users');
+        $col = new Column('id', 'users');
         $this->assertSame('id', $col->name);
         $this->assertSame('users', $col->table);
         $this->assertNull($col->schema);
 
-        $col = new ColumnRef('id', 'users', 'public');
+        $col = new Column('id', 'users', 'public');
         $this->assertSame('id', $col->name);
         $this->assertSame('users', $col->table);
         $this->assertSame('public', $col->schema);
@@ -54,7 +54,7 @@ class NodeTest extends TestCase
     public function testLiteral(): void
     {
         $str = new Literal('hello');
-        $this->assertInstanceOf(Expr::class, $str);
+        $this->assertInstanceOf(Expression::class, $str);
         $this->assertSame('hello', $str->value);
 
         $int = new Literal(42);
@@ -73,7 +73,7 @@ class NodeTest extends TestCase
     public function testStar(): void
     {
         $star = new Star();
-        $this->assertInstanceOf(Expr::class, $star);
+        $this->assertInstanceOf(Expression::class, $star);
         $this->assertNull($star->table);
 
         $star = new Star('users');
@@ -83,7 +83,7 @@ class NodeTest extends TestCase
     public function testPlaceholder(): void
     {
         $q = new Placeholder('?');
-        $this->assertInstanceOf(Expr::class, $q);
+        $this->assertInstanceOf(Expression::class, $q);
         $this->assertSame('?', $q->value);
 
         $named = new Placeholder(':name');
@@ -96,63 +96,63 @@ class NodeTest extends TestCase
     public function testRaw(): void
     {
         $raw = new Raw('NOW() + INTERVAL 1 DAY');
-        $this->assertInstanceOf(Expr::class, $raw);
+        $this->assertInstanceOf(Expression::class, $raw);
         $this->assertSame('NOW() + INTERVAL 1 DAY', $raw->sql);
     }
 
-    public function testBinaryExpr(): void
+    public function testBinaryExpression(): void
     {
-        $left = new ColumnRef('age');
+        $left = new Column('age');
         $right = new Literal(18);
-        $expr = new BinaryExpr($left, '>=', $right);
+        $expression = new Binary($left, '>=', $right);
 
-        $this->assertInstanceOf(Expr::class, $expr);
-        $this->assertSame($left, $expr->left);
-        $this->assertSame('>=', $expr->operator);
-        $this->assertSame($right, $expr->right);
+        $this->assertInstanceOf(Expression::class, $expression);
+        $this->assertSame($left, $expression->left);
+        $this->assertSame('>=', $expression->operator);
+        $this->assertSame($right, $expression->right);
 
-        $and = new BinaryExpr(
-            new BinaryExpr(new ColumnRef('a'), '=', new Literal(1)),
+        $and = new Binary(
+            new Binary(new Column('a'), '=', new Literal(1)),
             'AND',
-            new BinaryExpr(new ColumnRef('b'), '=', new Literal(2)),
+            new Binary(new Column('b'), '=', new Literal(2)),
         );
         $this->assertSame('AND', $and->operator);
     }
 
-    public function testUnaryExprPrefix(): void
+    public function testUnaryExpressionPrefix(): void
     {
-        $operand = new ColumnRef('active');
-        $not = new UnaryExpr('NOT', $operand);
+        $operand = new Column('active');
+        $not = new Unary('NOT', $operand);
 
-        $this->assertInstanceOf(Expr::class, $not);
+        $this->assertInstanceOf(Expression::class, $not);
         $this->assertSame('NOT', $not->operator);
         $this->assertSame($operand, $not->operand);
         $this->assertTrue($not->prefix);
 
-        $neg = new UnaryExpr('-', new Literal(5));
+        $neg = new Unary('-', new Literal(5));
         $this->assertSame('-', $neg->operator);
         $this->assertTrue($neg->prefix);
     }
 
-    public function testUnaryExprPostfix(): void
+    public function testUnaryExpressionPostfix(): void
     {
-        $operand = new ColumnRef('deleted_at');
-        $isNull = new UnaryExpr('IS NULL', $operand, false);
+        $operand = new Column('deleted_at');
+        $isNull = new Unary('IS NULL', $operand, false);
 
-        $this->assertInstanceOf(Expr::class, $isNull);
+        $this->assertInstanceOf(Expression::class, $isNull);
         $this->assertSame('IS NULL', $isNull->operator);
         $this->assertSame($operand, $isNull->operand);
         $this->assertFalse($isNull->prefix);
 
-        $isNotNull = new UnaryExpr('IS NOT NULL', $operand, false);
+        $isNotNull = new Unary('IS NOT NULL', $operand, false);
         $this->assertSame('IS NOT NULL', $isNotNull->operator);
         $this->assertFalse($isNotNull->prefix);
     }
 
     public function testFunctionCall(): void
     {
-        $fn = new FunctionCall('UPPER', [new ColumnRef('name')]);
-        $this->assertInstanceOf(Expr::class, $fn);
+        $fn = new FunctionCall('UPPER', [new Column('name')]);
+        $this->assertInstanceOf(Expression::class, $fn);
         $this->assertSame('UPPER', $fn->name);
         $this->assertCount(1, $fn->arguments);
         $this->assertFalse($fn->distinct);
@@ -164,180 +164,180 @@ class NodeTest extends TestCase
 
     public function testFunctionCallDistinct(): void
     {
-        $count = new FunctionCall('COUNT', [new ColumnRef('id')], true);
+        $count = new FunctionCall('COUNT', [new Column('id')], true);
         $this->assertSame('COUNT', $count->name);
         $this->assertTrue($count->distinct);
         $this->assertCount(1, $count->arguments);
     }
 
-    public function testInExpr(): void
+    public function testInExpression(): void
     {
-        $col = new ColumnRef('status');
+        $col = new Column('status');
         $list = [new Literal('active'), new Literal('pending')];
-        $in = new InExpr($col, $list);
+        $in = new In($col, $list);
 
-        $this->assertInstanceOf(Expr::class, $in);
-        $this->assertSame($col, $in->expr);
+        $this->assertInstanceOf(Expression::class, $in);
+        $this->assertSame($col, $in->expression);
         $this->assertSame($list, $in->list);
         $this->assertFalse($in->negated);
 
-        $notIn = new InExpr($col, $list, true);
+        $notIn = new In($col, $list, true);
         $this->assertTrue($notIn->negated);
 
         $subquery = new SelectStatement(
-            columns: [new ColumnRef('id')],
-            from: new TableRef('other'),
+            columns: [new Column('id')],
+            from: new Table('other'),
         );
-        $inSub = new InExpr($col, $subquery);
+        $inSub = new In($col, $subquery);
         $this->assertInstanceOf(SelectStatement::class, $inSub->list);
     }
 
-    public function testBetweenExpr(): void
+    public function testBetweenExpression(): void
     {
-        $col = new ColumnRef('age');
+        $col = new Column('age');
         $low = new Literal(18);
         $high = new Literal(65);
-        $between = new BetweenExpr($col, $low, $high);
+        $between = new Between($col, $low, $high);
 
-        $this->assertInstanceOf(Expr::class, $between);
-        $this->assertSame($col, $between->expr);
+        $this->assertInstanceOf(Expression::class, $between);
+        $this->assertSame($col, $between->expression);
         $this->assertSame($low, $between->low);
         $this->assertSame($high, $between->high);
         $this->assertFalse($between->negated);
 
-        $notBetween = new BetweenExpr($col, $low, $high, true);
+        $notBetween = new Between($col, $low, $high, true);
         $this->assertTrue($notBetween->negated);
     }
 
-    public function testExistsExpr(): void
+    public function testExistsExpression(): void
     {
         $subquery = new SelectStatement(
             columns: [new Literal(1)],
-            from: new TableRef('users'),
-            where: new BinaryExpr(new ColumnRef('id'), '=', new Literal(1)),
+            from: new Table('users'),
+            where: new Binary(new Column('id'), '=', new Literal(1)),
         );
 
-        $exists = new ExistsExpr($subquery);
-        $this->assertInstanceOf(Expr::class, $exists);
+        $exists = new Exists($subquery);
+        $this->assertInstanceOf(Expression::class, $exists);
         $this->assertSame($subquery, $exists->subquery);
         $this->assertFalse($exists->negated);
 
-        $notExists = new ExistsExpr($subquery, true);
+        $notExists = new Exists($subquery, true);
         $this->assertTrue($notExists->negated);
     }
 
-    public function testCaseExpr(): void
+    public function testConditionalExpression(): void
     {
         $whens = [
             new CaseWhen(
-                new BinaryExpr(new ColumnRef('status'), '=', new Literal('active')),
+                new Binary(new Column('status'), '=', new Literal('active')),
                 new Literal(1),
             ),
             new CaseWhen(
-                new BinaryExpr(new ColumnRef('status'), '=', new Literal('inactive')),
+                new Binary(new Column('status'), '=', new Literal('inactive')),
                 new Literal(0),
             ),
         ];
         $else = new Literal(-1);
-        $searched = new CaseExpr(null, $whens, $else);
+        $searched = new Conditional(null, $whens, $else);
 
-        $this->assertInstanceOf(Expr::class, $searched);
+        $this->assertInstanceOf(Expression::class, $searched);
         $this->assertNull($searched->operand);
         $this->assertCount(2, $searched->whens);
         $this->assertSame($else, $searched->else);
 
-        $simple = new CaseExpr(new ColumnRef('status'), $whens);
-        $this->assertInstanceOf(Expr::class, $simple);
+        $simple = new Conditional(new Column('status'), $whens);
+        $this->assertInstanceOf(Expression::class, $simple);
         $this->assertNotNull($simple->operand);
         $this->assertNull($simple->else);
     }
 
-    public function testCastExpr(): void
+    public function testCastExpression(): void
     {
-        $expr = new ColumnRef('price');
-        $cast = new CastExpr($expr, 'INTEGER');
+        $expression = new Column('price');
+        $cast = new Cast($expression, 'INTEGER');
 
-        $this->assertInstanceOf(Expr::class, $cast);
-        $this->assertSame($expr, $cast->expr);
+        $this->assertInstanceOf(Expression::class, $cast);
+        $this->assertSame($expression, $cast->expression);
         $this->assertSame('INTEGER', $cast->type);
     }
 
-    public function testAliasedExpr(): void
+    public function testAliasedExpression(): void
     {
-        $expr = new FunctionCall('COUNT', [new Star()]);
-        $aliased = new AliasedExpr($expr, 'total');
+        $expression = new FunctionCall('COUNT', [new Star()]);
+        $aliased = new Aliased($expression, 'total');
 
-        $this->assertInstanceOf(Expr::class, $aliased);
-        $this->assertSame($expr, $aliased->expr);
+        $this->assertInstanceOf(Expression::class, $aliased);
+        $this->assertSame($expression, $aliased->expression);
         $this->assertSame('total', $aliased->alias);
     }
 
-    public function testSubqueryExpr(): void
+    public function testSubqueryExpression(): void
     {
         $query = new SelectStatement(
-            columns: [new FunctionCall('MAX', [new ColumnRef('salary')])],
-            from: new TableRef('employees'),
+            columns: [new FunctionCall('MAX', [new Column('salary')])],
+            from: new Table('employees'),
         );
-        $sub = new SubqueryExpr($query);
+        $sub = new Subquery($query);
 
-        $this->assertInstanceOf(Expr::class, $sub);
+        $this->assertInstanceOf(Expression::class, $sub);
         $this->assertSame($query, $sub->query);
     }
 
-    public function testWindowExpr(): void
+    public function testWindowExpression(): void
     {
         $fn = new FunctionCall('ROW_NUMBER');
-        $spec = new WindowSpec(
-            partitionBy: [new ColumnRef('department')],
-            orderBy: [new OrderByItem(new ColumnRef('salary'), 'DESC')],
+        $specification = new WindowSpecification(
+            partitionBy: [new Column('department')],
+            orderBy: [new OrderByItem(new Column('salary'), 'DESC')],
         );
-        $window = new WindowExpr($fn, spec: $spec);
+        $window = new Window($fn, specification: $specification);
 
-        $this->assertInstanceOf(Expr::class, $window);
+        $this->assertInstanceOf(Expression::class, $window);
         $this->assertSame($fn, $window->function);
         $this->assertNull($window->windowName);
-        $this->assertSame($spec, $window->spec);
+        $this->assertSame($specification, $window->specification);
 
-        $namedWindow = new WindowExpr($fn, windowName: 'w');
+        $namedWindow = new Window($fn, windowName: 'w');
         $this->assertSame('w', $namedWindow->windowName);
-        $this->assertNull($namedWindow->spec);
+        $this->assertNull($namedWindow->specification);
     }
 
-    public function testWindowSpec(): void
+    public function testWindowSpecification(): void
     {
-        $spec = new WindowSpec();
-        $this->assertSame([], $spec->partitionBy);
-        $this->assertSame([], $spec->orderBy);
-        $this->assertNull($spec->frameType);
-        $this->assertNull($spec->frameStart);
-        $this->assertNull($spec->frameEnd);
+        $specification = new WindowSpecification();
+        $this->assertSame([], $specification->partitionBy);
+        $this->assertSame([], $specification->orderBy);
+        $this->assertNull($specification->frameType);
+        $this->assertNull($specification->frameStart);
+        $this->assertNull($specification->frameEnd);
 
-        $spec = new WindowSpec(
-            partitionBy: [new ColumnRef('dept')],
-            orderBy: [new OrderByItem(new ColumnRef('hire_date'))],
+        $specification = new WindowSpecification(
+            partitionBy: [new Column('dept')],
+            orderBy: [new OrderByItem(new Column('hire_date'))],
             frameType: 'ROWS',
             frameStart: 'UNBOUNDED PRECEDING',
             frameEnd: 'CURRENT ROW',
         );
-        $this->assertCount(1, $spec->partitionBy);
-        $this->assertCount(1, $spec->orderBy);
-        $this->assertSame('ROWS', $spec->frameType);
-        $this->assertSame('UNBOUNDED PRECEDING', $spec->frameStart);
-        $this->assertSame('CURRENT ROW', $spec->frameEnd);
+        $this->assertCount(1, $specification->partitionBy);
+        $this->assertCount(1, $specification->orderBy);
+        $this->assertSame('ROWS', $specification->frameType);
+        $this->assertSame('UNBOUNDED PRECEDING', $specification->frameStart);
+        $this->assertSame('CURRENT ROW', $specification->frameEnd);
     }
 
-    public function testTableRef(): void
+    public function testTableReference(): void
     {
-        $table = new TableRef('users');
+        $table = new Table('users');
         $this->assertSame('users', $table->name);
         $this->assertNull($table->alias);
         $this->assertNull($table->schema);
 
-        $aliased = new TableRef('users', 'u');
+        $aliased = new Table('users', 'u');
         $this->assertSame('users', $aliased->name);
         $this->assertSame('u', $aliased->alias);
 
-        $schemed = new TableRef('users', 'u', 'public');
+        $schemed = new Table('users', 'u', 'public');
         $this->assertSame('public', $schemed->schema);
     }
 
@@ -345,7 +345,7 @@ class NodeTest extends TestCase
     {
         $query = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users'),
+            from: new Table('users'),
         );
         $source = new SubquerySource($query, 'sub');
 
@@ -355,11 +355,11 @@ class NodeTest extends TestCase
 
     public function testJoinClause(): void
     {
-        $table = new TableRef('orders', 'o');
-        $condition = new BinaryExpr(
-            new ColumnRef('id', 'u'),
+        $table = new Table('orders', 'o');
+        $condition = new Binary(
+            new Column('id', 'u'),
             '=',
-            new ColumnRef('user_id', 'o'),
+            new Column('user_id', 'o'),
         );
 
         $join = new JoinClause('JOIN', $table, $condition);
@@ -374,7 +374,7 @@ class NodeTest extends TestCase
         $this->assertNull($cross->condition);
 
         $subSource = new SubquerySource(
-            new SelectStatement(columns: [new Star()], from: new TableRef('items')),
+            new SelectStatement(columns: [new Star()], from: new Table('items')),
             'i',
         );
         $subJoin = new JoinClause('LEFT JOIN', $subSource, $condition);
@@ -383,38 +383,38 @@ class NodeTest extends TestCase
 
     public function testOrderByItem(): void
     {
-        $item = new OrderByItem(new ColumnRef('name'));
+        $item = new OrderByItem(new Column('name'));
         $this->assertSame('ASC', $item->direction);
         $this->assertNull($item->nulls);
 
-        $desc = new OrderByItem(new ColumnRef('created_at'), 'DESC');
+        $desc = new OrderByItem(new Column('created_at'), 'DESC');
         $this->assertSame('DESC', $desc->direction);
 
-        $nullsFirst = new OrderByItem(new ColumnRef('score'), 'ASC', 'FIRST');
+        $nullsFirst = new OrderByItem(new Column('score'), 'ASC', 'FIRST');
         $this->assertSame('FIRST', $nullsFirst->nulls);
 
-        $nullsLast = new OrderByItem(new ColumnRef('score'), 'DESC', 'LAST');
+        $nullsLast = new OrderByItem(new Column('score'), 'DESC', 'LAST');
         $this->assertSame('LAST', $nullsLast->nulls);
     }
 
     public function testWindowDefinition(): void
     {
-        $spec = new WindowSpec(
-            partitionBy: [new ColumnRef('dept')],
-            orderBy: [new OrderByItem(new ColumnRef('salary'), 'DESC')],
+        $specification = new WindowSpecification(
+            partitionBy: [new Column('dept')],
+            orderBy: [new OrderByItem(new Column('salary'), 'DESC')],
         );
-        $def = new WindowDefinition('w', $spec);
+        $def = new WindowDefinition('w', $specification);
 
         $this->assertSame('w', $def->name);
-        $this->assertSame($spec, $def->spec);
+        $this->assertSame($specification, $def->specification);
     }
 
     public function testCteDefinition(): void
     {
         $query = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('employees'),
-            where: new BinaryExpr(new ColumnRef('active'), '=', new Literal(true)),
+            from: new Table('employees'),
+            where: new Binary(new Column('active'), '=', new Literal(true)),
         );
 
         $cte = new CteDefinition('active_employees', $query);
@@ -434,32 +434,32 @@ class NodeTest extends TestCase
     {
         $select = new SelectStatement(
             columns: [
-                new ColumnRef('name', 'u'),
-                new AliasedExpr(new FunctionCall('COUNT', [new Star()]), 'order_count'),
+                new Column('name', 'u'),
+                new Aliased(new FunctionCall('COUNT', [new Star()]), 'order_count'),
             ],
-            from: new TableRef('users', 'u'),
+            from: new Table('users', 'u'),
             joins: [
                 new JoinClause(
                     'LEFT JOIN',
-                    new TableRef('orders', 'o'),
-                    new BinaryExpr(new ColumnRef('id', 'u'), '=', new ColumnRef('user_id', 'o')),
+                    new Table('orders', 'o'),
+                    new Binary(new Column('id', 'u'), '=', new Column('user_id', 'o')),
                 ),
             ],
-            where: new BinaryExpr(new ColumnRef('active', 'u'), '=', new Literal(true)),
-            groupBy: [new ColumnRef('name', 'u')],
-            having: new BinaryExpr(
+            where: new Binary(new Column('active', 'u'), '=', new Literal(true)),
+            groupBy: [new Column('name', 'u')],
+            having: new Binary(
                 new FunctionCall('COUNT', [new Star()]),
                 '>',
                 new Literal(5),
             ),
-            orderBy: [new OrderByItem(new ColumnRef('name', 'u'))],
+            orderBy: [new OrderByItem(new Column('name', 'u'))],
             limit: new Literal(10),
             offset: new Literal(0),
             distinct: true,
         );
 
         $this->assertCount(2, $select->columns);
-        $this->assertInstanceOf(TableRef::class, $select->from);
+        $this->assertInstanceOf(Table::class, $select->from);
         $this->assertCount(1, $select->joins);
         $this->assertNotNull($select->where);
         $this->assertCount(1, $select->groupBy);
@@ -476,7 +476,7 @@ class NodeTest extends TestCase
     {
         $original = new SelectStatement(
             columns: [new Star()],
-            from: new TableRef('users'),
+            from: new Table('users'),
             limit: new Literal(10),
             distinct: false,
         );
@@ -496,7 +496,7 @@ class NodeTest extends TestCase
         $this->assertFalse($original->distinct);
 
         $withWhere = $original->with(
-            where: new BinaryExpr(new ColumnRef('id'), '=', new Literal(1)),
+            where: new Binary(new Column('id'), '=', new Literal(1)),
         );
         $this->assertNotNull($withWhere->where);
         $this->assertNull($original->where);
@@ -524,8 +524,8 @@ class NodeTest extends TestCase
 
         $withWindows = $original->with(
             windows: [
-                new WindowDefinition('w', new WindowSpec(
-                    orderBy: [new OrderByItem(new ColumnRef('id'))],
+                new WindowDefinition('w', new WindowSpecification(
+                    orderBy: [new OrderByItem(new Column('id'))],
                 )),
             ],
         );

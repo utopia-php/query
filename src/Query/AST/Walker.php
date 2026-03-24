@@ -2,6 +2,19 @@
 
 namespace Utopia\Query\AST;
 
+use Utopia\Query\AST\Expression\Aliased;
+use Utopia\Query\AST\Expression\Between;
+use Utopia\Query\AST\Expression\Binary;
+use Utopia\Query\AST\Expression\CaseWhen;
+use Utopia\Query\AST\Expression\Cast;
+use Utopia\Query\AST\Expression\Conditional;
+use Utopia\Query\AST\Expression\Exists;
+use Utopia\Query\AST\Expression\In;
+use Utopia\Query\AST\Expression\Subquery;
+use Utopia\Query\AST\Expression\Unary;
+use Utopia\Query\AST\Expression\Window;
+use Utopia\Query\AST\Reference\Table;
+
 class Walker
 {
     /**
@@ -16,11 +29,11 @@ class Walker
 
     private function walkStatement(SelectStatement $stmt, Visitor $visitor): SelectStatement
     {
-        $columns = $this->walkExprArray($stmt->columns, $visitor);
+        $columns = $this->walkExpressionArray($stmt->columns, $visitor);
 
         $from = $stmt->from;
-        if ($from instanceof TableRef) {
-            $from = $visitor->visitTableRef($from);
+        if ($from instanceof Table) {
+            $from = $visitor->visitTableReference($from);
         } elseif ($from instanceof SubquerySource) {
             $from = $this->walkSubquerySource($from, $visitor);
         }
@@ -30,19 +43,19 @@ class Walker
             $joins[] = $this->walkJoin($join, $visitor);
         }
 
-        $where = $stmt->where !== null ? $this->walkExpr($stmt->where, $visitor) : null;
+        $where = $stmt->where !== null ? $this->walkExpression($stmt->where, $visitor) : null;
 
-        $groupBy = $this->walkExprArray($stmt->groupBy, $visitor);
+        $groupBy = $this->walkExpressionArray($stmt->groupBy, $visitor);
 
-        $having = $stmt->having !== null ? $this->walkExpr($stmt->having, $visitor) : null;
+        $having = $stmt->having !== null ? $this->walkExpression($stmt->having, $visitor) : null;
 
         $orderBy = [];
         foreach ($stmt->orderBy as $item) {
             $orderBy[] = $this->walkOrderByItem($item, $visitor);
         }
 
-        $limit = $stmt->limit !== null ? $this->walkExpr($stmt->limit, $visitor) : null;
-        $offset = $stmt->offset !== null ? $this->walkExpr($stmt->offset, $visitor) : null;
+        $limit = $stmt->limit !== null ? $this->walkExpression($stmt->limit, $visitor) : null;
+        $offset = $stmt->offset !== null ? $this->walkExpression($stmt->offset, $visitor) : null;
 
         $ctes = [];
         foreach ($stmt->ctes as $cte) {
@@ -70,129 +83,129 @@ class Walker
         );
     }
 
-    private function walkExpr(Expr $expr, Visitor $visitor): Expr
+    private function walkExpression(Expression $expression, Visitor $visitor): Expression
     {
         $walked = match (true) {
-            $expr instanceof BinaryExpr => new BinaryExpr(
-                $this->walkExpr($expr->left, $visitor),
-                $expr->operator,
-                $this->walkExpr($expr->right, $visitor),
+            $expression instanceof Binary => new Binary(
+                $this->walkExpression($expression->left, $visitor),
+                $expression->operator,
+                $this->walkExpression($expression->right, $visitor),
             ),
-            $expr instanceof UnaryExpr => new UnaryExpr(
-                $expr->operator,
-                $this->walkExpr($expr->operand, $visitor),
-                $expr->prefix,
+            $expression instanceof Unary => new Unary(
+                $expression->operator,
+                $this->walkExpression($expression->operand, $visitor),
+                $expression->prefix,
             ),
-            $expr instanceof FunctionCall => $this->walkFunctionCall($expr, $visitor),
-            $expr instanceof AliasedExpr => new AliasedExpr(
-                $this->walkExpr($expr->expr, $visitor),
-                $expr->alias,
+            $expression instanceof FunctionCall => $this->walkFunctionCall($expression, $visitor),
+            $expression instanceof Aliased => new Aliased(
+                $this->walkExpression($expression->expression, $visitor),
+                $expression->alias,
             ),
-            $expr instanceof InExpr => $this->walkInExpr($expr, $visitor),
-            $expr instanceof BetweenExpr => new BetweenExpr(
-                $this->walkExpr($expr->expr, $visitor),
-                $this->walkExpr($expr->low, $visitor),
-                $this->walkExpr($expr->high, $visitor),
-                $expr->negated,
+            $expression instanceof In => $this->walkInExpression($expression, $visitor),
+            $expression instanceof Between => new Between(
+                $this->walkExpression($expression->expression, $visitor),
+                $this->walkExpression($expression->low, $visitor),
+                $this->walkExpression($expression->high, $visitor),
+                $expression->negated,
             ),
-            $expr instanceof ExistsExpr => new ExistsExpr(
-                $this->walkStatement($expr->subquery, $visitor),
-                $expr->negated,
+            $expression instanceof Exists => new Exists(
+                $this->walkStatement($expression->subquery, $visitor),
+                $expression->negated,
             ),
-            $expr instanceof CaseExpr => $this->walkCaseExpr($expr, $visitor),
-            $expr instanceof CastExpr => new CastExpr(
-                $this->walkExpr($expr->expr, $visitor),
-                $expr->type,
+            $expression instanceof Conditional => $this->walkConditionalExpression($expression, $visitor),
+            $expression instanceof Cast => new Cast(
+                $this->walkExpression($expression->expression, $visitor),
+                $expression->type,
             ),
-            $expr instanceof SubqueryExpr => new SubqueryExpr(
-                $this->walkStatement($expr->query, $visitor),
+            $expression instanceof Subquery => new Subquery(
+                $this->walkStatement($expression->query, $visitor),
             ),
-            $expr instanceof WindowExpr => $this->walkWindowExpr($expr, $visitor),
-            default => $expr,
+            $expression instanceof Window => $this->walkWindowExpression($expression, $visitor),
+            default => $expression,
         };
 
-        return $visitor->visitExpr($walked);
+        return $visitor->visitExpression($walked);
     }
 
     /**
-     * @param Expr[] $exprs
-     * @return Expr[]
+     * @param Expression[] $expressions
+     * @return Expression[]
      */
-    private function walkExprArray(array $exprs, Visitor $visitor): array
+    private function walkExpressionArray(array $expressions, Visitor $visitor): array
     {
         $result = [];
-        foreach ($exprs as $expr) {
-            $result[] = $this->walkExpr($expr, $visitor);
+        foreach ($expressions as $expression) {
+            $result[] = $this->walkExpression($expression, $visitor);
         }
         return $result;
     }
 
-    private function walkFunctionCall(FunctionCall $expr, Visitor $visitor): FunctionCall
+    private function walkFunctionCall(FunctionCall $expression, Visitor $visitor): FunctionCall
     {
-        $args = $this->walkExprArray($expr->arguments, $visitor);
-        $filter = $expr->filter !== null ? $this->walkExpr($expr->filter, $visitor) : null;
+        $args = $this->walkExpressionArray($expression->arguments, $visitor);
+        $filter = $expression->filter !== null ? $this->walkExpression($expression->filter, $visitor) : null;
 
         return new FunctionCall(
-            $expr->name,
+            $expression->name,
             $args,
-            $expr->distinct,
+            $expression->distinct,
             $filter,
         );
     }
 
-    private function walkInExpr(InExpr $expr, Visitor $visitor): InExpr
+    private function walkInExpression(In $expression, Visitor $visitor): In
     {
-        $walked = $this->walkExpr($expr->expr, $visitor);
+        $walked = $this->walkExpression($expression->expression, $visitor);
 
-        if ($expr->list instanceof SelectStatement) {
-            $list = $this->walkStatement($expr->list, $visitor);
+        if ($expression->list instanceof SelectStatement) {
+            $list = $this->walkStatement($expression->list, $visitor);
         } else {
-            $list = $this->walkExprArray($expr->list, $visitor);
+            $list = $this->walkExpressionArray($expression->list, $visitor);
         }
 
-        return new InExpr($walked, $list, $expr->negated);
+        return new In($walked, $list, $expression->negated);
     }
 
-    private function walkCaseExpr(CaseExpr $expr, Visitor $visitor): CaseExpr
+    private function walkConditionalExpression(Conditional $expression, Visitor $visitor): Conditional
     {
-        $operand = $expr->operand !== null ? $this->walkExpr($expr->operand, $visitor) : null;
+        $operand = $expression->operand !== null ? $this->walkExpression($expression->operand, $visitor) : null;
 
         $whens = [];
-        foreach ($expr->whens as $when) {
+        foreach ($expression->whens as $when) {
             $whens[] = new CaseWhen(
-                $this->walkExpr($when->condition, $visitor),
-                $this->walkExpr($when->result, $visitor),
+                $this->walkExpression($when->condition, $visitor),
+                $this->walkExpression($when->result, $visitor),
             );
         }
 
-        $else = $expr->else !== null ? $this->walkExpr($expr->else, $visitor) : null;
+        $else = $expression->else !== null ? $this->walkExpression($expression->else, $visitor) : null;
 
-        return new CaseExpr($operand, $whens, $else);
+        return new Conditional($operand, $whens, $else);
     }
 
-    private function walkWindowExpr(WindowExpr $expr, Visitor $visitor): WindowExpr
+    private function walkWindowExpression(Window $expression, Visitor $visitor): Window
     {
-        $fn = $this->walkExpr($expr->function, $visitor);
-        $spec = $expr->spec !== null ? $this->walkWindowSpec($expr->spec, $visitor) : null;
+        $function = $this->walkExpression($expression->function, $visitor);
+        $specification = $expression->specification !== null ? $this->walkWindowSpecification($expression->specification, $visitor) : null;
 
-        return new WindowExpr($fn, $expr->windowName, $spec);
+        return new Window($function, $expression->windowName, $specification);
     }
 
-    private function walkWindowSpec(WindowSpec $spec, Visitor $visitor): WindowSpec
+    private function walkWindowSpecification(WindowSpecification $specification, Visitor $visitor): WindowSpecification
     {
-        $partitionBy = $this->walkExprArray($spec->partitionBy, $visitor);
+        $partitionBy = $this->walkExpressionArray($specification->partitionBy, $visitor);
 
         $orderBy = [];
-        foreach ($spec->orderBy as $item) {
+        foreach ($specification->orderBy as $item) {
             $orderBy[] = $this->walkOrderByItem($item, $visitor);
         }
 
-        return new WindowSpec(
+        return new WindowSpecification(
             $partitionBy,
             $orderBy,
-            $spec->frameType,
-            $spec->frameStart,
-            $spec->frameEnd,
+            $specification->frameType,
+            $specification->frameStart,
+            $specification->frameEnd,
         );
     }
 
@@ -200,14 +213,14 @@ class Walker
     {
         return new WindowDefinition(
             $win->name,
-            $this->walkWindowSpec($win->spec, $visitor),
+            $this->walkWindowSpecification($win->specification, $visitor),
         );
     }
 
     private function walkOrderByItem(OrderByItem $item, Visitor $visitor): OrderByItem
     {
         return new OrderByItem(
-            $this->walkExpr($item->expr, $visitor),
+            $this->walkExpression($item->expression, $visitor),
             $item->direction,
             $item->nulls,
         );
@@ -216,13 +229,13 @@ class Walker
     private function walkJoin(JoinClause $join, Visitor $visitor): JoinClause
     {
         $table = $join->table;
-        if ($table instanceof TableRef) {
-            $table = $visitor->visitTableRef($table);
+        if ($table instanceof Table) {
+            $table = $visitor->visitTableReference($table);
         } elseif ($table instanceof SubquerySource) {
             $table = $this->walkSubquerySource($table, $visitor);
         }
 
-        $condition = $join->condition !== null ? $this->walkExpr($join->condition, $visitor) : null;
+        $condition = $join->condition !== null ? $this->walkExpression($join->condition, $visitor) : null;
 
         return new JoinClause($join->type, $table, $condition);
     }

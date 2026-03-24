@@ -2,26 +2,26 @@
 
 namespace Utopia\Query\AST\Visitor;
 
-use Utopia\Query\AST\BinaryExpr;
-use Utopia\Query\AST\Expr;
+use Utopia\Query\AST\Expression;
+use Utopia\Query\AST\Expression\Binary;
+use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\SelectStatement;
-use Utopia\Query\AST\TableRef;
 use Utopia\Query\AST\Visitor;
 
 class FilterInjector implements Visitor
 {
-    public function __construct(private readonly Expr $condition)
+    public function __construct(private readonly Expression $condition)
     {
     }
 
-    public function visitExpr(Expr $expr): Expr
+    public function visitExpression(Expression $expression): Expression
     {
-        return $expr;
+        return $expression;
     }
 
-    public function visitTableRef(TableRef $ref): TableRef
+    public function visitTableReference(Table $reference): Table
     {
-        return $ref;
+        return $reference;
     }
 
     public function visitSelect(SelectStatement $stmt): SelectStatement
@@ -30,7 +30,7 @@ class FilterInjector implements Visitor
             return $stmt->with(where: $this->condition);
         }
 
-        $combined = new BinaryExpr($stmt->where, 'AND', $this->condition);
+        $combined = new Binary($stmt->where, 'AND', $this->condition);
         return $stmt->with(where: $combined);
     }
 }

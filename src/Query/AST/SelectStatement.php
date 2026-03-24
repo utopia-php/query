@@ -2,26 +2,28 @@
 
 namespace Utopia\Query\AST;
 
+use Utopia\Query\AST\Reference\Table;
+
 readonly class SelectStatement
 {
     /**
-     * @param Expr[] $columns
+     * @param Expression[] $columns
      * @param JoinClause[] $joins
-     * @param Expr[] $groupBy
+     * @param Expression[] $groupBy
      * @param OrderByItem[] $orderBy
      * @param CteDefinition[] $ctes
      * @param WindowDefinition[] $windows
      */
     public function __construct(
         public array $columns = [],
-        public TableRef|SubquerySource|null $from = null,
+        public Table|SubquerySource|null $from = null,
         public array $joins = [],
-        public ?Expr $where = null,
+        public ?Expression $where = null,
         public array $groupBy = [],
-        public ?Expr $having = null,
+        public ?Expression $having = null,
         public array $orderBy = [],
-        public ?Expr $limit = null,
-        public ?Expr $offset = null,
+        public ?Expression $limit = null,
+        public ?Expression $offset = null,
         public bool $distinct = false,
         public array $ctes = [],
         public array $windows = [],
@@ -34,23 +36,23 @@ readonly class SelectStatement
      * Uses false as default for nullable properties to distinguish
      * "not passed" from "explicitly set to null".
      *
-     * @param Expr[]|null $columns
+     * @param Expression[]|null $columns
      * @param JoinClause[]|null $joins
-     * @param Expr[]|null $groupBy
+     * @param Expression[]|null $groupBy
      * @param OrderByItem[]|null $orderBy
      * @param CteDefinition[]|null $ctes
      * @param WindowDefinition[]|null $windows
      */
     public function with(
         ?array $columns = null,
-        TableRef|SubquerySource|null|false $from = false,
+        Table|SubquerySource|null|false $from = false,
         ?array $joins = null,
-        Expr|null|false $where = false,
+        Expression|null|false $where = false,
         ?array $groupBy = null,
-        Expr|null|false $having = false,
+        Expression|null|false $having = false,
         ?array $orderBy = null,
-        Expr|null|false $limit = false,
-        Expr|null|false $offset = false,
+        Expression|null|false $limit = false,
+        Expression|null|false $offset = false,
         ?bool $distinct = null,
         ?array $ctes = null,
         ?array $windows = null,

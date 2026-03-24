@@ -1,12 +1,12 @@
 <?php
 
-namespace Utopia\Query\AST;
+namespace Utopia\Query\AST\Reference;
 
-readonly class ColumnRef implements Expr
+readonly class Table
 {
     public function __construct(
         public string $name,
-        public ?string $table = null,
+        public ?string $alias = null,
         public ?string $schema = null,
     ) {
     }

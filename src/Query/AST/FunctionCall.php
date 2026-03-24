@@ -2,16 +2,16 @@
 
 namespace Utopia\Query\AST;
 
-readonly class FunctionCall implements Expr
+readonly class FunctionCall implements Expression
 {
     /**
-     * @param Expr[] $arguments
+     * @param Expression[] $arguments
      */
     public function __construct(
         public string $name,
         public array $arguments = [],
         public bool $distinct = false,
-        public ?Expr $filter = null,
+        public ?Expression $filter = null,
     ) {
     }
 }

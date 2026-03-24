@@ -3,20 +3,20 @@
 namespace Tests\Query\AST;
 
 use PHPUnit\Framework\TestCase;
-use Utopia\Query\AST\AliasedExpr;
-use Utopia\Query\AST\BinaryExpr;
-use Utopia\Query\AST\ColumnRef;
+use Utopia\Query\AST\Expression\Aliased;
+use Utopia\Query\AST\Expression\Binary;
+use Utopia\Query\AST\Expression\Unary;
 use Utopia\Query\AST\FunctionCall;
 use Utopia\Query\AST\Literal;
 use Utopia\Query\AST\OrderByItem;
 use Utopia\Query\AST\Parser;
 use Utopia\Query\AST\Placeholder;
 use Utopia\Query\AST\Raw;
+use Utopia\Query\AST\Reference\Column;
+use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\SelectStatement;
 use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Star;
-use Utopia\Query\AST\TableRef;
-use Utopia\Query\AST\UnaryExpr;
 use Utopia\Query\Tokenizer\Tokenizer;
 
 class SerializerTest extends TestCase
@@ -172,13 +172,13 @@ class SerializerTest extends TestCase
         $this->assertSame('SELECT COUNT(DISTINCT `user_id`) FROM `orders`', $result);
     }
 
-    public function testCaseExpr(): void
+    public function testCaseExpression(): void
     {
         $result = $this->roundTrip("SELECT CASE WHEN x > 0 THEN 'pos' ELSE 'neg' END FROM t");
         $this->assertSame("SELECT CASE WHEN `x` > 0 THEN 'pos' ELSE 'neg' END FROM `t`", $result);
     }
 
-    public function testCastExpr(): void
+    public function testCastExpression(): void
     {
         $result = $this->roundTrip('SELECT CAST(val AS INTEGER) FROM t');
         $this->assertSame('SELECT CAST(`val` AS INTEGER) FROM `t`', $result);
@@ -248,22 +248,22 @@ class SerializerTest extends TestCase
     {
         $stmt = new SelectStatement(
             columns: [
-                new AliasedExpr(new ColumnRef('name'), 'n'),
+                new Aliased(new Column('name'), 'n'),
                 new FunctionCall('COUNT', [new Star()]),
             ],
-            from: new TableRef('users', 'u'),
-            where: new BinaryExpr(
-                new ColumnRef('active'),
+            from: new Table('users', 'u'),
+            where: new Binary(
+                new Column('active'),
                 '=',
                 new Literal(true),
             ),
-            groupBy: [new ColumnRef('name')],
-            having: new BinaryExpr(
+            groupBy: [new Column('name')],
+            having: new Binary(
                 new FunctionCall('COUNT', [new Star()]),
                 '>',
                 new Literal(5),
             ),
-            orderBy: [new OrderByItem(new ColumnRef('name'), 'ASC')],
+            orderBy: [new OrderByItem(new Column('name'), 'ASC')],
             limit: new Literal(10),
         );
 
@@ -300,47 +300,47 @@ class SerializerTest extends TestCase
         $this->assertSame($expected, $result);
     }
 
-    public function testSerializeExprColumnRef(): void
+    public function testSerializeExpressionColumnReference(): void
     {
         $serializer = new Serializer();
-        $this->assertSame('`name`', $serializer->serializeExpr(new ColumnRef('name')));
-        $this->assertSame('`t`.`name`', $serializer->serializeExpr(new ColumnRef('name', 't')));
-        $this->assertSame('`s`.`t`.`name`', $serializer->serializeExpr(new ColumnRef('name', 't', 's')));
+        $this->assertSame('`name`', $serializer->serializeExpression(new Column('name')));
+        $this->assertSame('`t`.`name`', $serializer->serializeExpression(new Column('name', 't')));
+        $this->assertSame('`s`.`t`.`name`', $serializer->serializeExpression(new Column('name', 't', 's')));
     }
 
-    public function testSerializeExprLiterals(): void
+    public function testSerializeExpressionLiterals(): void
     {
         $serializer = new Serializer();
-        $this->assertSame('42', $serializer->serializeExpr(new Literal(42)));
-        $this->assertSame('3.14', $serializer->serializeExpr(new Literal(3.14)));
-        $this->assertSame("'hello'", $serializer->serializeExpr(new Literal('hello')));
-        $this->assertSame('TRUE', $serializer->serializeExpr(new Literal(true)));
-        $this->assertSame('FALSE', $serializer->serializeExpr(new Literal(false)));
-        $this->assertSame('NULL', $serializer->serializeExpr(new Literal(null)));
+        $this->assertSame('42', $serializer->serializeExpression(new Literal(42)));
+        $this->assertSame('3.14', $serializer->serializeExpression(new Literal(3.14)));
+        $this->assertSame("'hello'", $serializer->serializeExpression(new Literal('hello')));
+        $this->assertSame('TRUE', $serializer->serializeExpression(new Literal(true)));
+        $this->assertSame('FALSE', $serializer->serializeExpression(new Literal(false)));
+        $this->assertSame('NULL', $serializer->serializeExpression(new Literal(null)));
     }
 
-    public function testSerializeExprStar(): void
+    public function testSerializeExpressionStar(): void
     {
         $serializer = new Serializer();
-        $this->assertSame('*', $serializer->serializeExpr(new Star()));
-        $this->assertSame('`users`.*', $serializer->serializeExpr(new Star('users')));
+        $this->assertSame('*', $serializer->serializeExpression(new Star()));
+        $this->assertSame('`users`.*', $serializer->serializeExpression(new Star('users')));
     }
 
-    public function testSerializeExprPlaceholder(): void
+    public function testSerializeExpressionPlaceholder(): void
     {
         $serializer = new Serializer();
-        $this->assertSame('?', $serializer->serializeExpr(new Placeholder('?')));
-        $this->assertSame(':name', $serializer->serializeExpr(new Placeholder(':name')));
-        $this->assertSame('$1', $serializer->serializeExpr(new Placeholder('$1')));
+        $this->assertSame('?', $serializer->serializeExpression(new Placeholder('?')));
+        $this->assertSame(':name', $serializer->serializeExpression(new Placeholder(':name')));
+        $this->assertSame('$1', $serializer->serializeExpression(new Placeholder('$1')));
     }
 
-    public function testSerializeExprRaw(): void
+    public function testSerializeExpressionRaw(): void
     {
         $serializer = new Serializer();
-        $this->assertSame('NOW()', $serializer->serializeExpr(new Raw('NOW()')));
+        $this->assertSame('NOW()', $serializer->serializeExpression(new Raw('NOW()')));
     }
 
-    public function testNotExistsExpr(): void
+    public function testNotExistsExpression(): void
     {
         $result = $this->roundTrip('SELECT * FROM users WHERE NOT EXISTS (SELECT 1 FROM orders WHERE orders.user_id = users.id)');
         $this->assertSame('SELECT * FROM `users` WHERE NOT EXISTS (SELECT 1 FROM `orders` WHERE `orders`.`user_id` = `users`.`id`)', $result);
@@ -361,8 +361,8 @@ class SerializerTest extends TestCase
     public function testUnaryMinus(): void
     {
         $serializer = new Serializer();
-        $expr = new UnaryExpr('-', new Literal(5));
-        $this->assertSame('-(5)', $serializer->serializeExpr($expr));
+        $expression = new Unary('-', new Literal(5));
+        $this->assertSame('-(5)', $serializer->serializeExpression($expression));
     }
 
     public function testCaseSimple(): void
@@ -383,13 +383,13 @@ class SerializerTest extends TestCase
         $this->assertSame('WITH `cte` (`a`, `b`) AS (SELECT 1, 2) SELECT * FROM `cte`', $result);
     }
 
-    public function testTableRefWithSchema(): void
+    public function testTableReferenceWithSchema(): void
     {
         $result = $this->roundTrip('SELECT * FROM public.users');
         $this->assertSame('SELECT * FROM `public`.`users`', $result);
     }
 
-    public function testSubqueryExprInColumn(): void
+    public function testSubqueryExpressionInColumn(): void
     {
         $result = $this->roundTrip('SELECT (SELECT COUNT(*) FROM orders) FROM users');
         $this->assertSame('SELECT (SELECT COUNT(*) FROM `orders`) FROM `users`', $result);
