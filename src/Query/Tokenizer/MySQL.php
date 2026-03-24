@@ -77,6 +77,27 @@ class MySQL extends Tokenizer
                 continue;
             }
 
+            if ($char === '"') {
+                $result .= $char;
+                $i++;
+                while ($i < $len) {
+                    $c = $sql[$i];
+                    if ($c === '"') {
+                        $result .= $c;
+                        $i++;
+                        if ($i < $len && $sql[$i] === '"') {
+                            $result .= $sql[$i];
+                            $i++;
+                            continue;
+                        }
+                        break;
+                    }
+                    $result .= $c;
+                    $i++;
+                }
+                continue;
+            }
+
             if ($char === '#') {
                 $result .= '--';
                 $i++;
