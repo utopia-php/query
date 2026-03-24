@@ -95,8 +95,17 @@ class AggregationQueryTest extends TestCase
         $this->assertTrue(Method::Min->isAggregate());
         $this->assertTrue(Method::Max->isAggregate());
         $this->assertTrue(Method::CountDistinct->isAggregate());
+        $this->assertTrue(Method::Stddev->isAggregate());
+        $this->assertTrue(Method::StddevPop->isAggregate());
+        $this->assertTrue(Method::StddevSamp->isAggregate());
+        $this->assertTrue(Method::Variance->isAggregate());
+        $this->assertTrue(Method::VarPop->isAggregate());
+        $this->assertTrue(Method::VarSamp->isAggregate());
+        $this->assertTrue(Method::BitAnd->isAggregate());
+        $this->assertTrue(Method::BitOr->isAggregate());
+        $this->assertTrue(Method::BitXor->isAggregate());
         $aggMethods = array_filter(Method::cases(), fn (Method $m) => $m->isAggregate());
-        $this->assertCount(6, $aggMethods);
+        $this->assertCount(15, $aggMethods);
     }
 
     public function testCountWithEmptyStringAttribute(): void
@@ -238,6 +247,141 @@ class AggregationQueryTest extends TestCase
         $query = Query::max('price');
         $sql = $query->compile($builder);
         $this->assertEquals('MAX(`price`)', $sql);
+    }
+
+    public function testStddev(): void
+    {
+        $query = Query::stddev('score');
+        $this->assertSame(Method::Stddev, $query->getMethod());
+        $this->assertEquals('score', $query->getAttribute());
+    }
+
+    public function testStddevCompileDispatch(): void
+    {
+        $builder = new MySQL();
+        $query = Query::stddev('score');
+        $sql = $query->compile($builder);
+        $this->assertEquals('STDDEV(`score`)', $sql);
+    }
+
+    public function testStddevPop(): void
+    {
+        $query = Query::stddevPop('score');
+        $this->assertSame(Method::StddevPop, $query->getMethod());
+        $this->assertEquals('score', $query->getAttribute());
+    }
+
+    public function testStddevPopCompileDispatch(): void
+    {
+        $builder = new MySQL();
+        $query = Query::stddevPop('score', 'sd');
+        $sql = $query->compile($builder);
+        $this->assertEquals('STDDEV_POP(`score`) AS `sd`', $sql);
+    }
+
+    public function testStddevSamp(): void
+    {
+        $query = Query::stddevSamp('score');
+        $this->assertSame(Method::StddevSamp, $query->getMethod());
+        $this->assertEquals('score', $query->getAttribute());
+    }
+
+    public function testStddevSampCompileDispatch(): void
+    {
+        $builder = new MySQL();
+        $query = Query::stddevSamp('score', 'sd');
+        $sql = $query->compile($builder);
+        $this->assertEquals('STDDEV_SAMP(`score`) AS `sd`', $sql);
+    }
+
+    public function testVariance(): void
+    {
+        $query = Query::variance('score');
+        $this->assertSame(Method::Variance, $query->getMethod());
+        $this->assertEquals('score', $query->getAttribute());
+    }
+
+    public function testVarianceCompileDispatch(): void
+    {
+        $builder = new MySQL();
+        $query = Query::variance('score');
+        $sql = $query->compile($builder);
+        $this->assertEquals('VARIANCE(`score`)', $sql);
+    }
+
+    public function testVarPop(): void
+    {
+        $query = Query::varPop('score');
+        $this->assertSame(Method::VarPop, $query->getMethod());
+        $this->assertEquals('score', $query->getAttribute());
+    }
+
+    public function testVarPopCompileDispatch(): void
+    {
+        $builder = new MySQL();
+        $query = Query::varPop('score', 'vp');
+        $sql = $query->compile($builder);
+        $this->assertEquals('VAR_POP(`score`) AS `vp`', $sql);
+    }
+
+    public function testVarSamp(): void
+    {
+        $query = Query::varSamp('score');
+        $this->assertSame(Method::VarSamp, $query->getMethod());
+        $this->assertEquals('score', $query->getAttribute());
+    }
+
+    public function testVarSampCompileDispatch(): void
+    {
+        $builder = new MySQL();
+        $query = Query::varSamp('score', 'vs');
+        $sql = $query->compile($builder);
+        $this->assertEquals('VAR_SAMP(`score`) AS `vs`', $sql);
+    }
+
+    public function testBitAnd(): void
+    {
+        $query = Query::bitAnd('flags');
+        $this->assertSame(Method::BitAnd, $query->getMethod());
+        $this->assertEquals('flags', $query->getAttribute());
+    }
+
+    public function testBitAndCompileDispatch(): void
+    {
+        $builder = new MySQL();
+        $query = Query::bitAnd('flags', 'result');
+        $sql = $query->compile($builder);
+        $this->assertEquals('BIT_AND(`flags`) AS `result`', $sql);
+    }
+
+    public function testBitOr(): void
+    {
+        $query = Query::bitOr('flags');
+        $this->assertSame(Method::BitOr, $query->getMethod());
+        $this->assertEquals('flags', $query->getAttribute());
+    }
+
+    public function testBitOrCompileDispatch(): void
+    {
+        $builder = new MySQL();
+        $query = Query::bitOr('flags', 'result');
+        $sql = $query->compile($builder);
+        $this->assertEquals('BIT_OR(`flags`) AS `result`', $sql);
+    }
+
+    public function testBitXor(): void
+    {
+        $query = Query::bitXor('flags');
+        $this->assertSame(Method::BitXor, $query->getMethod());
+        $this->assertEquals('flags', $query->getAttribute());
+    }
+
+    public function testBitXorCompileDispatch(): void
+    {
+        $builder = new MySQL();
+        $query = Query::bitXor('flags', 'result');
+        $sql = $query->compile($builder);
+        $this->assertEquals('BIT_XOR(`flags`) AS `result`', $sql);
     }
 
     public function testGroupByCompileDispatch(): void

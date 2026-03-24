@@ -3,9 +3,11 @@
 namespace Utopia\Query\Builder;
 
 use Utopia\Query\Builder as BaseBuilder;
+use Utopia\Query\Builder\Feature\BitwiseAggregates;
 use Utopia\Query\Builder\Feature\FullTextSearch;
 use Utopia\Query\Builder\Feature\Locking;
 use Utopia\Query\Builder\Feature\Spatial;
+use Utopia\Query\Builder\Feature\StatisticalAggregates;
 use Utopia\Query\Builder\Feature\Transactions;
 use Utopia\Query\Builder\Feature\Upsert;
 use Utopia\Query\Exception\ValidationException;
@@ -14,7 +16,7 @@ use Utopia\Query\Query;
 use Utopia\Query\QuotesIdentifiers;
 use Utopia\Query\Schema\ColumnType;
 
-abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert, Spatial, FullTextSearch
+abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert, Spatial, FullTextSearch, StatisticalAggregates, BitwiseAggregates
 {
     use QuotesIdentifiers;
 
@@ -59,6 +61,69 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
     public function forShareNoWait(): static
     {
         $this->lockMode = LockMode::ForShareNoWait;
+
+        return $this;
+    }
+
+    public function stddev(string $attribute, string $alias = ''): static
+    {
+        $this->pendingQueries[] = Query::stddev($attribute, $alias);
+
+        return $this;
+    }
+
+    public function stddevPop(string $attribute, string $alias = ''): static
+    {
+        $this->pendingQueries[] = Query::stddevPop($attribute, $alias);
+
+        return $this;
+    }
+
+    public function stddevSamp(string $attribute, string $alias = ''): static
+    {
+        $this->pendingQueries[] = Query::stddevSamp($attribute, $alias);
+
+        return $this;
+    }
+
+    public function variance(string $attribute, string $alias = ''): static
+    {
+        $this->pendingQueries[] = Query::variance($attribute, $alias);
+
+        return $this;
+    }
+
+    public function varPop(string $attribute, string $alias = ''): static
+    {
+        $this->pendingQueries[] = Query::varPop($attribute, $alias);
+
+        return $this;
+    }
+
+    public function varSamp(string $attribute, string $alias = ''): static
+    {
+        $this->pendingQueries[] = Query::varSamp($attribute, $alias);
+
+        return $this;
+    }
+
+    public function bitAnd(string $attribute, string $alias = ''): static
+    {
+        $this->pendingQueries[] = Query::bitAnd($attribute, $alias);
+
+        return $this;
+    }
+
+    public function bitOr(string $attribute, string $alias = ''): static
+    {
+        $this->pendingQueries[] = Query::bitOr($attribute, $alias);
+
+        return $this;
+    }
+
+    public function bitXor(string $attribute, string $alias = ''): static
+    {
+        $this->pendingQueries[] = Query::bitXor($attribute, $alias);
 
         return $this;
     }

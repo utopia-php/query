@@ -4,6 +4,7 @@ namespace Utopia\Query\Builder\Feature;
 
 use Closure;
 use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\NullsPosition;
 
 interface Selects
 {
@@ -31,15 +32,19 @@ interface Selects
      */
     public function queries(array $queries): static;
 
-    public function sortAsc(string $attribute): static;
+    public function selectCast(string $column, string $type, string $alias = ''): static;
 
-    public function sortDesc(string $attribute): static;
+    public function sortAsc(string $attribute, ?NullsPosition $nulls = null): static;
+
+    public function sortDesc(string $attribute, ?NullsPosition $nulls = null): static;
 
     public function sortRandom(): static;
 
     public function limit(int $value): static;
 
     public function offset(int $value): static;
+
+    public function fetch(int $count, bool $withTies = false): static;
 
     public function page(int $page, int $perPage = 25): static;
 

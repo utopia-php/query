@@ -4,11 +4,12 @@ namespace Utopia\Query\Builder;
 
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\Json;
+use Utopia\Query\Builder\Feature\StringAggregates;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
 
-class SQLite extends SQL implements Json, ConditionalAggregates
+class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregates
 {
     /** @var array<string, Condition> */
     protected array $jsonSets = [];
@@ -288,6 +289,49 @@ class SQLite extends SQL implements Json, ConditionalAggregates
         $this->addBinding($value);
 
         return 'json_extract(' . $attribute . ', \'$.' . $path . '\') ' . $operator . ' ?';
+    }
+
+    public function groupConcat(string $column, string $separator = ',', string $alias = '', ?array $orderBy = null): static
+    {
+        $col = $this->resolveAndWrap($column);
+        $expr = 'GROUP_CONCAT(' . $col;
+        if ($orderBy !== null && $orderBy !== []) {
+            $orderCols = [];
+            foreach ($orderBy as $orderCol) {
+                if (\str_starts_with($orderCol, '-')) {
+                    $orderCols[] = $this->resolveAndWrap(\substr($orderCol, 1)) . ' DESC';
+                } else {
+                    $orderCols[] = $this->resolveAndWrap($orderCol) . ' ASC';
+                }
+            }
+            $expr .= ' ORDER BY ' . \implode(', ', $orderCols);
+        }
+        $expr .= ', ?)';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr, [$separator]);
+    }
+
+    public function jsonArrayAgg(string $column, string $alias = ''): static
+    {
+        $expr = 'json_group_array(' . $this->resolveAndWrap($column) . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr);
+    }
+
+    public function jsonObjectAgg(string $keyColumn, string $valueColumn, string $alias = ''): static
+    {
+        $expr = 'json_group_object(' . $this->resolveAndWrap($keyColumn) . ', ' . $this->resolveAndWrap($valueColumn) . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr);
     }
 
     public function reset(): static

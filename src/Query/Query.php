@@ -5,6 +5,7 @@ namespace Utopia\Query;
 use JsonException;
 use Utopia\Query\Builder\GroupedQueries;
 use Utopia\Query\Exception as QueryException;
+use Utopia\Query\NullsPosition;
 
 /** @phpstan-consistent-constructor */
 class Query
@@ -252,7 +253,16 @@ class Query
             Method::Sum,
             Method::Avg,
             Method::Min,
-            Method::Max => $compiler->compileAggregate($this),
+            Method::Max,
+            Method::Stddev,
+            Method::StddevPop,
+            Method::StddevSamp,
+            Method::Variance,
+            Method::VarPop,
+            Method::VarSamp,
+            Method::BitAnd,
+            Method::BitOr,
+            Method::BitXor => $compiler->compileAggregate($this),
             Method::GroupBy => $compiler->compileGroupBy($this),
             Method::Join,
             Method::LeftJoin,
@@ -411,17 +421,17 @@ class Query
     /**
      * Helper method to create Query with orderDesc method
      */
-    public static function orderDesc(string $attribute = ''): static
+    public static function orderDesc(string $attribute = '', ?NullsPosition $nulls = null): static
     {
-        return new static(Method::OrderDesc, $attribute);
+        return new static(Method::OrderDesc, $attribute, $nulls !== null ? [$nulls] : []);
     }
 
     /**
      * Helper method to create Query with orderAsc method
      */
-    public static function orderAsc(string $attribute = ''): static
+    public static function orderAsc(string $attribute = '', ?NullsPosition $nulls = null): static
     {
-        return new static(Method::OrderAsc, $attribute);
+        return new static(Method::OrderAsc, $attribute, $nulls !== null ? [$nulls] : []);
     }
 
     /**
@@ -680,7 +690,16 @@ class Query
                 $method === Method::Sum,
                 $method === Method::Avg,
                 $method === Method::Min,
-                $method === Method::Max => $aggregations[] = clone $query,
+                $method === Method::Max,
+                $method === Method::Stddev,
+                $method === Method::StddevPop,
+                $method === Method::StddevSamp,
+                $method === Method::Variance,
+                $method === Method::VarPop,
+                $method === Method::VarSamp,
+                $method === Method::BitAnd,
+                $method === Method::BitOr,
+                $method === Method::BitXor => $aggregations[] = clone $query,
 
                 $method === Method::GroupBy => (function () use ($values, &$groupBy): void {
                     /** @var array<string> $values */
@@ -971,6 +990,51 @@ class Query
     public static function max(string $attribute, string $alias = ''): static
     {
         return new static(Method::Max, $attribute, $alias !== '' ? [$alias] : []);
+    }
+
+    public static function stddev(string $attribute, string $alias = ''): static
+    {
+        return new static(Method::Stddev, $attribute, $alias !== '' ? [$alias] : []);
+    }
+
+    public static function stddevPop(string $attribute, string $alias = ''): static
+    {
+        return new static(Method::StddevPop, $attribute, $alias !== '' ? [$alias] : []);
+    }
+
+    public static function stddevSamp(string $attribute, string $alias = ''): static
+    {
+        return new static(Method::StddevSamp, $attribute, $alias !== '' ? [$alias] : []);
+    }
+
+    public static function variance(string $attribute, string $alias = ''): static
+    {
+        return new static(Method::Variance, $attribute, $alias !== '' ? [$alias] : []);
+    }
+
+    public static function varPop(string $attribute, string $alias = ''): static
+    {
+        return new static(Method::VarPop, $attribute, $alias !== '' ? [$alias] : []);
+    }
+
+    public static function varSamp(string $attribute, string $alias = ''): static
+    {
+        return new static(Method::VarSamp, $attribute, $alias !== '' ? [$alias] : []);
+    }
+
+    public static function bitAnd(string $attribute, string $alias = ''): static
+    {
+        return new static(Method::BitAnd, $attribute, $alias !== '' ? [$alias] : []);
+    }
+
+    public static function bitOr(string $attribute, string $alias = ''): static
+    {
+        return new static(Method::BitOr, $attribute, $alias !== '' ? [$alias] : []);
+    }
+
+    public static function bitXor(string $attribute, string $alias = ''): static
+    {
+        return new static(Method::BitXor, $attribute, $alias !== '' ? [$alias] : []);
     }
 
     /**

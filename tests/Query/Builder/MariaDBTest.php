@@ -807,7 +807,7 @@ class MariaDBTest extends TestCase
         $this->assertStringContainsString('JOIN `customers`', $result->query);
         $this->assertStringContainsString('WHERE `customers`.`active` IN (?)', $result->query);
         $this->assertStringContainsString('GROUP BY `customers`.`country`', $result->query);
-        $this->assertStringContainsString('HAVING `total` > ?', $result->query);
+        $this->assertStringContainsString('HAVING SUM(`filtered_orders`.`amount`) > ?', $result->query);
         $this->assertStringContainsString('ORDER BY `total` DESC', $result->query);
         $this->assertStringContainsString('LIMIT ?', $result->query);
     }
@@ -854,7 +854,7 @@ class MariaDBTest extends TestCase
 
         $this->assertStringContainsString('JOIN `customers`', $result->query);
         $this->assertStringContainsString('COUNT(*) AS `order_count`', $result->query);
-        $this->assertStringContainsString('HAVING `order_count` > ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
     }
 
     public function testUnionAllWithOrderLimit(): void

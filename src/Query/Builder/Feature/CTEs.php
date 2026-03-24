@@ -6,9 +6,18 @@ use Utopia\Query\Builder;
 
 interface CTEs
 {
-    public function with(string $name, Builder $query): static;
+    /**
+     * @param  list<string>  $columns
+     */
+    public function with(string $name, Builder $query, array $columns = []): static;
 
-    public function withRecursive(string $name, Builder $query): static;
+    /**
+     * @param  list<string>  $columns
+     */
+    public function withRecursive(string $name, Builder $query, array $columns = []): static;
 
-    public function withRecursiveSeedStep(string $name, Builder $seed, Builder $step): static;
+    /**
+     * @param  list<string>  $columns
+     */
+    public function withRecursiveSeedStep(string $name, Builder $seed, Builder $step, array $columns = []): static;
 }

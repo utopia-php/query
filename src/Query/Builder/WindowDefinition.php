@@ -12,6 +12,7 @@ readonly class WindowDefinition
         public string $name,
         public ?array $partitionBy,
         public ?array $orderBy,
+        public ?WindowFrame $frame = null,
     ) {
     }
 }

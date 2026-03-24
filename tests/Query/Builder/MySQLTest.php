@@ -24,7 +24,7 @@ use Utopia\Query\Builder\Feature\Transactions;
 use Utopia\Query\Builder\Feature\Unions;
 use Utopia\Query\Builder\Feature\Updates;
 use Utopia\Query\Builder\Feature\Upsert;
-use Utopia\Query\Builder\Feature\VectorSearch;
+use Utopia\Query\Builder\Feature\PostgreSQL\VectorSearch;
 use Utopia\Query\Builder\Feature\Windows;
 use Utopia\Query\Builder\JoinBuilder;
 use Utopia\Query\Builder\JoinType;
@@ -966,7 +966,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertEquals(
-            'SELECT COUNT(*) AS `total` FROM `orders` GROUP BY `status` HAVING `total` > ?',
+            'SELECT COUNT(*) AS `total` FROM `orders` GROUP BY `status` HAVING COUNT(*) > ?',
             $result->query
         );
         $this->assertEquals([5], $result->bindings);
@@ -1211,7 +1211,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertEquals(
-            'SELECT COUNT(*) AS `order_count`, SUM(`total`) AS `total_amount`, `users`.`name` FROM `orders` JOIN `users` ON `orders`.`user_id` = `users`.`id` GROUP BY `users`.`name` HAVING `order_count` > ? ORDER BY `total_amount` DESC LIMIT ?',
+            'SELECT COUNT(*) AS `order_count`, SUM(`total`) AS `total_amount`, `users`.`name` FROM `orders` JOIN `users` ON `orders`.`user_id` = `users`.`id` GROUP BY `users`.`name` HAVING COUNT(*) > ? ORDER BY `total_amount` DESC LIMIT ?',
             $result->query
         );
         $this->assertEquals([5, 10], $result->bindings);
@@ -1370,7 +1370,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertEquals(
-            'SELECT COUNT(*) AS `total`, SUM(`price`) AS `sum_price` FROM `t` GROUP BY `status` HAVING `total` > ? AND `sum_price` < ?',
+            'SELECT COUNT(*) AS `total`, SUM(`price`) AS `sum_price` FROM `t` GROUP BY `status` HAVING COUNT(*) > ? AND SUM(`price`) < ?',
             $result->query
         );
         $this->assertEquals([5, 1000], $result->bindings);
@@ -1420,7 +1420,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('HAVING `total` > ? AND `total` < ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ? AND COUNT(*) < ?', $result->query);
         $this->assertEquals([1, 100], $result->bindings);
     }
 
@@ -2125,7 +2125,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('LEFT JOIN `coupons`', $result->query);
         $this->assertStringContainsString('WHERE', $result->query);
         $this->assertStringContainsString('GROUP BY `status`', $result->query);
-        $this->assertStringContainsString('HAVING `cnt` > ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
         $this->assertStringContainsString('ORDER BY `sum_total` DESC', $result->query);
         $this->assertStringContainsString('LIMIT ?', $result->query);
         $this->assertStringContainsString('OFFSET ?', $result->query);
@@ -3782,7 +3782,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('JOIN `users`', $result->query);
         $this->assertStringContainsString('WHERE `orders`.`total` > ?', $result->query);
         $this->assertStringContainsString('GROUP BY `users`.`name`', $result->query);
-        $this->assertStringContainsString('HAVING `cnt` > ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
         $this->assertStringContainsString('ORDER BY `revenue` DESC', $result->query);
         $this->assertStringContainsString('LIMIT ?', $result->query);
         $this->assertStringContainsString('OFFSET ?', $result->query);
@@ -3885,7 +3885,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('COUNT(*) AS `cnt`', $result->query);
         $this->assertStringContainsString('JOIN `users`', $result->query);
         $this->assertStringContainsString('GROUP BY `users`.`name`', $result->query);
-        $this->assertStringContainsString('HAVING `cnt` > ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
         $this->assertEquals([3], $result->bindings);
     }
 
@@ -4391,7 +4391,7 @@ class MySQLTest extends TestCase
             ->toRawSql();
 
         $this->assertStringContainsString('COUNT(*) AS `total`', $sql);
-        $this->assertStringContainsString('HAVING `total` > 5', $sql);
+        $this->assertStringContainsString('HAVING COUNT(*) > 5', $sql);
         $this->assertStringNotContainsString('?', $sql);
     }
 
@@ -5536,7 +5536,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('HAVING `cnt` > ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
         $this->assertStringNotContainsString('GROUP BY', $result->query);
     }
 
@@ -5698,7 +5698,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertEquals(
-            '(SELECT DISTINCT COUNT(*) AS `total`, `status` FROM `orders` JOIN `users` ON `orders`.`uid` = `users`.`id` WHERE `amount` > ? GROUP BY `status` HAVING `total` > ? ORDER BY `status` ASC LIMIT ? OFFSET ?) UNION (SELECT * FROM `archive` WHERE `status` IN (?))',
+            '(SELECT DISTINCT COUNT(*) AS `total`, `status` FROM `orders` JOIN `users` ON `orders`.`uid` = `users`.`id` WHERE `amount` > ? GROUP BY `status` HAVING COUNT(*) > ? ORDER BY `status` ASC LIMIT ? OFFSET ?) UNION (SELECT * FROM `archive` WHERE `status` IN (?))',
             $result->query
         );
         $this->assertEquals([100, 5, 10, 20, 'closed'], $result->bindings);
@@ -5856,7 +5856,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
         // Provider should be in WHERE, not HAVING
         $this->assertStringContainsString('WHERE _tenant = ?', $result->query);
-        $this->assertStringContainsString('HAVING `total` > ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
         // Provider bindings before having bindings
         $this->assertEquals(['t1', 5], $result->bindings);
     }
@@ -10599,7 +10599,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertSame(
-            'SELECT COUNT(*) AS `order_count`, SUM(`total`) AS `total_spent`, `user_id` FROM `orders` GROUP BY `user_id` HAVING `order_count` > ?',
+            'SELECT COUNT(*) AS `order_count`, SUM(`total`) AS `total_spent`, `user_id` FROM `orders` GROUP BY `user_id` HAVING COUNT(*) > ?',
             $result->query
         );
         $this->assertEquals([5], $result->bindings);
@@ -13343,7 +13343,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('SUM(`amount`) AS `total_amount`', $result->query);
         $this->assertStringContainsString('AVG(`amount`) AS `avg_amount`', $result->query);
         $this->assertStringContainsString('GROUP BY `region`', $result->query);
-        $this->assertStringContainsString('HAVING `sale_count` > ? AND `avg_amount` > ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ? AND AVG(`amount`) > ?', $result->query);
         $this->assertEquals([10, 50, 5], $result->bindings);
     }
 
@@ -13828,7 +13828,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('WHERE `total` > ?', $result->query);
         $this->assertStringContainsString('tenant_id = ?', $result->query);
         $this->assertStringContainsString('`user_id` NOT IN (SELECT', $result->query);
-        $this->assertStringContainsString('HAVING `cnt` > ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
         $this->assertEquals([0, 't1', 'fraud', 5, 10], $result->bindings);
     }
 
@@ -13924,7 +13924,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('HAVING `cnt` > ? AND (`total` > ? OR `total` < ?)', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ? AND (`total` > ? OR `total` < ?)', $result->query);
         $this->assertEquals([5, 10000, 100], $result->bindings);
     }
 
@@ -14026,7 +14026,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('HAVING `cnt` > ? AND SUM(total) > ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ? AND SUM(total) > ?', $result->query);
         $this->assertEquals([5, 1000], $result->bindings);
     }
 

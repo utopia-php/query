@@ -1,6 +1,6 @@
 <?php
 
-namespace Utopia\Query\Builder\Feature;
+namespace Utopia\Query\Builder\Feature\PostgreSQL;
 
 use Utopia\Query\Builder\VectorMetric;
 

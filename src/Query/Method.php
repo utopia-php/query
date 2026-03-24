@@ -73,6 +73,15 @@ enum Method: string
     case Avg = 'avg';
     case Min = 'min';
     case Max = 'max';
+    case Stddev = 'stddev';
+    case StddevPop = 'stddevPop';
+    case StddevSamp = 'stddevSamp';
+    case Variance = 'variance';
+    case VarPop = 'varPop';
+    case VarSamp = 'varSamp';
+    case BitAnd = 'bitAnd';
+    case BitOr = 'bitOr';
+    case BitXor = 'bitXor';
     case GroupBy = 'groupBy';
     case Having = 'having';
 
@@ -203,7 +212,16 @@ enum Method: string
             self::Sum,
             self::Avg,
             self::Min,
-            self::Max => true,
+            self::Max,
+            self::Stddev,
+            self::StddevPop,
+            self::StddevSamp,
+            self::Variance,
+            self::VarPop,
+            self::VarSamp,
+            self::BitAnd,
+            self::BitOr,
+            self::BitXor => true,
             default => false,
         };
     }

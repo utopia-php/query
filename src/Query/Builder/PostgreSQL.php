@@ -5,19 +5,25 @@ namespace Utopia\Query\Builder;
 use Utopia\Query\Builder as BaseBuilder;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\FullOuterJoins;
+use Utopia\Query\Builder\Feature\GroupByModifiers;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\LateralJoins;
-use Utopia\Query\Builder\Feature\LockingOf;
-use Utopia\Query\Builder\Feature\Merge;
-use Utopia\Query\Builder\Feature\Returning;
+use Utopia\Query\Builder\Feature\PostgreSQL\AggregateFilter;
+use Utopia\Query\Builder\Feature\PostgreSQL\DistinctOn;
+use Utopia\Query\Builder\Feature\PostgreSQL\LockingOf;
+use Utopia\Query\Builder\Feature\PostgreSQL\Merge;
+use Utopia\Query\Builder\Feature\PostgreSQL\OrderedSetAggregates;
+use Utopia\Query\Builder\Feature\PostgreSQL\Returning;
+use Utopia\Query\Builder\Feature\PostgreSQL\VectorSearch;
+use Utopia\Query\Builder\Feature\StringAggregates;
 use Utopia\Query\Builder\Feature\TableSampling;
-use Utopia\Query\Builder\Feature\VectorSearch;
+use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\ColumnType;
 
-class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf, ConditionalAggregates, Merge, LateralJoins, TableSampling, FullOuterJoins
+class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf, ConditionalAggregates, Merge, LateralJoins, TableSampling, FullOuterJoins, StringAggregates, OrderedSetAggregates, DistinctOn, AggregateFilter, GroupByModifiers
 {
     protected string $wrapChar = '"';
 
@@ -56,6 +62,11 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
 
     /** @var list<MergeClause> */
     protected array $mergeClauses = [];
+
+    /** @var list<string> */
+    protected array $distinctOnColumns = [];
+
+    protected ?string $groupByModifier = null;
 
     protected function compileRandom(): string
     {
@@ -711,6 +722,195 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    public function groupConcat(string $column, string $separator = ',', string $alias = '', ?array $orderBy = null): static
+    {
+        $col = $this->resolveAndWrap($column);
+        $expr = 'STRING_AGG(' . $col . ', ?';
+        if ($orderBy !== null && $orderBy !== []) {
+            $orderCols = [];
+            foreach ($orderBy as $orderCol) {
+                if (\str_starts_with($orderCol, '-')) {
+                    $orderCols[] = $this->resolveAndWrap(\substr($orderCol, 1)) . ' DESC';
+                } else {
+                    $orderCols[] = $this->resolveAndWrap($orderCol) . ' ASC';
+                }
+            }
+            $expr .= ' ORDER BY ' . \implode(', ', $orderCols);
+        }
+        $expr .= ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr, [$separator]);
+    }
+
+    public function jsonArrayAgg(string $column, string $alias = ''): static
+    {
+        $expr = 'JSON_AGG(' . $this->resolveAndWrap($column) . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr);
+    }
+
+    public function jsonObjectAgg(string $keyColumn, string $valueColumn, string $alias = ''): static
+    {
+        $expr = 'JSON_OBJECT_AGG(' . $this->resolveAndWrap($keyColumn) . ', ' . $this->resolveAndWrap($valueColumn) . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr);
+    }
+
+    public function arrayAgg(string $column, string $alias = ''): static
+    {
+        $expr = 'ARRAY_AGG(' . $this->resolveAndWrap($column) . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr);
+    }
+
+    public function boolAnd(string $column, string $alias = ''): static
+    {
+        $expr = 'BOOL_AND(' . $this->resolveAndWrap($column) . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr);
+    }
+
+    public function boolOr(string $column, string $alias = ''): static
+    {
+        $expr = 'BOOL_OR(' . $this->resolveAndWrap($column) . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr);
+    }
+
+    public function every(string $column, string $alias = ''): static
+    {
+        $expr = 'EVERY(' . $this->resolveAndWrap($column) . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr);
+    }
+
+    public function percentileCont(float $fraction, string $orderColumn, string $alias = ''): static
+    {
+        $expr = 'PERCENTILE_CONT(?) WITHIN GROUP (ORDER BY ' . $this->resolveAndWrap($orderColumn) . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr, [$fraction]);
+    }
+
+    public function percentileDisc(float $fraction, string $orderColumn, string $alias = ''): static
+    {
+        $expr = 'PERCENTILE_DISC(?) WITHIN GROUP (ORDER BY ' . $this->resolveAndWrap($orderColumn) . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr, [$fraction]);
+    }
+
+    public function distinctOn(array $columns): static
+    {
+        $this->distinctOnColumns = $columns;
+
+        return $this;
+    }
+
+    public function selectAggregateFilter(string $aggregateExpr, string $filterCondition, string $alias = '', array $bindings = []): static
+    {
+        $expr = $aggregateExpr . ' FILTER (WHERE ' . $filterCondition . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr, $bindings);
+    }
+
+    public function insertDefaultValues(): BuildResult
+    {
+        $result = parent::insertDefaultValues();
+
+        return $this->appendReturning($result);
+    }
+
+    public function withTotals(): static
+    {
+        throw new UnsupportedException('WITH TOTALS is not supported by PostgreSQL.');
+    }
+
+    public function withRollup(): static
+    {
+        $this->groupByModifier = 'ROLLUP';
+
+        return $this;
+    }
+
+    public function withCube(): static
+    {
+        $this->groupByModifier = 'CUBE';
+
+        return $this;
+    }
+
+    public function build(): BuildResult
+    {
+        $result = parent::build();
+        $query = $result->query;
+        $modified = false;
+
+        if (! empty($this->distinctOnColumns)) {
+            $cols = \array_map(
+                fn (string $col): string => $this->resolveAndWrap($col),
+                $this->distinctOnColumns
+            );
+            $distinctOnClause = 'SELECT DISTINCT ON (' . \implode(', ', $cols) . ')';
+            $query = \preg_replace('/^SELECT(\s+DISTINCT)?/', $distinctOnClause, $query, 1) ?? $query;
+            $modified = true;
+        }
+
+        if ($this->groupByModifier !== null) {
+            $groupByPos = \strpos($query, 'GROUP BY ');
+            if ($groupByPos !== false) {
+                $afterGroupBy = $groupByPos + 9;
+                $endPos = null;
+                foreach (['HAVING ', 'WINDOW ', 'ORDER BY ', 'LIMIT ', 'OFFSET ', 'FETCH ', 'FOR '] as $keyword) {
+                    $pos = \strpos($query, $keyword, $afterGroupBy);
+                    if ($pos !== false && ($endPos === null || $pos < $endPos)) {
+                        $endPos = $pos;
+                    }
+                }
+                $columns = $endPos !== null
+                    ? \rtrim(\substr($query, $afterGroupBy, $endPos - $afterGroupBy))
+                    : \substr($query, $afterGroupBy);
+                $replacement = 'GROUP BY ' . $this->groupByModifier . '(' . $columns . ')';
+                $query = \substr($query, 0, $groupByPos) . $replacement . ($endPos !== null ? ' ' . \substr($query, $endPos) : '');
+            }
+            $modified = true;
+        }
+
+        if ($modified) {
+            return new BuildResult($query, $result->bindings, $result->readOnly);
+        }
+
+        return $result;
+    }
+
     public function reset(): static
     {
         parent::reset();
@@ -730,6 +930,8 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         $this->mergeCondition = '';
         $this->mergeConditionBindings = [];
         $this->mergeClauses = [];
+        $this->distinctOnColumns = [];
+        $this->groupByModifier = null;
 
         return $this;
     }

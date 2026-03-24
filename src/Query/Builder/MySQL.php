@@ -4,13 +4,16 @@ namespace Utopia\Query\Builder;
 
 use Utopia\Query\Builder as BaseBuilder;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
+use Utopia\Query\Builder\Feature\GroupByModifiers;
 use Utopia\Query\Builder\Feature\Hints;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\LateralJoins;
+use Utopia\Query\Builder\Feature\StringAggregates;
+use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
 
-class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJoins
+class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJoins, StringAggregates, GroupByModifiers
 {
     /** @var list<string> */
     protected array $hints = [];
@@ -22,6 +25,8 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     protected string $updateJoinRight = '';
 
     protected string $updateJoinAlias = '';
+
+    protected ?string $groupByModifier = null;
 
     protected string $deleteAlias = '';
 
@@ -205,12 +210,31 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     public function build(): BuildResult
     {
         $result = parent::build();
+        $query = $result->query;
+
+        if ($this->groupByModifier !== null) {
+            $groupByPos = \strpos($query, 'GROUP BY ');
+            if ($groupByPos !== false) {
+                $afterGroupBy = $groupByPos + 9;
+                $endPos = null;
+                foreach (['HAVING ', 'WINDOW ', 'ORDER BY ', 'LIMIT ', 'FOR '] as $keyword) {
+                    $pos = \strpos($query, $keyword, $afterGroupBy);
+                    if ($pos !== false && ($endPos === null || $pos < $endPos)) {
+                        $endPos = $pos;
+                    }
+                }
+                $insertAt = $endPos !== null ? $endPos : \strlen($query);
+                $query = \rtrim(\substr($query, 0, $insertAt)) . ' ' . $this->groupByModifier . ($endPos !== null ? ' ' . \substr($query, $endPos) : '');
+            }
+        }
 
         if (! empty($this->hints)) {
             $hintStr = '/*+ ' . \implode(' ', $this->hints) . ' */';
-            $query = \preg_replace('/^SELECT(\s+DISTINCT)?/', 'SELECT$1 ' . $hintStr, $result->query, 1);
+            $query = \preg_replace('/^SELECT(\s+DISTINCT)?/', 'SELECT$1 ' . $hintStr, $query, 1) ?? $query;
+        }
 
-            return new BuildResult($query ?? $result->query, $result->bindings, $result->readOnly);
+        if ($query !== $result->query) {
+            return new BuildResult($query, $result->bindings, $result->readOnly);
         }
 
         return $result;
@@ -370,11 +394,80 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this->joinLateral($subquery, $alias, JoinType::Left);
     }
 
+    public function groupConcat(string $column, string $separator = ',', string $alias = '', ?array $orderBy = null): static
+    {
+        $col = $this->resolveAndWrap($column);
+        $expr = 'GROUP_CONCAT(' . $col;
+        if ($orderBy !== null && $orderBy !== []) {
+            $orderCols = [];
+            foreach ($orderBy as $orderCol) {
+                if (\str_starts_with($orderCol, '-')) {
+                    $orderCols[] = $this->resolveAndWrap(\substr($orderCol, 1)) . ' DESC';
+                } else {
+                    $orderCols[] = $this->resolveAndWrap($orderCol) . ' ASC';
+                }
+            }
+            $expr .= ' ORDER BY ' . \implode(', ', $orderCols);
+        }
+        $expr .= ' SEPARATOR ?)';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr, [$separator]);
+    }
+
+    public function jsonArrayAgg(string $column, string $alias = ''): static
+    {
+        $expr = 'JSON_ARRAYAGG(' . $this->resolveAndWrap($column) . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr);
+    }
+
+    public function jsonObjectAgg(string $keyColumn, string $valueColumn, string $alias = ''): static
+    {
+        $expr = 'JSON_OBJECTAGG(' . $this->resolveAndWrap($keyColumn) . ', ' . $this->resolveAndWrap($valueColumn) . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->selectRaw($expr);
+    }
+
+    public function insertDefaultValues(): BuildResult
+    {
+        $this->bindings = [];
+        $this->validateTable();
+
+        return new BuildResult('INSERT INTO ' . $this->quote($this->table) . ' () VALUES ()', $this->bindings);
+    }
+
+    public function withTotals(): static
+    {
+        throw new UnsupportedException('WITH TOTALS is not supported by MySQL.');
+    }
+
+    public function withRollup(): static
+    {
+        $this->groupByModifier = 'WITH ROLLUP';
+
+        return $this;
+    }
+
+    public function withCube(): static
+    {
+        throw new UnsupportedException('WITH CUBE is not supported by MySQL.');
+    }
+
     public function reset(): static
     {
         parent::reset();
         $this->hints = [];
         $this->jsonSets = [];
+        $this->groupByModifier = null;
         $this->updateJoinTable = '';
         $this->updateJoinLeft = '';
         $this->updateJoinRight = '';

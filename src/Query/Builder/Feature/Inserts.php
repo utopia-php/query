@@ -22,6 +22,8 @@ interface Inserts
 
     public function insert(): BuildResult;
 
+    public function insertDefaultValues(): BuildResult;
+
     /**
      * @param  list<string>  $columns
      */

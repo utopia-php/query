@@ -18,7 +18,8 @@ use Utopia\Query\Builder\Feature\Joins;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\LateralJoins;
 use Utopia\Query\Builder\Feature\Locking;
-use Utopia\Query\Builder\Feature\Merge;
+use Utopia\Query\Builder\Feature\PostgreSQL\Merge;
+use Utopia\Query\Builder\Feature\PostgreSQL\VectorSearch;
 use Utopia\Query\Builder\Feature\Selects;
 use Utopia\Query\Builder\Feature\Spatial;
 use Utopia\Query\Builder\Feature\TableSampling;
@@ -26,7 +27,6 @@ use Utopia\Query\Builder\Feature\Transactions;
 use Utopia\Query\Builder\Feature\Unions;
 use Utopia\Query\Builder\Feature\Updates;
 use Utopia\Query\Builder\Feature\Upsert;
-use Utopia\Query\Builder\Feature\VectorSearch;
 use Utopia\Query\Builder\Feature\Windows;
 use Utopia\Query\Builder\JoinBuilder;
 use Utopia\Query\Builder\JoinType;
@@ -240,7 +240,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('HAVING "cnt" > ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
     }
 
     public function testDistinctWrapsWithDoubleQuotes(): void
@@ -1530,7 +1530,7 @@ class PostgreSQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('GROUP BY "customer_id"', $result->query);
-        $this->assertStringContainsString('HAVING "cnt" > ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
         $this->assertContains(5, $result->bindings);
     }
 
@@ -2875,7 +2875,7 @@ class PostgreSQLTest extends TestCase
             ->build();
 
         $this->assertSame(
-            'SELECT COUNT(*) AS "order_count" FROM "orders" GROUP BY "user_id" HAVING "order_count" > ?',
+            'SELECT COUNT(*) AS "order_count" FROM "orders" GROUP BY "user_id" HAVING COUNT(*) > ?',
             $result->query
         );
         $this->assertEquals([5], $result->bindings);
@@ -4543,7 +4543,7 @@ class PostgreSQLTest extends TestCase
 
         $this->assertStringContainsString('"tags" @> ?::jsonb', $result->query);
         $this->assertStringContainsString('GROUP BY "category"', $result->query);
-        $this->assertStringContainsString('HAVING "cnt" > ?', $result->query);
+        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
         $this->assertBindingCount($result);
     }
 

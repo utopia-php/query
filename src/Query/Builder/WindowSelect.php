@@ -14,6 +14,7 @@ readonly class WindowSelect
         public ?array $partitionBy,
         public ?array $orderBy,
         public ?string $windowName = null,
+        public ?WindowFrame $frame = null,
     ) {
     }
 }
