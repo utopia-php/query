@@ -1,8 +1,11 @@
 <?php
 
-namespace Utopia\Query\AST;
+namespace Utopia\Query\AST\Specification;
 
-readonly class WindowSpecification
+use Utopia\Query\AST\Expression;
+use Utopia\Query\AST\OrderByItem;
+
+readonly class Window
 {
     /**
      * @param Expression[] $partitionBy

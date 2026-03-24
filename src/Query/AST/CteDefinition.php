@@ -2,6 +2,8 @@
 
 namespace Utopia\Query\AST;
 
+use Utopia\Query\AST\Statement\Select;
+
 readonly class CteDefinition
 {
     /**
@@ -9,7 +11,7 @@ readonly class CteDefinition
      */
     public function __construct(
         public string $name,
-        public SelectStatement $query,
+        public Select $query,
         public array $columns = [],
         public bool $recursive = false,
     ) {

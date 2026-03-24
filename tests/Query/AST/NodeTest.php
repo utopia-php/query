@@ -24,11 +24,11 @@ use Utopia\Query\AST\Placeholder;
 use Utopia\Query\AST\Raw;
 use Utopia\Query\AST\Reference\Column;
 use Utopia\Query\AST\Reference\Table;
-use Utopia\Query\AST\SelectStatement;
+use Utopia\Query\AST\Specification\Window as WindowSpecification;
 use Utopia\Query\AST\Star;
+use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\AST\SubquerySource;
 use Utopia\Query\AST\WindowDefinition;
-use Utopia\Query\AST\WindowSpecification;
 
 class NodeTest extends TestCase
 {
@@ -184,12 +184,12 @@ class NodeTest extends TestCase
         $notIn = new In($col, $list, true);
         $this->assertTrue($notIn->negated);
 
-        $subquery = new SelectStatement(
+        $subquery = new Select(
             columns: [new Column('id')],
             from: new Table('other'),
         );
         $inSub = new In($col, $subquery);
-        $this->assertInstanceOf(SelectStatement::class, $inSub->list);
+        $this->assertInstanceOf(Select::class, $inSub->list);
     }
 
     public function testBetweenExpression(): void
@@ -211,7 +211,7 @@ class NodeTest extends TestCase
 
     public function testExistsExpression(): void
     {
-        $subquery = new SelectStatement(
+        $subquery = new Select(
             columns: [new Literal(1)],
             from: new Table('users'),
             where: new Binary(new Column('id'), '=', new Literal(1)),
@@ -274,7 +274,7 @@ class NodeTest extends TestCase
 
     public function testSubqueryExpression(): void
     {
-        $query = new SelectStatement(
+        $query = new Select(
             columns: [new FunctionCall('MAX', [new Column('salary')])],
             from: new Table('employees'),
         );
@@ -343,7 +343,7 @@ class NodeTest extends TestCase
 
     public function testSubquerySource(): void
     {
-        $query = new SelectStatement(
+        $query = new Select(
             columns: [new Star()],
             from: new Table('users'),
         );
@@ -374,7 +374,7 @@ class NodeTest extends TestCase
         $this->assertNull($cross->condition);
 
         $subSource = new SubquerySource(
-            new SelectStatement(columns: [new Star()], from: new Table('items')),
+            new Select(columns: [new Star()], from: new Table('items')),
             'i',
         );
         $subJoin = new JoinClause('LEFT JOIN', $subSource, $condition);
@@ -411,7 +411,7 @@ class NodeTest extends TestCase
 
     public function testCteDefinition(): void
     {
-        $query = new SelectStatement(
+        $query = new Select(
             columns: [new Star()],
             from: new Table('employees'),
             where: new Binary(new Column('active'), '=', new Literal(true)),
@@ -430,9 +430,9 @@ class NodeTest extends TestCase
         $this->assertTrue($recursive->recursive);
     }
 
-    public function testSelectStatement(): void
+    public function testSelect(): void
     {
-        $select = new SelectStatement(
+        $select = new Select(
             columns: [
                 new Column('name', 'u'),
                 new Aliased(new FunctionCall('COUNT', [new Star()]), 'order_count'),
@@ -472,9 +472,9 @@ class NodeTest extends TestCase
         $this->assertSame([], $select->windows);
     }
 
-    public function testSelectStatementWith(): void
+    public function testSelectWith(): void
     {
-        $original = new SelectStatement(
+        $original = new Select(
             columns: [new Star()],
             from: new Table('users'),
             limit: new Literal(10),
@@ -516,7 +516,7 @@ class NodeTest extends TestCase
 
         $withCtes = $original->with(
             ctes: [
-                new CteDefinition('sub', new SelectStatement(columns: [new Literal(1)])),
+                new CteDefinition('sub', new Select(columns: [new Literal(1)])),
             ],
         );
         $this->assertCount(1, $withCtes->ctes);

@@ -3,7 +3,7 @@
 namespace Utopia\Query\AST\Expression;
 
 use Utopia\Query\AST\Expression;
-use Utopia\Query\AST\WindowSpecification;
+use Utopia\Query\AST\Specification\Window as WindowSpecification;
 
 readonly class Window implements Expression
 {

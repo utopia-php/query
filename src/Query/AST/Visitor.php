@@ -3,6 +3,7 @@
 namespace Utopia\Query\AST;
 
 use Utopia\Query\AST\Reference\Table;
+use Utopia\Query\AST\Statement\Select;
 
 interface Visitor
 {
@@ -12,6 +13,6 @@ interface Visitor
     // Visit a table reference. Return the same or replacement.
     public function visitTableReference(Table $reference): Table;
 
-    // Visit a SelectStatement. Return the same or replacement.
-    public function visitSelect(SelectStatement $stmt): SelectStatement;
+    // Visit a Select. Return the same or replacement.
+    public function visitSelect(Select $stmt): Select;
 }

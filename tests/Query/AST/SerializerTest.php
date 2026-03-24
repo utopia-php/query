@@ -14,14 +14,14 @@ use Utopia\Query\AST\Placeholder;
 use Utopia\Query\AST\Raw;
 use Utopia\Query\AST\Reference\Column;
 use Utopia\Query\AST\Reference\Table;
-use Utopia\Query\AST\SelectStatement;
 use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Star;
+use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\Tokenizer\Tokenizer;
 
 class SerializerTest extends TestCase
 {
-    private function parse(string $sql): SelectStatement
+    private function parse(string $sql): Select
     {
         $tokenizer = new Tokenizer();
         $tokens = Tokenizer::filter($tokenizer->tokenize($sql));
@@ -29,7 +29,7 @@ class SerializerTest extends TestCase
         return $parser->parse($tokens);
     }
 
-    private function serialize(SelectStatement $stmt): string
+    private function serialize(Select $stmt): string
     {
         $serializer = new Serializer();
         return $serializer->serialize($stmt);
@@ -246,7 +246,7 @@ class SerializerTest extends TestCase
 
     public function testDirectAstConstruction(): void
     {
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [
                 new Aliased(new Column('name'), 'n'),
                 new FunctionCall('COUNT', [new Star()]),

@@ -1,10 +1,16 @@
 <?php
 
-namespace Utopia\Query\AST;
+namespace Utopia\Query\AST\Statement;
 
+use Utopia\Query\AST\CteDefinition;
+use Utopia\Query\AST\Expression;
+use Utopia\Query\AST\JoinClause;
+use Utopia\Query\AST\OrderByItem;
 use Utopia\Query\AST\Reference\Table;
+use Utopia\Query\AST\SubquerySource;
+use Utopia\Query\AST\WindowDefinition;
 
-readonly class SelectStatement
+readonly class Select
 {
     /**
      * @param Expression[] $columns

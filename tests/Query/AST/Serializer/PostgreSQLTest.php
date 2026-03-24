@@ -4,13 +4,13 @@ namespace Tests\Query\AST\Serializer;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\AST\Parser;
-use Utopia\Query\AST\SelectStatement;
 use Utopia\Query\AST\Serializer\PostgreSQL;
+use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\Tokenizer\Tokenizer;
 
 class PostgreSQLTest extends TestCase
 {
-    private function parse(string $sql): SelectStatement
+    private function parse(string $sql): Select
     {
         $tokenizer = new \Utopia\Query\Tokenizer\PostgreSQL();
         $tokens = Tokenizer::filter($tokenizer->tokenize($sql));
@@ -18,7 +18,7 @@ class PostgreSQLTest extends TestCase
         return $parser->parse($tokens);
     }
 
-    private function serialize(SelectStatement $stmt): string
+    private function serialize(Select $stmt): string
     {
         $serializer = new PostgreSQL();
         return $serializer->serialize($stmt);

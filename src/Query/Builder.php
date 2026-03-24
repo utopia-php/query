@@ -17,9 +17,9 @@ use Utopia\Query\AST\OrderByItem;
 use Utopia\Query\AST\Raw;
 use Utopia\Query\AST\Reference\Column;
 use Utopia\Query\AST\Reference\Table;
-use Utopia\Query\AST\SelectStatement;
 use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Star;
+use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\AST\SubquerySource;
 use Utopia\Query\Builder\BuildResult;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
@@ -2307,7 +2307,7 @@ abstract class Builder implements
         return $attribute;
     }
 
-    public function toAst(): SelectStatement
+    public function toAst(): Select
     {
         $grouped = Query::groupByType($this->pendingQueries);
 
@@ -2322,7 +2322,7 @@ abstract class Builder implements
         $offset = $grouped->offset !== null ? new Literal($grouped->offset) : null;
         $cteDefinitions = $this->buildAstCtes();
 
-        return new SelectStatement(
+        return new Select(
             columns: $columns,
             from: $from,
             joins: $joins,
@@ -2732,7 +2732,7 @@ abstract class Builder implements
         return $defs;
     }
 
-    private function parseSqlToAst(string $sql): SelectStatement
+    private function parseSqlToAst(string $sql): Select
     {
         $tokenizer = new \Utopia\Query\Tokenizer\Tokenizer();
         $tokens = \Utopia\Query\Tokenizer\Tokenizer::filter($tokenizer->tokenize($sql));
@@ -2740,7 +2740,7 @@ abstract class Builder implements
         return $parser->parse($tokens);
     }
 
-    public static function fromAst(SelectStatement $ast): static
+    public static function fromAst(Select $ast): static
     {
         $builder = new static(); // @phpstan-ignore new.static
 
@@ -2764,7 +2764,7 @@ abstract class Builder implements
         return $builder;
     }
 
-    private function applyAstColumns(SelectStatement $ast): void
+    private function applyAstColumns(Select $ast): void
     {
         $selectCols = [];
         $hasNonStar = false;
@@ -2915,7 +2915,7 @@ abstract class Builder implements
         return \implode('.', $parts);
     }
 
-    private function applyAstJoins(SelectStatement $ast): void
+    private function applyAstJoins(Select $ast): void
     {
         foreach ($ast->joins as $join) {
             if (!$join->table instanceof Table) {
@@ -2972,7 +2972,7 @@ abstract class Builder implements
         return $serializer->serializeExpression($expression);
     }
 
-    private function applyAstWhere(SelectStatement $ast): void
+    private function applyAstWhere(Select $ast): void
     {
         if ($ast->where === null) {
             return;
@@ -3117,7 +3117,7 @@ abstract class Builder implements
         return Query::raw($attr . ' NOT LIKE ?', [$val]);
     }
 
-    private function applyAstGroupBy(SelectStatement $ast): void
+    private function applyAstGroupBy(Select $ast): void
     {
         if (empty($ast->groupBy)) {
             return;
@@ -3135,7 +3135,7 @@ abstract class Builder implements
         }
     }
 
-    private function applyAstHaving(SelectStatement $ast): void
+    private function applyAstHaving(Select $ast): void
     {
         if ($ast->having === null) {
             return;
@@ -3147,7 +3147,7 @@ abstract class Builder implements
         }
     }
 
-    private function applyAstOrderBy(SelectStatement $ast): void
+    private function applyAstOrderBy(Select $ast): void
     {
         foreach ($ast->orderBy as $item) {
             if ($item->expression instanceof Column) {
@@ -3171,7 +3171,7 @@ abstract class Builder implements
         }
     }
 
-    private function applyAstLimitOffset(SelectStatement $ast): void
+    private function applyAstLimitOffset(Select $ast): void
     {
         if ($ast->limit instanceof Literal && ($ast->limit->value !== null)) {
             $this->limit((int) $ast->limit->value);
@@ -3182,7 +3182,7 @@ abstract class Builder implements
         }
     }
 
-    private function applyAstCtes(SelectStatement $ast): void
+    private function applyAstCtes(Select $ast): void
     {
         foreach ($ast->ctes as $cte) {
             $serializer = new Serializer();

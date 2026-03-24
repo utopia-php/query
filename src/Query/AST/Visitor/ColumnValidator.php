@@ -5,7 +5,7 @@ namespace Utopia\Query\AST\Visitor;
 use Utopia\Query\AST\Expression;
 use Utopia\Query\AST\Reference\Column;
 use Utopia\Query\AST\Reference\Table;
-use Utopia\Query\AST\SelectStatement;
+use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\AST\Visitor;
 use Utopia\Query\Exception;
 
@@ -31,7 +31,7 @@ class ColumnValidator implements Visitor
         return $reference;
     }
 
-    public function visitSelect(SelectStatement $stmt): SelectStatement
+    public function visitSelect(Select $stmt): Select
     {
         return $stmt;
     }

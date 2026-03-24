@@ -14,20 +14,22 @@ use Utopia\Query\AST\Expression\Subquery;
 use Utopia\Query\AST\Expression\Unary;
 use Utopia\Query\AST\Expression\Window;
 use Utopia\Query\AST\Reference\Table;
+use Utopia\Query\AST\Specification\Window as WindowSpecification;
+use Utopia\Query\AST\Statement\Select;
 
 class Walker
 {
     /**
      * Walk the entire AST, applying the visitor to every node.
-     * Returns a new (possibly transformed) SelectStatement.
+     * Returns a new (possibly transformed) Select.
      */
-    public function walk(SelectStatement $stmt, Visitor $visitor): SelectStatement
+    public function walk(Select $stmt, Visitor $visitor): Select
     {
         $stmt = $this->walkStatement($stmt, $visitor);
         return $visitor->visitSelect($stmt);
     }
 
-    private function walkStatement(SelectStatement $stmt, Visitor $visitor): SelectStatement
+    private function walkStatement(Select $stmt, Visitor $visitor): Select
     {
         $columns = $this->walkExpressionArray($stmt->columns, $visitor);
 
@@ -67,7 +69,7 @@ class Walker
             $windows[] = $this->walkWindowDefinition($win, $visitor);
         }
 
-        return new SelectStatement(
+        return new Select(
             columns: $columns,
             from: $from,
             joins: $joins,
@@ -157,7 +159,7 @@ class Walker
     {
         $walked = $this->walkExpression($expression->expression, $visitor);
 
-        if ($expression->list instanceof SelectStatement) {
+        if ($expression->list instanceof Select) {
             $list = $this->walkStatement($expression->list, $visitor);
         } else {
             $list = $this->walkExpressionArray($expression->list, $visitor);

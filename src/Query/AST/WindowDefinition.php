@@ -2,11 +2,13 @@
 
 namespace Utopia\Query\AST;
 
+use Utopia\Query\AST\Specification\Window;
+
 readonly class WindowDefinition
 {
     public function __construct(
         public string $name,
-        public WindowSpecification $specification,
+        public Window $specification,
     ) {
     }
 }

@@ -15,8 +15,8 @@ use Utopia\Query\AST\Literal;
 use Utopia\Query\AST\OrderByItem;
 use Utopia\Query\AST\Reference\Column;
 use Utopia\Query\AST\Reference\Table;
-use Utopia\Query\AST\SelectStatement;
 use Utopia\Query\AST\Star;
+use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\Builder\MySQL;
 use Utopia\Query\Builder\PostgreSQL;
 use Utopia\Query\Query;
@@ -31,7 +31,7 @@ class BuilderIntegrationTest extends TestCase
 
         $ast = $builder->toAst();
 
-        $this->assertInstanceOf(SelectStatement::class, $ast);
+        $this->assertInstanceOf(Select::class, $ast);
         $this->assertInstanceOf(Table::class, $ast->from);
         $this->assertSame('users', $ast->from->name);
         $this->assertCount(3, $ast->columns);
@@ -192,7 +192,7 @@ class BuilderIntegrationTest extends TestCase
 
     public function testFromAstSimpleSelect(): void
     {
-        $ast = new SelectStatement(
+        $ast = new Select(
             columns: [new Star()],
             from: new Table('users'),
         );
@@ -205,7 +205,7 @@ class BuilderIntegrationTest extends TestCase
 
     public function testFromAstWithWhere(): void
     {
-        $ast = new SelectStatement(
+        $ast = new Select(
             columns: [new Star()],
             from: new Table('users'),
             where: new Binary(
@@ -224,7 +224,7 @@ class BuilderIntegrationTest extends TestCase
 
     public function testFromAstWithJoin(): void
     {
-        $ast = new SelectStatement(
+        $ast = new Select(
             columns: [new Star()],
             from: new Table('users'),
             joins: [
@@ -249,7 +249,7 @@ class BuilderIntegrationTest extends TestCase
 
     public function testFromAstWithOrderBy(): void
     {
-        $ast = new SelectStatement(
+        $ast = new Select(
             columns: [new Star()],
             from: new Table('users'),
             orderBy: [
@@ -268,7 +268,7 @@ class BuilderIntegrationTest extends TestCase
 
     public function testFromAstWithLimitOffset(): void
     {
-        $ast = new SelectStatement(
+        $ast = new Select(
             columns: [new Star()],
             from: new Table('users'),
             limit: new Literal(25),
@@ -309,7 +309,7 @@ class BuilderIntegrationTest extends TestCase
 
     public function testRoundTripAstToBuilder(): void
     {
-        $ast = new SelectStatement(
+        $ast = new Select(
             columns: [new Column('id'), new Column('name')],
             from: new Table('users'),
             where: new Binary(
@@ -334,7 +334,7 @@ class BuilderIntegrationTest extends TestCase
 
     public function testFromAstComplexQuery(): void
     {
-        $ast = new SelectStatement(
+        $ast = new Select(
             columns: [
                 new Column('id'),
                 new Aliased(new FunctionCall('COUNT', [new Star()]), 'order_count'),
@@ -373,7 +373,7 @@ class BuilderIntegrationTest extends TestCase
 
     public function testFromAstWithCte(): void
     {
-        $innerStmt = new SelectStatement(
+        $innerStmt = new Select(
             columns: [new Star()],
             from: new Table('users'),
             where: new Binary(
@@ -383,7 +383,7 @@ class BuilderIntegrationTest extends TestCase
             ),
         );
 
-        $ast = new SelectStatement(
+        $ast = new Select(
             columns: [new Star()],
             from: new Table('active_users'),
             ctes: [
@@ -550,7 +550,7 @@ class BuilderIntegrationTest extends TestCase
 
     public function testFromAstWithDistinct(): void
     {
-        $ast = new SelectStatement(
+        $ast = new Select(
             columns: [new Column('email')],
             from: new Table('users'),
             distinct: true,
@@ -564,7 +564,7 @@ class BuilderIntegrationTest extends TestCase
 
     public function testFromAstWithGroupBy(): void
     {
-        $ast = new SelectStatement(
+        $ast = new Select(
             columns: [
                 new Column('department'),
                 new Aliased(new FunctionCall('COUNT', [new Star()]), 'cnt'),
@@ -582,7 +582,7 @@ class BuilderIntegrationTest extends TestCase
 
     public function testFromAstWithBetween(): void
     {
-        $ast = new SelectStatement(
+        $ast = new Select(
             columns: [new Star()],
             from: new Table('users'),
             where: new Between(
@@ -600,7 +600,7 @@ class BuilderIntegrationTest extends TestCase
 
     public function testFromAstWithInExpression(): void
     {
-        $ast = new SelectStatement(
+        $ast = new Select(
             columns: [new Star()],
             from: new Table('users'),
             where: new In(
@@ -617,7 +617,7 @@ class BuilderIntegrationTest extends TestCase
 
     public function testFromAstAndCombinedFilters(): void
     {
-        $ast = new SelectStatement(
+        $ast = new Select(
             columns: [new Star()],
             from: new Table('users'),
             where: new Binary(

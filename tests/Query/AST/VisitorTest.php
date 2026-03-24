@@ -14,9 +14,9 @@ use Utopia\Query\AST\OrderByItem;
 use Utopia\Query\AST\Parser;
 use Utopia\Query\AST\Reference\Column;
 use Utopia\Query\AST\Reference\Table;
-use Utopia\Query\AST\SelectStatement;
 use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Star;
+use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\AST\Visitor\ColumnValidator;
 use Utopia\Query\AST\Visitor\FilterInjector;
 use Utopia\Query\AST\Visitor\TableRenamer;
@@ -26,7 +26,7 @@ use Utopia\Query\Tokenizer\Tokenizer;
 
 class VisitorTest extends TestCase
 {
-    private function parse(string $sql): SelectStatement
+    private function parse(string $sql): Select
     {
         $tokenizer = new Tokenizer();
         $tokens = Tokenizer::filter($tokenizer->tokenize($sql));
@@ -34,7 +34,7 @@ class VisitorTest extends TestCase
         return $parser->parse($tokens);
     }
 
-    private function serialize(SelectStatement $stmt): string
+    private function serialize(Select $stmt): string
     {
         $serializer = new Serializer();
         return $serializer->serialize($stmt);
@@ -42,7 +42,7 @@ class VisitorTest extends TestCase
 
     public function testTableRenamerSingleTable(): void
     {
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [new Star()],
             from: new Table('users'),
         );
@@ -56,7 +56,7 @@ class VisitorTest extends TestCase
 
     public function testTableRenamerInJoin(): void
     {
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [new Star()],
             from: new Table('users', 'u'),
             joins: [
@@ -84,7 +84,7 @@ class VisitorTest extends TestCase
 
     public function testTableRenamerInColumnReference(): void
     {
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [
                 new Column('name', 'u'),
                 new Column('email', 'u'),
@@ -101,7 +101,7 @@ class VisitorTest extends TestCase
 
     public function testTableRenamerInStar(): void
     {
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [new Star('users')],
             from: new Table('users'),
         );
@@ -115,7 +115,7 @@ class VisitorTest extends TestCase
 
     public function testTableRenamerMultiple(): void
     {
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [
                 new Column('name', 'users'),
                 new Column('title', 'orders'),
@@ -146,7 +146,7 @@ class VisitorTest extends TestCase
 
     public function testTableRenamerNoMatch(): void
     {
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [new Star()],
             from: new Table('users'),
         );
@@ -160,7 +160,7 @@ class VisitorTest extends TestCase
 
     public function testColumnValidatorAllowed(): void
     {
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [
                 new Column('name'),
                 new Column('email'),
@@ -177,7 +177,7 @@ class VisitorTest extends TestCase
 
     public function testColumnValidatorDisallowed(): void
     {
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [
                 new Column('name'),
                 new Column('password'),
@@ -195,7 +195,7 @@ class VisitorTest extends TestCase
 
     public function testColumnValidatorInWhere(): void
     {
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [new Column('name')],
             from: new Table('users'),
             where: new Binary(
@@ -215,7 +215,7 @@ class VisitorTest extends TestCase
 
     public function testColumnValidatorInOrderBy(): void
     {
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [new Column('name')],
             from: new Table('users'),
             orderBy: [
@@ -233,7 +233,7 @@ class VisitorTest extends TestCase
 
     public function testFilterInjectorEmptyWhere(): void
     {
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [new Star()],
             from: new Table('users'),
         );
@@ -253,7 +253,7 @@ class VisitorTest extends TestCase
 
     public function testFilterInjectorExistingWhere(): void
     {
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [new Star()],
             from: new Table('users'),
             where: new Binary(
@@ -281,7 +281,7 @@ class VisitorTest extends TestCase
 
     public function testFilterInjectorPreservesOther(): void
     {
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [new Column('name')],
             from: new Table('users'),
             orderBy: [new OrderByItem(new Column('name'))],
@@ -306,7 +306,7 @@ class VisitorTest extends TestCase
 
     public function testComposedVisitors(): void
     {
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [new Column('name')],
             from: new Table('users'),
         );
@@ -326,12 +326,12 @@ class VisitorTest extends TestCase
 
     public function testVisitorWithSubquery(): void
     {
-        $subquery = new SelectStatement(
+        $subquery = new Select(
             columns: [new Column('id')],
             from: new Table('orders'),
         );
 
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [new Star()],
             from: new Table('users'),
             where: new In(
@@ -352,7 +352,7 @@ class VisitorTest extends TestCase
 
     public function testVisitorWithCte(): void
     {
-        $cteQuery = new SelectStatement(
+        $cteQuery = new Select(
             columns: [new Column('id'), new Column('name')],
             from: new Table('users'),
             where: new Binary(
@@ -362,7 +362,7 @@ class VisitorTest extends TestCase
             ),
         );
 
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [new Star()],
             from: new Table('active_users'),
             ctes: [
@@ -382,7 +382,7 @@ class VisitorTest extends TestCase
 
     public function testWalkerRoundTrip(): void
     {
-        $stmt = new SelectStatement(
+        $stmt = new Select(
             columns: [
                 new Column('name', 'u'),
                 new Aliased(new FunctionCall('COUNT', [new Star()]), 'total'),

@@ -3,12 +3,12 @@
 namespace Utopia\Query\AST\Expression;
 
 use Utopia\Query\AST\Expression;
-use Utopia\Query\AST\SelectStatement;
+use Utopia\Query\AST\Statement\Select;
 
 readonly class Subquery implements Expression
 {
     public function __construct(
-        public SelectStatement $query,
+        public Select $query,
     ) {
     }
 }

@@ -14,10 +14,12 @@ use Utopia\Query\AST\Expression\Unary;
 use Utopia\Query\AST\Expression\Window;
 use Utopia\Query\AST\Reference\Column;
 use Utopia\Query\AST\Reference\Table;
+use Utopia\Query\AST\Specification\Window as WindowSpecification;
+use Utopia\Query\AST\Statement\Select;
 
 class Serializer
 {
-    public function serialize(SelectStatement $stmt): string
+    public function serialize(Select $stmt): string
     {
         $parts = [];
 
@@ -240,7 +242,7 @@ class Serializer
         $left = $this->serializeExpression($expression->expression);
         $keyword = $expression->negated ? 'NOT IN' : 'IN';
 
-        if ($expression->list instanceof SelectStatement) {
+        if ($expression->list instanceof Select) {
             return $left . ' ' . $keyword . ' (' . $this->serialize($expression->list) . ')';
         }
 

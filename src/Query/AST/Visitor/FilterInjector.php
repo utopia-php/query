@@ -5,7 +5,7 @@ namespace Utopia\Query\AST\Visitor;
 use Utopia\Query\AST\Expression;
 use Utopia\Query\AST\Expression\Binary;
 use Utopia\Query\AST\Reference\Table;
-use Utopia\Query\AST\SelectStatement;
+use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\AST\Visitor;
 
 class FilterInjector implements Visitor
@@ -24,7 +24,7 @@ class FilterInjector implements Visitor
         return $reference;
     }
 
-    public function visitSelect(SelectStatement $stmt): SelectStatement
+    public function visitSelect(Select $stmt): Select
     {
         if ($stmt->where === null) {
             return $stmt->with(where: $this->condition);

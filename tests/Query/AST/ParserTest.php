@@ -22,16 +22,16 @@ use Utopia\Query\AST\Parser;
 use Utopia\Query\AST\Placeholder;
 use Utopia\Query\AST\Reference\Column;
 use Utopia\Query\AST\Reference\Table;
-use Utopia\Query\AST\SelectStatement;
+use Utopia\Query\AST\Specification\Window as WindowSpecification;
 use Utopia\Query\AST\Star;
+use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\AST\SubquerySource;
 use Utopia\Query\AST\WindowDefinition;
-use Utopia\Query\AST\WindowSpecification;
 use Utopia\Query\Tokenizer\Tokenizer;
 
 class ParserTest extends TestCase
 {
-    private function parse(string $sql): SelectStatement
+    private function parse(string $sql): Select
     {
         $tokenizer = new Tokenizer();
         $tokens = Tokenizer::filter($tokenizer->tokenize($sql));
@@ -466,7 +466,7 @@ class ParserTest extends TestCase
         $stmt = $this->parse('SELECT * FROM users WHERE id IN (SELECT user_id FROM orders)');
 
         $this->assertInstanceOf(In::class, $stmt->where);
-        $this->assertInstanceOf(SelectStatement::class, $stmt->where->list);
+        $this->assertInstanceOf(Select::class, $stmt->where->list);
         $this->assertCount(1, $stmt->where->list->columns);
     }
 
@@ -476,7 +476,7 @@ class ParserTest extends TestCase
 
         $this->assertInstanceOf(SubquerySource::class, $stmt->from);
         $this->assertSame('sub', $stmt->from->alias);
-        $this->assertInstanceOf(SelectStatement::class, $stmt->from->query);
+        $this->assertInstanceOf(Select::class, $stmt->from->query);
     }
 
     public function testExistsExpression(): void
@@ -485,7 +485,7 @@ class ParserTest extends TestCase
 
         $this->assertInstanceOf(Exists::class, $stmt->where);
         $this->assertFalse($stmt->where->negated);
-        $this->assertInstanceOf(SelectStatement::class, $stmt->where->subquery);
+        $this->assertInstanceOf(Select::class, $stmt->where->subquery);
     }
 
     public function testNotExistsExpression(): void
@@ -593,7 +593,7 @@ class ParserTest extends TestCase
         $this->assertInstanceOf(CteDefinition::class, $cte);
         $this->assertSame('active', $cte->name);
         $this->assertFalse($cte->recursive);
-        $this->assertInstanceOf(SelectStatement::class, $cte->query);
+        $this->assertInstanceOf(Select::class, $cte->query);
 
         $this->assertInstanceOf(Table::class, $stmt->from);
         $this->assertSame('active', $stmt->from->name);

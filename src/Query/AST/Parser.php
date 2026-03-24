@@ -15,6 +15,8 @@ use Utopia\Query\AST\Expression\Unary;
 use Utopia\Query\AST\Expression\Window;
 use Utopia\Query\AST\Reference\Column;
 use Utopia\Query\AST\Reference\Table;
+use Utopia\Query\AST\Specification\Window as WindowSpecification;
+use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\Exception;
 use Utopia\Query\Tokenizer\Token;
 use Utopia\Query\Tokenizer\TokenType;
@@ -27,10 +29,10 @@ class Parser
     private bool $inColumnList = false;
 
     /**
-     * Parse tokens into a SelectStatement.
+     * Parse tokens into a Select.
      * @param Token[] $tokens filtered tokens (no whitespace/comments), must end with Eof
      */
-    public function parse(array $tokens): SelectStatement
+    public function parse(array $tokens): Select
     {
         $this->tokens = $tokens;
         $this->pos = 0;
@@ -39,7 +41,7 @@ class Parser
         return $this->parseSelect();
     }
 
-    private function parseSelect(): SelectStatement
+    private function parseSelect(): Select
     {
         $ctes = [];
         $recursive = false;
@@ -124,7 +126,7 @@ class Parser
             $this->expectIdentifierValue('ONLY');
         }
 
-        return new SelectStatement(
+        return new Select(
             columns: $columns,
             from: $from,
             joins: $joins,
