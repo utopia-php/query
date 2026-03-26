@@ -4557,7 +4557,6 @@ class ClickHouseTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('No table specified');
         (new Builder())
-            ->from('')
             ->final()
             ->build();
     }
@@ -4567,7 +4566,6 @@ class ClickHouseTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('No table specified');
         (new Builder())
-            ->from('')
             ->sample(0.5)
             ->build();
     }
@@ -7148,7 +7146,7 @@ class ClickHouseTest extends TestCase
 
     public function testSelectSubClickHouse(): void
     {
-        $sub = (new Builder())->from('events')->selectRaw('COUNT(*)');
+        $sub = (new Builder())->from('events')->select('COUNT(*)');
 
         $result = (new Builder())
             ->from('users')
@@ -7620,7 +7618,7 @@ class ClickHouseTest extends TestCase
     {
         $sub = (new Builder())
             ->from('orders')
-            ->selectRaw('1')
+            ->select('1')
             ->filter([Query::raw('`orders`.`user_id` = `users`.`id`')]);
 
         $result = (new Builder())
@@ -9405,7 +9403,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('events')
-            ->selectRaw('toDate(?) AS ref_date', ['2024-01-01'])
+            ->select('toDate(?) AS ref_date', ['2024-01-01'])
             ->build();
         $this->assertBindingCount($result);
 

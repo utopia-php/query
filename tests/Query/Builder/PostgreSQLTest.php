@@ -5599,8 +5599,8 @@ class PostgreSQLTest extends TestCase
     public function testFromNone(): void
     {
         $result = (new Builder())
-            ->fromNone()
-            ->selectRaw('1 AS one')
+            ->from()
+            ->select('1 AS one')
             ->build();
 
         $this->assertSame('SELECT 1 AS one', $result->query);
@@ -5611,7 +5611,7 @@ class PostgreSQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->selectRaw('COALESCE("name", ?) AS display_name', ['Unknown'])
+            ->select('COALESCE("name", ?) AS display_name', ['Unknown'])
             ->build();
 
         $this->assertStringContainsString('COALESCE("name", ?) AS display_name', $result->query);

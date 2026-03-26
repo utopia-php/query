@@ -2050,7 +2050,7 @@ class MySQLTest extends TestCase
     {
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('No table specified');
-        (new Builder())->from('')->build();
+        (new Builder())->build();
     }
 
     public function testCursorWithLimitAndOffset(): void
@@ -5452,7 +5452,7 @@ class MySQLTest extends TestCase
     {
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('No table specified');
-        (new Builder())->from('')->build();
+        (new Builder())->build();
     }
 
     public function testBuildWithOnlyLimit(): void
@@ -5460,7 +5460,6 @@ class MySQLTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('No table specified');
         (new Builder())
-            ->from('')
             ->limit(10)
             ->build();
     }
@@ -5470,7 +5469,6 @@ class MySQLTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('No table specified');
         (new Builder())
-            ->from('')
             ->offset(50)
             ->build();
     }
@@ -5480,7 +5478,6 @@ class MySQLTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('No table specified');
         (new Builder())
-            ->from('')
             ->sortAsc('name')
             ->build();
     }
@@ -5490,7 +5487,6 @@ class MySQLTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('No table specified');
         (new Builder())
-            ->from('')
             ->select(['a', 'b'])
             ->build();
     }
@@ -5500,7 +5496,6 @@ class MySQLTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('No table specified');
         (new Builder())
-            ->from('')
             ->count('*', 'total')
             ->build();
     }
@@ -6017,7 +6012,7 @@ class MySQLTest extends TestCase
     {
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('No table specified');
-        (new Builder())->from('')->join('other', 'a', 'b')->build();
+        (new Builder())->join('other', 'a', 'b')->build();
     }
 
     public function testBuildWithoutFromCall(): void
@@ -7052,7 +7047,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('orders')
-            ->selectRaw('SUM(amount) AS total')
+            ->select('SUM(amount) AS total')
             ->build();
         $this->assertBindingCount($result);
 
@@ -7063,7 +7058,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('orders')
-            ->selectRaw('IF(amount > ?, 1, 0) AS big_order', [1000])
+            ->select('IF(amount > ?, 1, 0) AS big_order', [1000])
             ->build();
         $this->assertBindingCount($result);
 
@@ -7076,7 +7071,7 @@ class MySQLTest extends TestCase
         $result = (new Builder())
             ->from('orders')
             ->select(['id', 'customer_id'])
-            ->selectRaw('SUM(amount) AS total')
+            ->select('SUM(amount) AS total')
             ->build();
         $this->assertBindingCount($result);
 
@@ -7094,7 +7089,7 @@ class MySQLTest extends TestCase
         $result = (new Builder())
             ->from('users')
             ->select(['id'])
-            ->selectRaw($case->sql, $case->bindings)
+            ->select($case->sql, $case->bindings)
             ->build();
         $this->assertBindingCount($result);
 
@@ -7104,7 +7099,7 @@ class MySQLTest extends TestCase
 
     public function testSelectRawResetClears(): void
     {
-        $builder = (new Builder())->from('t')->selectRaw('1 AS one');
+        $builder = (new Builder())->from('t')->select('1 AS one');
         $builder->build();
         $builder->reset();
 
@@ -7143,8 +7138,8 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->selectRaw('COUNT(*) AS cnt')
-            ->selectRaw('MAX(price) AS max_price')
+            ->select('COUNT(*) AS cnt')
+            ->select('MAX(price) AS max_price')
             ->build();
         $this->assertBindingCount($result);
 
@@ -9057,7 +9052,7 @@ class MySQLTest extends TestCase
         $result = (new Builder())
             ->from('t')
             ->select(['id'])
-            ->selectRaw('NOW() as current_time')
+            ->select('NOW() as current_time')
             ->build();
         $this->assertBindingCount($result);
 
@@ -9068,7 +9063,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->selectRaw('COALESCE(?, ?) as result', ['a', 'b'])
+            ->select('COALESCE(?, ?) as result', ['a', 'b'])
             ->build();
         $this->assertBindingCount($result);
 
@@ -9153,7 +9148,7 @@ class MySQLTest extends TestCase
 
     public function testResetClearsRawSelects2(): void
     {
-        $builder = (new Builder())->from('t')->selectRaw('1 AS one');
+        $builder = (new Builder())->from('t')->select('1 AS one');
         $builder->build();
         $builder->reset();
 
@@ -9911,7 +9906,7 @@ class MySQLTest extends TestCase
     public function testSelectSubBindingOrder(): void
     {
         $sub = (new Builder())->from('orders')
-            ->selectRaw('COUNT(*)')
+            ->select('COUNT(*)')
             ->filter([Query::equal('orders.user_id', ['matched'])]);
 
         $result = (new Builder())
@@ -10718,8 +10713,8 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('users')
-            ->selectRaw('COUNT(*) AS `total`')
-            ->selectRaw('MAX(`created_at`) AS `latest`')
+            ->select('COUNT(*) AS `total`')
+            ->select('MAX(`created_at`) AS `latest`')
             ->filter([Query::equal('active', [true])])
             ->orderByRaw('FIELD(`role`, ?, ?, ?)', ['admin', 'editor', 'viewer'])
             ->build();
@@ -10816,7 +10811,7 @@ class MySQLTest extends TestCase
     {
         $sub = (new Builder())
             ->from('orders')
-            ->selectRaw('COUNT(*)')
+            ->select('COUNT(*)')
             ->filter([Query::raw('`orders`.`user_id` = `users`.`id`')]);
 
         $result = (new Builder())
@@ -11265,8 +11260,8 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('orders')
-            ->selectRaw('DATE(`created_at`) AS `order_date`')
-            ->selectRaw('SUM(`total`) AS `daily_total`')
+            ->select('DATE(`created_at`) AS `order_date`')
+            ->select('SUM(`total`) AS `daily_total`')
             ->groupByRaw('DATE(`created_at`)')
             ->havingRaw('SUM(`total`) > ?', [1000])
             ->build();
@@ -11717,8 +11712,8 @@ class MySQLTest extends TestCase
     public function testFromNone(): void
     {
         $result = (new Builder())
-            ->fromNone()
-            ->selectRaw('1 AS one')
+            ->from()
+            ->select('1 AS one')
             ->build();
         $this->assertBindingCount($result);
 
@@ -11790,8 +11785,8 @@ class MySQLTest extends TestCase
 
     public function testWithRecursiveSeedStep(): void
     {
-        $seed = (new Builder())->fromNone()->selectRaw('1 AS n');
-        $step = (new Builder())->from('cte')->selectRaw('n + 1')->filter([Query::lessThan('n', 10)]);
+        $seed = (new Builder())->from()->select('1 AS n');
+        $step = (new Builder())->from('cte')->select('n + 1')->filter([Query::lessThan('n', 10)]);
         $result = (new Builder())
             ->from('cte')
             ->withRecursiveSeedStep('cte', $seed, $step)
@@ -11917,7 +11912,7 @@ class MySQLTest extends TestCase
 
     public function testSelectSubquery(): void
     {
-        $sub = (new Builder())->fromNone()->selectRaw('COUNT(*)');
+        $sub = (new Builder())->from()->select('COUNT(*)');
         $result = (new Builder())
             ->from('users')
             ->select(['name'])
@@ -12760,8 +12755,8 @@ class MySQLTest extends TestCase
     public function testValidateTableFromNone(): void
     {
         $result = (new Builder())
-            ->fromNone()
-            ->selectRaw('CONNECTION_ID() AS cid')
+            ->from()
+            ->select('CONNECTION_ID() AS cid')
             ->build();
         $this->assertBindingCount($result);
 
@@ -13879,7 +13874,7 @@ class MySQLTest extends TestCase
         $result = (new Builder())
             ->from('t')
             ->select(['name'])
-            ->selectRaw('COALESCE(bio, ?) AS bio_display', ['N/A'])
+            ->select('COALESCE(bio, ?) AS bio_display', ['N/A'])
             ->filter([Query::equal('active', [true])])
             ->build();
         $this->assertBindingCount($result);
@@ -14121,8 +14116,8 @@ class MySQLTest extends TestCase
     public function testFromNoneWithSelectRaw(): void
     {
         $result = (new Builder())
-            ->fromNone()
-            ->selectRaw('1 + 1 AS result')
+            ->from()
+            ->select('1 + 1 AS result')
             ->build();
         $this->assertBindingCount($result);
 
@@ -14529,9 +14524,9 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->selectRaw('NOW() AS current_time')
-            ->selectRaw('CONCAT(first_name, ?, last_name) AS full_name', [' '])
-            ->selectRaw('? AS constant_val', [42])
+            ->select('NOW() AS current_time')
+            ->select('CONCAT(first_name, ?, last_name) AS full_name', [' '])
+            ->select('? AS constant_val', [42])
             ->build();
         $this->assertBindingCount($result);
 
@@ -14580,12 +14575,12 @@ class MySQLTest extends TestCase
     {
         $existsSub = (new Builder())
             ->from('orders')
-            ->selectRaw('1')
+            ->select('1')
             ->filter([Query::raw('orders.user_id = users.id')]);
 
         $notExistsSub = (new Builder())
             ->from('bans')
-            ->selectRaw('1')
+            ->select('1')
             ->filter([Query::raw('bans.user_id = users.id')]);
 
         $result = (new Builder())

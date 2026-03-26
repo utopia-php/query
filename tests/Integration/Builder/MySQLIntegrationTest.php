@@ -335,7 +335,7 @@ class MySQLIntegrationTest extends IntegrationTestCase
     {
         $subquery = (new Builder())
             ->from('orders', 'o')
-            ->selectRaw('1')
+            ->select('1')
             ->filter([Query::equal('o.status', ['completed'])]);
 
         $result = $this->fresh()
@@ -350,7 +350,7 @@ class MySQLIntegrationTest extends IntegrationTestCase
 
         $noMatchSubquery = (new Builder())
             ->from('orders', 'o')
-            ->selectRaw('1')
+            ->select('1')
             ->filter([Query::equal('o.status', ['refunded'])]);
 
         $emptyResult = $this->fresh()

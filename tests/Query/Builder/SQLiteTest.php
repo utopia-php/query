@@ -1762,7 +1762,7 @@ class SQLiteTest extends TestCase
     {
         $result = (new Builder())
             ->from('users')
-            ->selectRaw("strftime('%Y', created_at) AS year")
+            ->select("strftime('%Y', created_at) AS year")
             ->build();
         $this->assertBindingCount($result);
 
