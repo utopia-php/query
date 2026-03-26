@@ -63,7 +63,7 @@ abstract class Builder implements
 {
     protected string $table = '';
 
-    protected string $tableAlias = '';
+    protected string $alias = '';
 
     /**
      * @var array<Query>
@@ -90,7 +90,7 @@ abstract class Builder implements
     protected array $joinFilterHooks = [];
 
     /** @var list<array<string, mixed>> */
-    protected array $pendingRows = [];
+    protected array $rows = [];
 
     /** @var array<string, string> */
     protected array $rawSets = [];
@@ -120,10 +120,10 @@ abstract class Builder implements
     protected array $windowDefinitions = [];
 
     /** @var ?array{percent: float, method: string} */
-    protected ?array $tableSample = null;
+    protected ?array $sample = null;
 
     /** @var list<CaseExpression> */
-    protected array $caseSelects = [];
+    protected array $cases = [];
 
     /** @var array<string, CaseExpression> */
     protected array $caseSets = [];
@@ -156,7 +156,7 @@ abstract class Builder implements
 
     protected ?SubSelect $fromSubquery = null;
 
-    protected bool $noTable = false;
+    protected bool $tableless = false;
 
     /** @var list<Condition> */
     protected array $rawOrders = [];
@@ -168,7 +168,7 @@ abstract class Builder implements
     protected array $rawHavings = [];
 
     /** @var array<int, JoinBuilder> */
-    protected array $joinBuilders = [];
+    protected array $joins = [];
 
     /** @var list<ExistsSubquery> */
     protected array $existsSubqueries = [];
@@ -185,7 +185,7 @@ abstract class Builder implements
     /** @var (\Closure(Plan): (array<mixed>|int))|null */
     protected ?\Closure $executor = null;
 
-    protected bool $qualifyColumns = false;
+    protected bool $qualify = false;
 
     /** @var array<string, true> */
     protected array $aggregationAliases = [];
@@ -210,7 +210,7 @@ abstract class Builder implements
 
     protected function buildTableClause(): string
     {
-        if ($this->noTable) {
+        if ($this->tableless) {
             return '';
         }
 
@@ -226,12 +226,12 @@ abstract class Builder implements
 
         $sql = 'FROM ' . $this->quote($this->table);
 
-        if ($this->tableAlias !== '') {
-            $sql .= ' AS ' . $this->quote($this->tableAlias);
+        if ($this->alias !== '') {
+            $sql .= ' AS ' . $this->quote($this->alias);
         }
 
-        if ($this->tableSample !== null) {
-            $sql .= ' TABLESAMPLE ' . $this->tableSample['method'] . '(' . $this->tableSample['percent'] . ')';
+        if ($this->sample !== null) {
+            $sql .= ' TABLESAMPLE ' . $this->sample['method'] . '(' . $this->sample['percent'] . ')';
         }
 
         return $sql;
@@ -247,25 +247,12 @@ abstract class Builder implements
         // no-op by default
     }
 
-    public function from(string $table, string $alias = ''): static
+    public function from(string $table = '', string $alias = ''): static
     {
         $this->table = $table;
-        $this->tableAlias = $alias;
+        $this->alias = $alias;
         $this->fromSubquery = null;
-        $this->noTable = false;
-
-        return $this;
-    }
-
-    /**
-     * Build a query without a FROM clause (e.g. SELECT 1, SELECT CONNECTION_ID()).
-     */
-    public function fromNone(): static
-    {
-        $this->noTable = true;
-        $this->table = '';
-        $this->tableAlias = '';
-        $this->fromSubquery = null;
+        $this->tableless = ($table === '');
 
         return $this;
     }
@@ -293,7 +280,7 @@ abstract class Builder implements
      */
     public function set(array $row): static
     {
-        $this->pendingRows[] = $row;
+        $this->rows[] = $row;
 
         return $this;
     }
@@ -445,7 +432,7 @@ abstract class Builder implements
         }
 
         $index = \count($this->pendingQueries) - 1;
-        $this->joinBuilders[$index] = $joinBuilder;
+        $this->joins[$index] = $joinBuilder;
 
         return $this;
     }
@@ -473,11 +460,16 @@ abstract class Builder implements
     }
 
     /**
-     * @param  array<string>  $columns
+     * @param  string|array<string>  $columns
+     * @param  list<mixed>  $bindings
      */
-    public function select(array $columns): static
+    public function select(string|array $columns, array $bindings = []): static
     {
-        $this->pendingQueries[] = Query::select($columns);
+        if (\is_string($columns)) {
+            $this->rawSelects[] = new Condition($columns, $bindings);
+        } else {
+            $this->pendingQueries[] = Query::select($columns);
+        }
 
         return $this;
     }
@@ -801,16 +793,6 @@ abstract class Builder implements
         return $this;
     }
 
-    /**
-     * @param  list<mixed>  $bindings
-     */
-    public function selectRaw(string $expression, array $bindings = []): static
-    {
-        $this->rawSelects[] = new Condition($expression, $bindings);
-
-        return $this;
-    }
-
     public function selectCast(string $column, string $type, string $alias = ''): static
     {
         $expr = 'CAST(' . $this->resolveAndWrap($column) . ' AS ' . $type . ')';
@@ -838,7 +820,7 @@ abstract class Builder implements
 
     public function selectCase(CaseExpression $case): static
     {
-        $this->caseSelects[] = $case;
+        $this->cases[] = $case;
 
         return $this;
     }
@@ -959,10 +941,10 @@ abstract class Builder implements
 
         $grouped = Query::groupByType($this->pendingQueries);
 
-        $this->qualifyColumns = false;
+        $this->qualify = false;
         $this->aggregationAliases = [];
-        if (! empty($grouped->joins) && $this->tableAlias !== '') {
-            $this->qualifyColumns = true;
+        if (! empty($grouped->joins) && $this->alias !== '') {
+            $this->qualify = true;
             foreach ($grouped->aggregations as $agg) {
                 /** @var string $aggAlias */
                 $aggAlias = $agg->getValue('');
@@ -1041,7 +1023,7 @@ abstract class Builder implements
         }
 
         // CASE selects
-        foreach ($this->caseSelects as $caseSelect) {
+        foreach ($this->cases as $caseSelect) {
             $selectParts[] = $caseSelect->sql;
             foreach ($caseSelect->bindings as $binding) {
                 $this->addBinding($binding);
@@ -1072,7 +1054,7 @@ abstract class Builder implements
 
             foreach ($grouped->joins as $joinIdx => $joinQuery) {
                 $pendingIdx = $joinQueryIndices[$joinIdx] ?? -1;
-                $joinBuilder = $this->joinBuilders[$pendingIdx] ?? null;
+                $joinBuilder = $this->joins[$pendingIdx] ?? null;
 
                 if ($joinBuilder !== null) {
                     $joinSQL = $this->compileJoinWithBuilder($joinQuery, $joinBuilder);
@@ -1147,7 +1129,7 @@ abstract class Builder implements
         }
 
         foreach ($this->filterHooks as $hook) {
-            $condition = $hook->filter($this->tableAlias ?: $this->table);
+            $condition = $hook->filter($this->alias ?: $this->table);
             $whereClauses[] = $condition->expression;
             foreach ($condition->bindings as $binding) {
                 $this->addBinding($binding);
@@ -1411,7 +1393,7 @@ abstract class Builder implements
 
         $bindings = [];
         $rowPlaceholders = [];
-        foreach ($this->pendingRows as $row) {
+        foreach ($this->rows as $row) {
             $placeholders = [];
             foreach ($columns as $col) {
                 $bindings[] = $row[$col] ?? null;
@@ -1467,8 +1449,8 @@ abstract class Builder implements
     {
         $assignments = [];
 
-        if (! empty($this->pendingRows)) {
-            foreach ($this->pendingRows[0] as $col => $value) {
+        if (! empty($this->rows)) {
+            foreach ($this->rows[0] as $col => $value) {
                 $assignments[] = $this->resolveAndWrap($col) . ' = ?';
                 $this->addBinding($value);
             }
@@ -1544,7 +1526,7 @@ abstract class Builder implements
         }
 
         foreach ($this->filterHooks as $hook) {
-            $condition = $hook->filter($this->tableAlias ?: $this->table);
+            $condition = $hook->filter($this->alias ?: $this->table);
             $whereClauses[] = $condition->expression;
             foreach ($condition->bindings as $binding) {
                 $this->addBinding($binding);
@@ -1623,7 +1605,7 @@ abstract class Builder implements
 
     protected function validateTable(): void
     {
-        if ($this->noTable) {
+        if ($this->tableless) {
             return;
         }
         if ($this->table === '' && $this->fromSubquery === null) {
@@ -1633,11 +1615,11 @@ abstract class Builder implements
 
     protected function validateRows(string $operation): void
     {
-        if (empty($this->pendingRows)) {
+        if (empty($this->rows)) {
             throw new ValidationException("No rows to {$operation}. Call set() before {$operation}().");
         }
 
-        foreach ($this->pendingRows as $row) {
+        foreach ($this->rows as $row) {
             if (empty($row)) {
                 throw new ValidationException('Cannot ' . $operation . ' an empty row. Each set() call must include at least one column.');
             }
@@ -1651,7 +1633,7 @@ abstract class Builder implements
      */
     protected function validateAndGetColumns(): array
     {
-        $columns = \array_keys($this->pendingRows[0]);
+        $columns = \array_keys($this->rows[0]);
 
         foreach ($columns as $col) {
             if ($col === '') {
@@ -1659,11 +1641,11 @@ abstract class Builder implements
             }
         }
 
-        if (\count($this->pendingRows) > 1) {
+        if (\count($this->rows) > 1) {
             $expectedKeys = $columns;
             \sort($expectedKeys);
 
-            foreach ($this->pendingRows as $i => $row) {
+            foreach ($this->rows as $i => $row) {
                 $rowKeys = \array_keys($row);
                 \sort($rowKeys);
 
@@ -1689,9 +1671,9 @@ abstract class Builder implements
         $this->pendingQueries = [];
         $this->bindings = [];
         $this->table = '';
-        $this->tableAlias = '';
+        $this->alias = '';
         $this->unions = [];
-        $this->pendingRows = [];
+        $this->rows = [];
         $this->rawSets = [];
         $this->rawSetBindings = [];
         $this->conflictKeys = [];
@@ -1709,17 +1691,17 @@ abstract class Builder implements
         $this->rawSelects = [];
         $this->windowSelects = [];
         $this->windowDefinitions = [];
-        $this->tableSample = null;
-        $this->caseSelects = [];
+        $this->sample = null;
+        $this->cases = [];
         $this->caseSets = [];
         $this->whereInSubqueries = [];
         $this->subSelects = [];
         $this->fromSubquery = null;
-        $this->noTable = false;
+        $this->tableless = false;
         $this->rawOrders = [];
         $this->rawGroups = [];
         $this->rawHavings = [];
-        $this->joinBuilders = [];
+        $this->joins = [];
         $this->existsSubqueries = [];
         $this->lateralJoins = [];
         $this->beforeBuildCallbacks = [];
@@ -1746,7 +1728,7 @@ abstract class Builder implements
         $this->subSelects = \array_map(fn (SubSelect $s) => new SubSelect(clone $s->subquery, $s->alias), $this->subSelects);
         $this->whereInSubqueries = \array_map(fn (WhereInSubquery $s) => new WhereInSubquery($s->column, clone $s->subquery, $s->not), $this->whereInSubqueries);
         $this->existsSubqueries = \array_map(fn (ExistsSubquery $s) => new ExistsSubquery(clone $s->subquery, $s->not), $this->existsSubqueries);
-        $this->joinBuilders = \array_map(fn (JoinBuilder $j) => clone $j, $this->joinBuilders);
+        $this->joins = \array_map(fn (JoinBuilder $j) => clone $j, $this->joins);
         $this->pendingQueries = \array_map(fn (Query $q) => clone $q, $this->pendingQueries);
         $this->lateralJoins = \array_map(fn (LateralJoin $l) => new LateralJoin(clone $l->subquery, $l->alias, $l->type), $this->lateralJoins);
     }
@@ -2043,12 +2025,12 @@ abstract class Builder implements
     {
         $resolved = $this->resolveAttribute($attribute);
 
-        if ($this->qualifyColumns
+        if ($this->qualify
             && $resolved !== '*'
             && ! \str_contains($resolved, '.')
             && ! isset($this->aggregationAliases[$resolved])
         ) {
-            $resolved = $this->tableAlias . '.' . $resolved;
+            $resolved = $this->alias . '.' . $resolved;
         }
 
         return $this->quote($resolved);
@@ -2449,7 +2431,7 @@ abstract class Builder implements
 
     private function buildAstFrom(): Table|SubquerySource|null
     {
-        if ($this->noTable) {
+        if ($this->tableless) {
             return null;
         }
 
@@ -2457,7 +2439,7 @@ abstract class Builder implements
             return null;
         }
 
-        $alias = $this->tableAlias !== '' ? $this->tableAlias : null;
+        $alias = $this->alias !== '' ? $this->alias : null;
         return new Table($this->table, $alias);
     }
 
@@ -2836,7 +2818,7 @@ abstract class Builder implements
             }
 
             $serializer = $this->createAstSerializer();
-            $this->selectRaw($serializer->serializeExpression($col));
+            $this->select($serializer->serializeExpression($col));
             $hasNonStar = true;
         }
 
@@ -2885,7 +2867,7 @@ abstract class Builder implements
         }
 
         $serializer = $this->createAstSerializer();
-        $this->selectRaw($serializer->serializeExpression($aliased));
+        $this->select($serializer->serializeExpression($aliased));
     }
 
     private function applyAstUnaliasedFunctionColumn(Func $fn): void
@@ -2913,7 +2895,7 @@ abstract class Builder implements
         }
 
         $serializer = $this->createAstSerializer();
-        $this->selectRaw($serializer->serializeExpression($fn));
+        $this->select($serializer->serializeExpression($fn));
     }
 
     private function astFuncArgToAttribute(Func $fn): string

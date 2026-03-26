@@ -8,17 +8,13 @@ use Utopia\Query\NullsPosition;
 
 interface Selects
 {
-    public function from(string $table, string $alias = ''): static;
+    public function from(string $table = '', string $alias = ''): static;
 
     /**
-     * @param  array<string>  $columns
-     */
-    public function select(array $columns): static;
-
-    /**
+     * @param  string|array<string>  $columns
      * @param  list<mixed>  $bindings
      */
-    public function selectRaw(string $expression, array $bindings = []): static;
+    public function select(string|array $columns, array $bindings = []): static;
 
     public function distinct(): static;
 

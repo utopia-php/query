@@ -482,7 +482,7 @@ class MongoDB extends BaseBuilder implements
         $this->validateRows('insert');
 
         $documents = [];
-        foreach ($this->pendingRows as $row) {
+        foreach ($this->rows as $row) {
             $doc = [];
             foreach ($row as $col => $value) {
                 $this->addBinding($value);
@@ -563,7 +563,7 @@ class MongoDB extends BaseBuilder implements
         $this->validateTable();
         $this->validateRows('upsert');
 
-        $row = $this->pendingRows[0];
+        $row = $this->rows[0];
 
         $filter = [];
         foreach ($this->conflictKeys as $key) {
@@ -1663,9 +1663,9 @@ class MongoDB extends BaseBuilder implements
     {
         $update = [];
 
-        if (! empty($this->pendingRows)) {
+        if (! empty($this->rows)) {
             $setDoc = [];
-            foreach ($this->pendingRows[0] as $col => $value) {
+            foreach ($this->rows[0] as $col => $value) {
                 $this->addBinding($value);
                 $setDoc[$col] = '?';
             }

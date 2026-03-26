@@ -162,7 +162,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function sumWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
@@ -172,7 +172,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function avgWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
@@ -182,7 +182,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function minWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
@@ -192,7 +192,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function maxWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
@@ -202,7 +202,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     /**
@@ -318,7 +318,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, [$separator]);
+        return $this->select($expr, [$separator]);
     }
 
     public function jsonArrayAgg(string $column, string $alias = ''): static
@@ -328,7 +328,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function jsonObjectAgg(string $keyColumn, string $valueColumn, string $alias = ''): static
@@ -338,7 +338,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function reset(): static

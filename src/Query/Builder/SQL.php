@@ -185,7 +185,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         $wrappedColumns = \array_map(fn (string $col): string => $this->resolveAndWrap($col), $columns);
 
         $rowPlaceholders = [];
-        foreach ($this->pendingRows as $row) {
+        foreach ($this->rows as $row) {
             $placeholders = [];
             foreach ($columns as $col) {
                 $this->addBinding($row[$col] ?? null);

@@ -131,7 +131,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function sumWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
@@ -141,7 +141,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function avgWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
@@ -151,7 +151,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function minWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
@@ -161,7 +161,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function maxWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
@@ -171,7 +171,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function fullOuterJoin(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
@@ -189,7 +189,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, [$separator]);
+        return $this->select($expr, [$separator]);
     }
 
     public function jsonArrayAgg(string $column, string $alias = ''): static
@@ -199,7 +199,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function jsonObjectAgg(string $keyColumn, string $valueColumn, string $alias = ''): static
@@ -209,7 +209,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function stddev(string $attribute, string $alias = ''): static
@@ -371,7 +371,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function quantileExact(float $level, string $column, string $alias = ''): static
@@ -381,7 +381,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function median(string $column, string $alias = ''): static
@@ -391,7 +391,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function uniq(string $column, string $alias = ''): static
@@ -401,7 +401,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function uniqExact(string $column, string $alias = ''): static
@@ -411,7 +411,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function uniqCombined(string $column, string $alias = ''): static
@@ -421,7 +421,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function argMin(string $valueColumn, string $argColumn, string $alias = ''): static
@@ -431,7 +431,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function argMax(string $valueColumn, string $argColumn, string $alias = ''): static
@@ -441,7 +441,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function topK(int $k, string $column, string $alias = ''): static
@@ -451,7 +451,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function topKWeighted(int $k, string $column, string $weightColumn, string $alias = ''): static
@@ -461,7 +461,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function anyValue(string $column, string $alias = ''): static
@@ -471,7 +471,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function anyLastValue(string $column, string $alias = ''): static
@@ -481,7 +481,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function groupUniqArray(string $column, string $alias = ''): static
@@ -491,7 +491,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function groupArrayMovingAvg(string $column, string $alias = ''): static
@@ -501,7 +501,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function groupArrayMovingSum(string $column, string $alias = ''): static
@@ -511,7 +511,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function reset(): static
@@ -823,8 +823,8 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $sql .= ' SAMPLE ' . \sprintf('%.10g', $this->sampleFraction);
         }
 
-        if ($this->tableAlias !== '') {
-            $sql .= ' AS ' . $this->quote($this->tableAlias);
+        if ($this->alias !== '') {
+            $sql .= ' AS ' . $this->quote($this->alias);
         }
 
         return $sql;

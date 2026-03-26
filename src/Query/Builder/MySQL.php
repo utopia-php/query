@@ -339,7 +339,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function sumWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
@@ -349,7 +349,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function avgWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
@@ -359,7 +359,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function minWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
@@ -369,7 +369,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function maxWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
@@ -379,7 +379,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function joinLateral(BaseBuilder $subquery, string $alias, JoinType $type = JoinType::Inner): static
@@ -414,7 +414,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, [$separator]);
+        return $this->select($expr, [$separator]);
     }
 
     public function jsonArrayAgg(string $column, string $alias = ''): static
@@ -424,7 +424,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function jsonObjectAgg(string $keyColumn, string $valueColumn, string $alias = ''): static
@@ -434,7 +434,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function insertDefaultValues(): Plan

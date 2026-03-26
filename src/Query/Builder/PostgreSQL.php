@@ -180,7 +180,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
 
     public function tablesample(float $percent, string $method = 'BERNOULLI'): static
     {
-        $this->tableSample = ['percent' => $percent, 'method' => \strtoupper($method)];
+        $this->sample = ['percent' => $percent, 'method' => \strtoupper($method)];
 
         return $this;
     }
@@ -593,7 +593,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function sumWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
@@ -603,7 +603,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function avgWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
@@ -613,7 +613,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function minWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
@@ -623,7 +623,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function maxWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
@@ -633,7 +633,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, \array_values($bindings));
+        return $this->select($expr, \array_values($bindings));
     }
 
     public function mergeInto(string $target): static
@@ -750,7 +750,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, [$separator]);
+        return $this->select($expr, [$separator]);
     }
 
     public function jsonArrayAgg(string $column, string $alias = ''): static
@@ -760,7 +760,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function jsonObjectAgg(string $keyColumn, string $valueColumn, string $alias = ''): static
@@ -770,7 +770,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function arrayAgg(string $column, string $alias = ''): static
@@ -780,7 +780,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function boolAnd(string $column, string $alias = ''): static
@@ -790,7 +790,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function boolOr(string $column, string $alias = ''): static
@@ -800,7 +800,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function every(string $column, string $alias = ''): static
@@ -810,7 +810,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr);
+        return $this->select($expr);
     }
 
     public function percentileCont(float $fraction, string $orderColumn, string $alias = ''): static
@@ -820,7 +820,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, [$fraction]);
+        return $this->select($expr, [$fraction]);
     }
 
     public function percentileDisc(float $fraction, string $orderColumn, string $alias = ''): static
@@ -830,7 +830,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, [$fraction]);
+        return $this->select($expr, [$fraction]);
     }
 
     public function distinctOn(array $columns): static
@@ -847,7 +847,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->selectRaw($expr, $bindings);
+        return $this->select($expr, $bindings);
     }
 
     public function insertDefaultValues(): Plan
