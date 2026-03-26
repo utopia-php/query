@@ -257,6 +257,11 @@ abstract class Builder implements
         return $this;
     }
 
+    public function fromNone(): static
+    {
+        return $this->from('');
+    }
+
     public function into(string $table): static
     {
         $this->table = $table;
@@ -472,6 +477,14 @@ abstract class Builder implements
         }
 
         return $this;
+    }
+
+    /**
+     * @param  array<mixed>  $bindings
+     */
+    public function selectRaw(string $expression, array $bindings = []): static
+    {
+        return $this->select($expression, $bindings);
     }
 
     /**
@@ -905,6 +918,22 @@ abstract class Builder implements
         }
 
         return $sql;
+    }
+
+    public function forUpdate(): static
+    {
+        $this->lockMode = LockMode::ForUpdate;
+
+        return $this;
+    }
+
+    /**
+     * Build an INSERT ... ON CONFLICT/DUPLICATE KEY UPDATE statement.
+     * Requires onConflict() to be called first to configure conflict keys and update columns.
+     */
+    public function upsert(): Plan
+    {
+        return $this->insert();
     }
 
     public function build(): Plan
