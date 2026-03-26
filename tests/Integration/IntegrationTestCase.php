@@ -4,7 +4,7 @@ namespace Tests\Integration;
 
 use PDO;
 use PHPUnit\Framework\TestCase;
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 
 abstract class IntegrationTestCase extends TestCase
 {
@@ -77,7 +77,7 @@ abstract class IntegrationTestCase extends TestCase
     /**
      * @return list<array<string, mixed>>
      */
-    protected function executeOnMongoDB(BuildResult $result): array
+    protected function executeOnMongoDB(Plan $result): array
     {
         $mongo = $this->connectMongoDB();
 
@@ -92,7 +92,7 @@ abstract class IntegrationTestCase extends TestCase
     /**
      * @return list<array<string, mixed>>
      */
-    protected function executeOnMysql(BuildResult $result): array
+    protected function executeOnMysql(Plan $result): array
     {
         $pdo = $this->connectMysql();
         $stmt = $pdo->prepare($result->query);
@@ -115,7 +115,7 @@ abstract class IntegrationTestCase extends TestCase
     /**
      * @return list<array<string, mixed>>
      */
-    protected function executeOnPostgres(BuildResult $result): array
+    protected function executeOnPostgres(Plan $result): array
     {
         $pdo = $this->connectPostgres();
         $stmt = $pdo->prepare($result->query);
@@ -138,7 +138,7 @@ abstract class IntegrationTestCase extends TestCase
     /**
      * @return list<array<string, mixed>>
      */
-    protected function executeOnClickhouse(BuildResult $result): array
+    protected function executeOnClickhouse(Plan $result): array
     {
         $ch = $this->connectClickhouse();
 

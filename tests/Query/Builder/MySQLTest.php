@@ -5,7 +5,7 @@ namespace Tests\Query\Builder;
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
 use Tests\Query\Fixture\PermissionFilter as Permission;
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 use Utopia\Query\Builder\Case\Builder as CaseBuilder;
 use Utopia\Query\Builder\Case\Expression;
 use Utopia\Query\Builder\Condition;
@@ -11846,8 +11846,8 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('users')
-            ->afterBuild(function (BuildResult $result) {
-                return new BuildResult(
+            ->afterBuild(function (Plan $result) {
+                return new Plan(
                     '/* traced */ ' . $result->query,
                     $result->bindings,
                     $result->readOnly
@@ -14305,8 +14305,8 @@ class MySQLTest extends TestCase
         $result = (new Builder())
             ->from('t')
             ->filter([Query::equal('status', ['active'])])
-            ->afterBuild(function (BuildResult $r) {
-                return new BuildResult(
+            ->afterBuild(function (Plan $r) {
+                return new Plan(
                     '/* traced */ ' . $r->query,
                     $r->bindings,
                     $r->readOnly,

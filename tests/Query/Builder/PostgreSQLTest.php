@@ -5320,8 +5320,8 @@ class PostgreSQLTest extends TestCase
         $result = (new Builder())
             ->from('t')
             ->select(['id'])
-            ->afterBuild(function (\Utopia\Query\Builder\BuildResult $r): \Utopia\Query\Builder\BuildResult {
-                return new \Utopia\Query\Builder\BuildResult(
+            ->afterBuild(function (\Utopia\Query\Builder\Plan $r): \Utopia\Query\Builder\Plan {
+                return new \Utopia\Query\Builder\Plan(
                     'SELECT * FROM (' . $r->query . ') AS wrapped',
                     $r->bindings,
                     $r->readOnly,

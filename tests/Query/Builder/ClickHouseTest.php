@@ -4,7 +4,7 @@ namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 use Utopia\Query\Builder\Case\Builder as CaseBuilder;
 use Utopia\Query\Builder\ClickHouse as Builder;
 use Utopia\Query\Builder\Condition;
@@ -9248,7 +9248,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->filter([Query::equal('status', ['active'])])
-            ->afterBuild(function (BuildResult $r) use (&$capturedQuery) {
+            ->afterBuild(function (Plan $r) use (&$capturedQuery) {
                 $capturedQuery = 'callback_executed';
                 return $r;
             })

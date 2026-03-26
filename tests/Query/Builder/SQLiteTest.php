@@ -4,7 +4,7 @@ namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\SQLite as Builder;
@@ -1417,7 +1417,7 @@ class SQLiteTest extends TestCase
         $result = (new Builder())
             ->from('users')
             ->filter([Query::equal('status', ['active'])])
-            ->afterBuild(function (BuildResult $r) use (&$capturedQuery) {
+            ->afterBuild(function (Plan $r) use (&$capturedQuery) {
                 $capturedQuery = 'executed';
                 return $r;
             })

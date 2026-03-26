@@ -4,7 +4,7 @@ namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 use Utopia\Query\Builder\Feature\Aggregates;
 use Utopia\Query\Builder\Feature\CTEs;
 use Utopia\Query\Builder\Feature\Deletes;
@@ -2483,12 +2483,12 @@ class MongoDBTest extends TestCase
         $result = (new Builder())
             ->from('users')
             ->select(['name'])
-            ->afterBuild(function (BuildResult $result) {
+            ->afterBuild(function (Plan $result) {
                 /** @var array<string, mixed> $op */
                 $op = \json_decode($result->query, true);
                 $op['custom_flag'] = true;
 
-                return new BuildResult(
+                return new Plan(
                     \json_encode($op, JSON_THROW_ON_ERROR),
                     $result->bindings,
                     $result->readOnly
