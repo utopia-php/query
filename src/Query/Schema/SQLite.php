@@ -2,7 +2,7 @@
 
 namespace Utopia\Query\Schema;
 
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 use Utopia\Query\Exception\UnsupportedException;
 
 class SQLite extends SQL
@@ -35,35 +35,36 @@ class SQLite extends SQL
         return '';
     }
 
-    public function createDatabase(string $name): BuildResult
+    public function createDatabase(string $name): Plan
     {
         throw new UnsupportedException('SQLite does not support CREATE DATABASE.');
     }
 
-    public function dropDatabase(string $name): BuildResult
+    public function dropDatabase(string $name): Plan
     {
         throw new UnsupportedException('SQLite does not support DROP DATABASE.');
     }
 
-    public function rename(string $from, string $to): BuildResult
+    public function rename(string $from, string $to): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'ALTER TABLE ' . $this->quote($from) . ' RENAME TO ' . $this->quote($to),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function truncate(string $table): BuildResult
+    public function truncate(string $table): Plan
     {
-        return new BuildResult('DELETE FROM ' . $this->quote($table), []);
+        return new Plan('DELETE FROM ' . $this->quote($table), [], executor: $this->executor);
     }
 
-    public function dropIndex(string $table, string $name): BuildResult
+    public function dropIndex(string $table, string $name): Plan
     {
-        return new BuildResult('DROP INDEX ' . $this->quote($name), []);
+        return new Plan('DROP INDEX ' . $this->quote($name), [], executor: $this->executor);
     }
 
-    public function renameIndex(string $table, string $from, string $to): BuildResult
+    public function renameIndex(string $table, string $from, string $to): Plan
     {
         throw new UnsupportedException('SQLite does not support renaming indexes directly.');
     }

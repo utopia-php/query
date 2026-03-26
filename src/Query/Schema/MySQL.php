@@ -2,7 +2,7 @@
 
 namespace Utopia\Query\Schema;
 
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Schema\Feature\CreatePartition;
 use Utopia\Query\Schema\Feature\DropPartition;
@@ -39,59 +39,65 @@ class MySQL extends SQL implements TableComments, CreatePartition, DropPartition
         return 'AUTO_INCREMENT';
     }
 
-    public function createDatabase(string $name): BuildResult
+    public function createDatabase(string $name): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'CREATE DATABASE ' . $this->quote($name) . ' /*!40100 DEFAULT CHARACTER SET utf8mb4 */',
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
     /**
      * MySQL CHANGE COLUMN: rename and/or retype a column in one statement.
      */
-    public function changeColumn(string $table, string $oldName, string $newName, string $type): BuildResult
+    public function changeColumn(string $table, string $oldName, string $newName, string $type): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'ALTER TABLE ' . $this->quote($table)
             . ' CHANGE COLUMN ' . $this->quote($oldName) . ' ' . $this->quote($newName) . ' ' . $type,
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
     /**
      * MySQL MODIFY COLUMN: retype a column without renaming.
      */
-    public function modifyColumn(string $table, string $name, string $type): BuildResult
+    public function modifyColumn(string $table, string $name, string $type): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'ALTER TABLE ' . $this->quote($table)
             . ' MODIFY ' . $this->quote($name) . ' ' . $type,
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function commentOnTable(string $table, string $comment): BuildResult
+    public function commentOnTable(string $table, string $comment): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'ALTER TABLE ' . $this->quote($table) . " COMMENT = '" . str_replace("'", "''", $comment) . "'",
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function createPartition(string $parent, string $name, string $expression): BuildResult
+    public function createPartition(string $parent, string $name, string $expression): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'ALTER TABLE ' . $this->quote($parent) . ' ADD PARTITION (PARTITION ' . $this->quote($name) . ' ' . $expression . ')',
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function dropPartition(string $table, string $name): BuildResult
+    public function dropPartition(string $table, string $name): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'ALTER TABLE ' . $this->quote($table) . ' DROP PARTITION ' . $this->quote($name),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 }

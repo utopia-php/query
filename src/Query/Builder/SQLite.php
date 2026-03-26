@@ -65,7 +65,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return 'ON CONFLICT (' . \implode(', ', $wrappedKeys) . ') DO UPDATE SET ' . \implode(', ', $updates);
     }
 
-    public function insertOrIgnore(): BuildResult
+    public function insertOrIgnore(): Plan
     {
         $this->bindings = [];
         [$sql, $bindings] = $this->compileInsertBody();
@@ -75,7 +75,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
 
         $sql = \preg_replace('/^INSERT INTO/', 'INSERT OR IGNORE INTO', $sql, 1) ?? $sql;
 
-        return new BuildResult($sql, $this->bindings);
+        return new Plan($sql, $this->bindings, executor: $this->executor);
     }
 
     public function setJsonAppend(string $column, array $values): static
@@ -143,7 +143,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return $this;
     }
 
-    public function update(): BuildResult
+    public function update(): Plan
     {
         foreach ($this->jsonSets as $col => $condition) {
             $this->setRaw($col, $condition->expression, $condition->bindings);

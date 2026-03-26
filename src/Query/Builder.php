@@ -22,7 +22,7 @@ use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Star;
 use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\AST\SubquerySource;
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\CteClause;
@@ -179,8 +179,11 @@ abstract class Builder implements
     /** @var list<Closure> */
     protected array $beforeBuildCallbacks = [];
 
-    /** @var list<Closure(BuildResult): BuildResult> */
+    /** @var list<Closure(Plan): Plan> */
     protected array $afterBuildCallbacks = [];
+
+    /** @var (\Closure(Plan): (array<mixed>|int))|null */
+    protected ?\Closure $executor = null;
 
     protected bool $qualifyColumns = false;
 
@@ -461,12 +464,12 @@ abstract class Builder implements
         return $this;
     }
 
-    public function explain(bool $analyze = false): BuildResult
+    public function explain(bool $analyze = false): Plan
     {
         $result = $this->build();
         $prefix = $analyze ? 'EXPLAIN ANALYZE ' : 'EXPLAIN ';
 
-        return new BuildResult($prefix . $result->query, $result->bindings, readOnly: true);
+        return new Plan($prefix . $result->query, $result->bindings, readOnly: true, executor: $this->executor);
     }
 
     /**
@@ -731,7 +734,7 @@ abstract class Builder implements
         return $this;
     }
 
-    public function insertSelect(): BuildResult
+    public function insertSelect(): Plan
     {
         $this->bindings = [];
         $this->validateTable();
@@ -759,7 +762,7 @@ abstract class Builder implements
             $this->addBinding($binding);
         }
 
-        return new BuildResult($sql, $this->bindings);
+        return new Plan($sql, $this->bindings, executor: $this->executor);
     }
 
     /**
@@ -870,6 +873,16 @@ abstract class Builder implements
         return $this;
     }
 
+    /**
+     * @param  \Closure(Plan): (array<mixed>|int)  $executor
+     */
+    public function setExecutor(\Closure $executor): static
+    {
+        $this->executor = $executor;
+
+        return $this;
+    }
+
     public function page(int $page, int $perPage = 25): static
     {
         if ($page < 1) {
@@ -912,7 +925,7 @@ abstract class Builder implements
         return $sql;
     }
 
-    public function build(): BuildResult
+    public function build(): Plan
     {
         $this->bindings = [];
 
@@ -1366,13 +1379,21 @@ abstract class Builder implements
 
         $sql = $ctePrefix . $sql;
 
-        $result = new BuildResult($sql, $this->bindings, readOnly: true);
+        $result = new Plan($sql, $this->bindings, readOnly: true, executor: $this->executor);
 
         foreach ($this->afterBuildCallbacks as $callback) {
             $result = $callback($result);
         }
 
         return $result;
+    }
+
+    /**
+     * @return array<mixed>|int
+     */
+    public function execute(): array|int
+    {
+        return $this->build()->execute();
     }
 
     /**
@@ -1418,7 +1439,7 @@ abstract class Builder implements
         return [$sql, $bindings];
     }
 
-    public function insert(): BuildResult
+    public function insert(): Plan
     {
         $this->bindings = [];
         [$sql, $bindings] = $this->compileInsertBody();
@@ -1426,17 +1447,17 @@ abstract class Builder implements
             $this->addBinding($binding);
         }
 
-        return new BuildResult($sql, $this->bindings);
+        return new Plan($sql, $this->bindings, executor: $this->executor);
     }
 
-    public function insertDefaultValues(): BuildResult
+    public function insertDefaultValues(): Plan
     {
         $this->bindings = [];
         $this->validateTable();
 
         $sql = 'INSERT INTO ' . $this->quote($this->table) . ' DEFAULT VALUES';
 
-        return new BuildResult($sql, $this->bindings);
+        return new Plan($sql, $this->bindings, executor: $this->executor);
     }
 
     /**
@@ -1472,7 +1493,7 @@ abstract class Builder implements
         return $assignments;
     }
 
-    public function update(): BuildResult
+    public function update(): Plan
     {
         $this->bindings = [];
         $this->validateTable();
@@ -1491,10 +1512,10 @@ abstract class Builder implements
 
         $this->compileOrderAndLimit($parts, $grouped);
 
-        return new BuildResult(\implode(' ', $parts), $this->bindings);
+        return new Plan(\implode(' ', $parts), $this->bindings, executor: $this->executor);
     }
 
-    public function delete(): BuildResult
+    public function delete(): Plan
     {
         $this->bindings = [];
         $this->validateTable();
@@ -1507,7 +1528,7 @@ abstract class Builder implements
 
         $this->compileOrderAndLimit($parts, $grouped);
 
-        return new BuildResult(\implode(' ', $parts), $this->bindings);
+        return new Plan(\implode(' ', $parts), $this->bindings, executor: $this->executor);
     }
 
     /**
@@ -2426,7 +2447,6 @@ abstract class Builder implements
         return $funcCall;
     }
 
-    /** @phpstan-ignore return.unusedType */
     private function buildAstFrom(): Table|SubquerySource|null
     {
         if ($this->noTable) {

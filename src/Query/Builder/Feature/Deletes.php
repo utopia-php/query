@@ -2,11 +2,11 @@
 
 namespace Utopia\Query\Builder\Feature;
 
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 
 interface Deletes
 {
     public function from(string $table, string $alias = ''): static;
 
-    public function delete(): BuildResult;
+    public function delete(): Plan;
 }

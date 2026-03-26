@@ -3,7 +3,7 @@
 namespace Utopia\Query\Builder\Feature;
 
 use Utopia\Query\Builder;
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 
 interface Inserts
 {
@@ -20,14 +20,14 @@ interface Inserts
      */
     public function onConflict(array $keys, array $updateColumns): static;
 
-    public function insert(): BuildResult;
+    public function insert(): Plan;
 
-    public function insertDefaultValues(): BuildResult;
+    public function insertDefaultValues(): Plan;
 
     /**
      * @param  list<string>  $columns
      */
     public function fromSelect(array $columns, Builder $source): static;
 
-    public function insertSelect(): BuildResult;
+    public function insertSelect(): Plan;
 }

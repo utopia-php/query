@@ -185,7 +185,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
-    public function insertOrIgnore(): BuildResult
+    public function insertOrIgnore(): Plan
     {
         $this->bindings = [];
         [$sql, $bindings] = $this->compileInsertBody();
@@ -195,10 +195,10 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
 
         $sql .= ' ON CONFLICT DO NOTHING';
 
-        return $this->appendReturning(new BuildResult($sql, $this->bindings));
+        return $this->appendReturning(new Plan($sql, $this->bindings, executor: $this->executor));
     }
 
-    public function insert(): BuildResult
+    public function insert(): Plan
     {
         $result = parent::insert();
 
@@ -221,7 +221,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
-    public function update(): BuildResult
+    public function update(): Plan
     {
         foreach ($this->jsonSets as $col => $condition) {
             $this->setRaw($col, $condition->expression, $condition->bindings);
@@ -240,7 +240,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->appendReturning($result);
     }
 
-    private function buildUpdateFrom(): BuildResult
+    private function buildUpdateFrom(): Plan
     {
         $this->bindings = [];
         $this->validateTable();
@@ -281,7 +281,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             }
         }
 
-        return new BuildResult(\implode(' ', $parts), $this->bindings);
+        return new Plan(\implode(' ', $parts), $this->bindings, executor: $this->executor);
     }
 
     public function deleteUsing(string $table, string $condition, mixed ...$bindings): static
@@ -293,7 +293,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
-    public function delete(): BuildResult
+    public function delete(): Plan
     {
         if ($this->deleteUsingTable !== '') {
             $result = $this->buildDeleteUsing();
@@ -306,7 +306,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->appendReturning($result);
     }
 
-    private function buildDeleteUsing(): BuildResult
+    private function buildDeleteUsing(): Plan
     {
         $this->bindings = [];
         $this->validateTable();
@@ -335,24 +335,24 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             }
         }
 
-        return new BuildResult(\implode(' ', $parts), $this->bindings);
+        return new Plan(\implode(' ', $parts), $this->bindings, executor: $this->executor);
     }
 
-    public function upsert(): BuildResult
+    public function upsert(): Plan
     {
         $result = parent::upsert();
 
         return $this->appendReturning($result);
     }
 
-    public function upsertSelect(): BuildResult
+    public function upsertSelect(): Plan
     {
         $result = parent::upsertSelect();
 
         return $this->appendReturning($result);
     }
 
-    private function appendReturning(BuildResult $result): BuildResult
+    private function appendReturning(Plan $result): Plan
     {
         if (empty($this->returningColumns)) {
             return $result;
@@ -363,9 +363,10 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $this->returningColumns
         );
 
-        return new BuildResult(
+        return new Plan(
             $result->query . ' RETURNING ' . \implode(', ', $columns),
-            $result->bindings
+            $result->bindings,
+            executor: $this->executor,
         );
     }
 
@@ -441,7 +442,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
-    public function explain(bool $analyze = false, bool $verbose = false, bool $buffers = false, string $format = ''): BuildResult
+    public function explain(bool $analyze = false, bool $verbose = false, bool $buffers = false, string $format = ''): Plan
     {
         $result = $this->build();
         $options = [];
@@ -459,7 +460,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         }
         $prefix = empty($options) ? 'EXPLAIN' : 'EXPLAIN (' . \implode(', ', $options) . ')';
 
-        return new BuildResult($prefix . ' ' . $result->query, $result->bindings, readOnly: true);
+        return new Plan($prefix . ' ' . $result->query, $result->bindings, readOnly: true, executor: $this->executor);
     }
 
     public function compileFilter(Query $query): string
@@ -672,7 +673,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
-    public function executeMerge(): BuildResult
+    public function executeMerge(): Plan
     {
         if ($this->mergeTarget === '') {
             throw new ValidationException('No merge target specified. Call mergeInto() before executeMerge().');
@@ -707,7 +708,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             }
         }
 
-        return new BuildResult($sql, $this->bindings);
+        return new Plan($sql, $this->bindings, executor: $this->executor);
     }
 
     public function joinLateral(BaseBuilder $subquery, string $alias, JoinType $type = JoinType::Inner): static
@@ -849,7 +850,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->selectRaw($expr, $bindings);
     }
 
-    public function insertDefaultValues(): BuildResult
+    public function insertDefaultValues(): Plan
     {
         $result = parent::insertDefaultValues();
 
@@ -875,7 +876,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
-    public function build(): BuildResult
+    public function build(): Plan
     {
         $result = parent::build();
         $query = $result->query;
@@ -912,7 +913,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         }
 
         if ($modified) {
-            return new BuildResult($query, $result->bindings, $result->readOnly);
+            return new Plan($query, $result->bindings, $result->readOnly, $this->executor);
         }
 
         return $result;

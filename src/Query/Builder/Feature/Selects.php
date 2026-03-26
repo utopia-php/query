@@ -3,7 +3,7 @@
 namespace Utopia\Query\Builder\Feature;
 
 use Closure;
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 use Utopia\Query\NullsPosition;
 
 interface Selects
@@ -54,7 +54,7 @@ interface Selects
 
     public function when(bool $condition, Closure $callback): static;
 
-    public function build(): BuildResult;
+    public function build(): Plan;
 
     public function toRawSql(): string;
 

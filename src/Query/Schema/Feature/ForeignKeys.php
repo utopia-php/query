@@ -2,7 +2,7 @@
 
 namespace Utopia\Query\Schema\Feature;
 
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 use Utopia\Query\Schema\ForeignKeyAction;
 
 interface ForeignKeys
@@ -15,7 +15,7 @@ interface ForeignKeys
         string $refColumn,
         ?ForeignKeyAction $onDelete = null,
         ?ForeignKeyAction $onUpdate = null,
-    ): BuildResult;
+    ): Plan;
 
-    public function dropForeignKey(string $table, string $name): BuildResult;
+    public function dropForeignKey(string $table, string $name): Plan;
 }

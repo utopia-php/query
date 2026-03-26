@@ -643,7 +643,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return '(' . \implode(' AND ', $parts) . ')';
     }
 
-    public function update(): BuildResult
+    public function update(): Plan
     {
         $this->bindings = [];
         $this->validateTable();
@@ -666,10 +666,10 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             . ' UPDATE ' . \implode(', ', $assignments)
             . ' ' . \implode(' ', $parts);
 
-        return new BuildResult($sql, $this->bindings);
+        return new Plan($sql, $this->bindings, executor: $this->executor);
     }
 
-    public function delete(): BuildResult
+    public function delete(): Plan
     {
         $this->bindings = [];
         $this->validateTable();
@@ -685,7 +685,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         $sql = 'ALTER TABLE ' . $this->quote($this->table)
             . ' DELETE ' . \implode(' ', $parts);
 
-        return new BuildResult($sql, $this->bindings);
+        return new Plan($sql, $this->bindings, executor: $this->executor);
     }
 
     /**
@@ -697,7 +697,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return Placement::Where;
     }
 
-    public function build(): BuildResult
+    public function build(): Plan
     {
         $result = parent::build();
 
@@ -762,7 +762,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         }
 
         if ($sql !== $result->query || $bindings !== $result->bindings) {
-            return new BuildResult($sql, $bindings, $result->readOnly);
+            return new Plan($sql, $bindings, $result->readOnly, $this->executor);
         }
 
         return $result;

@@ -2,7 +2,7 @@
 
 namespace Utopia\Query\Builder\Feature;
 
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 
 interface Updates
 {
@@ -18,5 +18,5 @@ interface Updates
      */
     public function setRaw(string $column, string $expression, array $bindings = []): static;
 
-    public function update(): BuildResult;
+    public function update(): Plan;
 }

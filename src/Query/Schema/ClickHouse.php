@@ -3,7 +3,7 @@
 namespace Utopia\Query\Schema;
 
 use Utopia\Query\Builder;
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\QuotesIdentifiers;
 use Utopia\Query\Schema;
@@ -72,19 +72,20 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         return \implode(' ', $parts);
     }
 
-    public function dropIndex(string $table, string $name): BuildResult
+    public function dropIndex(string $table, string $name): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'ALTER TABLE ' . $this->quote($table)
             . ' DROP INDEX ' . $this->quote($name),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
     /**
      * @param  callable(Blueprint): void  $definition
      */
-    public function alter(string $table, callable $definition): BuildResult
+    public function alter(string $table, callable $definition): Plan
     {
         $blueprint = new Blueprint();
         $definition($blueprint);
@@ -120,13 +121,13 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         $sql = 'ALTER TABLE ' . $this->quote($table)
             . ' ' . \implode(', ', $alterations);
 
-        return new BuildResult($sql, []);
+        return new Plan($sql, [], executor: $this->executor);
     }
 
     /**
      * @param  callable(Blueprint): void  $definition
      */
-    public function create(string $table, callable $definition, bool $ifNotExists = false): BuildResult
+    public function create(string $table, callable $definition, bool $ifNotExists = false): Plan
     {
         $blueprint = new Blueprint();
         $definition($blueprint);
@@ -167,15 +168,15 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $sql .= ' ORDER BY (' . \implode(', ', $primaryKeys) . ')';
         }
 
-        return new BuildResult($sql, []);
+        return new Plan($sql, [], executor: $this->executor);
     }
 
-    public function createView(string $name, Builder $query): BuildResult
+    public function createView(string $name, Builder $query): Plan
     {
         $result = $query->build();
         $sql = 'CREATE VIEW ' . $this->quote($name) . ' AS ' . $result->query;
 
-        return new BuildResult($sql, $result->bindings);
+        return new Plan($sql, $result->bindings, executor: $this->executor);
     }
 
     /**
@@ -191,27 +192,30 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         return 'Enum8(' . \implode(', ', $parts) . ')';
     }
 
-    public function commentOnTable(string $table, string $comment): BuildResult
+    public function commentOnTable(string $table, string $comment): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'ALTER TABLE ' . $this->quote($table) . " MODIFY COMMENT '" . str_replace("'", "''", $comment) . "'",
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function commentOnColumn(string $table, string $column, string $comment): BuildResult
+    public function commentOnColumn(string $table, string $column, string $comment): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'ALTER TABLE ' . $this->quote($table) . ' COMMENT COLUMN ' . $this->quote($column) . " '" . str_replace("'", "''", $comment) . "'",
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function dropPartition(string $table, string $name): BuildResult
+    public function dropPartition(string $table, string $name): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'ALTER TABLE ' . $this->quote($table) . " DROP PARTITION '" . str_replace("'", "''", $name) . "'",
-            []
+            [],
+            executor: $this->executor,
         );
     }
 }

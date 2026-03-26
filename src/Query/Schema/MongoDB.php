@@ -3,7 +3,7 @@
 namespace Utopia\Query\Schema;
 
 use Utopia\Query\Builder;
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Schema;
 
@@ -41,7 +41,7 @@ class MongoDB extends Schema
     /**
      * @param callable(Blueprint): void $definition
      */
-    public function create(string $table, callable $definition, bool $ifNotExists = false): BuildResult
+    public function create(string $table, callable $definition, bool $ifNotExists = false): Plan
     {
         $blueprint = new Blueprint();
         $definition($blueprint);
@@ -90,16 +90,17 @@ class MongoDB extends Schema
             $command['validator'] = $validator;
         }
 
-        return new BuildResult(
+        return new Plan(
             \json_encode($command, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
     /**
      * @param callable(Blueprint): void $definition
      */
-    public function alter(string $table, callable $definition): BuildResult
+    public function alter(string $table, callable $definition): Plan
     {
         $blueprint = new Blueprint();
         $definition($blueprint);
@@ -147,46 +148,50 @@ class MongoDB extends Schema
             $command['validator'] = $validator;
         }
 
-        return new BuildResult(
+        return new Plan(
             \json_encode($command, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function drop(string $table): BuildResult
+    public function drop(string $table): Plan
     {
-        return new BuildResult(
+        return new Plan(
             \json_encode(['command' => 'drop', 'collection' => $table], JSON_THROW_ON_ERROR),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function dropIfExists(string $table): BuildResult
+    public function dropIfExists(string $table): Plan
     {
         return $this->drop($table);
     }
 
-    public function rename(string $from, string $to): BuildResult
+    public function rename(string $from, string $to): Plan
     {
-        return new BuildResult(
+        return new Plan(
             \json_encode([
                 'command' => 'renameCollection',
                 'from' => $from,
                 'to' => $to,
             ], JSON_THROW_ON_ERROR),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function truncate(string $table): BuildResult
+    public function truncate(string $table): Plan
     {
-        return new BuildResult(
+        return new Plan(
             \json_encode([
                 'command' => 'deleteMany',
                 'collection' => $table,
                 'filter' => new \stdClass(),
             ], JSON_THROW_ON_ERROR),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
@@ -209,7 +214,7 @@ class MongoDB extends Schema
         array $orders = [],
         array $collations = [],
         array $rawColumns = [],
-    ): BuildResult {
+    ): Plan {
         $keys = [];
         foreach ($columns as $col) {
             $direction = 1;
@@ -234,25 +239,27 @@ class MongoDB extends Schema
             'index' => $index,
         ];
 
-        return new BuildResult(
+        return new Plan(
             \json_encode($command, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function dropIndex(string $table, string $name): BuildResult
+    public function dropIndex(string $table, string $name): Plan
     {
-        return new BuildResult(
+        return new Plan(
             \json_encode([
                 'command' => 'dropIndex',
                 'collection' => $table,
                 'index' => $name,
             ], JSON_THROW_ON_ERROR),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function createView(string $name, Builder $query): BuildResult
+    public function createView(string $name, Builder $query): Plan
     {
         $result = $query->build();
 
@@ -269,33 +276,37 @@ class MongoDB extends Schema
             'pipeline' => $op['pipeline'] ?? [],
         ];
 
-        return new BuildResult(
+        return new Plan(
             \json_encode($command, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
-            $result->bindings
+            $result->bindings,
+            executor: $this->executor,
         );
     }
 
-    public function createDatabase(string $name): BuildResult
+    public function createDatabase(string $name): Plan
     {
-        return new BuildResult(
+        return new Plan(
             \json_encode(['command' => 'createDatabase', 'database' => $name], JSON_THROW_ON_ERROR),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function dropDatabase(string $name): BuildResult
+    public function dropDatabase(string $name): Plan
     {
-        return new BuildResult(
+        return new Plan(
             \json_encode(['command' => 'dropDatabase', 'database' => $name], JSON_THROW_ON_ERROR),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function analyzeTable(string $table): BuildResult
+    public function analyzeTable(string $table): Plan
     {
-        return new BuildResult(
+        return new Plan(
             \json_encode(['command' => 'collStats', 'collection' => $table], JSON_THROW_ON_ERROR),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 }

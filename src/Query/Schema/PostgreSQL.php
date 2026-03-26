@@ -2,7 +2,7 @@
 
 namespace Utopia\Query\Schema;
 
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\Feature\ColumnComments;
 use Utopia\Query\Schema\Feature\CreatePartition;
@@ -106,7 +106,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
         array $collations = [],
         array $rawColumns = [],
         bool $concurrently = false,
-    ): BuildResult {
+    ): Plan {
         if ($method !== '' && ! \preg_match('/^[A-Za-z0-9_]+$/', $method)) {
             throw new ValidationException('Invalid index method: ' . $method);
         }
@@ -132,30 +132,32 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
 
         $sql .= ' (' . $this->compileIndexColumns($index) . ')';
 
-        return new BuildResult($sql, []);
+        return new Plan($sql, [], executor: $this->executor);
     }
 
-    public function dropIndex(string $table, string $name): BuildResult
+    public function dropIndex(string $table, string $name): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'DROP INDEX ' . $this->quote($name),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function dropForeignKey(string $table, string $name): BuildResult
+    public function dropForeignKey(string $table, string $name): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'ALTER TABLE ' . $this->quote($table)
             . ' DROP CONSTRAINT ' . $this->quote($name),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
     /**
      * @param  list<array{0: ParameterDirection, 1: string, 2: string}>  $params
      */
-    public function createProcedure(string $name, array $params, string $body): BuildResult
+    public function createProcedure(string $name, array $params, string $body): Plan
     {
         $paramList = $this->compileProcedureParams($params);
 
@@ -163,12 +165,12 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             . '(' . \implode(', ', $paramList) . ')'
             . ' RETURNS VOID LANGUAGE plpgsql AS $$ BEGIN ' . $body . ' END; $$';
 
-        return new BuildResult($sql, []);
+        return new Plan($sql, [], executor: $this->executor);
     }
 
-    public function dropProcedure(string $name): BuildResult
+    public function dropProcedure(string $name): Plan
     {
-        return new BuildResult('DROP FUNCTION ' . $this->quote($name), []);
+        return new Plan('DROP FUNCTION ' . $this->quote($name), [], executor: $this->executor);
     }
 
     public function createTrigger(
@@ -177,7 +179,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
         TriggerTiming $timing,
         TriggerEvent $event,
         string $body,
-    ): BuildResult {
+    ): Plan {
         $funcName = $name . '_func';
 
         $sql = 'CREATE FUNCTION ' . $this->quote($funcName)
@@ -187,13 +189,13 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             . ' ON ' . $this->quote($table)
             . ' FOR EACH ROW EXECUTE FUNCTION ' . $this->quote($funcName) . '()';
 
-        return new BuildResult($sql, []);
+        return new Plan($sql, [], executor: $this->executor);
     }
 
     /**
      * @param  callable(Blueprint): void  $definition
      */
-    public function alter(string $table, callable $definition): BuildResult
+    public function alter(string $table, callable $definition): Plan
     {
         $blueprint = new Blueprint();
         $definition($blueprint);
@@ -263,25 +265,26 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             $statements[] = 'DROP INDEX ' . $this->quote($name);
         }
 
-        return new BuildResult(\implode('; ', $statements), []);
+        return new Plan(\implode('; ', $statements), [], executor: $this->executor);
     }
 
-    public function rename(string $from, string $to): BuildResult
+    public function rename(string $from, string $to): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'ALTER TABLE ' . $this->quote($from) . ' RENAME TO ' . $this->quote($to),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function createExtension(string $name): BuildResult
+    public function createExtension(string $name): Plan
     {
-        return new BuildResult('CREATE EXTENSION IF NOT EXISTS ' . $this->quote($name), []);
+        return new Plan('CREATE EXTENSION IF NOT EXISTS ' . $this->quote($name), [], executor: $this->executor);
     }
 
-    public function dropExtension(string $name): BuildResult
+    public function dropExtension(string $name): Plan
     {
-        return new BuildResult('DROP EXTENSION IF EXISTS ' . $this->quote($name), []);
+        return new Plan('DROP EXTENSION IF EXISTS ' . $this->quote($name), [], executor: $this->executor);
     }
 
     /**
@@ -289,7 +292,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
      *
      * @param  array<string, string>  $options  Key-value pairs (e.g. ['provider' => 'icu', 'locale' => 'und-u-ks-level1'])
      */
-    public function createCollation(string $name, array $options, bool $deterministic = true): BuildResult
+    public function createCollation(string $name, array $options, bool $deterministic = true): Plan
     {
         $optParts = [];
         foreach ($options as $key => $value) {
@@ -300,39 +303,40 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
         $sql = 'CREATE COLLATION IF NOT EXISTS ' . $this->quote($name)
             . ' (' . \implode(', ', $optParts) . ')';
 
-        return new BuildResult($sql, []);
+        return new Plan($sql, [], executor: $this->executor);
     }
 
-    public function renameIndex(string $table, string $from, string $to): BuildResult
+    public function renameIndex(string $table, string $from, string $to): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'ALTER INDEX ' . $this->quote($from) . ' RENAME TO ' . $this->quote($to),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
     /**
      * PostgreSQL uses schemas instead of databases for namespace isolation.
      */
-    public function createDatabase(string $name): BuildResult
+    public function createDatabase(string $name): Plan
     {
-        return new BuildResult('CREATE SCHEMA ' . $this->quote($name), []);
+        return new Plan('CREATE SCHEMA ' . $this->quote($name), [], executor: $this->executor);
     }
 
-    public function dropDatabase(string $name): BuildResult
+    public function dropDatabase(string $name): Plan
     {
-        return new BuildResult('DROP SCHEMA IF EXISTS ' . $this->quote($name) . ' CASCADE', []);
+        return new Plan('DROP SCHEMA IF EXISTS ' . $this->quote($name) . ' CASCADE', [], executor: $this->executor);
     }
 
-    public function analyzeTable(string $table): BuildResult
+    public function analyzeTable(string $table): Plan
     {
-        return new BuildResult('ANALYZE ' . $this->quote($table), []);
+        return new Plan('ANALYZE ' . $this->quote($table), [], executor: $this->executor);
     }
 
     /**
      * Alter a column's type with an optional USING expression for type casting.
      */
-    public function alterColumnType(string $table, string $column, string $type, string $using = ''): BuildResult
+    public function alterColumnType(string $table, string $column, string $type, string $using = ''): Plan
     {
         $sql = 'ALTER TABLE ' . $this->quote($table)
             . ' ALTER COLUMN ' . $this->quote($column)
@@ -342,79 +346,86 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             $sql .= ' USING ' . $using;
         }
 
-        return new BuildResult($sql, []);
+        return new Plan($sql, [], executor: $this->executor);
     }
 
-    public function dropIndexConcurrently(string $name): BuildResult
+    public function dropIndexConcurrently(string $name): Plan
     {
-        return new BuildResult('DROP INDEX CONCURRENTLY ' . $this->quote($name), []);
+        return new Plan('DROP INDEX CONCURRENTLY ' . $this->quote($name), [], executor: $this->executor);
     }
 
-    public function createType(string $name, array $values): BuildResult
+    public function createType(string $name, array $values): Plan
     {
         $escaped = array_map(fn (string $v): string => "'" . str_replace("'", "''", $v) . "'", $values);
 
-        return new BuildResult(
+        return new Plan(
             'CREATE TYPE ' . $this->quote($name) . ' AS ENUM (' . implode(', ', $escaped) . ')',
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function dropType(string $name): BuildResult
+    public function dropType(string $name): Plan
     {
-        return new BuildResult('DROP TYPE ' . $this->quote($name), []);
+        return new Plan('DROP TYPE ' . $this->quote($name), [], executor: $this->executor);
     }
 
-    public function createSequence(string $name, int $start = 1, int $incrementBy = 1): BuildResult
+    public function createSequence(string $name, int $start = 1, int $incrementBy = 1): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'CREATE SEQUENCE ' . $this->quote($name) . ' START ' . $start . ' INCREMENT BY ' . $incrementBy,
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function dropSequence(string $name): BuildResult
+    public function dropSequence(string $name): Plan
     {
-        return new BuildResult('DROP SEQUENCE ' . $this->quote($name), []);
+        return new Plan('DROP SEQUENCE ' . $this->quote($name), [], executor: $this->executor);
     }
 
-    public function nextVal(string $name): BuildResult
+    public function nextVal(string $name): Plan
     {
-        return new BuildResult(
+        return new Plan(
             "SELECT nextval('" . str_replace("'", "''", $name) . "')",
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function commentOnTable(string $table, string $comment): BuildResult
+    public function commentOnTable(string $table, string $comment): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'COMMENT ON TABLE ' . $this->quote($table) . " IS '" . str_replace("'", "''", $comment) . "'",
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function commentOnColumn(string $table, string $column, string $comment): BuildResult
+    public function commentOnColumn(string $table, string $column, string $comment): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'COMMENT ON COLUMN ' . $this->quote($table) . '.' . $this->quote($column) . " IS '" . str_replace("'", "''", $comment) . "'",
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function createPartition(string $parent, string $name, string $expression): BuildResult
+    public function createPartition(string $parent, string $name, string $expression): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'CREATE TABLE ' . $this->quote($name) . ' PARTITION OF ' . $this->quote($parent) . ' FOR VALUES ' . $expression,
-            []
+            [],
+            executor: $this->executor,
         );
     }
 
-    public function dropPartition(string $table, string $name): BuildResult
+    public function dropPartition(string $table, string $name): Plan
     {
-        return new BuildResult(
+        return new Plan(
             'DROP TABLE ' . $this->quote($name),
-            []
+            [],
+            executor: $this->executor,
         );
     }
 }

@@ -179,7 +179,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this->hint("MAX_EXECUTION_TIME({$ms})");
     }
 
-    public function insertOrIgnore(): BuildResult
+    public function insertOrIgnore(): Plan
     {
         $this->bindings = [];
         [$sql, $bindings] = $this->compileInsertBody();
@@ -190,10 +190,10 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         // Replace "INSERT INTO" with "INSERT IGNORE INTO"
         $sql = \preg_replace('/^INSERT INTO/', 'INSERT IGNORE INTO', $sql, 1) ?? $sql;
 
-        return new BuildResult($sql, $this->bindings);
+        return new Plan($sql, $this->bindings, executor: $this->executor);
     }
 
-    public function explain(bool $analyze = false, string $format = ''): BuildResult
+    public function explain(bool $analyze = false, string $format = ''): Plan
     {
         $result = $this->build();
         $prefix = 'EXPLAIN';
@@ -204,10 +204,10 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
             $prefix .= ' FORMAT=' . \strtoupper($format);
         }
 
-        return new BuildResult($prefix . ' ' . $result->query, $result->bindings, readOnly: true);
+        return new Plan($prefix . ' ' . $result->query, $result->bindings, readOnly: true, executor: $this->executor);
     }
 
-    public function build(): BuildResult
+    public function build(): Plan
     {
         $result = parent::build();
         $query = $result->query;
@@ -234,7 +234,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         }
 
         if ($query !== $result->query) {
-            return new BuildResult($query, $result->bindings, $result->readOnly);
+            return new Plan($query, $result->bindings, $result->readOnly, $this->executor);
         }
 
         return $result;
@@ -250,7 +250,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this;
     }
 
-    public function update(): BuildResult
+    public function update(): Plan
     {
         foreach ($this->jsonSets as $col => $condition) {
             $this->setRaw($col, $condition->expression, $condition->bindings);
@@ -269,7 +269,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $result;
     }
 
-    private function buildUpdateJoin(): BuildResult
+    private function buildUpdateJoin(): Plan
     {
         $this->bindings = [];
         $this->validateTable();
@@ -294,7 +294,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         $parts = [$sql];
         $this->compileWhereClauses($parts);
 
-        return new BuildResult(\implode(' ', $parts), $this->bindings);
+        return new Plan(\implode(' ', $parts), $this->bindings, executor: $this->executor);
     }
 
     public function deleteUsing(string $alias, string $table, string $left, string $right): static
@@ -307,7 +307,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this;
     }
 
-    public function delete(): BuildResult
+    public function delete(): Plan
     {
         if ($this->deleteAlias !== '') {
             return $this->buildDeleteUsing();
@@ -316,7 +316,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return parent::delete();
     }
 
-    private function buildDeleteUsing(): BuildResult
+    private function buildDeleteUsing(): Plan
     {
         $this->bindings = [];
         $this->validateTable();
@@ -329,7 +329,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         $parts = [$sql];
         $this->compileWhereClauses($parts);
 
-        return new BuildResult(\implode(' ', $parts), $this->bindings);
+        return new Plan(\implode(' ', $parts), $this->bindings, executor: $this->executor);
     }
 
     public function countWhen(string $condition, string $alias = '', mixed ...$bindings): static
@@ -437,12 +437,12 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this->selectRaw($expr);
     }
 
-    public function insertDefaultValues(): BuildResult
+    public function insertDefaultValues(): Plan
     {
         $this->bindings = [];
         $this->validateTable();
 
-        return new BuildResult('INSERT INTO ' . $this->quote($this->table) . ' () VALUES ()', $this->bindings);
+        return new Plan('INSERT INTO ' . $this->quote($this->table) . ' () VALUES ()', $this->bindings, executor: $this->executor);
     }
 
     public function withTotals(): static

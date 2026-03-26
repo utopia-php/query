@@ -2,19 +2,19 @@
 
 namespace Utopia\Query\Builder\Feature;
 
-use Utopia\Query\Builder\BuildResult;
+use Utopia\Query\Builder\Plan;
 
 interface Transactions
 {
-    public function begin(): BuildResult;
+    public function begin(): Plan;
 
-    public function commit(): BuildResult;
+    public function commit(): Plan;
 
-    public function rollback(): BuildResult;
+    public function rollback(): Plan;
 
-    public function savepoint(string $name): BuildResult;
+    public function savepoint(string $name): Plan;
 
-    public function releaseSavepoint(string $name): BuildResult;
+    public function releaseSavepoint(string $name): Plan;
 
-    public function rollbackToSavepoint(string $name): BuildResult;
+    public function rollbackToSavepoint(string $name): Plan;
 }

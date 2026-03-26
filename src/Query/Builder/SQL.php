@@ -128,39 +128,39 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
-    public function begin(): BuildResult
+    public function begin(): Plan
     {
-        return new BuildResult('BEGIN', []);
+        return new Plan('BEGIN', [], executor: $this->executor);
     }
 
-    public function commit(): BuildResult
+    public function commit(): Plan
     {
-        return new BuildResult('COMMIT', []);
+        return new Plan('COMMIT', [], executor: $this->executor);
     }
 
-    public function rollback(): BuildResult
+    public function rollback(): Plan
     {
-        return new BuildResult('ROLLBACK', []);
+        return new Plan('ROLLBACK', [], executor: $this->executor);
     }
 
-    public function savepoint(string $name): BuildResult
+    public function savepoint(string $name): Plan
     {
-        return new BuildResult('SAVEPOINT ' . $this->quote($name), []);
+        return new Plan('SAVEPOINT ' . $this->quote($name), [], executor: $this->executor);
     }
 
-    public function releaseSavepoint(string $name): BuildResult
+    public function releaseSavepoint(string $name): Plan
     {
-        return new BuildResult('RELEASE SAVEPOINT ' . $this->quote($name), []);
+        return new Plan('RELEASE SAVEPOINT ' . $this->quote($name), [], executor: $this->executor);
     }
 
-    public function rollbackToSavepoint(string $name): BuildResult
+    public function rollbackToSavepoint(string $name): Plan
     {
-        return new BuildResult('ROLLBACK TO SAVEPOINT ' . $this->quote($name), []);
+        return new Plan('ROLLBACK TO SAVEPOINT ' . $this->quote($name), [], executor: $this->executor);
     }
 
     abstract protected function compileConflictClause(): string;
 
-    public function upsert(): BuildResult
+    public function upsert(): Plan
     {
         $this->bindings = [];
         $this->validateTable();
@@ -212,12 +212,12 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
 
         $sql .= ' ' . $this->compileConflictClause();
 
-        return new BuildResult($sql, $this->bindings);
+        return new Plan($sql, $this->bindings, executor: $this->executor);
     }
 
-    abstract public function insertOrIgnore(): BuildResult;
+    abstract public function insertOrIgnore(): Plan;
 
-    public function upsertSelect(): BuildResult
+    public function upsertSelect(): Plan
     {
         $this->bindings = [];
         $this->validateTable();
@@ -252,7 +252,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
 
         $sql .= ' ' . $this->compileConflictClause();
 
-        return new BuildResult($sql, $this->bindings);
+        return new Plan($sql, $this->bindings, executor: $this->executor);
     }
 
     /**
