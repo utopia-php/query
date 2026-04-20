@@ -173,4 +173,36 @@ class QueryTest extends TestCase
         // Empty array returns deterministic hash
         $this->assertSame(\md5(''), Query::fingerprint([]));
     }
+
+    public function testFingerprintNestedLogicalQueries(): void
+    {
+        // AND queries with different inner shapes produce different fingerprints
+        $andEqName = new Query(Query::TYPE_AND, '', [Query::equal('name', ['Alice'])]);
+        $andEqEmail = new Query(Query::TYPE_AND, '', [Query::equal('email', ['a@b.c'])]);
+        $this->assertNotSame(Query::fingerprint([$andEqName]), Query::fingerprint([$andEqEmail]));
+
+        // AND queries with same inner shape produce the same fingerprint (values differ)
+        $andEqNameBob = new Query(Query::TYPE_AND, '', [Query::equal('name', ['Bob'])]);
+        $this->assertSame(Query::fingerprint([$andEqName]), Query::fingerprint([$andEqNameBob]));
+
+        // Order of children inside a logical query does not matter
+        $andA = new Query(Query::TYPE_AND, '', [Query::equal('name', ['Alice']), Query::greaterThan('age', 18)]);
+        $andB = new Query(Query::TYPE_AND, '', [Query::greaterThan('age', 42), Query::equal('name', ['Bob'])]);
+        $this->assertSame(Query::fingerprint([$andA]), Query::fingerprint([$andB]));
+
+        // AND of two filters differs from OR of the same two filters
+        $orA = new Query(Query::TYPE_OR, '', [Query::equal('name', ['Alice']), Query::greaterThan('age', 18)]);
+        $this->assertNotSame(Query::fingerprint([$andA]), Query::fingerprint([$orA]));
+
+        // AND with one child differs from AND with two children
+        $andOne = new Query(Query::TYPE_AND, '', [Query::equal('name', ['Alice'])]);
+        $andTwo = new Query(Query::TYPE_AND, '', [Query::equal('name', ['Alice']), Query::greaterThan('age', 18)]);
+        $this->assertNotSame(Query::fingerprint([$andOne]), Query::fingerprint([$andTwo]));
+    }
+
+    public function testFingerprintRejectsInvalidElements(): void
+    {
+        $this->expectException(\Utopia\Query\Exception::class);
+        Query::fingerprint([42]);
+    }
 }
