@@ -450,6 +450,69 @@ class Query
     }
 
     /**
+     * Compute a shape-only fingerprint of an array of queries.
+     *
+     * The fingerprint captures the structure of the queries — method and
+     * attribute — without values. Two query sets with the same shape but
+     * different parameter values produce the same fingerprint, which is
+     * useful for pattern-based counting and slow-query grouping.
+     *
+     * Logical queries (`and`, `or`, `elemMatch`) are recursively fingerprinted
+     * so their inner structure contributes to the hash — two `and(...)`
+     * queries with different child shapes produce different fingerprints.
+     *
+     * Accepts either raw query strings or parsed Query objects.
+     *
+     * @param  array<mixed>  $queries raw query strings or Query instances
+     * @return string md5 hash of the canonical shape
+     *
+     * @throws QueryException if an element is neither a string nor a Query
+     */
+    public static function fingerprint(array $queries): string
+    {
+        $shapes = [];
+
+        foreach ($queries as $query) {
+            if (\is_string($query)) {
+                $query = static::parse($query);
+            }
+
+            if (! $query instanceof self) {
+                throw new QueryException('Invalid query element for fingerprint: expected string or Query instance');
+            }
+
+            $shapes[] = self::queryShape($query);
+        }
+
+        \sort($shapes);
+
+        return \md5(\implode('|', $shapes));
+    }
+
+    /**
+     * Canonical shape string for a single Query — recursive for logical types.
+     */
+    private static function queryShape(self $query): string
+    {
+        $method = $query->getMethod();
+
+        if (\in_array($method, self::LOGICAL_TYPES, true)) {
+            $childShapes = [];
+            foreach ($query->getValues() as $child) {
+                if ($child instanceof self) {
+                    $childShapes[] = self::queryShape($child);
+                }
+            }
+            \sort($childShapes);
+
+            // Attribute is empty for and/or; meaningful for elemMatch (the field being matched).
+            return $method.':'.$query->getAttribute().'('.\implode('|', $childShapes).')';
+        }
+
+        return $method.':'.$query->getAttribute();
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toArray(): array
@@ -824,12 +887,12 @@ class Query
      *
      * @param  array<mixed>  $queries
      * @return array{
-     *     filters: array<static>,
-     *     selections: array<static>,
+     *     filters: list<self>,
+     *     selections: list<self>,
      *     limit: int|null,
      *     offset: int|null,
-     *     orderAttributes: array<string>,
-     *     orderTypes: array<string>,
+     *     orderAttributes: list<string>,
+     *     orderTypes: list<string>,
      *     cursor: mixed,
      *     cursorDirection: string|null
      * }
