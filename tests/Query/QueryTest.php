@@ -214,4 +214,35 @@ class QueryTest extends TestCase
         $this->expectException(\Utopia\Query\Exception::class);
         Query::fingerprint([42]);
     }
+
+    public function testShape(): void
+    {
+        // Leaf queries
+        $this->assertSame('equal:name', Query::equal('name', ['Alice'])->shape());
+        $this->assertSame('greaterThan:age', Query::greaterThan('age', 18)->shape());
+
+        // Logical with empty attribute
+        $and = new Query(Query::TYPE_AND, '', [Query::equal('name', ['Alice']), Query::greaterThan('age', 18)]);
+        $this->assertSame('and:(equal:name|greaterThan:age)', $and->shape());
+
+        // elemMatch preserves the attribute (the field being matched)
+        $elem = new Query(Query::TYPE_ELEM_MATCH, 'tags', [Query::equal('name', ['php'])]);
+        $this->assertSame('elemMatch:tags(equal:name)', $elem->shape());
+
+        // Deeply nested — iterative traversal must match recursive result
+        $deep = new Query(Query::TYPE_AND, '', [
+            new Query(Query::TYPE_OR, '', [
+                Query::equal('a', ['x']),
+                new Query(Query::TYPE_AND, '', [
+                    Query::equal('b', ['y']),
+                    Query::lessThan('c', 5),
+                ]),
+            ]),
+            Query::greaterThan('d', 10),
+        ]);
+        $this->assertSame(
+            'and:(greaterThan:d|or:(and:(equal:b|lessThan:c)|equal:a))',
+            $deep->shape(),
+        );
+    }
 }
