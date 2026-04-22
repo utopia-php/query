@@ -108,7 +108,7 @@ class MySQL extends Tokenizer
             }
 
             if ($char === '#') {
-                $result .= '--';
+                $result .= '-- ';
                 $i++;
                 continue;
             }

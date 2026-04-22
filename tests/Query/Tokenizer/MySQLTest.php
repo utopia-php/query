@@ -54,7 +54,7 @@ class MySQLTest extends TestCase
         ));
 
         $this->assertCount(1, $comments);
-        $this->assertSame('-- comment', $comments[0]->value);
+        $this->assertSame('--  comment', $comments[0]->value);
     }
 
     public function testHashCommentFilteredOut(): void
@@ -170,8 +170,8 @@ class MySQLTest extends TestCase
         ));
 
         $this->assertCount(2, $comments);
-        $this->assertSame('--first', $comments[0]->value);
-        $this->assertSame('--second', $comments[1]->value);
+        $this->assertSame('-- first', $comments[0]->value);
+        $this->assertSame('-- second', $comments[1]->value);
     }
 
     public function testHashCommentAtEndOfInput(): void
@@ -184,7 +184,7 @@ class MySQLTest extends TestCase
         ));
 
         $this->assertCount(1, $comments);
-        $this->assertSame('--comment', $comments[0]->value);
+        $this->assertSame('-- comment', $comments[0]->value);
 
         $filtered = Tokenizer::filter($all);
         $this->assertSame(
@@ -267,13 +267,30 @@ class MySQLTest extends TestCase
         $rewritten = $method->invoke($this->tokenizer, $sql);
 
         $this->assertIsString($rewritten);
-        $this->assertStringContainsString('-- trailing comment', $rewritten);
+        $this->assertStringContainsString('--  trailing comment', $rewritten);
         $this->assertStringNotContainsString('# trailing comment', $rewritten);
 
         // End-to-end: the tokenizer should drop the comment after filtering.
         $filtered = Tokenizer::filter($this->tokenizer->tokenize($sql));
         $types = array_map(fn (Token $t) => $t->type, $filtered);
         $this->assertNotContains(TokenType::LineComment, $types);
+    }
+
+    public function testHashReplacementEmitsTrailingSpaceForReTokenization(): void
+    {
+        // Regression: MySQL's `--` line-comment form requires a whitespace or
+        // control character after the two dashes. Replacing `#` with just `--`
+        // (no trailing space) emits SQL that is not re-tokenizable as a line
+        // comment. The replacement must be `-- ` (with trailing space).
+        $sql = 'SELECT 1 #comment';
+
+        $reflection = new ReflectionClass(MySQL::class);
+        $method = $reflection->getMethod('replaceHashComments');
+        $rewritten = $method->invoke($this->tokenizer, $sql);
+
+        $this->assertIsString($rewritten);
+        $this->assertStringContainsString('-- comment', $rewritten);
+        $this->assertStringNotContainsString('#comment', $rewritten);
     }
 
     public function testHashInsideSingleQuotedStringIsNotRewritten(): void
