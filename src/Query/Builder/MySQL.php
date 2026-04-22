@@ -2,7 +2,6 @@
 
 namespace Utopia\Query\Builder;
 
-use Utopia\Query\Builder as BaseBuilder;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\GroupByModifiers;
 use Utopia\Query\Builder\Feature\Hints;
@@ -15,8 +14,9 @@ use Utopia\Query\Method;
 
 class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJoins, StringAggregates, GroupByModifiers
 {
-    /** @var list<string> */
-    protected array $hints = [];
+    use Trait\ConditionalAggregates;
+    use Trait\Hints;
+    use Trait\LateralJoins;
 
     protected string $updateJoinTable = '';
 
@@ -170,18 +170,6 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     public function setJsonUnique(string $column): static
     {
         $this->setRaw($column, '(SELECT JSON_ARRAYAGG(val) FROM (SELECT DISTINCT val FROM JSON_TABLE(' . $this->resolveAndWrap($column) . ', \'$[*]\' COLUMNS(val JSON PATH \'$\')) AS jt) AS dt)');
-
-        return $this;
-    }
-
-    #[\Override]
-    public function hint(string $hint): static
-    {
-        if (!\preg_match('/^[A-Za-z0-9_()= ,]+$/', $hint)) {
-            throw new ValidationException('Invalid hint: ' . $hint);
-        }
-
-        $this->hints[] = $hint;
 
         return $this;
     }
@@ -345,75 +333,6 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         $this->compileWhereClauses($parts);
 
         return new Plan(\implode(' ', $parts), $this->bindings, executor: $this->executor);
-    }
-
-    #[\Override]
-    public function countWhen(string $condition, string $alias = '', mixed ...$bindings): static
-    {
-        $expr = 'COUNT(CASE WHEN ' . $condition . ' THEN 1 END)';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, \array_values($bindings));
-    }
-
-    #[\Override]
-    public function sumWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
-    {
-        $expr = 'SUM(CASE WHEN ' . $condition . ' THEN ' . $this->resolveAndWrap($column) . ' END)';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, \array_values($bindings));
-    }
-
-    #[\Override]
-    public function avgWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
-    {
-        $expr = 'AVG(CASE WHEN ' . $condition . ' THEN ' . $this->resolveAndWrap($column) . ' END)';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, \array_values($bindings));
-    }
-
-    #[\Override]
-    public function minWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
-    {
-        $expr = 'MIN(CASE WHEN ' . $condition . ' THEN ' . $this->resolveAndWrap($column) . ' END)';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, \array_values($bindings));
-    }
-
-    #[\Override]
-    public function maxWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
-    {
-        $expr = 'MAX(CASE WHEN ' . $condition . ' THEN ' . $this->resolveAndWrap($column) . ' END)';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, \array_values($bindings));
-    }
-
-    #[\Override]
-    public function joinLateral(BaseBuilder $subquery, string $alias, JoinType $type = JoinType::Inner): static
-    {
-        $this->lateralJoins[] = new LateralJoin($subquery, $alias, $type);
-
-        return $this;
-    }
-
-    #[\Override]
-    public function leftJoinLateral(BaseBuilder $subquery, string $alias): static
-    {
-        return $this->joinLateral($subquery, $alias, JoinType::Left);
     }
 
     #[\Override]

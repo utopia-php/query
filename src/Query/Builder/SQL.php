@@ -20,6 +20,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
     use QuotesIdentifiers;
     use Trait\BitwiseAggregates;
     use Trait\FullTextSearch;
+    use Trait\Json;
     use Trait\Locking;
     use Trait\Spatial;
     use Trait\StatisticalAggregates;
@@ -32,37 +33,6 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
     abstract protected function compileConflictClause(): string;
 
     abstract public function insertOrIgnore(): Plan;
-
-    public function filterJsonContains(string $attribute, mixed $value): static
-    {
-        $this->pendingQueries[] = Query::jsonContains($attribute, $value);
-
-        return $this;
-    }
-
-    public function filterJsonNotContains(string $attribute, mixed $value): static
-    {
-        $this->pendingQueries[] = Query::jsonNotContains($attribute, $value);
-
-        return $this;
-    }
-
-    /**
-     * @param  array<mixed>  $values
-     */
-    public function filterJsonOverlaps(string $attribute, array $values): static
-    {
-        $this->pendingQueries[] = Query::jsonOverlaps($attribute, $values);
-
-        return $this;
-    }
-
-    public function filterJsonPath(string $attribute, string $path, string $operator, mixed $value): static
-    {
-        $this->pendingQueries[] = Query::jsonPath($attribute, $path, $operator, $value);
-
-        return $this;
-    }
 
     #[\Override]
     public function compileFilter(Query $query): string

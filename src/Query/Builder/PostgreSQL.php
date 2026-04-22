@@ -27,6 +27,9 @@ use Utopia\Query\Schema\ColumnType;
 
 class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf, ConditionalAggregates, Merge, LateralJoins, TableSampling, FullOuterJoins, StringAggregates, OrderedSetAggregates, DistinctOn, AggregateFilter, GroupByModifiers
 {
+    use Trait\FullOuterJoins;
+    use Trait\LateralJoins;
+
     protected string $wrapChar = '"';
 
     #[\Override]
@@ -750,28 +753,6 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         }
 
         return new Plan($sql, $this->bindings, executor: $this->executor);
-    }
-
-    #[\Override]
-    public function joinLateral(BaseBuilder $subquery, string $alias, JoinType $type = JoinType::Inner): static
-    {
-        $this->lateralJoins[] = new LateralJoin($subquery, $alias, $type);
-
-        return $this;
-    }
-
-    #[\Override]
-    public function leftJoinLateral(BaseBuilder $subquery, string $alias): static
-    {
-        return $this->joinLateral($subquery, $alias, JoinType::Left);
-    }
-
-    #[\Override]
-    public function fullOuterJoin(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
-    {
-        $this->pendingQueries[] = Query::fullOuterJoin($table, $left, $right, $operator, $alias);
-
-        return $this;
     }
 
     #[\Override]

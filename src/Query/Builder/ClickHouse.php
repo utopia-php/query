@@ -25,6 +25,9 @@ use Utopia\Query\QuotesIdentifiers;
 class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, TableSampling, FullOuterJoins, StringAggregates, StatisticalAggregates, BitwiseAggregates, LimitBy, ArrayJoins, AsofJoins, WithFill, GroupByModifiers, ApproximateAggregates
 {
     use QuotesIdentifiers;
+    use Trait\BitwiseAggregates;
+    use Trait\FullOuterJoins;
+    use Trait\StatisticalAggregates;
 
     /**
      * @var array<Query>
@@ -183,14 +186,6 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     }
 
     #[\Override]
-    public function fullOuterJoin(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
-    {
-        $this->pendingQueries[] = Query::fullOuterJoin($table, $left, $right, $operator, $alias);
-
-        return $this;
-    }
-
-    #[\Override]
     public function groupConcat(string $column, string $separator = ',', string $alias = '', ?array $orderBy = null): static
     {
         $col = $this->resolveAndWrap($column);
@@ -222,78 +217,6 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         }
 
         return $this->select($expr);
-    }
-
-    #[\Override]
-    public function stddev(string $attribute, string $alias = ''): static
-    {
-        $this->pendingQueries[] = Query::stddev($attribute, $alias);
-
-        return $this;
-    }
-
-    #[\Override]
-    public function stddevPop(string $attribute, string $alias = ''): static
-    {
-        $this->pendingQueries[] = Query::stddevPop($attribute, $alias);
-
-        return $this;
-    }
-
-    #[\Override]
-    public function stddevSamp(string $attribute, string $alias = ''): static
-    {
-        $this->pendingQueries[] = Query::stddevSamp($attribute, $alias);
-
-        return $this;
-    }
-
-    #[\Override]
-    public function variance(string $attribute, string $alias = ''): static
-    {
-        $this->pendingQueries[] = Query::variance($attribute, $alias);
-
-        return $this;
-    }
-
-    #[\Override]
-    public function varPop(string $attribute, string $alias = ''): static
-    {
-        $this->pendingQueries[] = Query::varPop($attribute, $alias);
-
-        return $this;
-    }
-
-    #[\Override]
-    public function varSamp(string $attribute, string $alias = ''): static
-    {
-        $this->pendingQueries[] = Query::varSamp($attribute, $alias);
-
-        return $this;
-    }
-
-    #[\Override]
-    public function bitAnd(string $attribute, string $alias = ''): static
-    {
-        $this->pendingQueries[] = Query::bitAnd($attribute, $alias);
-
-        return $this;
-    }
-
-    #[\Override]
-    public function bitOr(string $attribute, string $alias = ''): static
-    {
-        $this->pendingQueries[] = Query::bitOr($attribute, $alias);
-
-        return $this;
-    }
-
-    #[\Override]
-    public function bitXor(string $attribute, string $alias = ''): static
-    {
-        $this->pendingQueries[] = Query::bitXor($attribute, $alias);
-
-        return $this;
     }
 
     #[\Override]
