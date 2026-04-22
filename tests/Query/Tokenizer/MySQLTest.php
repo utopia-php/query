@@ -238,4 +238,55 @@ class MySQLTest extends TestCase
         $this->assertStringNotContainsString('-- not a comment', $rewritten);
         $this->assertSame($sql, $rewritten);
     }
+
+    public function testHashInsidePlainDoubleQuotedIdentifierIsNotRewritten(): void
+    {
+        // With no backslash-escaped quotes, a plain "col#name" is still a
+        // double-quoted identifier under ANSI_QUOTES. The # inside must not
+        // be rewritten to a -- comment.
+        $sql = 'SELECT "col#name" FROM t';
+
+        $reflection = new ReflectionClass(MySQL::class);
+        $method = $reflection->getMethod('replaceHashComments');
+        $rewritten = $method->invoke($this->tokenizer, $sql);
+
+        $this->assertIsString($rewritten);
+        $this->assertStringContainsString('#name', $rewritten);
+        $this->assertStringNotContainsString('--name', $rewritten);
+        $this->assertSame($sql, $rewritten);
+    }
+
+    public function testHashAfterDoubleQuotedIdentifierIsRewritten(): void
+    {
+        // A # that appears after a closed double-quoted identifier is a real
+        // line comment and must be rewritten to --.
+        $sql = "SELECT \"a\" # trailing comment\nFROM t";
+
+        $reflection = new ReflectionClass(MySQL::class);
+        $method = $reflection->getMethod('replaceHashComments');
+        $rewritten = $method->invoke($this->tokenizer, $sql);
+
+        $this->assertIsString($rewritten);
+        $this->assertStringContainsString('-- trailing comment', $rewritten);
+        $this->assertStringNotContainsString('# trailing comment', $rewritten);
+
+        // End-to-end: the tokenizer should drop the comment after filtering.
+        $filtered = Tokenizer::filter($this->tokenizer->tokenize($sql));
+        $types = array_map(fn (Token $t) => $t->type, $filtered);
+        $this->assertNotContains(TokenType::LineComment, $types);
+    }
+
+    public function testHashInsideSingleQuotedStringIsNotRewritten(): void
+    {
+        $sql = "SELECT 'a#b' FROM t";
+
+        $reflection = new ReflectionClass(MySQL::class);
+        $method = $reflection->getMethod('replaceHashComments');
+        $rewritten = $method->invoke($this->tokenizer, $sql);
+
+        $this->assertIsString($rewritten);
+        $this->assertSame($sql, $rewritten);
+        $this->assertStringContainsString("'a#b'", $rewritten);
+        $this->assertStringNotContainsString("'a--b'", $rewritten);
+    }
 }

@@ -11008,4 +11008,120 @@ class ClickHouseTest extends TestCase
             ->from('t')
             ->selectWindow('ROW_NUMBER()); DROP --', 'w');
     }
+
+    /**
+     * @return list<array{0: string}>
+     */
+    public static function reservedWordsProvider(): array
+    {
+        return [
+            ['select'],
+            ['from'],
+            ['where'],
+            ['order'],
+            ['group'],
+            ['having'],
+            ['user'],
+            ['table'],
+            ['insert'],
+            ['update'],
+            ['delete'],
+            ['join'],
+            ['on'],
+            ['and'],
+            ['or'],
+            ['not'],
+            ['in'],
+            ['between'],
+            ['like'],
+            ['is'],
+            ['null'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('reservedWordsProvider')]
+    public function testReservedWordInSelect(string $word): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->select([$word])
+            ->build();
+
+        $this->assertStringContainsString('`' . $word . '`', $result->query);
+        $stripped = \preg_replace('/`[^`]+`/', '', $result->query) ?? '';
+        // Lowercase reserved word must not appear bare outside quotes
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])' . \preg_quote($word, '/') . '(?![A-Za-z0-9_])/',
+            $stripped
+        );
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('reservedWordsProvider')]
+    public function testReservedWordInFrom(string $word): void
+    {
+        $result = (new Builder())
+            ->from($word)
+            ->build();
+
+        $this->assertStringContainsString('FROM `' . $word . '`', $result->query);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('reservedWordsProvider')]
+    public function testReservedWordInFilter(string $word): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::equal($word, ['x'])])
+            ->build();
+
+        $this->assertStringContainsString('`' . $word . '`', $result->query);
+        $this->assertSame(['x'], $result->bindings);
+    }
+
+    /**
+     * @return list<array{0: string}>
+     */
+    public static function unicodeIdentifiersProvider(): array
+    {
+        return [
+            ['café'],
+            ['日本'],
+            ['column_with_émoji'],
+            ['Ω_omega'],
+            ['данные'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('unicodeIdentifiersProvider')]
+    public function testUnicodeIdentifierInSelect(string $identifier): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->select([$identifier])
+            ->build();
+
+        $this->assertStringContainsString('`' . $identifier . '`', $result->query);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('unicodeIdentifiersProvider')]
+    public function testUnicodeIdentifierInFrom(string $identifier): void
+    {
+        $result = (new Builder())
+            ->from($identifier)
+            ->build();
+
+        $this->assertStringContainsString('`' . $identifier . '`', $result->query);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('unicodeIdentifiersProvider')]
+    public function testUnicodeIdentifierInFilter(string $identifier): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::equal($identifier, ['x'])])
+            ->build();
+
+        $this->assertStringContainsString('`' . $identifier . '`', $result->query);
+        $this->assertSame(['x'], $result->bindings);
+    }
 }
