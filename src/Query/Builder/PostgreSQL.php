@@ -180,7 +180,11 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
 
     public function tablesample(float $percent, string $method = 'BERNOULLI'): static
     {
-        $this->sample = ['percent' => $percent, 'method' => \strtoupper($method)];
+        $normalized = \strtoupper($method);
+        if (! \in_array($normalized, ['BERNOULLI', 'SYSTEM'], true)) {
+            throw new ValidationException('Invalid TABLESAMPLE method: ' . $method);
+        }
+        $this->sample = ['percent' => $percent, 'method' => $normalized];
 
         return $this;
     }
@@ -189,9 +193,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     {
         $this->bindings = [];
         [$sql, $bindings] = $this->compileInsertBody();
-        foreach ($bindings as $binding) {
-            $this->addBinding($binding);
-        }
+        $this->addBindings($bindings);
 
         $sql .= ' ON CONFLICT DO NOTHING';
 
@@ -444,6 +446,10 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
 
     public function explain(bool $analyze = false, bool $verbose = false, bool $buffers = false, string $format = ''): Plan
     {
+        $normalizedFormat = \strtoupper($format);
+        if (! \in_array($normalizedFormat, ['', 'TEXT', 'XML', 'JSON', 'YAML'], true)) {
+            throw new ValidationException('Invalid EXPLAIN format: ' . $format);
+        }
         $result = $this->build();
         $options = [];
         if ($analyze) {
@@ -455,8 +461,8 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         if ($buffers) {
             $options[] = 'BUFFERS';
         }
-        if ($format !== '') {
-            $options[] = 'FORMAT ' . \strtoupper($format);
+        if ($normalizedFormat !== '') {
+            $options[] = 'FORMAT ' . $normalizedFormat;
         }
         $prefix = empty($options) ? 'EXPLAIN' : 'EXPLAIN (' . \implode(', ', $options) . ')';
 
@@ -688,9 +694,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         $this->bindings = [];
 
         $sourceResult = $this->mergeSource->build();
-        foreach ($sourceResult->bindings as $binding) {
-            $this->addBinding($binding);
-        }
+        $this->addBindings($sourceResult->bindings);
 
         $sql = 'MERGE INTO ' . $this->quote($this->mergeTarget)
             . ' USING (' . $sourceResult->query . ') AS ' . $this->quote($this->mergeSourceAlias)
@@ -703,9 +707,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         foreach ($this->mergeClauses as $clause) {
             $keyword = $clause->matched ? 'WHEN MATCHED THEN' : 'WHEN NOT MATCHED THEN';
             $sql .= ' ' . $keyword . ' ' . $clause->action;
-            foreach ($clause->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($clause->bindings);
         }
 
         return new Plan($sql, $this->bindings, executor: $this->executor);

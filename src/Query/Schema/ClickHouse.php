@@ -66,7 +66,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         }
 
         if ($column->comment !== null) {
-            $parts[] = "COMMENT '" . \str_replace("'", "''", $column->comment) . "'";
+            $parts[] = "COMMENT '" . \str_replace(['\\', "'"], ['\\\\', "''"], $column->comment) . "'";
         }
 
         return \implode(' ', $parts);
@@ -186,7 +186,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
     {
         $parts = [];
         foreach (\array_values($values) as $i => $value) {
-            $parts[] = "'" . \str_replace("'", "\\'", $value) . "' = " . ($i + 1);
+            $parts[] = "'" . \str_replace(['\\', "'"], ['\\\\', "\\'"], $value) . "' = " . ($i + 1);
         }
 
         return 'Enum8(' . \implode(', ', $parts) . ')';
@@ -195,7 +195,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
     public function commentOnTable(string $table, string $comment): Plan
     {
         return new Plan(
-            'ALTER TABLE ' . $this->quote($table) . " MODIFY COMMENT '" . str_replace("'", "''", $comment) . "'",
+            'ALTER TABLE ' . $this->quote($table) . " MODIFY COMMENT '" . str_replace(['\\', "'"], ['\\\\', "''"], $comment) . "'",
             [],
             executor: $this->executor,
         );
@@ -204,7 +204,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
     public function commentOnColumn(string $table, string $column, string $comment): Plan
     {
         return new Plan(
-            'ALTER TABLE ' . $this->quote($table) . ' COMMENT COLUMN ' . $this->quote($column) . " '" . str_replace("'", "''", $comment) . "'",
+            'ALTER TABLE ' . $this->quote($table) . ' COMMENT COLUMN ' . $this->quote($column) . " '" . str_replace(['\\', "'"], ['\\\\', "''"], $comment) . "'",
             [],
             executor: $this->executor,
         );
@@ -213,7 +213,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
     public function dropPartition(string $table, string $name): Plan
     {
         return new Plan(
-            'ALTER TABLE ' . $this->quote($table) . " DROP PARTITION '" . str_replace("'", "''", $name) . "'",
+            'ALTER TABLE ' . $this->quote($table) . " DROP PARTITION '" . str_replace(['\\', "'"], ['\\\\', "''"], $name) . "'",
             [],
             executor: $this->executor,
         );

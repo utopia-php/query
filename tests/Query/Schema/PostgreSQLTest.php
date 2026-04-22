@@ -5,6 +5,7 @@ namespace Tests\Query\Schema;
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\PostgreSQL as PgBuilder;
+use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\Feature\ColumnComments;
@@ -632,6 +633,23 @@ class PostgreSQLTest extends TestCase
         $result = $schema->createCollation('nd_collation', ['provider' => 'icu'], false);
 
         $this->assertStringContainsString('deterministic = false', $result->query);
+    }
+
+    public function testCreateCollationRejectsInvalidOptionKey(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid collation option key');
+
+        $schema = new Schema();
+        $schema->createCollation('bad', ['provider = pg_catalog, invalid_key' => 'icu']);
+    }
+
+    public function testCreateCollationRejectsKeyWithSpace(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->createCollation('bad', ['pro vider' => 'icu']);
     }
 
     public function testRenameIndex(): void

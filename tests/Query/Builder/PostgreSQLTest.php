@@ -3493,6 +3493,26 @@ class PostgreSQLTest extends TestCase
         $this->assertInstanceOf(TableSampling::class, new Builder());
     }
 
+    public function testTableSampleRejectsUnknownMethod(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid TABLESAMPLE method');
+
+        (new Builder())
+            ->from('users')
+            ->tablesample(10.0, 'DROP TABLE');
+    }
+
+    public function testExplainRejectsUnknownFormat(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid EXPLAIN format');
+
+        (new Builder())
+            ->from('users')
+            ->explain(format: 'csv');
+    }
+
     public function testImplementsConditionalAggregates(): void
     {
         $this->assertInstanceOf(ConditionalAggregates::class, new Builder());

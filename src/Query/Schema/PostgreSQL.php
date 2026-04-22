@@ -77,7 +77,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
 
         // PostgreSQL enum emulation via CHECK constraint
         if ($column->type === ColumnType::Enum && ! empty($column->enumValues)) {
-            $values = \array_map(fn (string $v): string => "'" . \str_replace("'", "''", $v) . "'", $column->enumValues);
+            $values = \array_map(fn (string $v): string => "'" . \str_replace(['\\', "'"], ['\\\\', "''"], $v) . "'", $column->enumValues);
             $parts[] = 'CHECK (' . $this->quote($column->name) . ' IN (' . \implode(', ', $values) . '))';
         }
 
@@ -296,7 +296,10 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
     {
         $optParts = [];
         foreach ($options as $key => $value) {
-            $optParts[] = $key . " = '" . \str_replace("'", "''", $value) . "'";
+            if (! \preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key)) {
+                throw new ValidationException('Invalid collation option key: ' . $key);
+            }
+            $optParts[] = $key . " = '" . \str_replace(['\\', "'"], ['\\\\', "''"], $value) . "'";
         }
         $optParts[] = 'deterministic = ' . ($deterministic ? 'true' : 'false');
 
@@ -356,7 +359,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
 
     public function createType(string $name, array $values): Plan
     {
-        $escaped = array_map(fn (string $v): string => "'" . str_replace("'", "''", $v) . "'", $values);
+        $escaped = array_map(fn (string $v): string => "'" . str_replace(['\\', "'"], ['\\\\', "''"], $v) . "'", $values);
 
         return new Plan(
             'CREATE TYPE ' . $this->quote($name) . ' AS ENUM (' . implode(', ', $escaped) . ')',
@@ -387,7 +390,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
     public function nextVal(string $name): Plan
     {
         return new Plan(
-            "SELECT nextval('" . str_replace("'", "''", $name) . "')",
+            "SELECT nextval('" . str_replace(['\\', "'"], ['\\\\', "''"], $name) . "')",
             [],
             executor: $this->executor,
         );
@@ -396,7 +399,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
     public function commentOnTable(string $table, string $comment): Plan
     {
         return new Plan(
-            'COMMENT ON TABLE ' . $this->quote($table) . " IS '" . str_replace("'", "''", $comment) . "'",
+            'COMMENT ON TABLE ' . $this->quote($table) . " IS '" . str_replace(['\\', "'"], ['\\\\', "''"], $comment) . "'",
             [],
             executor: $this->executor,
         );
@@ -405,7 +408,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
     public function commentOnColumn(string $table, string $column, string $comment): Plan
     {
         return new Plan(
-            'COMMENT ON COLUMN ' . $this->quote($table) . '.' . $this->quote($column) . " IS '" . str_replace("'", "''", $comment) . "'",
+            'COMMENT ON COLUMN ' . $this->quote($table) . '.' . $this->quote($column) . " IS '" . str_replace(['\\', "'"], ['\\\\', "''"], $comment) . "'",
             [],
             executor: $this->executor,
         );

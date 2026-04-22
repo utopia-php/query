@@ -2,6 +2,7 @@
 
 namespace Utopia\Query;
 
+use Closure;
 use Utopia\Query\Builder\Plan;
 use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\Column;
@@ -9,13 +10,13 @@ use Utopia\Query\Schema\IndexType;
 
 abstract class Schema
 {
-    /** @var (\Closure(Plan): (array<mixed>|int))|null */
-    protected ?\Closure $executor = null;
+    /** @var (Closure(Plan): (array<mixed>|int))|null */
+    protected ?Closure $executor = null;
 
     /**
-     * @param  \Closure(Plan): (array<mixed>|int)  $executor
+     * @param  Closure(Plan): (array<mixed>|int)  $executor
      */
-    public function setExecutor(\Closure $executor): static
+    public function setExecutor(Closure $executor): static
     {
         $this->executor = $executor;
 
@@ -307,7 +308,7 @@ abstract class Schema
         }
 
         if ($column->comment !== null) {
-            $parts[] = "COMMENT '" . \str_replace("'", "''", $column->comment) . "'";
+            $parts[] = "COMMENT '" . \str_replace(['\\', "'"], ['\\\\', "''"], $column->comment) . "'";
         }
 
         return \implode(' ', $parts);
@@ -326,7 +327,7 @@ abstract class Schema
         }
 
         /** @var string|int|float $value */
-        return "'" . \str_replace("'", "''", (string) $value) . "'";
+        return "'" . \str_replace(['\\', "'"], ['\\\\', "''"], (string) $value) . "'";
     }
 
     protected function compileUnsigned(): string

@@ -560,4 +560,17 @@ class ClickHouseTest extends TestCase
 
         $this->assertStringContainsString("'test''val'", $result->query);
     }
+
+    public function testEnumEscapesBackslash(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('items', function (Blueprint $table) {
+            // Input: a\' ; backslash must be escaped BEFORE the quote
+            // so the quote-escape `\'` is not cancelled by a trailing `\`.
+            $table->enum('status', ["a\\'b"]);
+        });
+
+        // Output literal: 'a\\\'b' (a, 2 backslashes, escaped quote, b)
+        $this->assertStringContainsString("'a\\\\\\'b'", $result->query);
+    }
 }

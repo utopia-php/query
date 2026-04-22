@@ -25,7 +25,7 @@ class MySQL extends SQL implements TableComments, CreatePartition, DropPartition
             ColumnType::Timestamp => $column->precision ? 'TIMESTAMP(' . $column->precision . ')' : 'TIMESTAMP',
             ColumnType::Json, ColumnType::Object => 'JSON',
             ColumnType::Binary => 'BLOB',
-            ColumnType::Enum => "ENUM('" . \implode("','", \array_map(fn ($v) => \str_replace("'", "''", $v), $column->enumValues)) . "')",
+            ColumnType::Enum => "ENUM('" . \implode("','", \array_map(fn ($v) => \str_replace(['\\', "'"], ['\\\\', "''"], $v), $column->enumValues)) . "')",
             ColumnType::Point => 'POINT' . ($column->srid !== null ? ' SRID ' . $column->srid : ''),
             ColumnType::Linestring => 'LINESTRING' . ($column->srid !== null ? ' SRID ' . $column->srid : ''),
             ColumnType::Polygon => 'POLYGON' . ($column->srid !== null ? ' SRID ' . $column->srid : ''),
@@ -77,7 +77,7 @@ class MySQL extends SQL implements TableComments, CreatePartition, DropPartition
     public function commentOnTable(string $table, string $comment): Plan
     {
         return new Plan(
-            'ALTER TABLE ' . $this->quote($table) . " COMMENT = '" . str_replace("'", "''", $comment) . "'",
+            'ALTER TABLE ' . $this->quote($table) . " COMMENT = '" . str_replace(['\\', "'"], ['\\\\', "''"], $comment) . "'",
             [],
             executor: $this->executor,
         );

@@ -1156,4 +1156,45 @@ class MySQLTest extends TestCase
 
         new Index('idx', ['col'], collations: ['col' => 'DROP;']);
     }
+
+    public function testEnumBackslashEscaping(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('items', function (Blueprint $table) {
+            // Input: `a\` and `b'c`. Expect backslash doubled and quote doubled.
+            $table->enum('status', ['a\\', "b'c"]);
+        });
+
+        // Expect literal sequence: ENUM('a\\','b''c')  (a + two backslashes)
+        $this->assertStringContainsString("ENUM('a\\\\','b''c')", $result->query);
+    }
+
+    public function testDefaultValueBackslashEscaping(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('items', function (Blueprint $table) {
+            // Input: a\' OR 1=1 -- . Expect backslash doubled, quote doubled.
+            $table->string('name')->default("a\\' OR 1=1 --");
+        });
+
+        $this->assertStringContainsString("DEFAULT 'a\\\\'' OR 1=1 --'", $result->query);
+    }
+
+    public function testCommentBackslashEscaping(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('items', function (Blueprint $table) {
+            $table->string('name')->comment('trailing\\');
+        });
+
+        $this->assertStringContainsString("COMMENT 'trailing\\\\'", $result->query);
+    }
+
+    public function testTableCommentBackslashEscaping(): void
+    {
+        $schema = new Schema();
+        $result = $schema->commentOnTable('items', 'trailing\\');
+
+        $this->assertStringContainsString("COMMENT = 'trailing\\\\'", $result->query);
+    }
 }
