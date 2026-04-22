@@ -776,4 +776,506 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $this->assertSame(90.0, $sums[3]);
         $this->assertSame(120.0, $sums[4]);
     }
+
+    public function testOrderWithFillFillsGaps(): void
+    {
+        $this->trackClickhouseTable('ch_fill');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_fill`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_fill` (
+                `ts` UInt32,
+                `value` Float64
+            ) ENGINE = MergeTree()
+            ORDER BY `ts`
+        ');
+        $this->clickhouseStatement("
+            INSERT INTO `ch_fill` (`ts`, `value`) VALUES
+            (1, 10.0),
+            (3, 30.0),
+            (5, 50.0)
+        ");
+
+        $result = (new Builder())
+            ->from('ch_fill')
+            ->select(['ts', 'value'])
+            ->orderWithFill('ts', 'ASC', 1, 5, 1)
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        // WITH FILL fills the gaps at ts=2 and ts=4 -> 5 rows.
+        $this->assertCount(5, $rows);
+        $timestamps = \array_map(
+            static fn (array $row): int => (int) $row['ts'], // @phpstan-ignore cast.int
+            $rows,
+        );
+        $this->assertSame([1, 2, 3, 4, 5], $timestamps);
+    }
+
+    public function testLimitByKeepsTopN(): void
+    {
+        $result = (new Builder())
+            ->from('ch_events')
+            ->select(['user_id', 'id', 'action'])
+            ->sortAsc('user_id')
+            ->sortAsc('id')
+            ->limitBy(1, ['user_id'])
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        // user_ids are 1,2,3,4,5 — limit 1 per user_id -> 5 rows, one per user.
+        $this->assertCount(5, $rows);
+        $userIds = \array_map(
+            static fn (array $row): int => (int) $row['user_id'], // @phpstan-ignore cast.int
+            $rows,
+        );
+        $this->assertSame([1, 2, 3, 4, 5], $userIds);
+    }
+
+    public function testGroupConcat(): void
+    {
+        $result = (new Builder())
+            ->from('ch_users')
+            ->select(['country'])
+            ->groupConcat('name', ',', 'names')
+            ->groupBy(['country'])
+            ->sortAsc('country')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(3, $rows);
+        $byCountry = [];
+        foreach ($rows as $row) {
+            $country = $row['country'];
+            $names = $row['names'];
+            \assert(\is_string($country) && \is_string($names));
+            $byCountry[$country] = $names;
+        }
+
+        $this->assertSame('Diana', $byCountry['DE']);
+
+        $ukNames = \explode(',', $byCountry['UK']);
+        \sort($ukNames);
+        $this->assertSame(['Bob', 'Eve'], $ukNames);
+
+        $usNames = \explode(',', $byCountry['US']);
+        \sort($usNames);
+        $this->assertSame(['Alice', 'Charlie'], $usNames);
+    }
+
+    public function testStddev(): void
+    {
+        $this->trackClickhouseTable('ch_stats');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_stats`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_stats` (
+                `id` UInt32,
+                `value` Float64
+            ) ENGINE = MergeTree()
+            ORDER BY `id`
+        ');
+        $this->clickhouseStatement("
+            INSERT INTO `ch_stats` (`id`, `value`) VALUES
+            (1, 2.0),
+            (2, 4.0),
+            (3, 4.0),
+            (4, 4.0),
+            (5, 5.0),
+            (6, 5.0),
+            (7, 7.0),
+            (8, 9.0)
+        ");
+
+        $result = (new Builder())
+            ->from('ch_stats')
+            ->stddev('value', 'sd')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(1, $rows);
+        $sd = (float) $rows[0]['sd']; // @phpstan-ignore cast.double
+
+        // Population stddev of [2,4,4,4,5,5,7,9] is 2.0.
+        $this->assertGreaterThanOrEqual(1.9, $sd);
+        $this->assertLessThanOrEqual(2.1, $sd);
+    }
+
+    public function testVariance(): void
+    {
+        $this->trackClickhouseTable('ch_stats');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_stats`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_stats` (
+                `id` UInt32,
+                `value` Float64
+            ) ENGINE = MergeTree()
+            ORDER BY `id`
+        ');
+        $this->clickhouseStatement("
+            INSERT INTO `ch_stats` (`id`, `value`) VALUES
+            (1, 2.0),
+            (2, 4.0),
+            (3, 4.0),
+            (4, 4.0),
+            (5, 5.0),
+            (6, 5.0),
+            (7, 7.0),
+            (8, 9.0)
+        ");
+
+        $result = (new Builder())
+            ->from('ch_stats')
+            ->variance('value', 'var')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(1, $rows);
+        $var = (float) $rows[0]['var']; // @phpstan-ignore cast.double
+
+        // Population variance of the same set is 4.0.
+        $this->assertGreaterThanOrEqual(3.8, $var);
+        $this->assertLessThanOrEqual(4.2, $var);
+    }
+
+    public function testBitAnd(): void
+    {
+        $this->trackClickhouseTable('ch_flags');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_flags`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_flags` (
+                `id` UInt32,
+                `flags` UInt32
+            ) ENGINE = MergeTree()
+            ORDER BY `id`
+        ');
+        $this->clickhouseStatement('
+            INSERT INTO `ch_flags` (`id`, `flags`) VALUES
+            (1, 7),
+            (2, 5),
+            (3, 6)
+        ');
+
+        $result = (new Builder())
+            ->from('ch_flags')
+            ->bitAnd('flags', 'and_flags')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        // 7 & 5 & 6 = 4
+        $this->assertCount(1, $rows);
+        $this->assertSame(4, (int) $rows[0]['and_flags']); // @phpstan-ignore cast.int
+    }
+
+    public function testBitOr(): void
+    {
+        $this->trackClickhouseTable('ch_flags');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_flags`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_flags` (
+                `id` UInt32,
+                `flags` UInt32
+            ) ENGINE = MergeTree()
+            ORDER BY `id`
+        ');
+        $this->clickhouseStatement('
+            INSERT INTO `ch_flags` (`id`, `flags`) VALUES
+            (1, 1),
+            (2, 2),
+            (3, 4)
+        ');
+
+        $result = (new Builder())
+            ->from('ch_flags')
+            ->bitOr('flags', 'or_flags')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        // 1 | 2 | 4 = 7
+        $this->assertCount(1, $rows);
+        $this->assertSame(7, (int) $rows[0]['or_flags']); // @phpstan-ignore cast.int
+    }
+
+    public function testBitXor(): void
+    {
+        $this->trackClickhouseTable('ch_flags');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_flags`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_flags` (
+                `id` UInt32,
+                `flags` UInt32
+            ) ENGINE = MergeTree()
+            ORDER BY `id`
+        ');
+        $this->clickhouseStatement('
+            INSERT INTO `ch_flags` (`id`, `flags`) VALUES
+            (1, 3),
+            (2, 5),
+            (3, 6)
+        ');
+
+        $result = (new Builder())
+            ->from('ch_flags')
+            ->bitXor('flags', 'xor_flags')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        // 3 ^ 5 ^ 6 = 0
+        $this->assertCount(1, $rows);
+        $this->assertSame(0, (int) $rows[0]['xor_flags']); // @phpstan-ignore cast.int
+    }
+
+    public function testHintSetting(): void
+    {
+        $result = (new Builder())
+            ->from('ch_events')
+            ->select(['id', 'action'])
+            ->sortAsc('id')
+            ->hint('max_threads=2')
+            ->build();
+
+        $this->assertStringContainsString('SETTINGS max_threads=2', $result->query);
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(8, $rows);
+        $this->assertSame('click', $rows[0]['action']);
+    }
+
+    public function testCountIf(): void
+    {
+        $result = (new Builder())
+            ->from('ch_events')
+            ->countWhen('`action` = ?', 'clicks', 'click')
+            ->countWhen('`action` = ?', 'purchases', 'purchase')
+            ->build();
+
+        $this->assertStringContainsString('countIf(`action` = ?)', $result->query);
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(4, (int) $rows[0]['clicks']); // @phpstan-ignore cast.int
+        $this->assertSame(3, (int) $rows[0]['purchases']); // @phpstan-ignore cast.int
+    }
+
+    public function testSumIf(): void
+    {
+        $result = (new Builder())
+            ->from('ch_events')
+            ->sumWhen('value', '`action` = ?', 'purchase_total', 'purchase')
+            ->build();
+
+        $this->assertStringContainsString('sumIf(`value`, `action` = ?)', $result->query);
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(1, $rows);
+        // Purchases: 99.99 + 49.99 + 199.99 = 349.97
+        $total = (float) $rows[0]['purchase_total']; // @phpstan-ignore cast.double
+        $this->assertGreaterThanOrEqual(349.96, $total);
+        $this->assertLessThanOrEqual(349.98, $total);
+    }
+
+    public function testTableSample(): void
+    {
+        $this->trackClickhouseTable('ch_sampled');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_sampled`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_sampled` (
+                `id` UInt32,
+                `name` String
+            ) ENGINE = MergeTree()
+            ORDER BY `id`
+            SAMPLE BY `id`
+        ');
+        $this->clickhouseStatement("
+            INSERT INTO `ch_sampled` (`id`, `name`) VALUES
+            (1, 'A'), (2, 'B'), (3, 'C'), (4, 'D'), (5, 'E')
+        ");
+
+        $result = (new Builder())
+            ->from('ch_sampled')
+            ->select(['id', 'name'])
+            ->tablesample(50.0)
+            ->build();
+
+        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertLessThanOrEqual(5, \count($rows));
+        foreach ($rows as $row) {
+            $this->assertArrayHasKey('id', $row);
+            $this->assertArrayHasKey('name', $row);
+        }
+    }
+
+    public function testGroupByWithRollup(): void
+    {
+        $result = (new Builder())
+            ->from('ch_events')
+            ->select(['user_id', 'action'])
+            ->count('*', 'cnt')
+            ->groupBy(['user_id', 'action'])
+            ->withRollup()
+            ->sortAsc('user_id')
+            ->sortAsc('action')
+            ->build();
+
+        $this->assertStringContainsString('WITH ROLLUP', $result->query);
+
+        $rows = $this->executeOnClickhouse($result);
+
+        // With ROLLUP: leaf rows (user_id, action), subtotals per user_id
+        // (action NULL/empty), and a grand total (both NULL/empty).
+        // There are 7 distinct (user_id, action) pairs in the seed data,
+        // plus 5 user subtotals, plus 1 grand total = 13.
+        $this->assertSame(13, \count($rows));
+    }
+
+    public function testGroupByWithTotals(): void
+    {
+        $result = (new Builder())
+            ->from('ch_events')
+            ->select(['action'])
+            ->count('*', 'cnt')
+            ->groupBy(['action'])
+            ->withTotals()
+            ->sortAsc('action')
+            ->build();
+
+        $this->assertStringContainsString('WITH TOTALS', $result->query);
+
+        $rows = $this->executeOnClickhouse($result);
+
+        // JSONEachRow emits only data rows for WITH TOTALS (totals are in a
+        // separate section), so we see one row per distinct action.
+        $actions = \array_column($rows, 'action');
+        $this->assertContains('click', $actions);
+        $this->assertContains('purchase', $actions);
+        $this->assertContains('view', $actions);
+    }
+
+    public function testFullOuterJoin(): void
+    {
+        $this->trackClickhouseTable('ch_left');
+        $this->trackClickhouseTable('ch_right');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_left`');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_right`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_left` (
+                `id` UInt32,
+                `label` String
+            ) ENGINE = MergeTree()
+            ORDER BY `id`
+        ');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_right` (
+                `id` UInt32,
+                `label` String
+            ) ENGINE = MergeTree()
+            ORDER BY `id`
+        ');
+        $this->clickhouseStatement("
+            INSERT INTO `ch_left` (`id`, `label`) VALUES
+            (1, 'L1'),
+            (2, 'L2')
+        ");
+        $this->clickhouseStatement("
+            INSERT INTO `ch_right` (`id`, `label`) VALUES
+            (2, 'R2'),
+            (3, 'R3')
+        ");
+
+        $result = (new Builder())
+            ->from('ch_left', 'l')
+            ->select(['l.label', 'r.label'])
+            ->fullOuterJoin('ch_right', 'l.id', 'r.id', '=', 'r')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        // Full outer join: matched (2) + left-only (1) + right-only (3) = 3 rows.
+        $this->assertCount(3, $rows);
+    }
+
+    public function testTopK(): void
+    {
+        $this->trackClickhouseTable('ch_topk');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_topk`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_topk` (
+                `id` UInt32,
+                `category` String
+            ) ENGINE = MergeTree()
+            ORDER BY `id`
+        ');
+
+        // Heavy-hitter distribution so topK results are deterministic:
+        //   'a' x 50, 'b' x 30, 'c' x 15, 'd' x 5.
+        $values = [];
+        $id = 1;
+        foreach (['a' => 50, 'b' => 30, 'c' => 15, 'd' => 5] as $category => $count) {
+            for ($i = 0; $i < $count; $i++) {
+                $values[] = '(' . $id . ", '" . $category . "')";
+                $id++;
+            }
+        }
+        $this->clickhouseStatement(
+            'INSERT INTO `ch_topk` (`id`, `category`) VALUES ' . \implode(', ', $values)
+        );
+
+        $result = (new Builder())
+            ->from('ch_topk')
+            ->topK(3, 'category', 'top')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(1, $rows);
+        $top = $rows[0]['top'];
+        $this->assertIsArray($top);
+        $this->assertCount(3, $top);
+        $this->assertSame(['a', 'b', 'c'], $top);
+    }
+
+    public function testArgMinArgMax(): void
+    {
+        $this->trackClickhouseTable('ch_arg');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_arg`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_arg` (
+                `id` UInt32,
+                `name` String,
+                `score` Float64
+            ) ENGINE = MergeTree()
+            ORDER BY `id`
+        ');
+        $this->clickhouseStatement("
+            INSERT INTO `ch_arg` (`id`, `name`, `score`) VALUES
+            (1, 'Alice', 10.0),
+            (2, 'Bob', 25.0),
+            (3, 'Charlie', 5.0),
+            (4, 'Diana', 40.0)
+        ");
+
+        $result = (new Builder())
+            ->from('ch_arg')
+            ->argMin('name', 'score', 'min_name')
+            ->argMax('name', 'score', 'max_name')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('Charlie', $rows[0]['min_name']);
+        $this->assertSame('Diana', $rows[0]['max_name']);
+    }
 }

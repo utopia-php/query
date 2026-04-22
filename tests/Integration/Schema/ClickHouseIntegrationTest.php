@@ -150,4 +150,186 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $this->assertSame('DateTime64(3)', $typeMap['created_at']);
         $this->assertSame('DateTime64(6)', $typeMap['updated_at']);
     }
+
+    public function testCreateReplacingMergeTree(): void
+    {
+        // Schema builder only emits MergeTree engine — no API for
+        // ReplacingMergeTree. Create via raw DDL, then exercise the engine
+        // semantics (duplicate inserts collapse on merge via FINAL).
+        $table = 'test_replacing_' . uniqid();
+        $this->trackClickhouseTable($table);
+
+        $this->clickhouseStatement('
+            CREATE TABLE `' . $table . '` (
+                `id` UInt32,
+                `name` String,
+                `version` UInt32
+            ) ENGINE = ReplacingMergeTree(`version`)
+            ORDER BY `id`
+        ');
+
+        $this->clickhouseStatement(
+            'INSERT INTO `' . $table . "` (`id`, `name`, `version`) VALUES (1, 'v1', 1)"
+        );
+        $this->clickhouseStatement(
+            'INSERT INTO `' . $table . "` (`id`, `name`, `version`) VALUES (1, 'v2', 2)"
+        );
+
+        $ch = $this->connectClickhouse();
+
+        $engineRows = $ch->execute(
+            "SELECT engine FROM system.tables WHERE database = 'query_test' AND name = '{$table}'"
+        );
+        $this->assertSame('ReplacingMergeTree', $engineRows[0]['engine']);
+
+        $rows = $ch->execute('SELECT `name` FROM `' . $table . '` FINAL WHERE `id` = 1');
+        $this->assertCount(1, $rows);
+        $this->assertSame('v2', $rows[0]['name']);
+    }
+
+    public function testCreateSummingMergeTree(): void
+    {
+        // Schema builder lacks SummingMergeTree support — use raw DDL.
+        $table = 'test_summing_' . uniqid();
+        $this->trackClickhouseTable($table);
+
+        $this->clickhouseStatement('
+            CREATE TABLE `' . $table . '` (
+                `key` UInt32,
+                `total` UInt64
+            ) ENGINE = SummingMergeTree(`total`)
+            ORDER BY `key`
+        ');
+
+        $this->clickhouseStatement(
+            'INSERT INTO `' . $table . '` (`key`, `total`) VALUES (1, 10), (1, 20), (2, 5)'
+        );
+
+        $ch = $this->connectClickhouse();
+
+        $engineRows = $ch->execute(
+            "SELECT engine FROM system.tables WHERE database = 'query_test' AND name = '{$table}'"
+        );
+        $this->assertSame('SummingMergeTree', $engineRows[0]['engine']);
+
+        // OPTIMIZE to force a merge so summing takes effect.
+        $this->clickhouseStatement('OPTIMIZE TABLE `' . $table . '` FINAL');
+
+        $rows = $ch->execute(
+            'SELECT `key`, `total` FROM `' . $table . '` ORDER BY `key`'
+        );
+        $this->assertCount(2, $rows);
+        $this->assertSame(30, (int) $rows[0]['total']); // @phpstan-ignore cast.int
+        $this->assertSame(5, (int) $rows[1]['total']); // @phpstan-ignore cast.int
+    }
+
+    public function testCreateAggregatingMergeTree(): void
+    {
+        // Schema builder lacks AggregatingMergeTree support — use raw DDL.
+        $table = 'test_aggregating_' . uniqid();
+        $this->trackClickhouseTable($table);
+
+        $this->clickhouseStatement('
+            CREATE TABLE `' . $table . '` (
+                `key` UInt32,
+                `max_value` AggregateFunction(max, UInt32)
+            ) ENGINE = AggregatingMergeTree()
+            ORDER BY `key`
+        ');
+
+        $this->clickhouseStatement(
+            'INSERT INTO `' . $table . '` (`key`, `max_value`) '
+            . 'SELECT `key`, maxState(`value`) FROM ('
+            . "  SELECT 1 AS `key`, 10 AS `value` UNION ALL "
+            . '  SELECT 1 AS `key`, 50 AS `value` UNION ALL '
+            . '  SELECT 2 AS `key`, 5 AS `value`'
+            . ') GROUP BY `key`'
+        );
+
+        $ch = $this->connectClickhouse();
+
+        $engineRows = $ch->execute(
+            "SELECT engine FROM system.tables WHERE database = 'query_test' AND name = '{$table}'"
+        );
+        $this->assertSame('AggregatingMergeTree', $engineRows[0]['engine']);
+
+        $rows = $ch->execute(
+            'SELECT `key`, maxMerge(`max_value`) AS `m` FROM `' . $table
+            . '` GROUP BY `key` ORDER BY `key`'
+        );
+        $this->assertCount(2, $rows);
+        $this->assertSame(50, (int) $rows[0]['m']); // @phpstan-ignore cast.int
+        $this->assertSame(5, (int) $rows[1]['m']); // @phpstan-ignore cast.int
+    }
+
+    public function testCreateTableWithTTL(): void
+    {
+        // Schema builder does not emit TTL clauses — use raw DDL and confirm
+        // the TTL expression lands on the table.
+        $table = 'test_ttl_' . uniqid();
+        $this->trackClickhouseTable($table);
+
+        $this->clickhouseStatement('
+            CREATE TABLE `' . $table . '` (
+                `id` UInt32,
+                `ts` DateTime
+            ) ENGINE = MergeTree()
+            ORDER BY `id`
+            TTL `ts` + INTERVAL 1 DAY
+        ');
+
+        $ch = $this->connectClickhouse();
+
+        $rows = $ch->execute(
+            "SELECT engine_full FROM system.tables WHERE database = 'query_test' AND name = '{$table}'"
+        );
+
+        $this->assertCount(1, $rows);
+        $engineFull = $rows[0]['engine_full'];
+        \assert(\is_string($engineFull));
+        $this->assertStringContainsString('TTL', $engineFull);
+        $this->assertStringContainsString('toIntervalDay(1)', $engineFull);
+    }
+
+    public function testCreateTableWithPartitionBy(): void
+    {
+        // Schema builder's Blueprint supports partitionByHash as a raw
+        // expression pass-through — use it to emit PARTITION BY toYYYYMM(ts).
+        $table = 'test_partition_' . uniqid();
+        $this->trackClickhouseTable($table);
+
+        $result = $this->schema->create($table, function (Blueprint $bp) {
+            $bp->integer('id')->primary();
+            $bp->datetime('ts');
+            $bp->partitionByHash('toYYYYMM(`ts`)');
+        });
+
+        $this->assertStringContainsString('PARTITION BY toYYYYMM(`ts`)', $result->query);
+
+        $this->clickhouseStatement($result->query);
+
+        $this->clickhouseStatement(
+            'INSERT INTO `' . $table . "` (`id`, `ts`) VALUES "
+            . "(1, '2024-01-05 00:00:00'), "
+            . "(2, '2024-02-10 00:00:00'), "
+            . "(3, '2024-01-20 00:00:00')"
+        );
+
+        $ch = $this->connectClickhouse();
+
+        $rows = $ch->execute(
+            "SELECT partition_key FROM system.tables WHERE database = 'query_test' AND name = '{$table}'"
+        );
+        $this->assertCount(1, $rows);
+        $partitionKey = $rows[0]['partition_key'];
+        \assert(\is_string($partitionKey));
+        $this->assertStringContainsString('toYYYYMM', $partitionKey);
+
+        $partitionRows = $ch->execute(
+            "SELECT DISTINCT partition FROM system.parts "
+            . "WHERE database = 'query_test' AND table = '{$table}' AND active"
+        );
+        // Two partitions: 202401 (two rows) and 202402 (one row).
+        $this->assertSame(2, \count($partitionRows));
+    }
 }
