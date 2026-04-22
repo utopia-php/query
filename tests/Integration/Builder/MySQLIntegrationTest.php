@@ -285,11 +285,10 @@ class MySQLIntegrationTest extends IntegrationTestCase
     public function testSelectWithCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('`age` < 25', "'young'")
-            ->when('`age` BETWEEN 25 AND 30', "'mid'")
-            ->elseResult("'senior'")
-            ->alias('`age_group`')
-            ->build();
+            ->when('age', '<', 25, 'young')
+            ->whenRaw('`age` BETWEEN 25 AND 30', 'mid')
+            ->else('senior')
+            ->alias('age_group');
 
         $result = $this->fresh()
             ->from('users')

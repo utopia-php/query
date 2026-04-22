@@ -6407,10 +6407,9 @@ class ClickHouseTest extends TestCase
     public function testSelectCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('`status` = ?', '?', ['active'], ['Active'])
-            ->elseResult('?', ['Unknown'])
-            ->alias('label')
-            ->build();
+            ->when('status', '=', 'active', 'Active')
+            ->else('Unknown')
+            ->alias('label');
 
         $result = (new Builder())
             ->from('t')
@@ -6418,27 +6417,26 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CASE WHEN `status` = ? THEN ? ELSE ? END AS label', $result->query);
-        $this->assertEquals(['active', 'Active', 'Unknown'], $result->bindings);
+        $this->assertStringContainsString('CASE WHEN `status` = ? THEN ? ELSE ? END AS `label`', $result->query);
+        $this->assertSame(['active', 'Active', 'Unknown'], $result->bindings);
     }
 
     public function testSetCaseInUpdate(): void
     {
         $case = (new CaseExpression())
-            ->when('`role` = ?', '?', ['admin'], ['Admin'])
-            ->elseResult('?', ['User'])
-            ->build();
+            ->when('role', '=', 'admin', 'Admin')
+            ->else('User');
 
         $result = (new Builder())
             ->from('t')
-            ->setRaw('label', $case->sql, $case->bindings)
+            ->setCase('label', $case)
             ->filter([Query::equal('id', [1])])
             ->update();
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('ALTER TABLE `t` UPDATE', $result->query);
         $this->assertStringContainsString('CASE WHEN `role` = ? THEN ? ELSE ? END', $result->query);
-        $this->assertEquals(['admin', 'Admin', 'User', 1], $result->bindings);
+        $this->assertSame(['admin', 'Admin', 'User', 1], $result->bindings);
     }
 
     public function testUnionSimple(): void
@@ -7744,11 +7742,10 @@ class ClickHouseTest extends TestCase
     public function testExactCaseInSelect(): void
     {
         $case = (new CaseExpression())
-            ->when('`status` = ?', '?', ['active'], ['Active'])
-            ->when('`status` = ?', '?', ['inactive'], ['Inactive'])
-            ->elseResult('?', ['Unknown'])
-            ->alias('`status_label`')
-            ->build();
+            ->when('status', '=', 'active', 'Active')
+            ->when('status', '=', 'inactive', 'Inactive')
+            ->else('Unknown')
+            ->alias('status_label');
 
         $result = (new Builder())
             ->from('users')
@@ -7760,7 +7757,7 @@ class ClickHouseTest extends TestCase
             'SELECT `id`, `name`, CASE WHEN `status` = ? THEN ? WHEN `status` = ? THEN ? ELSE ? END AS `status_label` FROM `users`',
             $result->query
         );
-        $this->assertEquals(['active', 'Active', 'inactive', 'Inactive', 'Unknown'], $result->bindings);
+        $this->assertSame(['active', 'Active', 'inactive', 'Inactive', 'Unknown'], $result->bindings);
         $this->assertBindingCount($result);
     }
 
@@ -8895,11 +8892,10 @@ class ClickHouseTest extends TestCase
     public function testCaseExpressionWithAggregate(): void
     {
         $case = (new CaseExpression())
-            ->when('status = ?', "'active'", ['active'])
-            ->when('status = ?', "'inactive'", ['inactive'])
-            ->elseResult("'unknown'")
-            ->alias('`status_label`')
-            ->build();
+            ->when('status', '=', 'active', 'active')
+            ->when('status', '=', 'inactive', 'inactive')
+            ->else('unknown')
+            ->alias('status_label');
 
         $result = (new Builder())
             ->from('users')
@@ -8909,7 +8905,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CASE WHEN status = ? THEN', $result->query);
+        $this->assertStringContainsString('CASE WHEN `status` = ? THEN', $result->query);
         $this->assertStringContainsString('COUNT(*) AS `total`', $result->query);
     }
 

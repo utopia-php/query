@@ -4,6 +4,7 @@ namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
+use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Plan;
@@ -1377,12 +1378,11 @@ class SQLiteTest extends TestCase
 
     public function testCaseExpressionWithWhere(): void
     {
-        $case = (new \Utopia\Query\Builder\Case\Expression())
-            ->when('status = ?', "'Active'", ['active'])
-            ->when('status = ?', "'Inactive'", ['inactive'])
-            ->elseResult("'Unknown'")
-            ->alias('`label`')
-            ->build();
+        $case = (new CaseExpression())
+            ->when('status', '=', 'active', 'Active')
+            ->when('status', '=', 'inactive', 'Inactive')
+            ->else('Unknown')
+            ->alias('label');
 
         $result = (new Builder())
             ->from('users')

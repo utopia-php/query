@@ -4,7 +4,7 @@ namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
-use Utopia\Query\Builder\Case\Result as CaseResult;
+use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\Feature\Aggregates;
 use Utopia\Query\Builder\Feature\CTEs;
 use Utopia\Query\Builder\Feature\Deletes;
@@ -1859,7 +1859,12 @@ class MongoDBTest extends TestCase
 
         (new Builder())
             ->from('users')
-            ->setCase('status', new CaseResult('CASE WHEN age > 18 THEN ? ELSE ? END', ['adult', 'minor']))
+            ->setCase(
+                'status',
+                (new CaseExpression())
+                    ->when('age', '>', 18, 'adult')
+                    ->else('minor')
+            )
             ->update();
     }
 

@@ -594,17 +594,16 @@ $result = (new Builder())
 
 ### CASE Expressions
 
-Build a CASE expression with `Utopia\Query\Builder\Case\Expression`, then pass the built `Result` to `selectCase()` or `setCase()`:
+Build a CASE expression with `Utopia\Query\Builder\Case\Expression`, then pass it to `selectCase()` or `setCase()`. All columns are quoted by the dialect, and all values are bound as parameters:
 
 ```php
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
 
 $case = (new CaseExpression())
-    ->when('amount > ?', 'high', conditionBindings: [1000])
-    ->when('amount > ?', 'medium', conditionBindings: [100])
-    ->elseResult('low')
-    ->alias('`priority`')
-    ->build();
+    ->when('amount', '>', 1000, 'high')
+    ->when('amount', '>', 100, 'medium')
+    ->else('low')
+    ->alias('priority');
 
 $result = (new Builder())
     ->from('orders')
@@ -612,9 +611,16 @@ $result = (new Builder())
     ->selectCase($case)
     ->build();
 
-// SELECT `id`, CASE WHEN amount > ? THEN ? WHEN amount > ? THEN ? ELSE ? END AS `priority`
+// SELECT `id`, CASE WHEN `amount` > ? THEN ? WHEN `amount` > ? THEN ? ELSE ? END AS `priority`
 //   FROM `orders`
 ```
+
+Supported WHEN shapes:
+
+- `when(string $column, string $operator, mixed $value, mixed $then)` — comparison (`=`, `!=`, `<>`, `<`, `>`, `<=`, `>=`, `LIKE`, `NOT LIKE`, `IS`, `IS NOT`).
+- `whenNull(string $column, mixed $then)` and `whenNotNull(string $column, mixed $then)`.
+- `whenIn(string $column, array $values, mixed $then)`.
+- `whenRaw(string $condition, mixed $then, array $conditionBindings = [])` — escape hatch for complex predicates. The caller owns the SQL fragment; the `$then` value is still bound.
 
 ### Inserts
 

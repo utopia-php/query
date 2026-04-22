@@ -6,7 +6,6 @@ use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
 use Tests\Query\Fixture\PermissionFilter as Permission;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
-use Utopia\Query\Builder\Case\Result as CaseResult;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\Feature\Aggregates;
 use Utopia\Query\Builder\Feature\CTEs;
@@ -6992,37 +6991,51 @@ class MySQLTest extends TestCase
     public function testCaseBuilder(): void
     {
         $case = (new CaseExpression())
-            ->when('status = ?', '?', ['active'], ['Active'])
-            ->when('status = ?', '?', ['inactive'], ['Inactive'])
-            ->elseResult('?', ['Unknown'])
-            ->alias('label')
+            ->when('status', '=', 'active', 'Active')
+            ->when('status', '=', 'inactive', 'Inactive')
+            ->else('Unknown')
+            ->alias('label');
+
+        $result = (new Builder())
+            ->from('t')
+            ->selectCase($case)
             ->build();
 
-        $this->assertEquals(
-            'CASE WHEN status = ? THEN ? WHEN status = ? THEN ? ELSE ? END AS label',
-            $case->sql
+        $this->assertStringContainsString(
+            'CASE WHEN `status` = ? THEN ? WHEN `status` = ? THEN ? ELSE ? END AS `label`',
+            $result->query
         );
-        $this->assertEquals(['active', 'Active', 'inactive', 'Inactive', 'Unknown'], $case->bindings);
+        $this->assertSame(['active', 'Active', 'inactive', 'Inactive', 'Unknown'], $result->bindings);
     }
 
     public function testCaseBuilderWithoutElse(): void
     {
         $case = (new CaseExpression())
-            ->when('x > ?', '1', [10])
+            ->when('x', '>', 10, 1);
+
+        $result = (new Builder())
+            ->from('t')
+            ->selectCase($case)
             ->build();
 
-        $this->assertEquals('CASE WHEN x > ? THEN 1 END', $case->sql);
-        $this->assertEquals([10], $case->bindings);
+        $this->assertStringContainsString('CASE WHEN `x` > ? THEN ? END', $result->query);
+        $this->assertSame([10, 1], $result->bindings);
     }
 
     public function testCaseBuilderWithoutAlias(): void
     {
         $case = (new CaseExpression())
-            ->when('x = 1', "'yes'")
-            ->elseResult("'no'")
+            ->whenRaw('x = 1', 'yes')
+            ->else('no');
+
+        $result = (new Builder())
+            ->from('t')
+            ->selectCase($case)
             ->build();
 
-        $this->assertEquals("CASE WHEN x = 1 THEN 'yes' ELSE 'no' END", $case->sql);
+        $this->assertStringContainsString('CASE WHEN x = 1 THEN ? ELSE ? END', $result->query);
+        $this->assertStringNotContainsString('END AS', $result->query);
+        $this->assertSame(['yes', 'no'], $result->bindings);
     }
 
     public function testCaseBuilderNoWhensThrows(): void
@@ -7030,17 +7043,24 @@ class MySQLTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('at least one WHEN');
 
-        (new CaseExpression())->build();
+        (new Builder())
+            ->from('t')
+            ->selectCase(new CaseExpression())
+            ->build();
     }
 
     public function testCaseExpressionToSql(): void
     {
         $case = (new CaseExpression())
-            ->when('a = ?', '1', [1])
+            ->whenRaw('a = ?', 1, [1]);
+
+        $result = (new Builder())
+            ->from('t')
+            ->selectCase($case)
             ->build();
 
-        $this->assertEquals('CASE WHEN a = ? THEN 1 END', $case->sql);
-        $this->assertEquals([1], $case->bindings);
+        $this->assertStringContainsString('CASE WHEN a = ? THEN ? END', $result->query);
+        $this->assertSame([1, 1], $result->bindings);
     }
 
     public function testSelectRaw(): void
@@ -7081,20 +7101,19 @@ class MySQLTest extends TestCase
     public function testSelectRawWithCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('status = ?', '?', ['active'], ['Active'])
-            ->elseResult('?', ['Other'])
-            ->alias('label')
-            ->build();
+            ->when('status', '=', 'active', 'Active')
+            ->else('Other')
+            ->alias('label');
 
         $result = (new Builder())
             ->from('users')
             ->select(['id'])
-            ->select($case->sql, $case->bindings)
+            ->selectCase($case)
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CASE WHEN status = ? THEN ? ELSE ? END AS label', $result->query);
-        $this->assertEquals(['active', 'Active', 'Other'], $result->bindings);
+        $this->assertStringContainsString('CASE WHEN `status` = ? THEN ? ELSE ? END AS `label`', $result->query);
+        $this->assertSame(['active', 'Active', 'Other'], $result->bindings);
     }
 
     public function testSelectRawResetClears(): void
@@ -7469,10 +7488,9 @@ class MySQLTest extends TestCase
     public function testSelectCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('status = ?', '?', ['active'], ['Active'])
-            ->elseResult('?', ['Other'])
-            ->alias('label')
-            ->build();
+            ->when('status', '=', 'active', 'Active')
+            ->else('Other')
+            ->alias('label');
 
         $result = (new Builder())
             ->from('users')
@@ -7481,16 +7499,15 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CASE WHEN status = ? THEN ? ELSE ? END AS label', $result->query);
-        $this->assertEquals(['active', 'Active', 'Other'], $result->bindings);
+        $this->assertStringContainsString('CASE WHEN `status` = ? THEN ? ELSE ? END AS `label`', $result->query);
+        $this->assertSame(['active', 'Active', 'Other'], $result->bindings);
     }
 
     public function testSetCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('age >= ?', '?', [18], ['adult'])
-            ->elseResult('?', ['minor'])
-            ->build();
+            ->when('age', '>=', 18, 'adult')
+            ->else('minor');
 
         $result = (new Builder())
             ->from('users')
@@ -7499,8 +7516,8 @@ class MySQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`category` = CASE WHEN age >= ? THEN ? ELSE ? END', $result->query);
-        $this->assertEquals([18, 'adult', 'minor', 0], $result->bindings);
+        $this->assertStringContainsString('`category` = CASE WHEN `age` >= ? THEN ? ELSE ? END', $result->query);
+        $this->assertSame([18, 'adult', 'minor', 0], $result->bindings);
     }
     //  Query factory methods for JSON
 
@@ -7928,40 +7945,51 @@ class MySQLTest extends TestCase
     public function testCaseWithMultipleWhens(): void
     {
         $case = (new CaseExpression())
-            ->when('x = ?', '?', [1], ['one'])
-            ->when('x = ?', '?', [2], ['two'])
-            ->when('x = ?', '?', [3], ['three'])
+            ->when('x', '=', 1, 'one')
+            ->when('x', '=', 2, 'two')
+            ->when('x', '=', 3, 'three');
+
+        $result = (new Builder())
+            ->from('t')
+            ->selectCase($case)
             ->build();
 
-        $this->assertStringContainsString('WHEN x = ? THEN ?', $case->sql);
-        $this->assertEquals([1, 'one', 2, 'two', 3, 'three'], $case->bindings);
+        $this->assertStringContainsString('WHEN `x` = ? THEN ?', $result->query);
+        $this->assertSame([1, 'one', 2, 'two', 3, 'three'], $result->bindings);
     }
 
     public function testCaseExpressionWithoutElseClause(): void
     {
         $case = (new CaseExpression())
-            ->when('x > ?', '1', [10])
-            ->when('x < ?', '0', [0])
+            ->when('x', '>', 10, 1)
+            ->when('x', '<', 0, 0);
+
+        $result = (new Builder())
+            ->from('t')
+            ->selectCase($case)
             ->build();
 
-        $this->assertStringNotContainsString('ELSE', $case->sql);
+        $this->assertStringNotContainsString('ELSE', $result->query);
     }
 
     public function testCaseExpressionWithoutAliasClause(): void
     {
         $case = (new CaseExpression())
-            ->when('x = 1', "'yes'")
+            ->whenRaw('x = 1', 'yes');
+
+        $result = (new Builder())
+            ->from('t')
+            ->selectCase($case)
             ->build();
 
-        $this->assertStringNotContainsString(' AS ', $case->sql);
+        $this->assertStringNotContainsString('END AS', $result->query);
     }
 
     public function testSetCaseInUpdate(): void
     {
         $case = (new CaseExpression())
-            ->when('age >= ?', '?', [18], ['adult'])
-            ->elseResult('?', ['minor'])
-            ->build();
+            ->when('age', '>=', 18, 'adult')
+            ->else('minor');
 
         $result = (new Builder())
             ->from('users')
@@ -7979,7 +8007,10 @@ class MySQLTest extends TestCase
     {
         $this->expectException(ValidationException::class);
 
-        (new CaseExpression())->build();
+        (new Builder())
+            ->from('t')
+            ->selectCase(new CaseExpression())
+            ->build();
     }
 
     public function testMultipleCTEsWithTwoSources(): void
@@ -9780,50 +9811,65 @@ class MySQLTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('at least one WHEN');
 
-        $case = new CaseExpression();
-        $case->build();
+        (new Builder())
+            ->from('t')
+            ->selectCase(new CaseExpression())
+            ->build();
     }
 
     public function testCaseBuilderMultipleWhens(): void
     {
         $case = (new CaseExpression())
-            ->when('`status` = ?', '?', ['active'], ['Active'])
-            ->when('`status` = ?', '?', ['inactive'], ['Inactive'])
-            ->elseResult('?', ['Unknown'])
-            ->alias('`label`')
+            ->when('status', '=', 'active', 'Active')
+            ->when('status', '=', 'inactive', 'Inactive')
+            ->else('Unknown')
+            ->alias('label');
+
+        $result = (new Builder())
+            ->from('t')
+            ->selectCase($case)
             ->build();
 
-        $this->assertEquals(
+        $this->assertStringContainsString(
             'CASE WHEN `status` = ? THEN ? WHEN `status` = ? THEN ? ELSE ? END AS `label`',
-            $case->sql
+            $result->query
         );
-        $this->assertEquals(['active', 'Active', 'inactive', 'Inactive', 'Unknown'], $case->bindings);
+        $this->assertSame(['active', 'Active', 'inactive', 'Inactive', 'Unknown'], $result->bindings);
     }
 
     public function testCaseBuilderWithoutElseClause(): void
     {
         $case = (new CaseExpression())
-            ->when('`x` > ?', '1', [10])
+            ->when('x', '>', 10, 1);
+
+        $result = (new Builder())
+            ->from('t')
+            ->selectCase($case)
             ->build();
 
-        $this->assertEquals('CASE WHEN `x` > ? THEN 1 END', $case->sql);
-        $this->assertEquals([10], $case->bindings);
+        $this->assertStringContainsString('CASE WHEN `x` > ? THEN ? END', $result->query);
+        $this->assertSame([10, 1], $result->bindings);
     }
 
     public function testCaseBuilderWithoutAliasClause(): void
     {
         $case = (new CaseExpression())
-            ->when('1=1', '?', [], ['yes'])
+            ->whenRaw('1=1', 'yes');
+
+        $result = (new Builder())
+            ->from('t')
+            ->selectCase($case)
             ->build();
 
-        $this->assertStringNotContainsString(' AS ', $case->sql);
+        $this->assertStringNotContainsString('END AS', $result->query);
     }
 
-    public function testCaseExpressionToSqlOutput(): void
+    public function testCaseExpressionRejectsUnknownOperator(): void
     {
-        $expr = new CaseResult('CASE WHEN 1 THEN 2 END', []);
-        $this->assertEquals('CASE WHEN 1 THEN 2 END', $expr->sql);
-        $this->assertEquals([], $expr->bindings);
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Unsupported CASE WHEN operator');
+
+        (new CaseExpression())->when('x', 'REGEXP', 'y', 'z');
     }
 
     // JoinBuilder — unit-level tests
@@ -10561,11 +10607,10 @@ class MySQLTest extends TestCase
     public function testExactCaseInSelect(): void
     {
         $case = (new CaseExpression())
-            ->when('status = ?', '?', ['active'], ['Active'])
-            ->when('status = ?', '?', ['inactive'], ['Inactive'])
-            ->elseResult('?', ['Unknown'])
-            ->alias('status_label')
-            ->build();
+            ->when('status', '=', 'active', 'Active')
+            ->when('status', '=', 'inactive', 'Inactive')
+            ->else('Unknown')
+            ->alias('status_label');
 
         $result = (new Builder())
             ->from('users')
@@ -10575,10 +10620,10 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertSame(
-            'SELECT `id`, `name`, CASE WHEN status = ? THEN ? WHEN status = ? THEN ? ELSE ? END AS status_label FROM `users`',
+            'SELECT `id`, `name`, CASE WHEN `status` = ? THEN ? WHEN `status` = ? THEN ? ELSE ? END AS `status_label` FROM `users`',
             $result->query
         );
-        $this->assertEquals(['active', 'Active', 'inactive', 'Inactive', 'Unknown'], $result->bindings);
+        $this->assertSame(['active', 'Active', 'inactive', 'Inactive', 'Unknown'], $result->bindings);
     }
 
     public function testExactAggregationGroupByHaving(): void
@@ -11173,10 +11218,9 @@ class MySQLTest extends TestCase
     public function testExactAdvancedSetCaseInUpdate(): void
     {
         $case = (new CaseExpression())
-            ->when('`category` = ?', '`price` * ?', ['electronics'], [1.2])
-            ->when('`category` = ?', '`price` * ?', ['clothing'], [0.8])
-            ->elseResult('`price`')
-            ->build();
+            ->when('category', '=', 'electronics', 1.2)
+            ->when('category', '=', 'clothing', 0.8)
+            ->else(1.0);
 
         $result = (new Builder())
             ->from('products')
@@ -11186,10 +11230,10 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertSame(
-            'UPDATE `products` SET `price` = CASE WHEN `category` = ? THEN `price` * ? WHEN `category` = ? THEN `price` * ? ELSE `price` END WHERE `stock` > ?',
+            'UPDATE `products` SET `price` = CASE WHEN `category` = ? THEN ? WHEN `category` = ? THEN ? ELSE ? END WHERE `stock` > ?',
             $result->query
         );
-        $this->assertEquals(['electronics', 1.2, 'clothing', 0.8, 0], $result->bindings);
+        $this->assertSame(['electronics', 1.2, 'clothing', 0.8, 1.0, 0], $result->bindings);
     }
 
     public function testExactAdvancedEmptyFilterArray(): void
@@ -13208,11 +13252,10 @@ class MySQLTest extends TestCase
     public function testCaseExpressionInSelectWithWhereAndOrderBy(): void
     {
         $case = (new CaseExpression())
-            ->when('`status` = ?', '?', ['active'], ['Active'])
-            ->when('`status` = ?', '?', ['inactive'], ['Inactive'])
-            ->elseResult('?', ['Unknown'])
-            ->alias('`status_label`')
-            ->build();
+            ->when('status', '=', 'active', 'Active')
+            ->when('status', '=', 'inactive', 'Inactive')
+            ->else('Unknown')
+            ->alias('status_label');
 
         $result = (new Builder())
             ->from('users')
@@ -13226,18 +13269,17 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('CASE WHEN `status` = ? THEN ? WHEN `status` = ? THEN ? ELSE ? END AS `status_label`', $result->query);
         $this->assertStringContainsString('WHERE `status` IS NOT NULL', $result->query);
         $this->assertStringContainsString('ORDER BY `name` ASC', $result->query);
-        $this->assertEquals(['active', 'Active', 'inactive', 'Inactive', 'Unknown'], $result->bindings);
+        $this->assertSame(['active', 'Active', 'inactive', 'Inactive', 'Unknown'], $result->bindings);
     }
 
     public function testCaseExpressionWithMultipleWhensAndAggregate(): void
     {
         $case = (new CaseExpression())
-            ->when('`score` >= ?', '?', [90], ['A'])
-            ->when('`score` >= ?', '?', [80], ['B'])
-            ->when('`score` >= ?', '?', [70], ['C'])
-            ->elseResult('?', ['F'])
-            ->alias('`grade`')
-            ->build();
+            ->when('score', '>=', 90, 'A')
+            ->when('score', '>=', 80, 'B')
+            ->when('score', '>=', 70, 'C')
+            ->else('F')
+            ->alias('grade');
 
         $result = (new Builder())
             ->from('students')
@@ -13250,7 +13292,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('CASE WHEN', $result->query);
         $this->assertStringContainsString('COUNT(*) AS `student_count`', $result->query);
         $this->assertStringContainsString('GROUP BY', $result->query);
-        $this->assertEquals([90, 'A', 80, 'B', 70, 'C', 'F'], $result->bindings);
+        $this->assertSame([90, 'A', 80, 'B', 70, 'C', 'F'], $result->bindings);
     }
 
     public function testLateralJoinWithWhereAndOrder(): void
@@ -14354,10 +14396,9 @@ class MySQLTest extends TestCase
     public function testUpdateWithCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('`priority` = ?', '?', ['high'], [1])
-            ->when('`priority` = ?', '?', ['medium'], [2])
-            ->elseResult('?', [3])
-            ->build();
+            ->when('priority', '=', 'high', 1)
+            ->when('priority', '=', 'medium', 2)
+            ->else(3);
 
         $result = (new Builder())
             ->from('tasks')
@@ -14368,7 +14409,7 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('SET `sort_order` = CASE WHEN `priority` = ? THEN ? WHEN `priority` = ? THEN ? ELSE ? END', $result->query);
         $this->assertStringContainsString('WHERE `priority` IS NOT NULL', $result->query);
-        $this->assertEquals(['high', 1, 'medium', 2, 3], $result->bindings);
+        $this->assertSame(['high', 1, 'medium', 2, 3], $result->bindings);
     }
 
     public function testLeftLateralJoinWithFilters(): void

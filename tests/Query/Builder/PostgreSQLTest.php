@@ -687,10 +687,9 @@ class PostgreSQLTest extends TestCase
     public function testSelectCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('status = ?', '?', ['active'], ['Active'])
-            ->elseResult('?', ['Other'])
-            ->alias('label')
-            ->build();
+            ->when('status', '=', 'active', 'Active')
+            ->else('Other')
+            ->alias('label');
 
         $result = (new Builder())
             ->from('users')
@@ -699,8 +698,8 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CASE WHEN status = ? THEN ? ELSE ? END AS label', $result->query);
-        $this->assertEquals(['active', 'Active', 'Other'], $result->bindings);
+        $this->assertStringContainsString('CASE WHEN "status" = ? THEN ? ELSE ? END AS "label"', $result->query);
+        $this->assertSame(['active', 'Active', 'Other'], $result->bindings);
     }
     //  Does NOT implement Hints
 
@@ -1294,11 +1293,10 @@ class PostgreSQLTest extends TestCase
     public function testCaseMultipleWhens(): void
     {
         $case = (new CaseExpression())
-            ->when('status = ?', '?', ['active'], ['Active'])
-            ->when('status = ?', '?', ['pending'], ['Pending'])
-            ->when('status = ?', '?', ['closed'], ['Closed'])
-            ->alias('label')
-            ->build();
+            ->when('status', '=', 'active', 'Active')
+            ->when('status', '=', 'pending', 'Pending')
+            ->when('status', '=', 'closed', 'Closed')
+            ->alias('label');
 
         $result = (new Builder())
             ->from('tickets')
@@ -1306,16 +1304,15 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WHEN status = ? THEN ?', $result->query);
-        $this->assertEquals(['active', 'Active', 'pending', 'Pending', 'closed', 'Closed'], $result->bindings);
+        $this->assertStringContainsString('WHEN "status" = ? THEN ?', $result->query);
+        $this->assertSame(['active', 'Active', 'pending', 'Pending', 'closed', 'Closed'], $result->bindings);
     }
 
     public function testCaseWithoutElse(): void
     {
         $case = (new CaseExpression())
-            ->when('active = ?', '?', [1], ['Yes'])
-            ->alias('lbl')
-            ->build();
+            ->when('active', '=', 1, 'Yes')
+            ->alias('lbl');
 
         $result = (new Builder())
             ->from('users')
@@ -1323,16 +1320,15 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CASE WHEN active = ? THEN ? END AS lbl', $result->query);
+        $this->assertStringContainsString('CASE WHEN "active" = ? THEN ? END AS "lbl"', $result->query);
         $this->assertStringNotContainsString('ELSE', $result->query);
     }
 
     public function testSetCaseInUpdate(): void
     {
         $case = (new CaseExpression())
-            ->when('age >= ?', '?', [18], ['adult'])
-            ->elseResult('?', ['minor'])
-            ->build();
+            ->when('age', '>=', 18, 'adult')
+            ->else('minor');
 
         $result = (new Builder())
             ->from('users')
@@ -1342,8 +1338,8 @@ class PostgreSQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('UPDATE "users" SET', $result->query);
-        $this->assertStringContainsString('CASE WHEN age >= ? THEN ? ELSE ? END', $result->query);
-        $this->assertEquals([18, 'adult', 'minor', 1], $result->bindings);
+        $this->assertStringContainsString('CASE WHEN "age" >= ? THEN ? ELSE ? END', $result->query);
+        $this->assertSame([18, 'adult', 'minor', 1], $result->bindings);
     }
 
     public function testToRawSqlWithStrings(): void
@@ -6197,11 +6193,10 @@ class PostgreSQLTest extends TestCase
     public function testCaseExpressionWithBindingsInSelect(): void
     {
         $case = (new CaseExpression())
-            ->when('price > ?', '?', [100], ['expensive'])
-            ->when('price > ?', '?', [50], ['moderate'])
-            ->elseResult('?', ['cheap'])
-            ->alias('price_tier')
-            ->build();
+            ->when('price', '>', 100, 'expensive')
+            ->when('price', '>', 50, 'moderate')
+            ->else('cheap')
+            ->alias('price_tier');
 
         $result = (new Builder())
             ->from('products')
@@ -6210,8 +6205,8 @@ class PostgreSQLTest extends TestCase
             ->filter([Query::equal('active', [true])])
             ->build();
 
-        $this->assertStringContainsString('CASE WHEN price > ? THEN ? WHEN price > ? THEN ? ELSE ? END AS price_tier', $result->query);
-        $this->assertEquals([100, 'expensive', 50, 'moderate', 'cheap', true], $result->bindings);
+        $this->assertStringContainsString('CASE WHEN "price" > ? THEN ? WHEN "price" > ? THEN ? ELSE ? END AS "price_tier"', $result->query);
+        $this->assertSame([100, 'expensive', 50, 'moderate', 'cheap', true], $result->bindings);
         $this->assertBindingCount($result);
     }
 

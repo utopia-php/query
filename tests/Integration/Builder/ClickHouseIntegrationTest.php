@@ -405,11 +405,10 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
     public function testSelectWithCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('`age` < ?', "'young'", [30])
-            ->when('`age` < ?', "'mid'", [35])
-            ->elseResult("'senior'")
-            ->alias('`bucket`')
-            ->build();
+            ->when('age', '<', 30, 'young')
+            ->when('age', '<', 35, 'mid')
+            ->else('senior')
+            ->alias('bucket');
 
         $result = (new Builder())
             ->from('ch_users')

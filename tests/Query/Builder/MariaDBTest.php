@@ -4,6 +4,7 @@ namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
+use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\Hints;
 use Utopia\Query\Builder\Feature\Json;
@@ -963,12 +964,11 @@ class MariaDBTest extends TestCase
 
     public function testCaseExpressionWithAggregate(): void
     {
-        $case = (new \Utopia\Query\Builder\Case\Expression())
-            ->when('status = ?', "'active'", ['active'])
-            ->when('status = ?', "'inactive'", ['inactive'])
-            ->elseResult("'other'")
-            ->alias('`label`')
-            ->build();
+        $case = (new CaseExpression())
+            ->when('status', '=', 'active', 'active')
+            ->when('status', '=', 'inactive', 'inactive')
+            ->else('other')
+            ->alias('label');
 
         $result = (new Builder())
             ->from('users')
