@@ -12,6 +12,7 @@ use Utopia\Query\Builder\SQLite as Builder;
 use Utopia\Query\Compiler;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
+use Utopia\Query\Method;
 use Utopia\Query\Query;
 
 class SQLiteTest extends TestCase
@@ -1379,8 +1380,8 @@ class SQLiteTest extends TestCase
     public function testCaseExpressionWithWhere(): void
     {
         $case = (new CaseExpression())
-            ->when('status', '=', 'active', 'Active')
-            ->when('status', '=', 'inactive', 'Inactive')
+            ->when('status', Method::Equal, 'active', 'Active')
+            ->when('status', Method::Equal, 'inactive', 'Inactive')
             ->else('Unknown')
             ->alias('label');
 

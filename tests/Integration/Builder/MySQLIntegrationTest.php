@@ -5,6 +5,7 @@ namespace Tests\Integration\Builder;
 use Tests\Integration\IntegrationTestCase;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\MySQL as Builder;
+use Utopia\Query\Method;
 use Utopia\Query\Query;
 
 class MySQLIntegrationTest extends IntegrationTestCase
@@ -285,7 +286,7 @@ class MySQLIntegrationTest extends IntegrationTestCase
     public function testSelectWithCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('age', '<', 25, 'young')
+            ->when('age', Method::LessThan, 25, 'young')
             ->whenRaw('`age` BETWEEN 25 AND 30', 'mid')
             ->else('senior')
             ->alias('age_group');

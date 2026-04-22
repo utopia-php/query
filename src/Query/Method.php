@@ -239,6 +239,36 @@ enum Method: string
         };
     }
 
+    public function isComparison(): bool
+    {
+        return match ($this) {
+            self::Equal,
+            self::NotEqual,
+            self::LessThan,
+            self::LessThanEqual,
+            self::GreaterThan,
+            self::GreaterThanEqual => true,
+            default => false,
+        };
+    }
+
+    /**
+     * Return the SQL operator symbol for comparison methods,
+     * or null if this method has no direct SQL-operator mapping.
+     */
+    public function sqlOperator(): ?string
+    {
+        return match ($this) {
+            self::Equal => '=',
+            self::NotEqual => '!=',
+            self::LessThan => '<',
+            self::LessThanEqual => '<=',
+            self::GreaterThan => '>',
+            self::GreaterThanEqual => '>=',
+            default => null,
+        };
+    }
+
     /**
      * Return the standard SQL function name for aggregation methods,
      * or null if this method has no direct SQL-function mapping.

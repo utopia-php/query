@@ -13,6 +13,7 @@ use Utopia\Query\Builder\MariaDB as Builder;
 use Utopia\Query\Builder\Plan;
 use Utopia\Query\Compiler;
 use Utopia\Query\Exception\ValidationException;
+use Utopia\Query\Method;
 use Utopia\Query\Query;
 
 class MariaDBTest extends TestCase
@@ -965,8 +966,8 @@ class MariaDBTest extends TestCase
     public function testCaseExpressionWithAggregate(): void
     {
         $case = (new CaseExpression())
-            ->when('status', '=', 'active', 'active')
-            ->when('status', '=', 'inactive', 'inactive')
+            ->when('status', Method::Equal, 'active', 'active')
+            ->when('status', Method::Equal, 'inactive', 'inactive')
             ->else('other')
             ->alias('label');
 

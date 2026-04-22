@@ -50,6 +50,7 @@ use Utopia\Query\Hook\Filter;
 use Utopia\Query\Hook\Join\Condition as JoinCondition;
 use Utopia\Query\Hook\Join\Filter as JoinFilter;
 use Utopia\Query\Hook\Join\Placement;
+use Utopia\Query\Method;
 use Utopia\Query\Query;
 
 class ClickHouseTest extends TestCase
@@ -6407,7 +6408,7 @@ class ClickHouseTest extends TestCase
     public function testSelectCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('status', '=', 'active', 'Active')
+            ->when('status', Method::Equal, 'active', 'Active')
             ->else('Unknown')
             ->alias('label');
 
@@ -6424,7 +6425,7 @@ class ClickHouseTest extends TestCase
     public function testSetCaseInUpdate(): void
     {
         $case = (new CaseExpression())
-            ->when('role', '=', 'admin', 'Admin')
+            ->when('role', Method::Equal, 'admin', 'Admin')
             ->else('User');
 
         $result = (new Builder())
@@ -7742,8 +7743,8 @@ class ClickHouseTest extends TestCase
     public function testExactCaseInSelect(): void
     {
         $case = (new CaseExpression())
-            ->when('status', '=', 'active', 'Active')
-            ->when('status', '=', 'inactive', 'Inactive')
+            ->when('status', Method::Equal, 'active', 'Active')
+            ->when('status', Method::Equal, 'inactive', 'Inactive')
             ->else('Unknown')
             ->alias('status_label');
 
@@ -8892,8 +8893,8 @@ class ClickHouseTest extends TestCase
     public function testCaseExpressionWithAggregate(): void
     {
         $case = (new CaseExpression())
-            ->when('status', '=', 'active', 'active')
-            ->when('status', '=', 'inactive', 'inactive')
+            ->when('status', Method::Equal, 'active', 'active')
+            ->when('status', Method::Equal, 'inactive', 'inactive')
             ->else('unknown')
             ->alias('status_label');
 

@@ -3,6 +3,7 @@
 namespace Utopia\Query\Builder\Case;
 
 use Utopia\Query\Exception\ValidationException;
+use Utopia\Query\Method;
 
 final class Expression
 {
@@ -18,24 +19,24 @@ final class Expression
     /**
      * Add a WHEN <column> <operator> <value> THEN <then> clause.
      *
-     * The column is quoted as an identifier per dialect. The operator must be one
-     * of =, !=, <>, <, >, <=, >=, LIKE, NOT LIKE, IS, IS NOT. $value and $then are
-     * bound as parameters.
+     * The column is quoted as an identifier per dialect. The operator must be a
+     * comparison Method (see Method::isComparison()): Method::Equal, Method::NotEqual,
+     * Method::LessThan, Method::LessThanEqual, Method::GreaterThan, Method::GreaterThanEqual.
+     * $value and $then are bound as parameters.
      */
-    public function when(string $column, string $operator, mixed $value, mixed $then): static
+    public function when(string $column, Method $operator, mixed $value, mixed $then): static
     {
-        $normalized = \strtoupper(\trim($operator));
-
-        if (! \in_array($normalized, self::OPERATORS, true)) {
+        if (! $operator->isComparison()) {
             throw new ValidationException(
-                'Unsupported CASE WHEN operator: ' . $operator . '. Supported operators are: ' . \implode(', ', self::OPERATORS)
+                'Unsupported CASE WHEN operator: ' . $operator->value
+                . '. Supported methods are: Method::Equal, Method::NotEqual, Method::LessThan, Method::LessThanEqual, Method::GreaterThan, Method::GreaterThanEqual'
             );
         }
 
         $this->whens[] = new WhenClause(
             kind: Kind::Comparison,
             column: $column,
-            operator: $normalized,
+            operator: $operator,
             value: $value,
             then: $then,
         );
@@ -162,21 +163,4 @@ final class Expression
     {
         return $this->alias;
     }
-
-    /**
-     * Allowlist of comparison operators accepted by when().
-     */
-    public const array OPERATORS = [
-        '=',
-        '!=',
-        '<>',
-        '<',
-        '>',
-        '<=',
-        '>=',
-        'LIKE',
-        'NOT LIKE',
-        'IS',
-        'IS NOT',
-    ];
 }

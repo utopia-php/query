@@ -30,6 +30,7 @@ use Utopia\Query\Builder\Plan;
 use Utopia\Query\Compiler;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
+use Utopia\Query\Method;
 use Utopia\Query\Query;
 
 class MongoDBTest extends TestCase
@@ -1862,7 +1863,7 @@ class MongoDBTest extends TestCase
             ->setCase(
                 'status',
                 (new CaseExpression())
-                    ->when('age', '>', 18, 'adult')
+                    ->when('age', Method::GreaterThan, 18, 'adult')
                     ->else('minor')
             )
             ->update();

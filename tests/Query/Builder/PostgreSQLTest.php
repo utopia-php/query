@@ -687,7 +687,7 @@ class PostgreSQLTest extends TestCase
     public function testSelectCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('status', '=', 'active', 'Active')
+            ->when('status', Method::Equal, 'active', 'Active')
             ->else('Other')
             ->alias('label');
 
@@ -1293,9 +1293,9 @@ class PostgreSQLTest extends TestCase
     public function testCaseMultipleWhens(): void
     {
         $case = (new CaseExpression())
-            ->when('status', '=', 'active', 'Active')
-            ->when('status', '=', 'pending', 'Pending')
-            ->when('status', '=', 'closed', 'Closed')
+            ->when('status', Method::Equal, 'active', 'Active')
+            ->when('status', Method::Equal, 'pending', 'Pending')
+            ->when('status', Method::Equal, 'closed', 'Closed')
             ->alias('label');
 
         $result = (new Builder())
@@ -1311,7 +1311,7 @@ class PostgreSQLTest extends TestCase
     public function testCaseWithoutElse(): void
     {
         $case = (new CaseExpression())
-            ->when('active', '=', 1, 'Yes')
+            ->when('active', Method::Equal, 1, 'Yes')
             ->alias('lbl');
 
         $result = (new Builder())
@@ -1327,7 +1327,7 @@ class PostgreSQLTest extends TestCase
     public function testSetCaseInUpdate(): void
     {
         $case = (new CaseExpression())
-            ->when('age', '>=', 18, 'adult')
+            ->when('age', Method::GreaterThanEqual, 18, 'adult')
             ->else('minor');
 
         $result = (new Builder())
@@ -6193,8 +6193,8 @@ class PostgreSQLTest extends TestCase
     public function testCaseExpressionWithBindingsInSelect(): void
     {
         $case = (new CaseExpression())
-            ->when('price', '>', 100, 'expensive')
-            ->when('price', '>', 50, 'moderate')
+            ->when('price', Method::GreaterThan, 100, 'expensive')
+            ->when('price', Method::GreaterThan, 50, 'moderate')
             ->else('cheap')
             ->alias('price_tier');
 

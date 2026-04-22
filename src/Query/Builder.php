@@ -973,15 +973,17 @@ abstract class Builder implements
                     throw new ValidationException('Comparison WHEN clause requires column and operator.');
                 }
 
-                if (! \in_array($when->operator, self::COMPARISON_OPERATORS, true)) {
+                $sqlOperator = $when->operator->sqlOperator();
+
+                if ($sqlOperator === null) {
                     throw new ValidationException(
-                        'Unsupported CASE WHEN operator: ' . $when->operator
+                        'Unsupported CASE WHEN operator: ' . $when->operator->value
                     );
                 }
 
                 $this->addBinding($when->value);
 
-                return $this->quote($when->column) . ' ' . $when->operator . ' ?';
+                return $this->quote($when->column) . ' ' . $sqlOperator . ' ?';
 
             case CaseKind::Null:
                 if ($when->column === null) {
@@ -1026,23 +1028,6 @@ abstract class Builder implements
                 return $when->rawCondition;
         }
     }
-
-    /**
-     * Comparison operators accepted by CaseExpression::when().
-     */
-    public const array COMPARISON_OPERATORS = [
-        '=',
-        '!=',
-        '<>',
-        '<',
-        '>',
-        '<=',
-        '>=',
-        'LIKE',
-        'NOT LIKE',
-        'IS',
-        'IS NOT',
-    ];
 
     #[\Override]
     public function when(bool $condition, Closure $callback): static
