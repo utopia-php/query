@@ -485,11 +485,10 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
      */
     protected function compileSpatialDistance(Method $method, string $attribute, array $values): string
     {
-        /** @var array{0: string|array<mixed>, 1: float, 2: bool} $data */
-        $data = $values[0];
-        $wkt = \is_array($data[0]) ? $this->geometryToWkt($data[0]) : $data[0];
-        $distance = $data[1];
-        $meters = $data[2];
+        /** @var array{0: string|array<mixed>, 1: float, 2: bool} $tuple */
+        $tuple = $values[0];
+        $filter = SpatialDistanceFilter::fromTuple($tuple);
+        $wkt = \is_array($filter->geometry) ? $this->geometryToWkt($filter->geometry) : $filter->geometry;
 
         $operator = match ($method) {
             Method::DistanceLessThan => '<',
@@ -500,9 +499,9 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         };
 
         $this->addBinding($wkt);
-        $this->addBinding($distance);
+        $this->addBinding($filter->distance);
 
-        if ($meters) {
+        if ($filter->meters) {
             return 'ST_Distance(ST_SRID(' . $attribute . ', 4326), ' . $this->geomFromText(4326) . ', \'metre\') ' . $operator . ' ?';
         }
 

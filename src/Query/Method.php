@@ -238,4 +238,30 @@ enum Method: string
             default => false,
         };
     }
+
+    /**
+     * Return the standard SQL function name for aggregation methods,
+     * or null if this method has no direct SQL-function mapping.
+     */
+    public function sqlFunction(): ?string
+    {
+        return match ($this) {
+            self::Sum => 'SUM',
+            self::Count => 'COUNT',
+            self::CountDistinct => 'COUNT',
+            self::Avg => 'AVG',
+            self::Min => 'MIN',
+            self::Max => 'MAX',
+            self::Stddev => 'STDDEV',
+            self::StddevPop => 'STDDEV_POP',
+            self::StddevSamp => 'STDDEV_SAMP',
+            self::Variance => 'VARIANCE',
+            self::VarPop => 'VAR_POP',
+            self::VarSamp => 'VAR_SAMP',
+            self::BitAnd => 'BIT_AND',
+            self::BitOr => 'BIT_OR',
+            self::BitXor => 'BIT_XOR',
+            default => null,
+        };
+    }
 }

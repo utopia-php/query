@@ -13,12 +13,12 @@ class MariaDB extends MySQL
     {
         if (\in_array($method, [Method::DistanceLessThan, Method::DistanceGreaterThan, Method::DistanceEqual, Method::DistanceNotEqual], true)) {
             $values = $query->getValues();
-            /** @var array{0: string|array<mixed>, 1: float, 2: bool} $data */
-            $data = $values[0];
-            $meters = $data[2];
+            /** @var array{0: string|array<mixed>, 1: float, 2: bool} $tuple */
+            $tuple = $values[0];
+            $filter = SpatialDistanceFilter::fromTuple($tuple);
 
-            if ($meters && $query->getAttributeType() !== '') {
-                $wkt = \is_array($data[0]) ? $this->geometryToWkt($data[0]) : $data[0];
+            if ($filter->meters && $query->getAttributeType() !== '') {
+                $wkt = \is_array($filter->geometry) ? $this->geometryToWkt($filter->geometry) : $filter->geometry;
                 $pos = \strpos($wkt, '(');
                 $wktType = $pos !== false ? \strtolower(\trim(\substr($wkt, 0, $pos))) : '';
                 $attrType = \strtolower($query->getAttributeType());
@@ -39,11 +39,10 @@ class MariaDB extends MySQL
 
     protected function compileSpatialDistance(Method $method, string $attribute, array $values): string
     {
-        /** @var array{0: string|array<mixed>, 1: float, 2: bool} $data */
-        $data = $values[0];
-        $wkt = \is_array($data[0]) ? $this->geometryToWkt($data[0]) : $data[0];
-        $distance = $data[1];
-        $meters = $data[2];
+        /** @var array{0: string|array<mixed>, 1: float, 2: bool} $tuple */
+        $tuple = $values[0];
+        $filter = SpatialDistanceFilter::fromTuple($tuple);
+        $wkt = \is_array($filter->geometry) ? $this->geometryToWkt($filter->geometry) : $filter->geometry;
 
         $operator = match ($method) {
             Method::DistanceLessThan => '<',
@@ -53,15 +52,12 @@ class MariaDB extends MySQL
             default => '<',
         };
 
-        if ($meters) {
-            $this->addBinding($wkt);
-            $this->addBinding($distance);
+        $this->addBinding($wkt);
+        $this->addBinding($filter->distance);
 
+        if ($filter->meters) {
             return 'ST_DISTANCE_SPHERE(' . $attribute . ', ST_GeomFromText(?, 4326)) ' . $operator . ' ?';
         }
-
-        $this->addBinding($wkt);
-        $this->addBinding($distance);
 
         return 'ST_Distance(' . $attribute . ', ST_GeomFromText(?, 4326)) ' . $operator . ' ?';
     }
