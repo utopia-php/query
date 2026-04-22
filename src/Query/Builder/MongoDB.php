@@ -77,11 +77,13 @@ class MongoDB extends BaseBuilder implements
     /** @var string|array<string, int>|null */
     protected string|array|null $indexHint = null;
 
+    #[\Override]
     protected function quote(string $identifier): string
     {
         return $identifier;
     }
 
+    #[\Override]
     protected function compileRandom(): string
     {
         return '$rand';
@@ -90,6 +92,7 @@ class MongoDB extends BaseBuilder implements
     /**
      * @param array<mixed> $values
      */
+    #[\Override]
     protected function compileRegex(string $attribute, array $values): string
     {
         $this->addBinding($values[0]);
@@ -109,6 +112,7 @@ class MongoDB extends BaseBuilder implements
         $this->updateOperations[$operator->value][$field] = $payload;
     }
 
+    #[\Override]
     public function set(array $row): static
     {
         foreach (\array_keys($row) as $field) {
@@ -160,6 +164,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function filterSearch(string $attribute, string $value): static
     {
         $this->textSearchTerm = $value;
@@ -167,11 +172,13 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function filterNotSearch(string $attribute, string $value): static
     {
         throw new UnsupportedException('MongoDB does not support negated full-text search.');
     }
 
+    #[\Override]
     public function tablesample(float $percent, string $method = 'BERNOULLI'): static
     {
         $this->sampleSize = $percent;
@@ -179,6 +186,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function rename(string $oldField, string $newField): static
     {
         $this->validateFieldName($oldField);
@@ -188,6 +196,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function multiply(string $field, int|float $factor): static
     {
         $this->validateFieldName($field);
@@ -196,6 +205,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function popFirst(string $field): static
     {
         $this->validateFieldName($field);
@@ -204,6 +214,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function popLast(string $field): static
     {
         $this->validateFieldName($field);
@@ -212,6 +223,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function pullAll(string $field, array $values): static
     {
         $this->validateFieldName($field);
@@ -220,6 +232,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function updateMin(string $field, mixed $value): static
     {
         $this->validateFieldName($field);
@@ -228,6 +241,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function updateMax(string $field, mixed $value): static
     {
         $this->validateFieldName($field);
@@ -236,6 +250,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function currentDate(string $field, string $type = 'date'): static
     {
         $this->validateFieldName($field);
@@ -244,6 +259,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function pushEach(string $field, array $values, ?int $position = null, ?int $slice = null, ?array $sort = null): static
     {
         $this->validateFieldName($field);
@@ -264,6 +280,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function arrayFilter(string $identifier, array $condition): static
     {
         $this->arrayFilters[] = [$identifier => $condition];
@@ -271,6 +288,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function bucket(string $groupBy, array $boundaries, ?string $defaultBucket = null, array $output = []): static
     {
         $stage = [
@@ -288,6 +306,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function bucketAuto(string $groupBy, int $buckets, array $output = []): static
     {
         $stage = [
@@ -302,6 +321,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function facet(array $facets): static
     {
         $this->facetStages = [];
@@ -321,6 +341,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function graphLookup(string $from, string $startWith, string $connectFromField, string $connectToField, string $as, ?int $maxDepth = null, ?string $depthField = null): static
     {
         $stage = [
@@ -341,6 +362,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function mergeIntoCollection(string $collection, ?array $on = null, ?array $whenMatched = null, ?array $whenNotMatched = null): static
     {
         $stage = ['into' => $collection];
@@ -358,6 +380,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function outputToCollection(string $collection, ?string $database = null): static
     {
         if ($database !== null) {
@@ -369,6 +392,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function replaceRoot(string $newRootExpression): static
     {
         $this->replaceRootExpr = $newRootExpression;
@@ -376,6 +400,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function search(array $searchDefinition, ?string $index = null): static
     {
         $stage = $searchDefinition;
@@ -387,6 +412,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function searchMeta(array $searchDefinition, ?string $index = null): static
     {
         $stage = $searchDefinition;
@@ -398,6 +424,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function vectorSearch(string $path, array $queryVector, int $numCandidates, int $limit, ?string $index = null, ?array $filter = null): static
     {
         $stage = [
@@ -427,6 +454,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function reset(): static
     {
         parent::reset();
@@ -449,6 +477,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    #[\Override]
     public function build(): Plan
     {
         $this->bindings = [];
@@ -474,6 +503,7 @@ class MongoDB extends BaseBuilder implements
         return $result;
     }
 
+    #[\Override]
     public function insert(): Plan
     {
         $this->bindings = [];
@@ -503,6 +533,7 @@ class MongoDB extends BaseBuilder implements
         );
     }
 
+    #[\Override]
     public function update(): Plan
     {
         $this->bindings = [];
@@ -542,6 +573,7 @@ class MongoDB extends BaseBuilder implements
         );
     }
 
+    #[\Override]
     public function delete(): Plan
     {
         $this->bindings = [];
@@ -563,6 +595,7 @@ class MongoDB extends BaseBuilder implements
         );
     }
 
+    #[\Override]
     public function upsert(): Plan
     {
         $this->bindings = [];
@@ -606,6 +639,7 @@ class MongoDB extends BaseBuilder implements
         );
     }
 
+    #[\Override]
     public function insertOrIgnore(): Plan
     {
         // Build the operation descriptor directly instead of round-tripping through
@@ -639,6 +673,7 @@ class MongoDB extends BaseBuilder implements
         );
     }
 
+    #[\Override]
     public function upsertSelect(): Plan
     {
         throw new UnsupportedException('upsertSelect() is not supported in MongoDB builder.');

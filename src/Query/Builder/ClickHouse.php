@@ -86,6 +86,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function hint(string $hint): static
     {
         if (!\preg_match('/^[A-Za-z0-9_=., ]+$/', $hint)) {
@@ -119,11 +120,13 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function tablesample(float $percent, string $method = 'BERNOULLI'): static
     {
         return $this->sample($percent / 100);
     }
 
+    #[\Override]
     public function countWhen(string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'countIf(' . $condition . ')';
@@ -134,6 +137,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function sumWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'sumIf(' . $this->resolveAndWrap($column) . ', ' . $condition . ')';
@@ -144,6 +148,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function avgWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'avgIf(' . $this->resolveAndWrap($column) . ', ' . $condition . ')';
@@ -154,6 +159,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function minWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'minIf(' . $this->resolveAndWrap($column) . ', ' . $condition . ')';
@@ -164,6 +170,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function maxWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'maxIf(' . $this->resolveAndWrap($column) . ', ' . $condition . ')';
@@ -174,6 +181,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function fullOuterJoin(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
     {
         $this->pendingQueries[] = Query::fullOuterJoin($table, $left, $right, $operator, $alias);
@@ -181,6 +189,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function groupConcat(string $column, string $separator = ',', string $alias = '', ?array $orderBy = null): static
     {
         $col = $this->resolveAndWrap($column);
@@ -192,6 +201,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr, [$separator]);
     }
 
+    #[\Override]
     public function jsonArrayAgg(string $column, string $alias = ''): static
     {
         $expr = 'toJSONString(groupArray(' . $this->resolveAndWrap($column) . '))';
@@ -202,6 +212,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function jsonObjectAgg(string $keyColumn, string $valueColumn, string $alias = ''): static
     {
         $expr = 'toJSONString(CAST((groupArray(' . $this->resolveAndWrap($keyColumn) . '), groupArray(' . $this->resolveAndWrap($valueColumn) . ')) AS Map(String, String)))';
@@ -212,6 +223,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function stddev(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::stddev($attribute, $alias);
@@ -219,6 +231,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function stddevPop(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::stddevPop($attribute, $alias);
@@ -226,6 +239,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function stddevSamp(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::stddevSamp($attribute, $alias);
@@ -233,6 +247,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function variance(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::variance($attribute, $alias);
@@ -240,6 +255,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function varPop(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::varPop($attribute, $alias);
@@ -247,6 +263,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function varSamp(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::varSamp($attribute, $alias);
@@ -254,6 +271,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function bitAnd(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::bitAnd($attribute, $alias);
@@ -261,6 +279,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function bitOr(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::bitOr($attribute, $alias);
@@ -268,6 +287,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function bitXor(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::bitXor($attribute, $alias);
@@ -275,6 +295,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function limitBy(int $count, array $columns): static
     {
         $this->limitByClause = ['count' => $count, 'columns' => $columns];
@@ -282,6 +303,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function arrayJoin(string $column, string $alias = ''): static
     {
         $this->arrayJoins[] = ['type' => 'ARRAY JOIN', 'column' => $column, 'alias' => $alias];
@@ -289,6 +311,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function leftArrayJoin(string $column, string $alias = ''): static
     {
         $this->arrayJoins[] = ['type' => 'LEFT ARRAY JOIN', 'column' => $column, 'alias' => $alias];
@@ -296,6 +319,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function asofJoin(string $table, string $left, string $right, string $alias = ''): static
     {
         $tableExpr = $this->quote($table);
@@ -308,6 +332,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function asofLeftJoin(string $table, string $left, string $right, string $alias = ''): static
     {
         $tableExpr = $this->quote($table);
@@ -320,6 +345,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function orderWithFill(string $column, string $direction = 'ASC', mixed $from = null, mixed $to = null, mixed $step = null): static
     {
         $expr = $this->resolveAndWrap($column) . ' ' . \strtoupper($direction) . ' WITH FILL';
@@ -343,6 +369,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function withTotals(): static
     {
         $this->groupByModifier = 'WITH TOTALS';
@@ -350,6 +377,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function withRollup(): static
     {
         $this->groupByModifier = 'WITH ROLLUP';
@@ -357,6 +385,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function withCube(): static
     {
         $this->groupByModifier = 'WITH CUBE';
@@ -364,6 +393,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     public function quantile(float $level, string $column, string $alias = ''): static
     {
         $expr = 'quantile(' . $level . ')(' . $this->resolveAndWrap($column) . ')';
@@ -374,6 +404,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function quantileExact(float $level, string $column, string $alias = ''): static
     {
         $expr = 'quantileExact(' . $level . ')(' . $this->resolveAndWrap($column) . ')';
@@ -384,6 +415,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function median(string $column, string $alias = ''): static
     {
         $expr = 'median(' . $this->resolveAndWrap($column) . ')';
@@ -394,6 +426,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function uniq(string $column, string $alias = ''): static
     {
         $expr = 'uniq(' . $this->resolveAndWrap($column) . ')';
@@ -404,6 +437,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function uniqExact(string $column, string $alias = ''): static
     {
         $expr = 'uniqExact(' . $this->resolveAndWrap($column) . ')';
@@ -414,6 +448,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function uniqCombined(string $column, string $alias = ''): static
     {
         $expr = 'uniqCombined(' . $this->resolveAndWrap($column) . ')';
@@ -424,6 +459,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function argMin(string $valueColumn, string $argColumn, string $alias = ''): static
     {
         $expr = 'argMin(' . $this->resolveAndWrap($valueColumn) . ', ' . $this->resolveAndWrap($argColumn) . ')';
@@ -434,6 +470,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function argMax(string $valueColumn, string $argColumn, string $alias = ''): static
     {
         $expr = 'argMax(' . $this->resolveAndWrap($valueColumn) . ', ' . $this->resolveAndWrap($argColumn) . ')';
@@ -444,6 +481,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function topK(int $k, string $column, string $alias = ''): static
     {
         $expr = 'topK(' . $k . ')(' . $this->resolveAndWrap($column) . ')';
@@ -454,6 +492,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function topKWeighted(int $k, string $column, string $weightColumn, string $alias = ''): static
     {
         $expr = 'topKWeighted(' . $k . ')(' . $this->resolveAndWrap($column) . ', ' . $this->resolveAndWrap($weightColumn) . ')';
@@ -464,6 +503,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function anyValue(string $column, string $alias = ''): static
     {
         $expr = 'any(' . $this->resolveAndWrap($column) . ')';
@@ -474,6 +514,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function anyLastValue(string $column, string $alias = ''): static
     {
         $expr = 'anyLast(' . $this->resolveAndWrap($column) . ')';
@@ -484,6 +525,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function groupUniqArray(string $column, string $alias = ''): static
     {
         $expr = 'groupUniqArray(' . $this->resolveAndWrap($column) . ')';
@@ -494,6 +536,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function groupArrayMovingAvg(string $column, string $alias = ''): static
     {
         $expr = 'groupArrayMovingAvg(' . $this->resolveAndWrap($column) . ')';
@@ -504,6 +547,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function groupArrayMovingSum(string $column, string $alias = ''): static
     {
         $expr = 'groupArrayMovingSum(' . $this->resolveAndWrap($column) . ')';
@@ -514,6 +558,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr);
     }
 
+    #[\Override]
     public function reset(): static
     {
         parent::reset();
@@ -529,6 +574,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    #[\Override]
     protected function compileRandom(): string
     {
         return 'rand()';
@@ -539,6 +585,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      *
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileRegex(string $attribute, array $values): string
     {
         $this->addBinding($values[0]);
@@ -551,6 +598,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      *
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileLike(string $attribute, array $values, string $prefix, string $suffix, bool $not): string
     {
         /** @var string $rawVal */
@@ -585,6 +633,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      *
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileContains(string $attribute, array $values): string
     {
         /** @var array<string> $values */
@@ -608,6 +657,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      *
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileContainsAll(string $attribute, array $values): string
     {
         /** @var array<string> $values */
@@ -625,6 +675,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      *
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileNotContains(string $attribute, array $values): string
     {
         /** @var array<string> $values */
@@ -643,6 +694,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return '(' . \implode(' AND ', $parts) . ')';
     }
 
+    #[\Override]
     public function update(): Plan
     {
         $this->bindings = [];
@@ -669,6 +721,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return new Plan($sql, $this->bindings, executor: $this->executor);
     }
 
+    #[\Override]
     public function delete(): Plan
     {
         $this->bindings = [];
@@ -692,11 +745,13 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      * ClickHouse does not support subqueries in JOIN ON conditions.
      * Force all join filter conditions to WHERE placement.
      */
+    #[\Override]
     protected function resolveJoinFilterPlacement(Placement $requested, bool $isCrossJoin): Placement
     {
         return Placement::Where;
     }
 
+    #[\Override]
     protected function buildTableClause(): string
     {
         $fromSub = $this->fromSubquery;
@@ -729,6 +784,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      * joins between the JOIN section and WHERE. These are structural
      * ClickHouse clauses that do not carry bindings.
      */
+    #[\Override]
     protected function buildAfterJoinsClause(GroupedQueries $grouped): string
     {
         $parts = [];
@@ -764,6 +820,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      * Emit the ClickHouse GROUP BY modifier (WITH TOTALS / WITH ROLLUP /
      * WITH CUBE) between GROUP BY and HAVING.
      */
+    #[\Override]
     protected function buildAfterGroupByClause(): string
     {
         return $this->groupByModifier ?? '';
@@ -774,6 +831,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      * here so ordering is naturally correct: LIMIT BY binding precedes the
      * outer LIMIT binding emitted by the parent.
      */
+    #[\Override]
     protected function buildAfterOrderByClause(): string
     {
         if ($this->limitByClause === null) {
@@ -793,6 +851,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     /**
      * Emit the trailing SETTINGS fragment from registered hints.
      */
+    #[\Override]
     protected function buildSettingsClause(): string
     {
         if (empty($this->hints)) {

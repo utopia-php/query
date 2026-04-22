@@ -23,6 +23,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
     /** @var array<string, Condition> */
     protected array $jsonSets = [];
 
+    #[\Override]
     public function forUpdate(): static
     {
         $this->lockMode = LockMode::ForUpdate;
@@ -30,6 +31,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function forShare(): static
     {
         $this->lockMode = LockMode::ForShare;
@@ -37,6 +39,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function forUpdateSkipLocked(): static
     {
         $this->lockMode = LockMode::ForUpdateSkipLocked;
@@ -44,6 +47,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function forUpdateNoWait(): static
     {
         $this->lockMode = LockMode::ForUpdateNoWait;
@@ -51,6 +55,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function forShareSkipLocked(): static
     {
         $this->lockMode = LockMode::ForShareSkipLocked;
@@ -58,6 +63,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function forShareNoWait(): static
     {
         $this->lockMode = LockMode::ForShareNoWait;
@@ -65,6 +71,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function stddev(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::stddev($attribute, $alias);
@@ -72,6 +79,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function stddevPop(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::stddevPop($attribute, $alias);
@@ -79,6 +87,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function stddevSamp(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::stddevSamp($attribute, $alias);
@@ -86,6 +95,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function variance(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::variance($attribute, $alias);
@@ -93,6 +103,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function varPop(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::varPop($attribute, $alias);
@@ -100,6 +111,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function varSamp(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::varSamp($attribute, $alias);
@@ -107,6 +119,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function bitAnd(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::bitAnd($attribute, $alias);
@@ -114,6 +127,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function bitOr(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::bitOr($attribute, $alias);
@@ -121,6 +135,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function bitXor(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::bitXor($attribute, $alias);
@@ -128,31 +143,37 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function begin(): Plan
     {
         return new Plan('BEGIN', [], executor: $this->executor);
     }
 
+    #[\Override]
     public function commit(): Plan
     {
         return new Plan('COMMIT', [], executor: $this->executor);
     }
 
+    #[\Override]
     public function rollback(): Plan
     {
         return new Plan('ROLLBACK', [], executor: $this->executor);
     }
 
+    #[\Override]
     public function savepoint(string $name): Plan
     {
         return new Plan('SAVEPOINT ' . $this->quote($name), [], executor: $this->executor);
     }
 
+    #[\Override]
     public function releaseSavepoint(string $name): Plan
     {
         return new Plan('RELEASE SAVEPOINT ' . $this->quote($name), [], executor: $this->executor);
     }
 
+    #[\Override]
     public function rollbackToSavepoint(string $name): Plan
     {
         return new Plan('ROLLBACK TO SAVEPOINT ' . $this->quote($name), [], executor: $this->executor);
@@ -160,6 +181,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
 
     abstract protected function compileConflictClause(): string;
 
+    #[\Override]
     public function upsert(): Plan
     {
         $this->bindings = [];
@@ -217,6 +239,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
 
     abstract public function insertOrIgnore(): Plan;
 
+    #[\Override]
     public function upsertSelect(): Plan
     {
         $this->bindings = [];
@@ -318,6 +341,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return 'unknown';
     }
 
+    #[\Override]
     public function filterDistance(string $attribute, array $point, string $operator, float $distance, bool $meters = false): static
     {
         $wkt = 'POINT(' . (float) $point[0] . ' ' . (float) $point[1] . ')';
@@ -334,6 +358,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function filterIntersects(string $attribute, array $geometry): static
     {
         $this->pendingQueries[] = Query::intersects($attribute, $geometry);
@@ -341,6 +366,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function filterNotIntersects(string $attribute, array $geometry): static
     {
         $this->pendingQueries[] = Query::notIntersects($attribute, $geometry);
@@ -348,6 +374,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function filterCrosses(string $attribute, array $geometry): static
     {
         $this->pendingQueries[] = Query::crosses($attribute, $geometry);
@@ -355,6 +382,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function filterNotCrosses(string $attribute, array $geometry): static
     {
         $this->pendingQueries[] = Query::notCrosses($attribute, $geometry);
@@ -362,6 +390,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function filterOverlaps(string $attribute, array $geometry): static
     {
         $this->pendingQueries[] = Query::overlaps($attribute, $geometry);
@@ -369,6 +398,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function filterNotOverlaps(string $attribute, array $geometry): static
     {
         $this->pendingQueries[] = Query::notOverlaps($attribute, $geometry);
@@ -376,6 +406,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function filterTouches(string $attribute, array $geometry): static
     {
         $this->pendingQueries[] = Query::touches($attribute, $geometry);
@@ -383,6 +414,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function filterNotTouches(string $attribute, array $geometry): static
     {
         $this->pendingQueries[] = Query::notTouches($attribute, $geometry);
@@ -390,6 +422,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function filterCovers(string $attribute, array $geometry): static
     {
         $this->pendingQueries[] = Query::covers($attribute, $geometry);
@@ -397,6 +430,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function filterNotCovers(string $attribute, array $geometry): static
     {
         $this->pendingQueries[] = Query::notCovers($attribute, $geometry);
@@ -404,6 +438,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function filterSpatialEquals(string $attribute, array $geometry): static
     {
         $this->pendingQueries[] = Query::spatialEquals($attribute, $geometry);
@@ -411,6 +446,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function filterNotSpatialEquals(string $attribute, array $geometry): static
     {
         $this->pendingQueries[] = Query::notSpatialEquals($attribute, $geometry);
@@ -418,6 +454,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function filterSearch(string $attribute, string $value): static
     {
         $this->pendingQueries[] = Query::search($attribute, $value);
@@ -425,6 +462,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function filterNotSearch(string $attribute, string $value): static
     {
         $this->pendingQueries[] = Query::notSearch($attribute, $value);
@@ -463,6 +501,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
         return $this;
     }
 
+    #[\Override]
     public function compileFilter(Query $query): string
     {
         $method = $query->getMethod();

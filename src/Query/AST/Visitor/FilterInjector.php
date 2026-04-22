@@ -14,11 +14,13 @@ class FilterInjector implements Visitor
     {
     }
 
+    #[\Override]
     public function visitExpression(Expression $expression): Expression
     {
         return $expression;
     }
 
+    #[\Override]
     public function visitTableReference(Table $reference): Table
     {
         return $reference;
@@ -34,6 +36,7 @@ class FilterInjector implements Visitor
      *     $injector = new FilterInjector($condition);
      *     $result = $injector->visitSelect($stmt);
      */
+    #[\Override]
     public function visitSelect(Select $stmt): Select
     {
         if ($stmt->where === null) {

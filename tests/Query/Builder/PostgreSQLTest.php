@@ -4,7 +4,7 @@ namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
-use Utopia\Query\Builder\Case\Builder as CaseBuilder;
+use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\Feature\Aggregates;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
@@ -686,7 +686,7 @@ class PostgreSQLTest extends TestCase
 
     public function testSelectCaseExpression(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('status = ?', '?', ['active'], ['Active'])
             ->elseResult('?', ['Other'])
             ->alias('label')
@@ -1293,7 +1293,7 @@ class PostgreSQLTest extends TestCase
 
     public function testCaseMultipleWhens(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('status = ?', '?', ['active'], ['Active'])
             ->when('status = ?', '?', ['pending'], ['Pending'])
             ->when('status = ?', '?', ['closed'], ['Closed'])
@@ -1312,7 +1312,7 @@ class PostgreSQLTest extends TestCase
 
     public function testCaseWithoutElse(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('active = ?', '?', [1], ['Yes'])
             ->alias('lbl')
             ->build();
@@ -1329,7 +1329,7 @@ class PostgreSQLTest extends TestCase
 
     public function testSetCaseInUpdate(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('age >= ?', '?', [18], ['adult'])
             ->elseResult('?', ['minor'])
             ->build();
@@ -6196,7 +6196,7 @@ class PostgreSQLTest extends TestCase
 
     public function testCaseExpressionWithBindingsInSelect(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('price > ?', '?', [100], ['expensive'])
             ->when('price > ?', '?', [50], ['moderate'])
             ->elseResult('?', ['cheap'])

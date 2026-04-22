@@ -16,11 +16,13 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
     /** @var array<string, Condition> */
     protected array $jsonSets = [];
 
+    #[\Override]
     protected function createAstSerializer(): Serializer
     {
         return new SQLiteSerializer();
     }
 
+    #[\Override]
     protected function compileRandom(): string
     {
         return 'RANDOM()';
@@ -29,6 +31,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileRegex(string $attribute, array $values): string
     {
         throw new UnsupportedException('REGEXP is not natively supported in SQLite.');
@@ -37,11 +40,13 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileSearchExpr(string $attribute, array $values, bool $not): string
     {
         throw new UnsupportedException('Full-text search is not supported in the SQLite query builder.');
     }
 
+    #[\Override]
     protected function compileConflictClause(): string
     {
         $wrappedKeys = \array_map(
@@ -65,6 +70,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return 'ON CONFLICT (' . \implode(', ', $wrappedKeys) . ') DO UPDATE SET ' . \implode(', ', $updates);
     }
 
+    #[\Override]
     public function insertOrIgnore(): Plan
     {
         $this->bindings = [];
@@ -78,6 +84,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return new Plan($sql, $this->bindings, executor: $this->executor);
     }
 
+    #[\Override]
     public function setJsonAppend(string $column, array $values): static
     {
         $this->jsonSets[$column] = new Condition(
@@ -88,6 +95,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return $this;
     }
 
+    #[\Override]
     public function setJsonPrepend(string $column, array $values): static
     {
         $this->jsonSets[$column] = new Condition(
@@ -98,6 +106,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return $this;
     }
 
+    #[\Override]
     public function setJsonInsert(string $column, int $index, mixed $value): static
     {
         $this->jsonSets[$column] = new Condition(
@@ -108,6 +117,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return $this;
     }
 
+    #[\Override]
     public function setJsonRemove(string $column, mixed $value): static
     {
         $wrapped = $this->resolveAndWrap($column);
@@ -119,6 +129,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return $this;
     }
 
+    #[\Override]
     public function setJsonIntersect(string $column, array $values): static
     {
         $wrapped = $this->resolveAndWrap($column);
@@ -127,6 +138,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return $this;
     }
 
+    #[\Override]
     public function setJsonDiff(string $column, array $values): static
     {
         $wrapped = $this->resolveAndWrap($column);
@@ -135,6 +147,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return $this;
     }
 
+    #[\Override]
     public function setJsonUnique(string $column): static
     {
         $wrapped = $this->resolveAndWrap($column);
@@ -143,6 +156,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return $this;
     }
 
+    #[\Override]
     public function update(): Plan
     {
         foreach ($this->jsonSets as $col => $condition) {
@@ -155,6 +169,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return $result;
     }
 
+    #[\Override]
     public function countWhen(string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'COUNT(CASE WHEN ' . $condition . ' THEN 1 END)';
@@ -165,6 +180,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function sumWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'SUM(CASE WHEN ' . $condition . ' THEN ' . $this->resolveAndWrap($column) . ' END)';
@@ -175,6 +191,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function avgWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'AVG(CASE WHEN ' . $condition . ' THEN ' . $this->resolveAndWrap($column) . ' END)';
@@ -185,6 +202,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function minWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'MIN(CASE WHEN ' . $condition . ' THEN ' . $this->resolveAndWrap($column) . ' END)';
@@ -195,6 +213,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function maxWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'MAX(CASE WHEN ' . $condition . ' THEN ' . $this->resolveAndWrap($column) . ' END)';
@@ -208,6 +227,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileSpatialDistance(Method $method, string $attribute, array $values): string
     {
         throw new UnsupportedException('Spatial distance queries are not supported in SQLite.');
@@ -216,6 +236,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileSpatialPredicate(string $function, string $attribute, array $values, bool $not): string
     {
         throw new UnsupportedException('Spatial predicates are not supported in SQLite.');
@@ -224,6 +245,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileSpatialCoversPredicate(string $attribute, array $values, bool $not): string
     {
         throw new UnsupportedException('Spatial covers predicates are not supported in SQLite.');
@@ -232,6 +254,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileJsonContainsExpr(string $attribute, array $values, bool $not): string
     {
         /** @var array<mixed> $arr */
@@ -255,6 +278,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileJsonOverlapsExpr(string $attribute, array $values): string
     {
         /** @var array<mixed> $arr */
@@ -276,6 +300,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileJsonPathExpr(string $attribute, array $values): string
     {
         /** @var string $path */
@@ -298,6 +323,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return 'json_extract(' . $attribute . ', \'$.' . $path . '\') ' . $operator . ' ?';
     }
 
+    #[\Override]
     public function groupConcat(string $column, string $separator = ',', string $alias = '', ?array $orderBy = null): static
     {
         $col = $this->resolveAndWrap($column);
@@ -321,6 +347,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return $this->select($expr, [$separator]);
     }
 
+    #[\Override]
     public function jsonArrayAgg(string $column, string $alias = ''): static
     {
         $expr = 'json_group_array(' . $this->resolveAndWrap($column) . ')';
@@ -331,6 +358,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return $this->select($expr);
     }
 
+    #[\Override]
     public function jsonObjectAgg(string $keyColumn, string $valueColumn, string $alias = ''): static
     {
         $expr = 'json_group_object(' . $this->resolveAndWrap($keyColumn) . ', ' . $this->resolveAndWrap($valueColumn) . ')';
@@ -341,6 +369,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
         return $this->select($expr);
     }
 
+    #[\Override]
     public function reset(): static
     {
         parent::reset();

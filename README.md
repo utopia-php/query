@@ -246,7 +246,7 @@ $errors = Query::validate($queries, ['name', 'age', 'status']);
 
 ## Query Builder
 
-The builder generates parameterized queries from the fluent API. Every `build()`, `insert()`, `update()`, and `delete()` call returns a `BuildResult` with `->query` (the query string), `->bindings` (the parameter array), and `->readOnly` (whether the query is read-only).
+The builder generates parameterized queries from the fluent API. Every `build()`, `insert()`, `update()`, and `delete()` call returns a `Plan` with `->query` (the query string), `->bindings` (the parameter array), and `->readOnly` (whether the query is read-only).
 
 Six dialect implementations are provided:
 
@@ -594,18 +594,22 @@ $result = (new Builder())
 
 ### CASE Expressions
 
+Build a CASE expression with `Utopia\Query\Builder\Case\Expression`, then pass the built `Result` to `selectCase()` or `setCase()`:
+
 ```php
+use Utopia\Query\Builder\Case\Expression as CaseExpression;
+
+$case = (new CaseExpression())
+    ->when('amount > ?', 'high', conditionBindings: [1000])
+    ->when('amount > ?', 'medium', conditionBindings: [100])
+    ->elseResult('low')
+    ->alias('`priority`')
+    ->build();
+
 $result = (new Builder())
     ->from('orders')
     ->select(['id'])
-    ->selectCase(
-        (new Builder())->case()
-            ->when('amount > ?', 'high', conditionBindings: [1000])
-            ->when('amount > ?', 'medium', conditionBindings: [100])
-            ->elseResult('low')
-            ->alias('priority')
-            ->build()
-    )
+    ->selectCase($case)
     ->build();
 
 // SELECT `id`, CASE WHEN amount > ? THEN ? WHEN amount > ? THEN ? ELSE ? END AS `priority`
@@ -793,7 +797,7 @@ $withSort = $base->clone()->sortAsc('name');
 $result = (new Builder())
     ->from('users')
     ->beforeBuild(fn(Builder $b) => $b->filter([Query::isNotNull('email')]))
-    ->afterBuild(fn(BuildResult $r) => new BuildResult("/* traced */ {$r->query}", $r->bindings, $r->readOnly))
+    ->afterBuild(fn(Plan $r) => new Plan("/* traced */ {$r->query}", $r->bindings, $r->readOnly))
     ->build();
 ```
 
@@ -1340,7 +1344,7 @@ $result = (new Builder())
 use Utopia\Query\Builder\MongoDB as Builder;
 ```
 
-The MongoDB builder generates JSON operation documents instead of SQL. The `BuildResult->query` contains a JSON-encoded operation and `BuildResult->bindings` contains parameter values.
+The MongoDB builder generates JSON operation documents instead of SQL. The `Plan->query` contains a JSON-encoded operation and `Plan->bindings` contains parameter values.
 
 **Basic queries:**
 

@@ -36,6 +36,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
 
     protected string $deleteUsingRight = '';
 
+    #[\Override]
     protected function compileRandom(): string
     {
         return 'RAND()';
@@ -44,6 +45,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileRegex(string $attribute, array $values): string
     {
         $this->addBinding($values[0]);
@@ -54,6 +56,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileSearchExpr(string $attribute, array $values, bool $not): string
     {
         /** @var string $term */
@@ -84,6 +87,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return 'MATCH(' . $attribute . ') AGAINST(? IN BOOLEAN MODE)';
     }
 
+    #[\Override]
     protected function compileConflictClause(): string
     {
         $updates = [];
@@ -102,6 +106,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return 'ON DUPLICATE KEY UPDATE ' . \implode(', ', $updates);
     }
 
+    #[\Override]
     public function setJsonAppend(string $column, array $values): static
     {
         $this->jsonSets[$column] = new Condition(
@@ -112,6 +117,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this;
     }
 
+    #[\Override]
     public function setJsonPrepend(string $column, array $values): static
     {
         $this->jsonSets[$column] = new Condition(
@@ -122,6 +128,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this;
     }
 
+    #[\Override]
     public function setJsonInsert(string $column, int $index, mixed $value): static
     {
         $this->jsonSets[$column] = new Condition(
@@ -132,6 +139,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this;
     }
 
+    #[\Override]
     public function setJsonRemove(string $column, mixed $value): static
     {
         $this->jsonSets[$column] = new Condition(
@@ -142,6 +150,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this;
     }
 
+    #[\Override]
     public function setJsonIntersect(string $column, array $values): static
     {
         $this->setRaw($column, '(SELECT JSON_ARRAYAGG(val) FROM JSON_TABLE(' . $this->resolveAndWrap($column) . ', \'$[*]\' COLUMNS(val JSON PATH \'$\')) AS jt WHERE JSON_CONTAINS(?, val))', [\json_encode($values)]);
@@ -149,6 +158,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this;
     }
 
+    #[\Override]
     public function setJsonDiff(string $column, array $values): static
     {
         $this->setRaw($column, '(SELECT JSON_ARRAYAGG(val) FROM JSON_TABLE(' . $this->resolveAndWrap($column) . ', \'$[*]\' COLUMNS(val JSON PATH \'$\')) AS jt WHERE NOT JSON_CONTAINS(?, val))', [\json_encode($values)]);
@@ -156,6 +166,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this;
     }
 
+    #[\Override]
     public function setJsonUnique(string $column): static
     {
         $this->setRaw($column, '(SELECT JSON_ARRAYAGG(val) FROM (SELECT DISTINCT val FROM JSON_TABLE(' . $this->resolveAndWrap($column) . ', \'$[*]\' COLUMNS(val JSON PATH \'$\')) AS jt) AS dt)');
@@ -163,6 +174,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this;
     }
 
+    #[\Override]
     public function hint(string $hint): static
     {
         if (!\preg_match('/^[A-Za-z0-9_()= ,]+$/', $hint)) {
@@ -179,6 +191,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this->hint("MAX_EXECUTION_TIME({$ms})");
     }
 
+    #[\Override]
     public function insertOrIgnore(): Plan
     {
         $this->bindings = [];
@@ -191,6 +204,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return new Plan($sql, $this->bindings, executor: $this->executor);
     }
 
+    #[\Override]
     public function explain(bool $analyze = false, string $format = ''): Plan
     {
         $result = $this->build();
@@ -205,6 +219,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return new Plan($prefix . ' ' . $result->query, $result->bindings, readOnly: true, executor: $this->executor);
     }
 
+    #[\Override]
     public function build(): Plan
     {
         $result = parent::build();
@@ -248,6 +263,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this;
     }
 
+    #[\Override]
     public function update(): Plan
     {
         foreach ($this->jsonSets as $col => $condition) {
@@ -305,6 +321,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this;
     }
 
+    #[\Override]
     public function delete(): Plan
     {
         if ($this->deleteAlias !== '') {
@@ -330,6 +347,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return new Plan(\implode(' ', $parts), $this->bindings, executor: $this->executor);
     }
 
+    #[\Override]
     public function countWhen(string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'COUNT(CASE WHEN ' . $condition . ' THEN 1 END)';
@@ -340,6 +358,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function sumWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'SUM(CASE WHEN ' . $condition . ' THEN ' . $this->resolveAndWrap($column) . ' END)';
@@ -350,6 +369,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function avgWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'AVG(CASE WHEN ' . $condition . ' THEN ' . $this->resolveAndWrap($column) . ' END)';
@@ -360,6 +380,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function minWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'MIN(CASE WHEN ' . $condition . ' THEN ' . $this->resolveAndWrap($column) . ' END)';
@@ -370,6 +391,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function maxWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'MAX(CASE WHEN ' . $condition . ' THEN ' . $this->resolveAndWrap($column) . ' END)';
@@ -380,6 +402,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function joinLateral(BaseBuilder $subquery, string $alias, JoinType $type = JoinType::Inner): static
     {
         $this->lateralJoins[] = new LateralJoin($subquery, $alias, $type);
@@ -387,11 +410,13 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this;
     }
 
+    #[\Override]
     public function leftJoinLateral(BaseBuilder $subquery, string $alias): static
     {
         return $this->joinLateral($subquery, $alias, JoinType::Left);
     }
 
+    #[\Override]
     public function groupConcat(string $column, string $separator = ',', string $alias = '', ?array $orderBy = null): static
     {
         $col = $this->resolveAndWrap($column);
@@ -415,6 +440,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this->select($expr, [$separator]);
     }
 
+    #[\Override]
     public function jsonArrayAgg(string $column, string $alias = ''): static
     {
         $expr = 'JSON_ARRAYAGG(' . $this->resolveAndWrap($column) . ')';
@@ -425,6 +451,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this->select($expr);
     }
 
+    #[\Override]
     public function jsonObjectAgg(string $keyColumn, string $valueColumn, string $alias = ''): static
     {
         $expr = 'JSON_OBJECTAGG(' . $this->resolveAndWrap($keyColumn) . ', ' . $this->resolveAndWrap($valueColumn) . ')';
@@ -435,6 +462,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this->select($expr);
     }
 
+    #[\Override]
     public function insertDefaultValues(): Plan
     {
         $this->bindings = [];
@@ -443,11 +471,13 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return new Plan('INSERT INTO ' . $this->quote($this->table) . ' () VALUES ()', $this->bindings, executor: $this->executor);
     }
 
+    #[\Override]
     public function withTotals(): static
     {
         throw new UnsupportedException('WITH TOTALS is not supported by MySQL.');
     }
 
+    #[\Override]
     public function withRollup(): static
     {
         $this->groupByModifier = 'WITH ROLLUP';
@@ -455,11 +485,13 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this;
     }
 
+    #[\Override]
     public function withCube(): static
     {
         throw new UnsupportedException('WITH CUBE is not supported by MySQL.');
     }
 
+    #[\Override]
     public function reset(): static
     {
         parent::reset();
@@ -481,6 +513,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileSpatialDistance(Method $method, string $attribute, array $values): string
     {
         /** @var array{0: string|array<mixed>, 1: float, 2: bool} $tuple */
@@ -509,6 +542,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileSpatialPredicate(string $function, string $attribute, array $values, bool $not): string
     {
         /** @var array<mixed> $geometry */
@@ -524,6 +558,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileSpatialCoversPredicate(string $attribute, array $values, bool $not): string
     {
         return $this->compileSpatialPredicate('ST_Contains', $attribute, $values, $not);
@@ -537,6 +572,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileJsonContainsExpr(string $attribute, array $values, bool $not): string
     {
         $this->addBinding(\json_encode($values[0]));
@@ -548,6 +584,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileJsonOverlapsExpr(string $attribute, array $values): string
     {
         /** @var array<mixed> $arr */
@@ -560,6 +597,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileJsonPathExpr(string $attribute, array $values): string
     {
         /** @var string $path */

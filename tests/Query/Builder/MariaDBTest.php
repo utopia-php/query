@@ -963,7 +963,7 @@ class MariaDBTest extends TestCase
 
     public function testCaseExpressionWithAggregate(): void
     {
-        $case = (new \Utopia\Query\Builder\Case\Builder())
+        $case = (new \Utopia\Query\Builder\Case\Expression())
             ->when('status = ?', "'active'", ['active'])
             ->when('status = ?', "'inactive'", ['inactive'])
             ->elseResult("'other'")

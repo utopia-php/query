@@ -16,6 +16,7 @@ class ColumnValidator implements Visitor
     {
     }
 
+    #[\Override]
     public function visitExpression(Expression $expression): Expression
     {
         if ($expression instanceof Column) {
@@ -26,11 +27,13 @@ class ColumnValidator implements Visitor
         return $expression;
     }
 
+    #[\Override]
     public function visitTableReference(Table $reference): Table
     {
         return $reference;
     }
 
+    #[\Override]
     public function visitSelect(Select $stmt): Select
     {
         return $stmt;

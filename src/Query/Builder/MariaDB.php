@@ -9,6 +9,7 @@ use Utopia\Query\Schema\ColumnType;
 
 class MariaDB extends MySQL
 {
+    #[\Override]
     protected function compileSpatialFilter(Method $method, string $attribute, Query $query): string
     {
         if (\in_array($method, [Method::DistanceLessThan, Method::DistanceGreaterThan, Method::DistanceEqual, Method::DistanceNotEqual], true)) {
@@ -32,11 +33,13 @@ class MariaDB extends MySQL
         return parent::compileSpatialFilter($method, $attribute, $query);
     }
 
+    #[\Override]
     protected function geomFromText(int $srid): string
     {
         return "ST_GeomFromText(?, {$srid})";
     }
 
+    #[\Override]
     protected function compileSpatialDistance(Method $method, string $attribute, array $values): string
     {
         /** @var array{0: string|array<mixed>, 1: float, 2: bool} $tuple */

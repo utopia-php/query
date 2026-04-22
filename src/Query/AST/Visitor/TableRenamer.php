@@ -16,6 +16,7 @@ class TableRenamer implements Visitor
     {
     }
 
+    #[\Override]
     public function visitExpression(Expression $expression): Expression
     {
         if ($expression instanceof Column && $expression->table !== null) {
@@ -35,6 +36,7 @@ class TableRenamer implements Visitor
         return $expression;
     }
 
+    #[\Override]
     public function visitTableReference(Table $reference): Table
     {
         $newName = $this->renames[$reference->name] ?? null;
@@ -51,6 +53,7 @@ class TableRenamer implements Visitor
         return $reference;
     }
 
+    #[\Override]
     public function visitSelect(Select $stmt): Select
     {
         return $stmt;

@@ -4,7 +4,7 @@ namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
-use Utopia\Query\Builder\Case\Builder as CaseBuilder;
+use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\ClickHouse as Builder;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\Feature\Aggregates;
@@ -6406,7 +6406,7 @@ class ClickHouseTest extends TestCase
 
     public function testSelectCaseExpression(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('`status` = ?', '?', ['active'], ['Active'])
             ->elseResult('?', ['Unknown'])
             ->alias('label')
@@ -6424,7 +6424,7 @@ class ClickHouseTest extends TestCase
 
     public function testSetCaseInUpdate(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('`role` = ?', '?', ['admin'], ['Admin'])
             ->elseResult('?', ['User'])
             ->build();
@@ -7743,7 +7743,7 @@ class ClickHouseTest extends TestCase
 
     public function testExactCaseInSelect(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('`status` = ?', '?', ['active'], ['Active'])
             ->when('`status` = ?', '?', ['inactive'], ['Inactive'])
             ->elseResult('?', ['Unknown'])
@@ -8894,7 +8894,7 @@ class ClickHouseTest extends TestCase
 
     public function testCaseExpressionWithAggregate(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('status = ?', "'active'", ['active'])
             ->when('status = ?', "'inactive'", ['inactive'])
             ->elseResult("'unknown'")

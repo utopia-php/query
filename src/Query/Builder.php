@@ -21,7 +21,7 @@ use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Star;
 use Utopia\Query\AST\Statement\Select;
-use Utopia\Query\Builder\Case\Expression as CaseExpression;
+use Utopia\Query\Builder\Case\Result as CaseResult;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\CteClause;
 use Utopia\Query\Builder\ExistsSubquery;
@@ -121,10 +121,10 @@ abstract class Builder implements
     /** @var ?array{percent: float, method: string} */
     protected ?array $sample = null;
 
-    /** @var list<CaseExpression> */
+    /** @var list<CaseResult> */
     protected array $cases = [];
 
-    /** @var array<string, CaseExpression> */
+    /** @var array<string, CaseResult> */
     protected array $caseSets = [];
 
     /** @var string[] */
@@ -274,6 +274,7 @@ abstract class Builder implements
         return '';
     }
 
+    #[\Override]
     public function from(string $table = '', string $alias = ''): static
     {
         $this->table = $table;
@@ -289,6 +290,7 @@ abstract class Builder implements
         return $this->from('');
     }
 
+    #[\Override]
     public function into(string $table): static
     {
         $this->table = $table;
@@ -310,6 +312,7 @@ abstract class Builder implements
     /**
      * @param  array<string, mixed>  $row
      */
+    #[\Override]
     public function set(array $row): static
     {
         $this->rows[] = $row;
@@ -320,6 +323,7 @@ abstract class Builder implements
     /**
      * @param  list<mixed>  $bindings
      */
+    #[\Override]
     public function setRaw(string $column, string $expression, array $bindings = []): static
     {
         $this->rawSets[$column] = $expression;
@@ -332,6 +336,7 @@ abstract class Builder implements
      * @param  string[]  $keys
      * @param  string[]  $updateColumns
      */
+    #[\Override]
     public function onConflict(array $keys, array $updateColumns): static
     {
         $this->conflictKeys = $keys;
@@ -428,6 +433,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function countDistinct(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::countDistinct($attribute, $alias);
@@ -438,6 +444,7 @@ abstract class Builder implements
     /**
      * @param  \Closure(JoinBuilder): void  $callback
      */
+    #[\Override]
     public function joinWhere(string $table, Closure $callback, JoinType $type = JoinType::Inner, string $alias = ''): static
     {
         $joinBuilder = new JoinBuilder();
@@ -495,6 +502,7 @@ abstract class Builder implements
      * @param  string|array<string>  $columns
      * @param  list<mixed>  $bindings
      */
+    #[\Override]
     public function select(string|array $columns, array $bindings = []): static
     {
         if (\is_string($columns)) {
@@ -517,6 +525,7 @@ abstract class Builder implements
     /**
      * @param  array<Query>  $queries
      */
+    #[\Override]
     public function filter(array $queries): static
     {
         foreach ($queries as $query) {
@@ -526,6 +535,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function sortAsc(string $attribute, ?NullsPosition $nulls = null): static
     {
         $this->pendingQueries[] = Query::orderAsc($attribute, $nulls);
@@ -533,6 +543,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function sortDesc(string $attribute, ?NullsPosition $nulls = null): static
     {
         $this->pendingQueries[] = Query::orderDesc($attribute, $nulls);
@@ -540,6 +551,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function sortRandom(): static
     {
         $this->pendingQueries[] = Query::orderRandom();
@@ -547,6 +559,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function limit(int $value): static
     {
         $this->pendingQueries[] = Query::limit($value);
@@ -554,6 +567,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function offset(int $value): static
     {
         $this->pendingQueries[] = Query::offset($value);
@@ -561,6 +575,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function fetch(int $count, bool $withTies = false): static
     {
         $this->fetchCount = $count;
@@ -569,6 +584,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function cursorAfter(mixed $value): static
     {
         $this->pendingQueries[] = Query::cursorAfter($value);
@@ -576,6 +592,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function cursorBefore(mixed $value): static
     {
         $this->pendingQueries[] = Query::cursorBefore($value);
@@ -586,6 +603,7 @@ abstract class Builder implements
     /**
      * @param  array<Query>  $queries
      */
+    #[\Override]
     public function queries(array $queries): static
     {
         foreach ($queries as $query) {
@@ -595,6 +613,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function addHook(Hook $hook): static
     {
         if ($hook instanceof Filter) {
@@ -610,6 +629,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function count(string $attribute = '*', string $alias = ''): static
     {
         $this->pendingQueries[] = Query::count($attribute, $alias);
@@ -617,6 +637,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function sum(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::sum($attribute, $alias);
@@ -624,6 +645,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function avg(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::avg($attribute, $alias);
@@ -631,6 +653,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function min(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::min($attribute, $alias);
@@ -638,6 +661,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function max(string $attribute, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::max($attribute, $alias);
@@ -648,6 +672,7 @@ abstract class Builder implements
     /**
      * @param  array<string>  $columns
      */
+    #[\Override]
     public function groupBy(array $columns): static
     {
         $this->pendingQueries[] = Query::groupBy($columns);
@@ -658,6 +683,7 @@ abstract class Builder implements
     /**
      * @param  array<Query>  $queries
      */
+    #[\Override]
     public function having(array $queries): static
     {
         $this->pendingQueries[] = Query::having($queries);
@@ -665,6 +691,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function distinct(): static
     {
         $this->pendingQueries[] = Query::distinct();
@@ -672,6 +699,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function join(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
     {
         $this->pendingQueries[] = Query::join($table, $left, $right, $operator, $alias);
@@ -679,6 +707,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function leftJoin(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
     {
         $this->pendingQueries[] = Query::leftJoin($table, $left, $right, $operator, $alias);
@@ -686,6 +715,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function rightJoin(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
     {
         $this->pendingQueries[] = Query::rightJoin($table, $left, $right, $operator, $alias);
@@ -693,6 +723,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function crossJoin(string $table, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::crossJoin($table, $alias);
@@ -700,6 +731,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function naturalJoin(string $table, string $alias = ''): static
     {
         $this->pendingQueries[] = Query::naturalJoin($table, $alias);
@@ -707,6 +739,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function union(self $other): static
     {
         $result = $other->build();
@@ -715,6 +748,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function unionAll(self $other): static
     {
         $result = $other->build();
@@ -723,6 +757,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function intersect(self $other): static
     {
         $result = $other->build();
@@ -731,6 +766,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function intersectAll(self $other): static
     {
         $result = $other->build();
@@ -739,6 +775,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function except(self $other): static
     {
         $result = $other->build();
@@ -747,6 +784,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function exceptAll(self $other): static
     {
         $result = $other->build();
@@ -758,6 +796,7 @@ abstract class Builder implements
     /**
      * @param  list<string>  $columns
      */
+    #[\Override]
     public function fromSelect(array $columns, self $source): static
     {
         $this->insertSelectColumns = $columns;
@@ -766,6 +805,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function insertSelect(): Plan
     {
         $this->bindings = [];
@@ -798,6 +838,7 @@ abstract class Builder implements
     /**
      * @param  list<string>  $columns
      */
+    #[\Override]
     public function with(string $name, self $query, array $columns = []): static
     {
         $result = $query->build();
@@ -809,6 +850,7 @@ abstract class Builder implements
     /**
      * @param  list<string>  $columns
      */
+    #[\Override]
     public function withRecursive(string $name, self $query, array $columns = []): static
     {
         $result = $query->build();
@@ -820,6 +862,7 @@ abstract class Builder implements
     /**
      * @param  list<string>  $columns
      */
+    #[\Override]
     public function withRecursiveSeedStep(string $name, self $seed, self $step, array $columns = []): static
     {
         $seedResult = $seed->build();
@@ -831,6 +874,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function selectCast(string $column, string $type, string $alias = ''): static
     {
         if (!\preg_match('/^[A-Za-z0-9_() ,]+$/', $type)) {
@@ -846,6 +890,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function selectWindow(string $function, string $alias, ?array $partitionBy = null, ?array $orderBy = null, ?string $windowName = null, ?WindowFrame $frame = null): static
     {
         if (!\preg_match('/^[A-Za-z_][A-Za-z0-9_]*\s*\(.*\)$/', \trim($function))) {
@@ -857,6 +902,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function window(string $name, ?array $partitionBy = null, ?array $orderBy = null, ?WindowFrame $frame = null): static
     {
         $this->windowDefinitions[] = new WindowDefinition($name, $partitionBy, $orderBy, $frame);
@@ -864,20 +910,21 @@ abstract class Builder implements
         return $this;
     }
 
-    public function selectCase(CaseExpression $case): static
+    public function selectCase(CaseResult $case): static
     {
         $this->cases[] = $case;
 
         return $this;
     }
 
-    public function setCase(string $column, CaseExpression $case): static
+    public function setCase(string $column, CaseResult $case): static
     {
         $this->caseSets[$column] = $case;
 
         return $this;
     }
 
+    #[\Override]
     public function when(bool $condition, Closure $callback): static
     {
         if ($condition) {
@@ -911,6 +958,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function page(int $page, int $perPage = 25): static
     {
         if ($page < 1) {
@@ -926,6 +974,7 @@ abstract class Builder implements
         return $this;
     }
 
+    #[\Override]
     public function toRawSql(): string
     {
         $result = $this->build();
@@ -969,6 +1018,7 @@ abstract class Builder implements
         return $this->insert();
     }
 
+    #[\Override]
     public function build(): Plan
     {
         $this->bindings = [];
@@ -1664,6 +1714,7 @@ abstract class Builder implements
         return [$sql, $bindings];
     }
 
+    #[\Override]
     public function insert(): Plan
     {
         $this->bindings = [];
@@ -1673,6 +1724,7 @@ abstract class Builder implements
         return new Plan($sql, $this->bindings, executor: $this->executor);
     }
 
+    #[\Override]
     public function insertDefaultValues(): Plan
     {
         $this->bindings = [];
@@ -1714,6 +1766,7 @@ abstract class Builder implements
         return $assignments;
     }
 
+    #[\Override]
     public function update(): Plan
     {
         $this->bindings = [];
@@ -1736,6 +1789,7 @@ abstract class Builder implements
         return new Plan(\implode(' ', $parts), $this->bindings, executor: $this->executor);
     }
 
+    #[\Override]
     public function delete(): Plan
     {
         $this->bindings = [];
@@ -1892,11 +1946,13 @@ abstract class Builder implements
     /**
      * @return list<mixed>
      */
+    #[\Override]
     public function getBindings(): array
     {
         return $this->bindings;
     }
 
+    #[\Override]
     public function reset(): static
     {
         $this->pendingQueries = [];
@@ -1964,6 +2020,7 @@ abstract class Builder implements
         $this->lateralJoins = \array_map(fn (LateralJoin $l) => new LateralJoin(clone $l->subquery, $l->alias, $l->type), $this->lateralJoins);
     }
 
+    #[\Override]
     public function compileFilter(Query $query): string
     {
         $method = $query->getMethod();
@@ -2022,6 +2079,7 @@ abstract class Builder implements
         };
     }
 
+    #[\Override]
     public function compileOrder(Query $query): string
     {
         $sql = match ($query->getMethod()) {
@@ -2039,6 +2097,7 @@ abstract class Builder implements
         return $sql;
     }
 
+    #[\Override]
     public function compileLimit(Query $query): string
     {
         $this->addBinding($query->getValue());
@@ -2046,6 +2105,7 @@ abstract class Builder implements
         return 'LIMIT ?';
     }
 
+    #[\Override]
     public function compileOffset(Query $query): string
     {
         $this->addBinding($query->getValue());
@@ -2053,6 +2113,7 @@ abstract class Builder implements
         return 'OFFSET ?';
     }
 
+    #[\Override]
     public function compileSelect(Query $query): string
     {
         /** @var array<string> $values */
@@ -2065,6 +2126,7 @@ abstract class Builder implements
         return \implode(', ', $columns);
     }
 
+    #[\Override]
     public function compileCursor(Query $query): string
     {
         $value = $query->getValue();
@@ -2075,6 +2137,7 @@ abstract class Builder implements
         return $this->quote('_cursor') . ' ' . $operator . ' ?';
     }
 
+    #[\Override]
     public function compileAggregate(Query $query): string
     {
         $method = $query->getMethod();
@@ -2127,6 +2190,7 @@ abstract class Builder implements
         return $sql;
     }
 
+    #[\Override]
     public function compileGroupBy(Query $query): string
     {
         /** @var array<string> $values */
@@ -2139,6 +2203,7 @@ abstract class Builder implements
         return \implode(', ', $columns);
     }
 
+    #[\Override]
     public function compileJoin(Query $query): string
     {
         $type = match ($query->getMethod()) {

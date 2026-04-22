@@ -5,8 +5,8 @@ namespace Tests\Query\Builder;
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
 use Tests\Query\Fixture\PermissionFilter as Permission;
-use Utopia\Query\Builder\Case\Builder as CaseBuilder;
-use Utopia\Query\Builder\Case\Expression;
+use Utopia\Query\Builder\Case\Expression as CaseExpression;
+use Utopia\Query\Builder\Case\Result as CaseResult;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\Feature\Aggregates;
 use Utopia\Query\Builder\Feature\CTEs;
@@ -6991,7 +6991,7 @@ class MySQLTest extends TestCase
 
     public function testCaseBuilder(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('status = ?', '?', ['active'], ['Active'])
             ->when('status = ?', '?', ['inactive'], ['Inactive'])
             ->elseResult('?', ['Unknown'])
@@ -7007,7 +7007,7 @@ class MySQLTest extends TestCase
 
     public function testCaseBuilderWithoutElse(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('x > ?', '1', [10])
             ->build();
 
@@ -7017,7 +7017,7 @@ class MySQLTest extends TestCase
 
     public function testCaseBuilderWithoutAlias(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('x = 1', "'yes'")
             ->elseResult("'no'")
             ->build();
@@ -7030,12 +7030,12 @@ class MySQLTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('at least one WHEN');
 
-        (new CaseBuilder())->build();
+        (new CaseExpression())->build();
     }
 
     public function testCaseExpressionToSql(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('a = ?', '1', [1])
             ->build();
 
@@ -7080,7 +7080,7 @@ class MySQLTest extends TestCase
 
     public function testSelectRawWithCaseExpression(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('status = ?', '?', ['active'], ['Active'])
             ->elseResult('?', ['Other'])
             ->alias('label')
@@ -7468,7 +7468,7 @@ class MySQLTest extends TestCase
 
     public function testSelectCaseExpression(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('status = ?', '?', ['active'], ['Active'])
             ->elseResult('?', ['Other'])
             ->alias('label')
@@ -7487,7 +7487,7 @@ class MySQLTest extends TestCase
 
     public function testSetCaseExpression(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('age >= ?', '?', [18], ['adult'])
             ->elseResult('?', ['minor'])
             ->build();
@@ -7927,7 +7927,7 @@ class MySQLTest extends TestCase
 
     public function testCaseWithMultipleWhens(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('x = ?', '?', [1], ['one'])
             ->when('x = ?', '?', [2], ['two'])
             ->when('x = ?', '?', [3], ['three'])
@@ -7939,7 +7939,7 @@ class MySQLTest extends TestCase
 
     public function testCaseExpressionWithoutElseClause(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('x > ?', '1', [10])
             ->when('x < ?', '0', [0])
             ->build();
@@ -7949,7 +7949,7 @@ class MySQLTest extends TestCase
 
     public function testCaseExpressionWithoutAliasClause(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('x = 1', "'yes'")
             ->build();
 
@@ -7958,7 +7958,7 @@ class MySQLTest extends TestCase
 
     public function testSetCaseInUpdate(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('age >= ?', '?', [18], ['adult'])
             ->elseResult('?', ['minor'])
             ->build();
@@ -7979,7 +7979,7 @@ class MySQLTest extends TestCase
     {
         $this->expectException(ValidationException::class);
 
-        (new CaseBuilder())->build();
+        (new CaseExpression())->build();
     }
 
     public function testMultipleCTEsWithTwoSources(): void
@@ -9780,13 +9780,13 @@ class MySQLTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('at least one WHEN');
 
-        $case = new CaseBuilder();
+        $case = new CaseExpression();
         $case->build();
     }
 
     public function testCaseBuilderMultipleWhens(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('`status` = ?', '?', ['active'], ['Active'])
             ->when('`status` = ?', '?', ['inactive'], ['Inactive'])
             ->elseResult('?', ['Unknown'])
@@ -9802,7 +9802,7 @@ class MySQLTest extends TestCase
 
     public function testCaseBuilderWithoutElseClause(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('`x` > ?', '1', [10])
             ->build();
 
@@ -9812,7 +9812,7 @@ class MySQLTest extends TestCase
 
     public function testCaseBuilderWithoutAliasClause(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('1=1', '?', [], ['yes'])
             ->build();
 
@@ -9821,7 +9821,7 @@ class MySQLTest extends TestCase
 
     public function testCaseExpressionToSqlOutput(): void
     {
-        $expr = new Expression('CASE WHEN 1 THEN 2 END', []);
+        $expr = new CaseResult('CASE WHEN 1 THEN 2 END', []);
         $this->assertEquals('CASE WHEN 1 THEN 2 END', $expr->sql);
         $this->assertEquals([], $expr->bindings);
     }
@@ -10560,7 +10560,7 @@ class MySQLTest extends TestCase
 
     public function testExactCaseInSelect(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('status = ?', '?', ['active'], ['Active'])
             ->when('status = ?', '?', ['inactive'], ['Inactive'])
             ->elseResult('?', ['Unknown'])
@@ -11172,7 +11172,7 @@ class MySQLTest extends TestCase
 
     public function testExactAdvancedSetCaseInUpdate(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('`category` = ?', '`price` * ?', ['electronics'], [1.2])
             ->when('`category` = ?', '`price` * ?', ['clothing'], [0.8])
             ->elseResult('`price`')
@@ -13207,7 +13207,7 @@ class MySQLTest extends TestCase
 
     public function testCaseExpressionInSelectWithWhereAndOrderBy(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('`status` = ?', '?', ['active'], ['Active'])
             ->when('`status` = ?', '?', ['inactive'], ['Inactive'])
             ->elseResult('?', ['Unknown'])
@@ -13231,7 +13231,7 @@ class MySQLTest extends TestCase
 
     public function testCaseExpressionWithMultipleWhensAndAggregate(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('`score` >= ?', '?', [90], ['A'])
             ->when('`score` >= ?', '?', [80], ['B'])
             ->when('`score` >= ?', '?', [70], ['C'])
@@ -14353,7 +14353,7 @@ class MySQLTest extends TestCase
 
     public function testUpdateWithCaseExpression(): void
     {
-        $case = (new CaseBuilder())
+        $case = (new CaseExpression())
             ->when('`priority` = ?', '?', ['high'], [1])
             ->when('`priority` = ?', '?', ['medium'], [2])
             ->elseResult('?', [3])

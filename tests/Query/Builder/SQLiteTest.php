@@ -1377,7 +1377,7 @@ class SQLiteTest extends TestCase
 
     public function testCaseExpressionWithWhere(): void
     {
-        $case = (new \Utopia\Query\Builder\Case\Builder())
+        $case = (new \Utopia\Query\Builder\Case\Expression())
             ->when('status = ?', "'Active'", ['active'])
             ->when('status = ?', "'Inactive'", ['inactive'])
             ->elseResult("'Unknown'")

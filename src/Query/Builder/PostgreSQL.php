@@ -29,6 +29,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
 {
     protected string $wrapChar = '"';
 
+    #[\Override]
     protected function createAstSerializer(): Serializer
     {
         return new PostgreSQLSerializer();
@@ -75,6 +76,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
 
     protected ?string $groupByModifier = null;
 
+    #[\Override]
     protected function compileRandom(): string
     {
         return 'RANDOM()';
@@ -83,6 +85,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileRegex(string $attribute, array $values): string
     {
         $this->addBinding($values[0]);
@@ -93,6 +96,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileSearchExpr(string $attribute, array $values, bool $not): string
     {
         /** @var string $term */
@@ -124,6 +128,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $tsvector . ' @@ websearch_to_tsquery(?)';
     }
 
+    #[\Override]
     protected function compileConflictClause(): string
     {
         $wrappedKeys = \array_map(
@@ -147,6 +152,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return 'ON CONFLICT (' . \implode(', ', $wrappedKeys) . ') DO UPDATE SET ' . \implode(', ', $updates);
     }
 
+    #[\Override]
     protected function shouldEmitOffset(?int $offset, ?int $limit): bool
     {
         return $offset !== null;
@@ -155,6 +161,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     /**
      * @param  list<string>  $columns
      */
+    #[\Override]
     public function returning(array $columns = ['*']): static
     {
         $this->returningColumns = $columns;
@@ -162,6 +169,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function forUpdateOf(string $table): static
     {
         $this->lockMode = LockMode::ForUpdate;
@@ -170,6 +178,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function forShareOf(string $table): static
     {
         $this->lockMode = LockMode::ForShare;
@@ -178,6 +187,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function tablesample(float $percent, string $method = 'BERNOULLI'): static
     {
         $normalized = \strtoupper($method);
@@ -189,6 +199,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function insertOrIgnore(): Plan
     {
         $this->bindings = [];
@@ -200,6 +211,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->appendReturning(new Plan($sql, $this->bindings, executor: $this->executor));
     }
 
+    #[\Override]
     public function insert(): Plan
     {
         $result = parent::insert();
@@ -223,6 +235,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function update(): Plan
     {
         foreach ($this->jsonSets as $col => $condition) {
@@ -295,6 +308,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function delete(): Plan
     {
         if ($this->deleteUsingTable !== '') {
@@ -340,6 +354,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return new Plan(\implode(' ', $parts), $this->bindings, executor: $this->executor);
     }
 
+    #[\Override]
     public function upsert(): Plan
     {
         $result = parent::upsert();
@@ -347,6 +362,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->appendReturning($result);
     }
 
+    #[\Override]
     public function upsertSelect(): Plan
     {
         $result = parent::upsertSelect();
@@ -372,6 +388,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         );
     }
 
+    #[\Override]
     public function orderByVectorDistance(string $attribute, array $vector, VectorMetric $metric = VectorMetric::Cosine): static
     {
         $this->vectorOrder = [
@@ -383,6 +400,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function setJsonAppend(string $column, array $values): static
     {
         $this->jsonSets[$column] = new Condition(
@@ -393,6 +411,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function setJsonPrepend(string $column, array $values): static
     {
         $this->jsonSets[$column] = new Condition(
@@ -403,6 +422,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function setJsonInsert(string $column, int $index, mixed $value): static
     {
         $this->jsonSets[$column] = new Condition(
@@ -413,6 +433,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function setJsonRemove(string $column, mixed $value): static
     {
         $this->jsonSets[$column] = new Condition(
@@ -423,6 +444,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function setJsonIntersect(string $column, array $values): static
     {
         $this->setRaw($column, '(SELECT jsonb_agg(elem) FROM jsonb_array_elements(' . $this->resolveAndWrap($column) . ') AS elem WHERE elem <@ ?::jsonb)', [\json_encode($values)]);
@@ -430,6 +452,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function setJsonDiff(string $column, array $values): static
     {
         $this->setRaw($column, '(SELECT COALESCE(jsonb_agg(elem), \'[]\'::jsonb) FROM jsonb_array_elements(' . $this->resolveAndWrap($column) . ') AS elem WHERE NOT elem <@ ?::jsonb)', [\json_encode($values)]);
@@ -437,6 +460,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function setJsonUnique(string $column): static
     {
         $this->setRaw($column, '(SELECT jsonb_agg(DISTINCT elem) FROM jsonb_array_elements(' . $this->resolveAndWrap($column) . ') AS elem)');
@@ -444,6 +468,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function explain(bool $analyze = false, bool $verbose = false, bool $buffers = false, string $format = ''): Plan
     {
         $normalizedFormat = \strtoupper($format);
@@ -469,6 +494,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return new Plan($prefix . ' ' . $result->query, $result->bindings, readOnly: true, executor: $this->executor);
     }
 
+    #[\Override]
     public function compileFilter(Query $query): string
     {
         $method = $query->getMethod();
@@ -552,6 +578,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return '(' . \implode($separator, $conditions) . ')';
     }
 
+    #[\Override]
     protected function getLikeKeyword(): string
     {
         return 'ILIKE';
@@ -576,6 +603,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $chain . "->>'" . $lastKey . "'";
     }
 
+    #[\Override]
     protected function compileVectorOrderExpr(): ?Condition
     {
         if ($this->vectorOrder === null) {
@@ -592,6 +620,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         );
     }
 
+    #[\Override]
     public function countWhen(string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'COUNT(*) FILTER (WHERE ' . $condition . ')';
@@ -602,6 +631,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function sumWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'SUM(' . $this->resolveAndWrap($column) . ') FILTER (WHERE ' . $condition . ')';
@@ -612,6 +642,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function avgWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'AVG(' . $this->resolveAndWrap($column) . ') FILTER (WHERE ' . $condition . ')';
@@ -622,6 +653,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function minWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'MIN(' . $this->resolveAndWrap($column) . ') FILTER (WHERE ' . $condition . ')';
@@ -632,6 +664,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function maxWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
         $expr = 'MAX(' . $this->resolveAndWrap($column) . ') FILTER (WHERE ' . $condition . ')';
@@ -642,6 +675,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->select($expr, \array_values($bindings));
     }
 
+    #[\Override]
     public function mergeInto(string $target): static
     {
         $this->mergeTarget = $target;
@@ -649,6 +683,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function using(BaseBuilder $source, string $alias): static
     {
         $this->mergeSource = $source;
@@ -657,6 +692,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function on(string $condition, mixed ...$bindings): static
     {
         $this->mergeCondition = $condition;
@@ -665,6 +701,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function whenMatched(string $action, mixed ...$bindings): static
     {
         $this->mergeClauses[] = new MergeClause($action, true, \array_values($bindings));
@@ -672,6 +709,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function whenNotMatched(string $action, mixed ...$bindings): static
     {
         $this->mergeClauses[] = new MergeClause($action, false, \array_values($bindings));
@@ -679,6 +717,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function executeMerge(): Plan
     {
         if ($this->mergeTarget === '') {
@@ -713,6 +752,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return new Plan($sql, $this->bindings, executor: $this->executor);
     }
 
+    #[\Override]
     public function joinLateral(BaseBuilder $subquery, string $alias, JoinType $type = JoinType::Inner): static
     {
         $this->lateralJoins[] = new LateralJoin($subquery, $alias, $type);
@@ -720,11 +760,13 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function leftJoinLateral(BaseBuilder $subquery, string $alias): static
     {
         return $this->joinLateral($subquery, $alias, JoinType::Left);
     }
 
+    #[\Override]
     public function fullOuterJoin(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
     {
         $this->pendingQueries[] = Query::fullOuterJoin($table, $left, $right, $operator, $alias);
@@ -732,6 +774,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function groupConcat(string $column, string $separator = ',', string $alias = '', ?array $orderBy = null): static
     {
         $col = $this->resolveAndWrap($column);
@@ -755,6 +798,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->select($expr, [$separator]);
     }
 
+    #[\Override]
     public function jsonArrayAgg(string $column, string $alias = ''): static
     {
         $expr = 'JSON_AGG(' . $this->resolveAndWrap($column) . ')';
@@ -765,6 +809,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->select($expr);
     }
 
+    #[\Override]
     public function jsonObjectAgg(string $keyColumn, string $valueColumn, string $alias = ''): static
     {
         $expr = 'JSON_OBJECT_AGG(' . $this->resolveAndWrap($keyColumn) . ', ' . $this->resolveAndWrap($valueColumn) . ')';
@@ -775,6 +820,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->select($expr);
     }
 
+    #[\Override]
     public function arrayAgg(string $column, string $alias = ''): static
     {
         $expr = 'ARRAY_AGG(' . $this->resolveAndWrap($column) . ')';
@@ -785,6 +831,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->select($expr);
     }
 
+    #[\Override]
     public function boolAnd(string $column, string $alias = ''): static
     {
         $expr = 'BOOL_AND(' . $this->resolveAndWrap($column) . ')';
@@ -795,6 +842,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->select($expr);
     }
 
+    #[\Override]
     public function boolOr(string $column, string $alias = ''): static
     {
         $expr = 'BOOL_OR(' . $this->resolveAndWrap($column) . ')';
@@ -805,6 +853,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->select($expr);
     }
 
+    #[\Override]
     public function every(string $column, string $alias = ''): static
     {
         $expr = 'EVERY(' . $this->resolveAndWrap($column) . ')';
@@ -815,6 +864,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->select($expr);
     }
 
+    #[\Override]
     public function percentileCont(float $fraction, string $orderColumn, string $alias = ''): static
     {
         $expr = 'PERCENTILE_CONT(?) WITHIN GROUP (ORDER BY ' . $this->resolveAndWrap($orderColumn) . ')';
@@ -825,6 +875,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->select($expr, [$fraction]);
     }
 
+    #[\Override]
     public function percentileDisc(float $fraction, string $orderColumn, string $alias = ''): static
     {
         $expr = 'PERCENTILE_DISC(?) WITHIN GROUP (ORDER BY ' . $this->resolveAndWrap($orderColumn) . ')';
@@ -835,6 +886,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->select($expr, [$fraction]);
     }
 
+    #[\Override]
     public function distinctOn(array $columns): static
     {
         $this->distinctOnColumns = $columns;
@@ -842,6 +894,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function selectAggregateFilter(string $aggregateExpr, string $filterCondition, string $alias = '', array $bindings = []): static
     {
         $expr = $aggregateExpr . ' FILTER (WHERE ' . $filterCondition . ')';
@@ -852,6 +905,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->select($expr, $bindings);
     }
 
+    #[\Override]
     public function insertDefaultValues(): Plan
     {
         $result = parent::insertDefaultValues();
@@ -859,11 +913,13 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this->appendReturning($result);
     }
 
+    #[\Override]
     public function withTotals(): static
     {
         throw new UnsupportedException('WITH TOTALS is not supported by PostgreSQL.');
     }
 
+    #[\Override]
     public function withRollup(): static
     {
         $this->groupByModifier = 'ROLLUP';
@@ -871,6 +927,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function withCube(): static
     {
         $this->groupByModifier = 'CUBE';
@@ -878,6 +935,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $this;
     }
 
+    #[\Override]
     public function build(): Plan
     {
         $result = parent::build();
@@ -921,6 +979,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         return $result;
     }
 
+    #[\Override]
     public function reset(): static
     {
         parent::reset();
@@ -949,6 +1008,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileSpatialDistance(Method $method, string $attribute, array $values): string
     {
         /** @var array{0: string|array<mixed>, 1: float, 2: bool} $tuple */
@@ -977,6 +1037,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileSpatialPredicate(string $function, string $attribute, array $values, bool $not): string
     {
         /** @var array<mixed> $geometry */
@@ -992,6 +1053,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileSpatialCoversPredicate(string $attribute, array $values, bool $not): string
     {
         return $this->compileSpatialPredicate('ST_Covers', $attribute, $values, $not);
@@ -1000,6 +1062,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileJsonContainsExpr(string $attribute, array $values, bool $not): string
     {
         $this->addBinding(\json_encode($values[0]));
@@ -1011,6 +1074,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileJsonOverlapsExpr(string $attribute, array $values): string
     {
         /** @var array<mixed> $arr */
@@ -1028,6 +1092,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     /**
      * @param  array<mixed>  $values
      */
+    #[\Override]
     protected function compileJsonPathExpr(string $attribute, array $values): string
     {
         /** @var string $path */
