@@ -277,6 +277,10 @@ class MongoDB implements Parser
         }
         $strLen = $this->readUint32($data, $pos);
 
+        if ($pos + 4 + $strLen > $limit) {
+            return false;
+        }
+
         return $pos + 4 + $strLen;
     }
 
@@ -287,6 +291,10 @@ class MongoDB implements Parser
         }
         $docLen = $this->readUint32($data, $pos);
 
+        if ($pos + $docLen > $limit) {
+            return false;
+        }
+
         return $pos + $docLen;
     }
 
@@ -296,6 +304,10 @@ class MongoDB implements Parser
             return false;
         }
         $binLen = $this->readUint32($data, $pos);
+
+        if ($pos + 4 + 1 + $binLen > $limit) {
+            return false;
+        }
 
         return $pos + 4 + 1 + $binLen; // length + subtype byte + data
     }
