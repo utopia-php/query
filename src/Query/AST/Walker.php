@@ -114,7 +114,7 @@ class Walker
                 $expression->negated,
             ),
             $expression instanceof Exists => new Exists(
-                $this->walkStatement($expression->subquery, $visitor),
+                $this->walk($expression->subquery, $visitor),
                 $expression->negated,
             ),
             $expression instanceof Conditional => $this->walkConditionalExpression($expression, $visitor),
@@ -123,7 +123,7 @@ class Walker
                 $expression->type,
             ),
             $expression instanceof Subquery => new Subquery(
-                $this->walkStatement($expression->query, $visitor),
+                $this->walk($expression->query, $visitor),
             ),
             $expression instanceof Window => $this->walkWindowExpression($expression, $visitor),
             default => $expression,
@@ -163,7 +163,7 @@ class Walker
         $walked = $this->walkExpression($expression->expression, $visitor);
 
         if ($expression->list instanceof Select) {
-            $list = $this->walkStatement($expression->list, $visitor);
+            $list = $this->walk($expression->list, $visitor);
         } else {
             $list = $this->walkExpressionArray($expression->list, $visitor);
         }
