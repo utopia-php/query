@@ -598,11 +598,11 @@ Build a CASE expression with `Utopia\Query\Builder\Case\Expression`, then pass i
 
 ```php
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
-use Utopia\Query\Method;
+use Utopia\Query\Builder\Case\Operator;
 
 $case = (new CaseExpression())
-    ->when('amount', Method::GreaterThan, 1000, 'high')
-    ->when('amount', Method::GreaterThan, 100, 'medium')
+    ->when('amount', Operator::GreaterThan, 1000, 'high')
+    ->when('amount', Operator::GreaterThan, 100, 'medium')
     ->else('low')
     ->alias('priority');
 
@@ -618,7 +618,7 @@ $result = (new Builder())
 
 Supported WHEN shapes:
 
-- `when(string $column, Method $operator, mixed $value, mixed $then)` — comparison. The operator must satisfy `Method::isComparison()`: `Method::Equal`, `Method::NotEqual`, `Method::LessThan`, `Method::LessThanEqual`, `Method::GreaterThan`, `Method::GreaterThanEqual`.
+- `when(string $column, Operator $operator, mixed $value, mixed $then)` — comparison. The operator is a closed enum of the six comparisons: `Operator::Equal`, `Operator::NotEqual`, `Operator::LessThan`, `Operator::LessThanEqual`, `Operator::GreaterThan`, `Operator::GreaterThanEqual`.
 - `whenNull(string $column, mixed $then)` and `whenNotNull(string $column, mixed $then)`.
 - `whenIn(string $column, array $values, mixed $then)`.
 - `whenRaw(string $condition, mixed $then, array $conditionBindings = [])` — escape hatch for complex predicates. The caller owns the SQL fragment; the `$then` value is still bound.

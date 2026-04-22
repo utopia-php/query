@@ -5,6 +5,7 @@ namespace Tests\Query\Builder;
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
+use Utopia\Query\Builder\Case\Operator;
 use Utopia\Query\Builder\Feature\Aggregates;
 use Utopia\Query\Builder\Feature\CTEs;
 use Utopia\Query\Builder\Feature\Deletes;
@@ -1693,7 +1694,7 @@ class MongoDBTest extends TestCase
 
         (new Builder())
             ->from('orders')
-            ->queries([new Query(\Utopia\Query\Method::CountDistinct, 'id', ['cd'])])
+            ->queries([new Query(Method::CountDistinct, 'id', ['cd'])])
             ->build();
     }
 
@@ -1863,7 +1864,7 @@ class MongoDBTest extends TestCase
             ->setCase(
                 'status',
                 (new CaseExpression())
-                    ->when('age', Method::GreaterThan, 18, 'adult')
+                    ->when('age', Operator::GreaterThan, 18, 'adult')
                     ->else('minor')
             )
             ->update();

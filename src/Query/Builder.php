@@ -973,17 +973,9 @@ abstract class Builder implements
                     throw new ValidationException('Comparison WHEN clause requires column and operator.');
                 }
 
-                $sqlOperator = $when->operator->sqlOperator();
-
-                if ($sqlOperator === null) {
-                    throw new ValidationException(
-                        'Unsupported CASE WHEN operator: ' . $when->operator->value
-                    );
-                }
-
                 $this->addBinding($when->value);
 
-                return $this->quote($when->column) . ' ' . $sqlOperator . ' ?';
+                return $this->quote($when->column) . ' ' . $when->operator->sqlOperator() . ' ?';
 
             case CaseKind::Null:
                 if ($when->column === null) {

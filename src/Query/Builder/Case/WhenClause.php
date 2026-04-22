@@ -2,8 +2,6 @@
 
 namespace Utopia\Query\Builder\Case;
 
-use Utopia\Query\Method;
-
 readonly class WhenClause
 {
     /**
@@ -13,7 +11,7 @@ readonly class WhenClause
     public function __construct(
         public Kind $kind,
         public ?string $column,
-        public ?Method $operator,
+        public ?Operator $operator,
         public mixed $value,
         public mixed $then,
         public array $values = [],

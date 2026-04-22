@@ -5,6 +5,7 @@ namespace Tests\Query\Builder;
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
+use Utopia\Query\Builder\Case\Operator;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\Feature\Aggregates;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
@@ -35,7 +36,6 @@ use Utopia\Query\Builder\VectorMetric;
 use Utopia\Query\Compiler;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Hook\Filter;
-use Utopia\Query\Method;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\ColumnType;
 
@@ -687,7 +687,7 @@ class PostgreSQLTest extends TestCase
     public function testSelectCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('status', Method::Equal, 'active', 'Active')
+            ->when('status', Operator::Equal, 'active', 'Active')
             ->else('Other')
             ->alias('label');
 
@@ -1293,9 +1293,9 @@ class PostgreSQLTest extends TestCase
     public function testCaseMultipleWhens(): void
     {
         $case = (new CaseExpression())
-            ->when('status', Method::Equal, 'active', 'Active')
-            ->when('status', Method::Equal, 'pending', 'Pending')
-            ->when('status', Method::Equal, 'closed', 'Closed')
+            ->when('status', Operator::Equal, 'active', 'Active')
+            ->when('status', Operator::Equal, 'pending', 'Pending')
+            ->when('status', Operator::Equal, 'closed', 'Closed')
             ->alias('label');
 
         $result = (new Builder())
@@ -1311,7 +1311,7 @@ class PostgreSQLTest extends TestCase
     public function testCaseWithoutElse(): void
     {
         $case = (new CaseExpression())
-            ->when('active', Method::Equal, 1, 'Yes')
+            ->when('active', Operator::Equal, 1, 'Yes')
             ->alias('lbl');
 
         $result = (new Builder())
@@ -1327,7 +1327,7 @@ class PostgreSQLTest extends TestCase
     public function testSetCaseInUpdate(): void
     {
         $case = (new CaseExpression())
-            ->when('age', Method::GreaterThanEqual, 18, 'adult')
+            ->when('age', Operator::GreaterThanEqual, 18, 'adult')
             ->else('minor');
 
         $result = (new Builder())
@@ -6193,8 +6193,8 @@ class PostgreSQLTest extends TestCase
     public function testCaseExpressionWithBindingsInSelect(): void
     {
         $case = (new CaseExpression())
-            ->when('price', Method::GreaterThan, 100, 'expensive')
-            ->when('price', Method::GreaterThan, 50, 'moderate')
+            ->when('price', Operator::GreaterThan, 100, 'expensive')
+            ->when('price', Operator::GreaterThan, 50, 'moderate')
             ->else('cheap')
             ->alias('price_tier');
 

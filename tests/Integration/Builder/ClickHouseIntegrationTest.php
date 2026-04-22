@@ -4,8 +4,8 @@ namespace Tests\Integration\Builder;
 
 use Tests\Integration\IntegrationTestCase;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
+use Utopia\Query\Builder\Case\Operator;
 use Utopia\Query\Builder\ClickHouse as Builder;
-use Utopia\Query\Method;
 use Utopia\Query\Query;
 
 class ClickHouseIntegrationTest extends IntegrationTestCase
@@ -406,8 +406,8 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
     public function testSelectWithCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('age', Method::LessThan, 30, 'young')
-            ->when('age', Method::LessThan, 35, 'mid')
+            ->when('age', Operator::LessThan, 30, 'young')
+            ->when('age', Operator::LessThan, 35, 'mid')
             ->else('senior')
             ->alias('bucket');
 

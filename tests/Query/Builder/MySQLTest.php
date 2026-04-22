@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
 use Tests\Query\Fixture\PermissionFilter as Permission;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
+use Utopia\Query\Builder\Case\Operator;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\Feature\Aggregates;
 use Utopia\Query\Builder\Feature\CTEs;
@@ -6991,8 +6992,8 @@ class MySQLTest extends TestCase
     public function testCaseBuilder(): void
     {
         $case = (new CaseExpression())
-            ->when('status', Method::Equal, 'active', 'Active')
-            ->when('status', Method::Equal, 'inactive', 'Inactive')
+            ->when('status', Operator::Equal, 'active', 'Active')
+            ->when('status', Operator::Equal, 'inactive', 'Inactive')
             ->else('Unknown')
             ->alias('label');
 
@@ -7011,7 +7012,7 @@ class MySQLTest extends TestCase
     public function testCaseBuilderWithoutElse(): void
     {
         $case = (new CaseExpression())
-            ->when('x', Method::GreaterThan, 10, 1);
+            ->when('x', Operator::GreaterThan, 10, 1);
 
         $result = (new Builder())
             ->from('t')
@@ -7101,7 +7102,7 @@ class MySQLTest extends TestCase
     public function testSelectRawWithCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('status', Method::Equal, 'active', 'Active')
+            ->when('status', Operator::Equal, 'active', 'Active')
             ->else('Other')
             ->alias('label');
 
@@ -7488,7 +7489,7 @@ class MySQLTest extends TestCase
     public function testSelectCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('status', Method::Equal, 'active', 'Active')
+            ->when('status', Operator::Equal, 'active', 'Active')
             ->else('Other')
             ->alias('label');
 
@@ -7506,7 +7507,7 @@ class MySQLTest extends TestCase
     public function testSetCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('age', Method::GreaterThanEqual, 18, 'adult')
+            ->when('age', Operator::GreaterThanEqual, 18, 'adult')
             ->else('minor');
 
         $result = (new Builder())
@@ -7945,9 +7946,9 @@ class MySQLTest extends TestCase
     public function testCaseWithMultipleWhens(): void
     {
         $case = (new CaseExpression())
-            ->when('x', Method::Equal, 1, 'one')
-            ->when('x', Method::Equal, 2, 'two')
-            ->when('x', Method::Equal, 3, 'three');
+            ->when('x', Operator::Equal, 1, 'one')
+            ->when('x', Operator::Equal, 2, 'two')
+            ->when('x', Operator::Equal, 3, 'three');
 
         $result = (new Builder())
             ->from('t')
@@ -7961,8 +7962,8 @@ class MySQLTest extends TestCase
     public function testCaseExpressionWithoutElseClause(): void
     {
         $case = (new CaseExpression())
-            ->when('x', Method::GreaterThan, 10, 1)
-            ->when('x', Method::LessThan, 0, 0);
+            ->when('x', Operator::GreaterThan, 10, 1)
+            ->when('x', Operator::LessThan, 0, 0);
 
         $result = (new Builder())
             ->from('t')
@@ -7988,7 +7989,7 @@ class MySQLTest extends TestCase
     public function testSetCaseInUpdate(): void
     {
         $case = (new CaseExpression())
-            ->when('age', Method::GreaterThanEqual, 18, 'adult')
+            ->when('age', Operator::GreaterThanEqual, 18, 'adult')
             ->else('minor');
 
         $result = (new Builder())
@@ -9820,8 +9821,8 @@ class MySQLTest extends TestCase
     public function testCaseBuilderMultipleWhens(): void
     {
         $case = (new CaseExpression())
-            ->when('status', Method::Equal, 'active', 'Active')
-            ->when('status', Method::Equal, 'inactive', 'Inactive')
+            ->when('status', Operator::Equal, 'active', 'Active')
+            ->when('status', Operator::Equal, 'inactive', 'Inactive')
             ->else('Unknown')
             ->alias('label');
 
@@ -9840,7 +9841,7 @@ class MySQLTest extends TestCase
     public function testCaseBuilderWithoutElseClause(): void
     {
         $case = (new CaseExpression())
-            ->when('x', Method::GreaterThan, 10, 1);
+            ->when('x', Operator::GreaterThan, 10, 1);
 
         $result = (new Builder())
             ->from('t')
@@ -9862,14 +9863,6 @@ class MySQLTest extends TestCase
             ->build();
 
         $this->assertStringNotContainsString('END AS', $result->query);
-    }
-
-    public function testCaseExpressionRejectsUnknownOperator(): void
-    {
-        $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('Unsupported CASE WHEN operator');
-
-        (new CaseExpression())->when('x', Method::Contains, 'y', 'z');
     }
 
     // JoinBuilder — unit-level tests
@@ -10607,8 +10600,8 @@ class MySQLTest extends TestCase
     public function testExactCaseInSelect(): void
     {
         $case = (new CaseExpression())
-            ->when('status', Method::Equal, 'active', 'Active')
-            ->when('status', Method::Equal, 'inactive', 'Inactive')
+            ->when('status', Operator::Equal, 'active', 'Active')
+            ->when('status', Operator::Equal, 'inactive', 'Inactive')
             ->else('Unknown')
             ->alias('status_label');
 
@@ -11218,8 +11211,8 @@ class MySQLTest extends TestCase
     public function testExactAdvancedSetCaseInUpdate(): void
     {
         $case = (new CaseExpression())
-            ->when('category', Method::Equal, 'electronics', 1.2)
-            ->when('category', Method::Equal, 'clothing', 0.8)
+            ->when('category', Operator::Equal, 'electronics', 1.2)
+            ->when('category', Operator::Equal, 'clothing', 0.8)
             ->else(1.0);
 
         $result = (new Builder())
@@ -13252,8 +13245,8 @@ class MySQLTest extends TestCase
     public function testCaseExpressionInSelectWithWhereAndOrderBy(): void
     {
         $case = (new CaseExpression())
-            ->when('status', Method::Equal, 'active', 'Active')
-            ->when('status', Method::Equal, 'inactive', 'Inactive')
+            ->when('status', Operator::Equal, 'active', 'Active')
+            ->when('status', Operator::Equal, 'inactive', 'Inactive')
             ->else('Unknown')
             ->alias('status_label');
 
@@ -13275,9 +13268,9 @@ class MySQLTest extends TestCase
     public function testCaseExpressionWithMultipleWhensAndAggregate(): void
     {
         $case = (new CaseExpression())
-            ->when('score', Method::GreaterThanEqual, 90, 'A')
-            ->when('score', Method::GreaterThanEqual, 80, 'B')
-            ->when('score', Method::GreaterThanEqual, 70, 'C')
+            ->when('score', Operator::GreaterThanEqual, 90, 'A')
+            ->when('score', Operator::GreaterThanEqual, 80, 'B')
+            ->when('score', Operator::GreaterThanEqual, 70, 'C')
             ->else('F')
             ->alias('grade');
 
@@ -14396,8 +14389,8 @@ class MySQLTest extends TestCase
     public function testUpdateWithCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('priority', Method::Equal, 'high', 1)
-            ->when('priority', Method::Equal, 'medium', 2)
+            ->when('priority', Operator::Equal, 'high', 1)
+            ->when('priority', Operator::Equal, 'medium', 2)
             ->else(3);
 
         $result = (new Builder())

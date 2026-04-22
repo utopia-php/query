@@ -5,6 +5,7 @@ namespace Tests\Query\Builder;
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
+use Utopia\Query\Builder\Case\Operator;
 use Utopia\Query\Builder\ClickHouse as Builder;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\Feature\Aggregates;
@@ -50,7 +51,6 @@ use Utopia\Query\Hook\Filter;
 use Utopia\Query\Hook\Join\Condition as JoinCondition;
 use Utopia\Query\Hook\Join\Filter as JoinFilter;
 use Utopia\Query\Hook\Join\Placement;
-use Utopia\Query\Method;
 use Utopia\Query\Query;
 
 class ClickHouseTest extends TestCase
@@ -6408,7 +6408,7 @@ class ClickHouseTest extends TestCase
     public function testSelectCaseExpression(): void
     {
         $case = (new CaseExpression())
-            ->when('status', Method::Equal, 'active', 'Active')
+            ->when('status', Operator::Equal, 'active', 'Active')
             ->else('Unknown')
             ->alias('label');
 
@@ -6425,7 +6425,7 @@ class ClickHouseTest extends TestCase
     public function testSetCaseInUpdate(): void
     {
         $case = (new CaseExpression())
-            ->when('role', Method::Equal, 'admin', 'Admin')
+            ->when('role', Operator::Equal, 'admin', 'Admin')
             ->else('User');
 
         $result = (new Builder())
@@ -7743,8 +7743,8 @@ class ClickHouseTest extends TestCase
     public function testExactCaseInSelect(): void
     {
         $case = (new CaseExpression())
-            ->when('status', Method::Equal, 'active', 'Active')
-            ->when('status', Method::Equal, 'inactive', 'Inactive')
+            ->when('status', Operator::Equal, 'active', 'Active')
+            ->when('status', Operator::Equal, 'inactive', 'Inactive')
             ->else('Unknown')
             ->alias('status_label');
 
@@ -8893,8 +8893,8 @@ class ClickHouseTest extends TestCase
     public function testCaseExpressionWithAggregate(): void
     {
         $case = (new CaseExpression())
-            ->when('status', Method::Equal, 'active', 'active')
-            ->when('status', Method::Equal, 'inactive', 'inactive')
+            ->when('status', Operator::Equal, 'active', 'active')
+            ->when('status', Operator::Equal, 'inactive', 'inactive')
             ->else('unknown')
             ->alias('status_label');
 

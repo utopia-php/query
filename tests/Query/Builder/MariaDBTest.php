@@ -5,6 +5,7 @@ namespace Tests\Query\Builder;
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
+use Utopia\Query\Builder\Case\Operator;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\Hints;
 use Utopia\Query\Builder\Feature\Json;
@@ -773,7 +774,7 @@ class MariaDBTest extends TestCase
 
     public function testSpatialDistanceWktString(): void
     {
-        $query = new Query(\Utopia\Query\Method::DistanceLessThan, 'coords', [['POINT(10 20)', 500.0, false]]);
+        $query = new Query(Method::DistanceLessThan, 'coords', [['POINT(10 20)', 500.0, false]]);
 
         $result = (new Builder())
             ->from('t')
@@ -966,8 +967,8 @@ class MariaDBTest extends TestCase
     public function testCaseExpressionWithAggregate(): void
     {
         $case = (new CaseExpression())
-            ->when('status', Method::Equal, 'active', 'active')
-            ->when('status', Method::Equal, 'inactive', 'inactive')
+            ->when('status', Operator::Equal, 'active', 'active')
+            ->when('status', Operator::Equal, 'inactive', 'inactive')
             ->else('other')
             ->alias('label');
 
