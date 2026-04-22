@@ -951,11 +951,10 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
      */
     protected function compileSpatialDistance(Method $method, string $attribute, array $values): string
     {
-        /** @var array{0: string|array<mixed>, 1: float, 2: bool} $data */
-        $data = $values[0];
-        $wkt = \is_array($data[0]) ? $this->geometryToWkt($data[0]) : $data[0];
-        $distance = $data[1];
-        $meters = $data[2];
+        /** @var array{0: string|array<mixed>, 1: float, 2: bool} $tuple */
+        $tuple = $values[0];
+        $filter = SpatialDistanceFilter::fromTuple($tuple);
+        $wkt = \is_array($filter->geometry) ? $this->geometryToWkt($filter->geometry) : $filter->geometry;
 
         $operator = match ($method) {
             Method::DistanceLessThan => '<',
@@ -965,15 +964,12 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             default => '<',
         };
 
-        if ($meters) {
-            $this->addBinding($wkt);
-            $this->addBinding($distance);
+        $this->addBinding($wkt);
+        $this->addBinding($filter->distance);
 
+        if ($filter->meters) {
             return 'ST_Distance((' . $attribute . '::geography), ST_SetSRID(ST_GeomFromText(?), 4326)::geography) ' . $operator . ' ?';
         }
-
-        $this->addBinding($wkt);
-        $this->addBinding($distance);
 
         return 'ST_Distance(' . $attribute . ', ST_GeomFromText(?, 4326)) ' . $operator . ' ?';
     }
