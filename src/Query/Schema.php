@@ -4,6 +4,7 @@ namespace Utopia\Query;
 
 use Closure;
 use Utopia\Query\Builder\Plan;
+use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\Column;
 use Utopia\Query\Schema\IndexType;
@@ -337,6 +338,8 @@ abstract class Schema
 
     /**
      * Compile index column list with lengths, orders, collations, and operator classes.
+     *
+     * @throws ValidationException if a collation or order value is not safe to emit inline.
      */
     protected function compileIndexColumns(Schema\Index $index): string
     {
@@ -346,7 +349,11 @@ abstract class Schema
             $part = $this->quote($col);
 
             if (isset($index->collations[$col])) {
-                $part .= ' COLLATE ' . $index->collations[$col];
+                $collation = $index->collations[$col];
+                if (! \preg_match('/^[A-Za-z0-9_"]+$/', $collation)) {
+                    throw new ValidationException('Invalid collation: ' . $collation);
+                }
+                $part .= ' COLLATE ' . $collation;
             }
 
             if (isset($index->lengths[$col])) {
@@ -358,7 +365,11 @@ abstract class Schema
             }
 
             if (isset($index->orders[$col])) {
-                $part .= ' ' . \strtoupper($index->orders[$col]);
+                $order = \strtoupper($index->orders[$col]);
+                if ($order !== OrderDirection::Asc->value && $order !== OrderDirection::Desc->value) {
+                    throw new ValidationException('Invalid index order: ' . $index->orders[$col]);
+                }
+                $part .= ' ' . $order;
             }
 
             $parts[] = $part;

@@ -73,6 +73,11 @@ abstract class SQL extends Schema implements ForeignKeys, Procedures, Triggers
     }
 
     /**
+     * Create a stored procedure.
+     *
+     * $body is emitted verbatim into the generated DDL and must come from
+     * trusted (developer-controlled) source — never from untrusted input.
+     *
      * @param  list<array{0: ParameterDirection, 1: string, 2: string}>  $params
      */
     public function createProcedure(string $name, array $params, string $body): Plan
@@ -91,6 +96,12 @@ abstract class SQL extends Schema implements ForeignKeys, Procedures, Triggers
         return new Plan('DROP PROCEDURE ' . $this->quote($name), [], executor: $this->executor);
     }
 
+    /**
+     * Create a trigger.
+     *
+     * $body is emitted verbatim into the generated DDL and must come from
+     * trusted (developer-controlled) source — never from untrusted input.
+     */
     public function createTrigger(
         string $name,
         string $table,

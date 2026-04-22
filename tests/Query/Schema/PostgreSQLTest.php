@@ -706,6 +706,82 @@ class PostgreSQLTest extends TestCase
         $this->assertEquals([], $result->bindings);
     }
 
+    public function testAlterColumnTypeRejectsInjectionInType(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid column type');
+
+        $schema = new Schema();
+        $schema->alterColumnType('users', 'age', 'INTEGER; DROP TABLE users');
+    }
+
+    public function testAlterColumnTypeRejectsSemicolonInUsing(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid USING expression');
+
+        $schema = new Schema();
+        $schema->alterColumnType('users', 'age', 'INTEGER', 'age::integer; DROP TABLE users');
+    }
+
+    public function testAlterColumnTypeRejectsLineCommentInUsing(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->alterColumnType('users', 'age', 'INTEGER', 'age::integer -- trailing');
+    }
+
+    public function testAlterColumnTypeRejectsBlockCommentInUsing(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->alterColumnType('users', 'age', 'INTEGER', 'age::integer /* comment */');
+    }
+
+    public function testAlterColumnTypeRejectsOversizedUsing(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('1024 character limit');
+
+        $schema = new Schema();
+        $schema->alterColumnType('users', 'age', 'INTEGER', \str_repeat('a', 1025));
+    }
+
+    public function testAlterColumnTypeAllowsCastExpressionInUsing(): void
+    {
+        $schema = new Schema();
+        $result = $schema->alterColumnType('users', 'age', 'INTEGER', 'CAST("age" AS INTEGER)');
+
+        $this->assertStringContainsString('USING CAST("age" AS INTEGER)', $result->query);
+    }
+
+    public function testCreatePartitionRejectsSemicolon(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid partition expression');
+
+        $schema = new Schema();
+        $schema->createPartition('orders', 'orders_bad', "IN ('2024'); DROP TABLE orders");
+    }
+
+    public function testCreatePartitionRejectsLineComment(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->createPartition('orders', 'orders_bad', "IN ('2024') -- bad");
+    }
+
+    public function testCreatePartitionRejectsOversizedExpression(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->createPartition('orders', 'orders_bad', \str_repeat('a', 1025));
+    }
+
     public function testDropIndexConcurrently(): void
     {
         $schema = new Schema();
@@ -1043,6 +1119,88 @@ class PostgreSQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString("(data->>'name')", $result->query);
+    }
+
+    public function testCreateIndexRejectsInjectionInCollation(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid collation');
+
+        $schema = new Schema();
+        $schema->createIndex(
+            'users',
+            'idx_name',
+            ['name'],
+            collations: ['name' => 'en_US; DROP TABLE users'],
+        );
+    }
+
+    public function testCreateIndexRejectsInjectionInOrder(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid index order');
+
+        $schema = new Schema();
+        $schema->createIndex(
+            'users',
+            'idx_name',
+            ['name'],
+            orders: ['name' => 'ASC; DROP TABLE users'],
+        );
+    }
+
+    public function testCreateIndexRejectsNonAscDescOrder(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->createIndex(
+            'users',
+            'idx_name',
+            ['name'],
+            orders: ['name' => 'random'],
+        );
+    }
+
+    public function testCreateIndexAcceptsQuotedCollation(): void
+    {
+        $schema = new Schema();
+        $result = $schema->createIndex(
+            'users',
+            'idx_name',
+            ['name'],
+            collations: ['name' => '"en_US"'],
+        );
+
+        $this->assertStringContainsString('COLLATE "en_US"', $result->query);
+    }
+
+    public function testCreateTriggerRejectsDollarQuoteTerminatorInBody(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('dollar-quote terminator');
+
+        $schema = new Schema();
+        $schema->createTrigger(
+            'my_trigger',
+            'users',
+            TriggerTiming::Before,
+            TriggerEvent::Insert,
+            "$$; DROP TABLE users; --",
+        );
+    }
+
+    public function testCreateProcedureRejectsDollarQuoteTerminatorInBody(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('dollar-quote terminator');
+
+        $schema = new Schema();
+        $schema->createProcedure(
+            'my_proc',
+            [[ParameterDirection::In, 'x', 'INT']],
+            "$$; DROP TABLE users; --",
+        );
     }
 
     public function testBlueprintAddIndexWithStringType(): void

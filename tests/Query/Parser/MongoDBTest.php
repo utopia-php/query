@@ -281,6 +281,57 @@ class MongoDBTest extends TestCase
         $this->assertSame(Type::Unknown, $this->parser->parse($header . $body));
     }
 
+    public function testMalformedBsonStringLengthDoesNotCrash(): void
+    {
+        // Build a BSON doc with a string element whose declared strLen is
+        // 0xFFFFFFFF (maximum uint32). On 32-bit PHP this is a negative int;
+        // on 64-bit it vastly exceeds the buffer. Either way, skipBsonString
+        // must reject it and the parser must not read past the buffer.
+        // Layout: [docLen][0x02 "foo" \0 0xFFFFFFFF "x" \0][00]
+        $malicious = "\x02" . 'foo' . "\x00"
+            . "\xFF\xFF\xFF\xFF"   // claimed strLen (huge / negative)
+            . 'x' . "\x00";         // some placeholder bytes; we will not read them
+        $bsonBody = $malicious . "\x00"; // document terminator
+        $bson = \pack('V', 4 + \strlen($bsonBody)) . $bsonBody;
+
+        $sectionKind = "\x00";
+        $flags = \pack('V', 0);
+        $body = $flags . $sectionKind . $bson;
+        $header = \pack('V', 16 + \strlen($body))
+            . \pack('V', 1)
+            . \pack('V', 0)
+            . \pack('V', 2013);
+
+        $data = $header . $body;
+
+        // The hasBsonKey scan for startTransaction must bail safely
+        // (returning false), and the first-key command lookup is 'foo',
+        // which is unknown — so classification is Unknown.
+        $this->assertSame(Type::Unknown, $this->parser->parse($data));
+    }
+
+    public function testMalformedBsonBinaryLengthDoesNotCrash(): void
+    {
+        // Same attack but via a binary element (type 0x05).
+        $malicious = "\x05" . 'foo' . "\x00"
+            . "\xFF\xFF\xFF\xFF"   // claimed binLen
+            . "\x00";               // subtype byte
+        $bsonBody = $malicious . "\x00";
+        $bson = \pack('V', 4 + \strlen($bsonBody)) . $bsonBody;
+
+        $sectionKind = "\x00";
+        $flags = \pack('V', 0);
+        $body = $flags . $sectionKind . $bson;
+        $header = \pack('V', 16 + \strlen($body))
+            . \pack('V', 1)
+            . \pack('V', 0)
+            . \pack('V', 2013);
+
+        $data = $header . $body;
+
+        $this->assertSame(Type::Unknown, $this->parser->parse($data));
+    }
+
     public function testClassifySqlReturnsUnknown(): void
     {
         $this->assertSame(Type::Unknown, $this->parser->classifySQL('SELECT * FROM users'));
