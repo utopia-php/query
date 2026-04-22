@@ -70,6 +70,46 @@ class OrderedSetAggregatesTest extends TestCase
         $this->assertStringNotContainsString('AS ""', $result->query);
     }
 
+    public function testModeEmitsModeWithinGroup(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->mode('city')
+            ->build();
+
+        $this->assertStringContainsString(
+            'MODE() WITHIN GROUP (ORDER BY "city")',
+            $result->query,
+        );
+        $this->assertStringNotContainsString('AS ""', $result->query);
+    }
+
+    public function testModeWithAlias(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->mode('city', 'top_city')
+            ->build();
+
+        $this->assertStringContainsString(
+            'MODE() WITHIN GROUP (ORDER BY "city") AS "top_city"',
+            $result->query,
+        );
+    }
+
+    public function testModeWithQualifiedColumn(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->mode('users.city', 'top_city')
+            ->build();
+
+        $this->assertStringContainsString(
+            'MODE() WITHIN GROUP (ORDER BY "users"."city") AS "top_city"',
+            $result->query,
+        );
+    }
+
     public function testTwoPercentilesBindFractionsInCallOrder(): void
     {
         $result = (new Builder())

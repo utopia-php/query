@@ -865,6 +865,17 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     }
 
     #[\Override]
+    public function mode(string $column, string $alias = ''): static
+    {
+        $expr = 'MODE() WITHIN GROUP (ORDER BY ' . $this->resolveAndWrap($column) . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->select($expr);
+    }
+
+    #[\Override]
     public function percentileCont(float $fraction, string $orderColumn, string $alias = ''): static
     {
         $expr = 'PERCENTILE_CONT(?) WITHIN GROUP (ORDER BY ' . $this->resolveAndWrap($orderColumn) . ')';

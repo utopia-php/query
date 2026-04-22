@@ -651,7 +651,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
     {
         $result = (new Builder())
             ->from('users')
-            ->selectRaw('MODE() WITHIN GROUP (ORDER BY "city") AS "top_city"')
+            ->mode('city', 'top_city')
             ->build();
 
         $rows = $this->executeOnPostgres($result);
