@@ -460,6 +460,27 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     }
 
     #[\Override]
+    public function quantiles(array $levels, string $column, string $alias = ''): static
+    {
+        if ($levels === []) {
+            throw new ValidationException('quantiles() requires at least one level.');
+        }
+
+        foreach ($levels as $level) {
+            if ($level < 0.0 || $level > 1.0) {
+                throw new ValidationException('quantiles() levels must be in the range [0, 1].');
+            }
+        }
+
+        $expr = 'quantiles(' . \implode(', ', $levels) . ')(' . $this->resolveAndWrap($column) . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->select($expr);
+    }
+
+    #[\Override]
     public function quantileExact(float $level, string $column, string $alias = ''): static
     {
         $expr = 'quantileExact(' . $level . ')(' . $this->resolveAndWrap($column) . ')';

@@ -699,10 +699,9 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
             . \implode(', ', $values)
         );
 
-        // Builder has no `quantiles(level, level, ...)` helper; use selectRaw.
         $result = (new Builder())
             ->from('ch_approx')
-            ->selectRaw('quantiles(0.25, 0.5, 0.75)(`value`) AS `qs`')
+            ->quantiles([0.25, 0.5, 0.75], 'value', 'qs')
             ->build();
 
         $rows = $this->executeOnClickhouse($result);
