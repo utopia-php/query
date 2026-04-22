@@ -2,6 +2,7 @@
 
 namespace Tests\Query\Parser;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Parser\PostgreSQL;
 use Utopia\Query\Type;
@@ -205,6 +206,7 @@ class SQLTest extends TestCase
 
     // -- Performance --
 
+    #[Group('performance')]
     public function testClassifySqlPerformance(): void
     {
         if (\getenv('CI') !== false) {

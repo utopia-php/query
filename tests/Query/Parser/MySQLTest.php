@@ -2,6 +2,7 @@
 
 namespace Tests\Query\Parser;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Parser\MySQL;
 use Utopia\Query\Type;
@@ -177,6 +178,7 @@ class MySQLTest extends TestCase
 
     // -- Performance --
 
+    #[Group('performance')]
     public function testParsePerformance(): void
     {
         if (\getenv('CI') !== false) {

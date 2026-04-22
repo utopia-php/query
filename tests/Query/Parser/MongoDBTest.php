@@ -2,6 +2,7 @@
 
 namespace Tests\Query\Parser;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Parser\MongoDB;
 use Utopia\Query\Type;
@@ -344,6 +345,7 @@ class MongoDBTest extends TestCase
 
     // -- Performance --
 
+    #[Group('performance')]
     public function testParsePerformance(): void
     {
         if (\getenv('CI') !== false) {
@@ -367,6 +369,7 @@ class MongoDBTest extends TestCase
         );
     }
 
+    #[Group('performance')]
     public function testTransactionScanPerformance(): void
     {
         if (\getenv('CI') !== false) {
