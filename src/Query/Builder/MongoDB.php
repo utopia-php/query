@@ -2,6 +2,7 @@
 
 namespace Utopia\Query\Builder;
 
+use stdClass;
 use Utopia\Query\Builder as BaseBuilder;
 use Utopia\Query\Builder\Feature\FullTextSearch;
 use Utopia\Query\Builder\Feature\MongoDB\ArrayPushModifiers;
@@ -509,6 +510,13 @@ class MongoDB extends BaseBuilder implements
         $this->bindings = [];
         $this->validateTable();
 
+        if (! empty($this->rawSets) || ! empty($this->caseSets) || ! empty($this->conflictRawSets)) {
+            throw new UnsupportedException(
+                'setRaw()/setCase() are not supported on the MongoDB builder. '
+                . 'Use typed set()/updateInc/updatePush/etc. or raw pipeline stages instead.'
+            );
+        }
+
         $grouped = Query::groupByType($this->pendingQueries);
         $filter = $this->buildFilter($grouped);
 
@@ -521,7 +529,7 @@ class MongoDB extends BaseBuilder implements
         $operation = [
             'collection' => $this->table,
             'operation' => 'updateMany',
-            'filter' => ! empty($filter) ? $filter : new \stdClass(),
+            'filter' => ! empty($filter) ? $filter : new stdClass(),
             'update' => $update,
         ];
 
@@ -547,7 +555,7 @@ class MongoDB extends BaseBuilder implements
         $operation = [
             'collection' => $this->table,
             'operation' => 'deleteMany',
-            'filter' => ! empty($filter) ? $filter : new \stdClass(),
+            'filter' => ! empty($filter) ? $filter : new stdClass(),
         ];
 
         return new Plan(
@@ -602,14 +610,33 @@ class MongoDB extends BaseBuilder implements
 
     public function insertOrIgnore(): Plan
     {
-        $result = $this->insert();
-        /** @var array<string, mixed> $op */
-        $op = \json_decode($result->query, true);
-        $op['options'] = ['ordered' => false];
+        // Build the operation descriptor directly instead of round-tripping through
+        // insert() + json_decode(): a round-trip would coerce empty stdClass values
+        // (used elsewhere to encode `{}`) into `[]`.
+        $this->bindings = [];
+        $this->validateTable();
+        $this->validateRows('insert');
+
+        $documents = [];
+        foreach ($this->rows as $row) {
+            $document = [];
+            foreach ($row as $column => $value) {
+                $this->addBinding($value);
+                $document[$column] = '?';
+            }
+            $documents[] = $document;
+        }
+
+        $operation = [
+            'collection' => $this->table,
+            'operation' => 'insertMany',
+            'documents' => $documents,
+            'options' => ['ordered' => false],
+        ];
 
         return new Plan(
-            \json_encode($op, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
-            $result->bindings,
+            \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+            $this->bindings,
             executor: $this->executor,
         );
     }
@@ -871,7 +898,7 @@ class MongoDB extends BaseBuilder implements
         $orderQueries = Query::getByType($this->pendingQueries, [Method::OrderRandom], false);
         if (! empty($orderQueries)) {
             $hasRandomOrder = true;
-            $pipeline[] = ['$addFields' => ['_rand' => ['$rand' => new \stdClass()]]];
+            $pipeline[] = ['$addFields' => ['_rand' => ['$rand' => new stdClass()]]];
         }
 
         // ORDER BY
@@ -1236,14 +1263,23 @@ class MongoDB extends BaseBuilder implements
      */
     private function buildFieldExists(Query $query, bool $exists): array
     {
+        // SQL parity: IS NULL is true only for an explicit NULL value; IS NOT NULL is
+        // true only for a non-null present value. Missing fields are neither IS NULL nor
+        // IS NOT NULL under that reading.
+        //
+        // MongoDB:
+        //   - {field: {$type: 10}} matches documents where the field EXISTS and is
+        //     explicitly BSON null — mirrors SQL IS NULL.
+        //   - {field: {$exists: true, $ne: null}} matches documents where the field
+        //     EXISTS and is non-null — mirrors SQL IS NOT NULL.
         $conditions = [];
         foreach ($query->getValues() as $attr) {
             /** @var string $attr */
             $field = $this->resolveAttribute($attr);
             if ($exists) {
-                $conditions[] = [$field => ['$ne' => null]];
+                $conditions[] = [$field => ['$exists' => true, '$ne' => null]];
             } else {
-                $conditions[] = [$field => null];
+                $conditions[] = [$field => ['$type' => 10]];
             }
         }
 
@@ -1396,10 +1432,19 @@ class MongoDB extends BaseBuilder implements
 
         /** @var string $leftCol */
         $leftCol = $values[0];
+        /** @var string $operator */
+        $operator = $values[1] ?? '=';
         /** @var string $rightCol */
         $rightCol = $values[2];
         /** @var string $alias */
         $alias = $values[3] ?? $table;
+
+        if ($operator !== '=') {
+            throw new UnsupportedException(
+                'MongoDB $lookup in localField/foreignField form only supports equality joins. '
+                . "Got operator '{$operator}'. Use a pipeline-form \$lookup via a raw stage for non-equality joins."
+            );
+        }
 
         $localField = $this->stripTablePrefix($leftCol);
         $foreignField = $this->stripTablePrefix($rightCol);
@@ -1433,18 +1478,22 @@ class MongoDB extends BaseBuilder implements
             /** @var array<string> $fields */
             $fields = $grouped->selections[0]->getValues();
 
+            // Resolve each attribute once — attribute hooks can be O(hooks) per call.
+            $resolved = [];
+            foreach ($fields as $field) {
+                $resolved[$field] = $this->resolveAttribute($field);
+            }
+
             $id = [];
             foreach ($fields as $field) {
-                $resolved = $this->resolveAttribute($field);
-                $id[$resolved] = '$' . $resolved;
+                $id[$resolved[$field]] = '$' . $resolved[$field];
             }
 
             $stages[] = ['$group' => ['_id' => $id]];
 
             $project = ['_id' => 0];
             foreach ($fields as $field) {
-                $resolved = $this->resolveAttribute($field);
-                $project[$resolved] = '$_id.' . $resolved;
+                $project[$resolved[$field]] = '$_id.' . $resolved[$field];
             }
             $stages[] = ['$project' => $project];
         }
@@ -1497,13 +1546,32 @@ class MongoDB extends BaseBuilder implements
                 default => null,
             };
 
-            if ($mongoFunc !== null) {
-                $output[$win->alias] = [$mongoFunc => new \stdClass()];
+            $isRankingFunction = $mongoFunc !== null;
+
+            if ($isRankingFunction) {
+                // MongoDB's $rank/$denseRank/$documentNumber require a sortBy at runtime;
+                // surface this as a build-time error for a clearer failure mode.
+                if ($win->orderBy === null || $win->orderBy === []) {
+                    throw new ValidationException(
+                        "Window function '{$win->function}' requires an ORDER BY clause on MongoDB."
+                    );
+                }
+
+                $output[$win->alias] = [$mongoFunc => new stdClass()];
             } else {
-                // Try to parse function with argument like SUM(amount)
                 if (\preg_match('/^(\w+)\((.+)\)$/i', $win->function, $matches)) {
+                    $argument = \trim($matches[2]);
+
+                    // Reject multi-argument window functions (e.g. COVAR(a, b)) — the
+                    // localField/pipeline $setWindowFields shape only accepts a single expression.
+                    if (\str_contains($argument, ',')) {
+                        throw new UnsupportedException(
+                            "Multi-argument window functions are not supported on MongoDB: {$win->function}"
+                        );
+                    }
+
                     $aggFunc = \strtolower($matches[1]);
-                    $aggCol = \trim($matches[2]);
+                    $aggCol = $argument;
                     $mongoAggFunc = match ($aggFunc) {
                         'sum' => '$sum',
                         'avg' => '$avg',

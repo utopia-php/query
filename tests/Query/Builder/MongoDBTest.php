@@ -4,6 +4,7 @@ namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
+use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\Feature\Aggregates;
 use Utopia\Query\Builder\Feature\CTEs;
 use Utopia\Query\Builder\Feature\Deletes;
@@ -1506,7 +1507,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['email' => ['$ne' => null]], $op['filter']);
+        $this->assertEquals(['email' => ['$exists' => true, '$ne' => null]], $op['filter']);
     }
 
     public function testFilterFieldNotExists(): void
@@ -1518,7 +1519,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['email' => null], $op['filter']);
+        $this->assertEquals(['email' => ['$type' => 10]], $op['filter']);
     }
 
     public function testFilterFieldExistsMultiple(): void
@@ -1531,8 +1532,8 @@ class MongoDBTest extends TestCase
 
         $op = $this->decode($result->query);
         $this->assertEquals(['$and' => [
-            ['email' => ['$ne' => null]],
-            ['phone' => ['$ne' => null]],
+            ['email' => ['$exists' => true, '$ne' => null]],
+            ['phone' => ['$exists' => true, '$ne' => null]],
         ]], $op['filter']);
     }
 
@@ -1546,8 +1547,8 @@ class MongoDBTest extends TestCase
 
         $op = $this->decode($result->query);
         $this->assertEquals(['$and' => [
-            ['email' => null],
-            ['phone' => null],
+            ['email' => ['$type' => 10]],
+            ['phone' => ['$type' => 10]],
         ]], $op['filter']);
     }
 
@@ -1815,6 +1816,179 @@ class MongoDBTest extends TestCase
 
         $op = $this->decode($result->query);
         $this->assertArrayHasKey('filter', $op);
+    }
+
+    public function testJoinWithNonEqualityOperatorThrows(): void
+    {
+        $this->expectException(UnsupportedException::class);
+        $this->expectExceptionMessage('equality joins');
+
+        (new Builder())
+            ->from('orders')
+            ->join('users', 'orders.user_id', 'users.id', '<>', 'u')
+            ->build();
+    }
+
+    public function testJoinWithGreaterThanOperatorThrows(): void
+    {
+        $this->expectException(UnsupportedException::class);
+        $this->expectExceptionMessage('equality joins');
+
+        (new Builder())
+            ->from('orders')
+            ->join('orders', 'orders.amount', 'users.threshold', '>', 'o')
+            ->build();
+    }
+
+    public function testUpdateWithSetRawThrows(): void
+    {
+        $this->expectException(UnsupportedException::class);
+        $this->expectExceptionMessage('setRaw()/setCase()');
+
+        (new Builder())
+            ->from('users')
+            ->setRaw('counter', 'counter + 1')
+            ->update();
+    }
+
+    public function testUpdateWithSetCaseThrows(): void
+    {
+        $this->expectException(UnsupportedException::class);
+        $this->expectExceptionMessage('setRaw()/setCase()');
+
+        (new Builder())
+            ->from('users')
+            ->setCase('status', new CaseExpression('CASE WHEN age > 18 THEN ? ELSE ? END', ['adult', 'minor']))
+            ->update();
+    }
+
+    public function testWindowFunctionMultiArgumentThrows(): void
+    {
+        $this->expectException(UnsupportedException::class);
+        $this->expectExceptionMessage('Multi-argument window functions');
+
+        (new Builder())
+            ->from('metrics')
+            ->selectWindow('COVAR(a, b)', 'cov', ['user_id'], ['created_at'])
+            ->build();
+    }
+
+    public function testWindowFunctionRankWithoutOrderByThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('requires an ORDER BY');
+
+        (new Builder())
+            ->from('scores')
+            ->selectWindow('RANK()', 'rnk', ['category'])
+            ->build();
+    }
+
+    public function testWindowFunctionDenseRankWithoutOrderByThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('requires an ORDER BY');
+
+        (new Builder())
+            ->from('scores')
+            ->selectWindow('DENSE_RANK()', 'dense', ['category'])
+            ->build();
+    }
+
+    public function testWindowFunctionRowNumberWithoutOrderByThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('requires an ORDER BY');
+
+        (new Builder())
+            ->from('orders')
+            ->selectWindow('ROW_NUMBER()', 'rn', ['user_id'])
+            ->build();
+    }
+
+    public function testFilterFieldExistsUsesExplicitNonNullCheck(): void
+    {
+        // SQL-parity: IS NOT NULL is true only when the field is present AND non-null.
+        $result = (new Builder())
+            ->from('users')
+            ->filter([Query::exists(['email'])])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $filter */
+        $filter = $op['filter'];
+        /** @var array<string, mixed> $emailFilter */
+        $emailFilter = $filter['email'];
+        $this->assertTrue($emailFilter['$exists']);
+        $this->assertNull($emailFilter['$ne']);
+    }
+
+    public function testFilterFieldNotExistsUsesTypeNull(): void
+    {
+        // SQL-parity: IS NULL is true only when the field is present AND explicitly null.
+        // Missing fields do not match (BSON type 10 = null).
+        $result = (new Builder())
+            ->from('users')
+            ->filter([Query::notExists(['email'])])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $filter */
+        $filter = $op['filter'];
+        /** @var array<string, mixed> $emailFilter */
+        $emailFilter = $filter['email'];
+        $this->assertSame(10, $emailFilter['$type']);
+    }
+
+    public function testInsertOrIgnoreDoesNotRoundTripThroughJson(): void
+    {
+        // Regression: an earlier implementation did json_decode(insert()->query) which
+        // would coerce any empty stdClass (used elsewhere to encode `{}`) to `[]`.
+        // Verify the output is still a well-formed insertMany with ordered=false.
+        $result = (new Builder())
+            ->into('users')
+            ->set(['name' => 'Alice', 'email' => 'alice@test.com'])
+            ->insertOrIgnore();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertSame('users', $op['collection']);
+        $this->assertSame('insertMany', $op['operation']);
+        /** @var array<string, mixed> $options */
+        $options = $op['options'];
+        $this->assertFalse($options['ordered']);
+        /** @var list<array<string, mixed>> $documents */
+        $documents = $op['documents'];
+        $this->assertCount(1, $documents);
+        $this->assertSame(['name' => '?', 'email' => '?'], $documents[0]);
+        $this->assertSame(['Alice', 'alice@test.com'], $result->bindings);
+    }
+
+    public function testWindowFunctionAliasIsPreservedInProjection(): void
+    {
+        // Regression for commit 06ceaca: the $project stage after $setWindowFields
+        // must include the window function alias so it survives projection.
+        $result = (new Builder())
+            ->from('orders')
+            ->select(['user_id'])
+            ->selectWindow('ROW_NUMBER()', 'rn', ['user_id'], ['-amount'])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $op = $this->decode($result->query);
+        $this->assertSame('aggregate', $op['operation']);
+
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $projectStage = $this->findStage($pipeline, '$project');
+        $this->assertNotNull($projectStage);
+        /** @var array<string, mixed> $projection */
+        $projection = $projectStage['$project'];
+        $this->assertArrayHasKey('rn', $projection);
+        $this->assertSame(1, $projection['rn']);
+        $this->assertArrayHasKey('user_id', $projection);
     }
 
     /**
