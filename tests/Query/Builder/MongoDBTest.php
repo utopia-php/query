@@ -24,6 +24,8 @@ use Utopia\Query\Builder\Feature\Updates;
 use Utopia\Query\Builder\Feature\Upsert;
 use Utopia\Query\Builder\Feature\Windows;
 use Utopia\Query\Builder\MongoDB as Builder;
+use Utopia\Query\Builder\MongoDB\Operation;
+use Utopia\Query\Builder\MongoDB\UpdateOperator;
 use Utopia\Query\Builder\Plan;
 use Utopia\Query\Compiler;
 use Utopia\Query\Exception\UnsupportedException;
@@ -5596,5 +5598,51 @@ class MongoDBTest extends TestCase
         $this->assertArrayHasKey('filter', $op);
         $this->assertArrayHasKey($identifier, $op['filter']);
         $this->assertSame(['x'], $result->bindings);
+    }
+
+    public function testUpdateUsesOperatorEnumsForMixedOperations(): void
+    {
+        $builder = (new Builder())
+            ->from('users')
+            ->set(['status' => 'active'])
+            ->push('tags', 'vip')
+            ->increment('loginCount', 1)
+            ->unsetFields('deprecatedField');
+
+        $plan = $builder->update();
+        /** @var array<string, mixed> $operation */
+        $operation = \json_decode($plan->query, true);
+
+        $this->assertSame(Operation::UpdateMany->value, $operation['operation']);
+
+        /** @var array<string, mixed> $update */
+        $update = $operation['update'];
+
+        $this->assertArrayHasKey(UpdateOperator::Set->value, $update);
+        $this->assertArrayHasKey(UpdateOperator::Push->value, $update);
+        $this->assertArrayHasKey(UpdateOperator::Increment->value, $update);
+        $this->assertArrayHasKey(UpdateOperator::Unset->value, $update);
+
+        $this->assertSame(['status' => '?'], $update[UpdateOperator::Set->value]);
+        $this->assertSame(['tags' => '?'], $update[UpdateOperator::Push->value]);
+        $this->assertSame(['loginCount' => 1], $update[UpdateOperator::Increment->value]);
+        $this->assertSame(['deprecatedField' => ''], $update[UpdateOperator::Unset->value]);
+    }
+
+    public function testUpdateOperatorEnumValuesMatchMongoStrings(): void
+    {
+        $this->assertSame('$set', UpdateOperator::Set->value);
+        $this->assertSame('$push', UpdateOperator::Push->value);
+        $this->assertSame('$pull', UpdateOperator::Pull->value);
+        $this->assertSame('$pullAll', UpdateOperator::PullAll->value);
+        $this->assertSame('$addToSet', UpdateOperator::AddToSet->value);
+        $this->assertSame('$inc', UpdateOperator::Increment->value);
+        $this->assertSame('$mul', UpdateOperator::Multiply->value);
+        $this->assertSame('$unset', UpdateOperator::Unset->value);
+        $this->assertSame('$rename', UpdateOperator::Rename->value);
+        $this->assertSame('$pop', UpdateOperator::Pop->value);
+        $this->assertSame('$min', UpdateOperator::Min->value);
+        $this->assertSame('$max', UpdateOperator::Max->value);
+        $this->assertSame('$currentDate', UpdateOperator::CurrentDate->value);
     }
 }
