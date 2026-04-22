@@ -21,15 +21,19 @@ use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\Specification\Window as WindowSpecification;
 use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\Exception;
+use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Tokenizer\Token;
 use Utopia\Query\Tokenizer\TokenType;
 
 class Parser
 {
+    private const int MAX_DEPTH = 256;
+
     /** @var Token[] */
     private array $tokens;
     private int $tokenCount;
     private int $pos;
+    private int $depth = 0;
     private bool $inColumnList = false;
 
     /**
@@ -41,6 +45,7 @@ class Parser
         $this->tokens = $tokens;
         $this->tokenCount = count($tokens);
         $this->pos = 0;
+        $this->depth = 0;
         $this->inColumnList = false;
 
         return $this->parseSelect();
@@ -255,7 +260,17 @@ class Parser
 
     private function parseExpression(): Expression
     {
-        return $this->parseOr();
+        if ($this->depth >= self::MAX_DEPTH) {
+            throw new ValidationException('Expression nesting too deep');
+        }
+
+        $this->depth++;
+
+        try {
+            return $this->parseOr();
+        } finally {
+            $this->depth--;
+        }
     }
 
     private function parseOr(): Expression

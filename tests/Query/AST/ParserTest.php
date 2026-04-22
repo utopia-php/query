@@ -27,6 +27,7 @@ use Utopia\Query\AST\Specification\Window as WindowSpecification;
 use Utopia\Query\AST\Star;
 use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\AST\SubquerySource;
+use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Tokenizer\Tokenizer;
 
 class ParserTest extends TestCase
@@ -713,5 +714,16 @@ class ParserTest extends TestCase
         $this->assertCount(1, $stmt->columns);
         $this->assertInstanceOf(Column::class, $stmt->columns[0]);
         $this->assertSame('foo"bar', $stmt->columns[0]->name);
+    }
+
+    public function testDeeplyNestedExpressionRejected(): void
+    {
+        $depth = 500;
+        $sql = 'SELECT ' . \str_repeat('(', $depth) . '1' . \str_repeat(')', $depth) . ' FROM t';
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Expression nesting too deep');
+
+        $this->parse($sql);
     }
 }

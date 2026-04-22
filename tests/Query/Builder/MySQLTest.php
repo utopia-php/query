@@ -14887,4 +14887,69 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('orders.created_at > NOW() - INTERVAL ? DAY', $result->query);
         $this->assertEquals([30], $result->bindings);
     }
+
+    public function testFromNoneEmitsNoFromClause(): void
+    {
+        $result = (new Builder())
+            ->fromNone()
+            ->selectRaw('1 + 1')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringNotContainsString('FROM', $result->query);
+        $this->assertStringContainsString('SELECT', $result->query);
+    }
+
+    public function testSelectCastEmitsCastExpression(): void
+    {
+        $result = (new Builder())
+            ->from('products')
+            ->selectCast('price', 'DECIMAL(10, 2)', 'price_decimal')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('CAST(`price` AS DECIMAL(10, 2))', $result->query);
+        $this->assertStringContainsString('`price_decimal`', $result->query);
+    }
+
+    public function testSelectCastAcceptsValidTypes(): void
+    {
+        foreach (['INT', 'VARCHAR(255)', 'DECIMAL(10, 2)', 'UNSIGNED INTEGER'] as $type) {
+            $result = (new Builder())
+                ->from('t')
+                ->selectCast('c', $type, 'a')
+                ->build();
+            $this->assertStringContainsString('CAST(`c` AS ' . $type . ')', $result->query);
+        }
+    }
+
+    public function testSelectCastRejectsInvalidType(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid cast type');
+
+        (new Builder())
+            ->from('t')
+            ->selectCast('c', 'INT); DROP TABLE x;--', 'a');
+    }
+
+    public function testSelectWindowAcceptsValidFunctions(): void
+    {
+        foreach (['ROW_NUMBER()', 'RANK()', 'SUM(amount)', 'LAG(x, 1, 0)'] as $function) {
+            $builder = (new Builder())
+                ->from('t')
+                ->selectWindow($function, 'w', ['cat'], ['price']);
+            $this->assertInstanceOf(Builder::class, $builder);
+        }
+    }
+
+    public function testSelectWindowRejectsInvalidFunction(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid window function');
+
+        (new Builder())
+            ->from('t')
+            ->selectWindow('ROW_NUMBER()); DROP --', 'w');
+    }
 }

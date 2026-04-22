@@ -1350,13 +1350,12 @@ class MongoDBTest extends TestCase
 
     public function testWindowFunctionUnsupportedNonParenthesizedThrows(): void
     {
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('Unsupported window function');
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid window function');
 
         (new Builder())
             ->from('orders')
-            ->selectWindow('custom_func', 'cf', ['user_id'])
-            ->build();
+            ->selectWindow('custom_func', 'cf', ['user_id']);
     }
 
     public function testWindowFunctionMultiplePartitionKeys(): void
@@ -5429,5 +5428,54 @@ class MongoDBTest extends TestCase
 
         $op = $this->decode($result->query);
         $this->assertArrayNotHasKey('hint', $op);
+    }
+
+    /**
+     * @return list<array{0: string, 1: callable(Builder, string): mixed}>
+     */
+    public static function fieldNameRejectingSetters(): array
+    {
+        return [
+            ['set',          fn (Builder $b, string $f) => $b->set([$f => 1])],
+            ['push',         fn (Builder $b, string $f) => $b->push($f, 1)],
+            ['pull',         fn (Builder $b, string $f) => $b->pull($f, 1)],
+            ['pullAll',      fn (Builder $b, string $f) => $b->pullAll($f, [1])],
+            ['addToSet',     fn (Builder $b, string $f) => $b->addToSet($f, 1)],
+            ['increment',    fn (Builder $b, string $f) => $b->increment($f, 1)],
+            ['multiply',     fn (Builder $b, string $f) => $b->multiply($f, 2)],
+            ['rename',       fn (Builder $b, string $f) => $b->rename($f, 'ok')],
+            ['renameTarget', fn (Builder $b, string $f) => $b->rename('ok', $f)],
+            ['unsetFields',  fn (Builder $b, string $f) => $b->unsetFields($f)],
+            ['currentDate',  fn (Builder $b, string $f) => $b->currentDate($f)],
+            ['popFirst',     fn (Builder $b, string $f) => $b->popFirst($f)],
+            ['popLast',      fn (Builder $b, string $f) => $b->popLast($f)],
+            ['updateMin',    fn (Builder $b, string $f) => $b->updateMin($f, 1)],
+            ['updateMax',    fn (Builder $b, string $f) => $b->updateMax($f, 1)],
+            ['pushEach',     fn (Builder $b, string $f) => $b->pushEach($f, [1])],
+        ];
+    }
+
+    /**
+     * @param callable(Builder, string): mixed $action
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('fieldNameRejectingSetters')]
+    public function testSetterRejectsDollarPrefixedFieldName(string $label, callable $action): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid MongoDB field name');
+
+        $action(new Builder(), '$where');
+    }
+
+    /**
+     * @param callable(Builder, string): mixed $action
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('fieldNameRejectingSetters')]
+    public function testSetterRejectsEmptyFieldName(string $label, callable $action): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid MongoDB field name');
+
+        $action(new Builder(), '');
     }
 }

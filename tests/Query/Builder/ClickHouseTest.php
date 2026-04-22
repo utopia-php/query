@@ -10963,4 +10963,49 @@ class ClickHouseTest extends TestCase
         $this->assertSame('SELECT * FROM `clean`', $result->query);
         $this->assertEquals([], $result->bindings);
     }
+
+    public function testFromNoneEmitsEmptyPlaceholder(): void
+    {
+        // ClickHouse always emits a FROM clause; fromNone() produces an empty backtick-quoted placeholder.
+        $result = (new Builder())
+            ->fromNone()
+            ->selectRaw('1 + 1')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('SELECT 1 + 1', $result->query);
+        $this->assertStringContainsString('FROM ``', $result->query);
+    }
+
+    public function testSelectCastEmitsCastExpression(): void
+    {
+        $result = (new Builder())
+            ->from('products')
+            ->selectCast('price', 'DECIMAL(10, 2)', 'price_decimal')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('CAST(`price` AS DECIMAL(10, 2))', $result->query);
+        $this->assertStringContainsString('`price_decimal`', $result->query);
+    }
+
+    public function testSelectCastRejectsInvalidType(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid cast type');
+
+        (new Builder())
+            ->from('t')
+            ->selectCast('c', 'INT); DROP TABLE x;--', 'a');
+    }
+
+    public function testSelectWindowRejectsInvalidFunction(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid window function');
+
+        (new Builder())
+            ->from('t')
+            ->selectWindow('ROW_NUMBER()); DROP --', 'w');
+    }
 }

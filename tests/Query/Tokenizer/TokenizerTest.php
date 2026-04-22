@@ -3,6 +3,7 @@
 namespace Tests\Query\Tokenizer;
 
 use PHPUnit\Framework\TestCase;
+use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Tokenizer\Token;
 use Utopia\Query\Tokenizer\Tokenizer;
 use Utopia\Query\Tokenizer\TokenType;
@@ -690,5 +691,14 @@ class TokenizerTest extends TestCase
             $last = $tokens[count($tokens) - 1];
             $this->assertSame(TokenType::Eof, $last->type, "EOF should be last token for: $sql");
         }
+    }
+
+    public function testStringWithTrailingBackslashThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Unterminated string literal');
+
+        // 'abc\  — opening quote, three chars, backslash, then EOF.
+        $this->tokenizer->tokenize("'abc\\");
     }
 }

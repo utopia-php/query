@@ -803,6 +803,10 @@ abstract class Builder implements
 
     public function selectCast(string $column, string $type, string $alias = ''): static
     {
+        if (!\preg_match('/^[A-Za-z0-9_() ,]+$/', $type)) {
+            throw new ValidationException('Invalid cast type: ' . $type);
+        }
+
         $expr = 'CAST(' . $this->resolveAndWrap($column) . ' AS ' . $type . ')';
         if ($alias !== '') {
             $expr .= ' AS ' . $this->quote($alias);
@@ -814,6 +818,10 @@ abstract class Builder implements
 
     public function selectWindow(string $function, string $alias, ?array $partitionBy = null, ?array $orderBy = null, ?string $windowName = null, ?WindowFrame $frame = null): static
     {
+        if (!\preg_match('/^[A-Za-z_][A-Za-z0-9_]*\s*\(.*\)$/', \trim($function))) {
+            throw new ValidationException('Invalid window function: ' . $function);
+        }
+
         $this->windowSelects[] = new WindowSelect($function, $alias, $partitionBy, $orderBy, $windowName, $frame);
 
         return $this;

@@ -2,6 +2,8 @@
 
 namespace Utopia\Query\Tokenizer;
 
+use Utopia\Query\Exception\ValidationException;
+
 class Tokenizer
 {
     private const KEYWORD_MAP = [
@@ -269,7 +271,10 @@ class Tokenizer
         while ($this->pos < $this->length) {
             $char = $this->sql[$this->pos];
             if ($char === '\\') {
-                // Backslash escape: skip next character
+                // Backslash escape: skip next character. Reject trailing backslash at EOF.
+                if ($this->pos + 1 >= $this->length) {
+                    throw new ValidationException('Unterminated string literal');
+                }
                 $this->pos += 2;
                 continue;
             }

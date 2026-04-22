@@ -125,8 +125,25 @@ class MongoDB extends BaseBuilder implements
         return $attribute . ' REGEX ?';
     }
 
+    private function validateFieldName(string $field): void
+    {
+        if ($field === '' || \str_starts_with($field, '$')) {
+            throw new ValidationException('Invalid MongoDB field name: ' . $field);
+        }
+    }
+
+    public function set(array $row): static
+    {
+        foreach (\array_keys($row) as $field) {
+            $this->validateFieldName((string) $field);
+        }
+
+        return parent::set($row);
+    }
+
     public function push(string $field, mixed $value): static
     {
+        $this->validateFieldName($field);
         $this->pushOps[$field] = $value;
 
         return $this;
@@ -134,6 +151,7 @@ class MongoDB extends BaseBuilder implements
 
     public function pull(string $field, mixed $value): static
     {
+        $this->validateFieldName($field);
         $this->pullOps[$field] = $value;
 
         return $this;
@@ -141,6 +159,7 @@ class MongoDB extends BaseBuilder implements
 
     public function addToSet(string $field, mixed $value): static
     {
+        $this->validateFieldName($field);
         $this->addToSetOps[$field] = $value;
 
         return $this;
@@ -148,6 +167,7 @@ class MongoDB extends BaseBuilder implements
 
     public function increment(string $field, int|float $amount = 1): static
     {
+        $this->validateFieldName($field);
         $this->incOps[$field] = $amount;
 
         return $this;
@@ -156,6 +176,7 @@ class MongoDB extends BaseBuilder implements
     public function unsetFields(string ...$fields): static
     {
         foreach ($fields as $field) {
+            $this->validateFieldName($field);
             $this->unsetOps[] = $field;
         }
 
@@ -183,6 +204,8 @@ class MongoDB extends BaseBuilder implements
 
     public function rename(string $oldField, string $newField): static
     {
+        $this->validateFieldName($oldField);
+        $this->validateFieldName($newField);
         $this->renameOps[$oldField] = $newField;
 
         return $this;
@@ -190,6 +213,7 @@ class MongoDB extends BaseBuilder implements
 
     public function multiply(string $field, int|float $factor): static
     {
+        $this->validateFieldName($field);
         $this->mulOps[$field] = $factor;
 
         return $this;
@@ -197,6 +221,7 @@ class MongoDB extends BaseBuilder implements
 
     public function popFirst(string $field): static
     {
+        $this->validateFieldName($field);
         $this->popOps[$field] = -1;
 
         return $this;
@@ -204,6 +229,7 @@ class MongoDB extends BaseBuilder implements
 
     public function popLast(string $field): static
     {
+        $this->validateFieldName($field);
         $this->popOps[$field] = 1;
 
         return $this;
@@ -211,6 +237,7 @@ class MongoDB extends BaseBuilder implements
 
     public function pullAll(string $field, array $values): static
     {
+        $this->validateFieldName($field);
         $this->pullAllOps[$field] = $values;
 
         return $this;
@@ -218,6 +245,7 @@ class MongoDB extends BaseBuilder implements
 
     public function updateMin(string $field, mixed $value): static
     {
+        $this->validateFieldName($field);
         $this->minOps[$field] = $value;
 
         return $this;
@@ -225,6 +253,7 @@ class MongoDB extends BaseBuilder implements
 
     public function updateMax(string $field, mixed $value): static
     {
+        $this->validateFieldName($field);
         $this->maxOps[$field] = $value;
 
         return $this;
@@ -232,6 +261,7 @@ class MongoDB extends BaseBuilder implements
 
     public function currentDate(string $field, string $type = 'date'): static
     {
+        $this->validateFieldName($field);
         $this->currentDateOps[$field] = ['$type' => $type];
 
         return $this;
@@ -239,6 +269,7 @@ class MongoDB extends BaseBuilder implements
 
     public function pushEach(string $field, array $values, ?int $position = null, ?int $slice = null, ?array $sort = null): static
     {
+        $this->validateFieldName($field);
         $modifier = ['values' => \array_values($values)];
         if ($position !== null) {
             $modifier['position'] = $position;
