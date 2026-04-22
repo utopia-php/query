@@ -24,6 +24,7 @@ use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\Case\Kind as CaseKind;
 use Utopia\Query\Builder\Case\WhenClause;
+use Utopia\Query\Builder\ColumnPredicate;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\CteClause;
 use Utopia\Query\Builder\ExistsSubquery;
@@ -62,6 +63,9 @@ abstract class Builder implements
     Feature\Hooks,
     Feature\Windows
 {
+    /** @var list<string> */
+    private const COLUMN_PREDICATE_OPERATORS = ['=', '!=', '<>', '<', '>', '<=', '>='];
+
     protected string $table = '';
 
     protected string $alias = '';
@@ -170,6 +174,9 @@ abstract class Builder implements
 
     /** @var list<Condition> */
     protected array $rawWheres = [];
+
+    /** @var list<ColumnPredicate> */
+    protected array $columnPredicates = [];
 
     /** @var array<int, JoinBuilder> */
     protected array $joins = [];
@@ -449,6 +456,23 @@ abstract class Builder implements
     public function whereRaw(string $expression, array $bindings = []): static
     {
         $this->rawWheres[] = new Condition($expression, $bindings);
+
+        return $this;
+    }
+
+    /**
+     * Append a column-to-column WHERE predicate (e.g. `users.id = orders.user_id`).
+     *
+     * Both columns are quoted per dialect. The operator is validated against
+     * an allowlist: =, !=, <>, <, >, <=, >=.
+     */
+    public function whereColumn(string $left, string $operator, string $right): static
+    {
+        if (! \in_array($operator, self::COLUMN_PREDICATE_OPERATORS, true)) {
+            throw new ValidationException('Invalid whereColumn operator: ' . $operator);
+        }
+
+        $this->columnPredicates[] = new ColumnPredicate($left, $operator, $right);
 
         return $this;
     }
@@ -1533,6 +1557,12 @@ abstract class Builder implements
             $this->addBindings($rawWhere->bindings);
         }
 
+        foreach ($this->columnPredicates as $predicate) {
+            $whereClauses[] = $this->resolveAndWrap($predicate->left)
+                . ' ' . $predicate->operator . ' '
+                . $this->resolveAndWrap($predicate->right);
+        }
+
         if (empty($whereClauses)) {
             return '';
         }
@@ -1963,6 +1993,12 @@ abstract class Builder implements
             $this->addBindings($rawWhere->bindings);
         }
 
+        foreach ($this->columnPredicates as $predicate) {
+            $whereClauses[] = $this->resolveAndWrap($predicate->left)
+                . ' ' . $predicate->operator . ' '
+                . $this->resolveAndWrap($predicate->right);
+        }
+
         if (! empty($whereClauses)) {
             $parts[] = 'WHERE ' . \implode(' AND ', $whereClauses);
         }
@@ -2112,6 +2148,7 @@ abstract class Builder implements
         $this->rawGroups = [];
         $this->rawHavings = [];
         $this->rawWheres = [];
+        $this->columnPredicates = [];
         $this->joins = [];
         $this->existsSubqueries = [];
         $this->lateralJoins = [];

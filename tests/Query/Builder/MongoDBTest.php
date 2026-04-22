@@ -5657,4 +5657,15 @@ class MongoDBTest extends TestCase
         $this->assertSame('$max', UpdateOperator::Max->value);
         $this->assertSame('$currentDate', UpdateOperator::CurrentDate->value);
     }
+
+    public function testWhereColumnIsNotSupportedOnMongoDB(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('whereColumn() is not supported on the MongoDB builder.');
+
+        (new Builder())
+            ->from('users')
+            ->whereColumn('users.id', '=', 'orders.user_id');
+    }
+
 }

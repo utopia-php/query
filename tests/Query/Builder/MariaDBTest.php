@@ -1501,4 +1501,41 @@ class MariaDBTest extends TestCase
         $this->assertContains(1, $result->bindings);
         $this->assertContains(2, $result->bindings);
     }
+
+    public function testWhereColumnEmitsQualifiedIdentifiers(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->whereColumn('users.id', '=', 'orders.user_id')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('`users`.`id` = `orders`.`user_id`', $result->query);
+        $this->assertSame([], $result->bindings);
+    }
+
+    public function testWhereColumnRejectsUnknownOperator(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid whereColumn operator: NOT_AN_OP');
+
+        (new Builder())
+            ->from('users')
+            ->whereColumn('a', 'NOT_AN_OP', 'b');
+    }
+
+    public function testWhereColumnCombinesWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->filter([Query::equal('status', ['active'])])
+            ->whereColumn('users.id', '=', 'orders.user_id')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('WHERE', $result->query);
+        $this->assertStringContainsString(' AND `users`.`id` = `orders`.`user_id`', $result->query);
+        $this->assertContains('active', $result->bindings);
+    }
+
 }

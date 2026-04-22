@@ -487,6 +487,12 @@ class MongoDB extends BaseBuilder implements
     }
 
     #[\Override]
+    public function whereColumn(string $left, string $operator, string $right): static
+    {
+        throw new ValidationException('whereColumn() is not supported on the MongoDB builder.');
+    }
+
+    #[\Override]
     public function build(): Plan
     {
         $this->bindings = [];

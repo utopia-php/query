@@ -11250,4 +11250,41 @@ class ClickHouseTest extends TestCase
         $this->assertStringNotContainsString('PREWHERE ', $result->query);
         $this->assertStringNotContainsString(' LIMIT BY ', $result->query);
     }
+
+    public function testWhereColumnEmitsQualifiedIdentifiers(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->whereColumn('events.user_id', '=', 'sessions.user_id')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('`events`.`user_id` = `sessions`.`user_id`', $result->query);
+        $this->assertSame([], $result->bindings);
+    }
+
+    public function testWhereColumnRejectsUnknownOperator(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid whereColumn operator: NOT_AN_OP');
+
+        (new Builder())
+            ->from('events')
+            ->whereColumn('a', 'NOT_AN_OP', 'b');
+    }
+
+    public function testWhereColumnCombinesWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->filter([Query::equal('status', ['active'])])
+            ->whereColumn('events.user_id', '=', 'sessions.user_id')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('WHERE', $result->query);
+        $this->assertStringContainsString(' AND `events`.`user_id` = `sessions`.`user_id`', $result->query);
+        $this->assertContains('active', $result->bindings);
+    }
+
 }
