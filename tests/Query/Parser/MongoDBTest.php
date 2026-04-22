@@ -333,6 +333,135 @@ class MongoDBTest extends TestCase
         $this->assertSame(Type::Unknown, $this->parser->parse($data));
     }
 
+    public function testMalformedBsonNestedDocumentLengthDoesNotCrash(): void
+    {
+        // Attack via a nested document (type 0x03) whose declared docLen
+        // far exceeds the remaining buffer. skipBsonDocument must reject
+        // by returning false; any out-of-bounds string index access would
+        // raise a warning, promoted to exception by withStrictErrors().
+        // Layout: [outer docLen][0x03 "sub" \0 <fake docLen 0x7FFFFFFF> ...][00]
+        $malicious = "\x03" . 'sub' . "\x00"
+            . "\xFF\xFF\xFF\x7F"   // claimed nested docLen ~ 2GB
+            . "\x00\x00\x00\x00\x00";
+        $bsonBody = $malicious . "\x00";
+        $bson = \pack('V', 4 + \strlen($bsonBody)) . $bsonBody;
+
+        $sectionKind = "\x00";
+        $flags = \pack('V', 0);
+        $body = $flags . $sectionKind . $bson;
+        $header = \pack('V', 16 + \strlen($body))
+            . \pack('V', 1)
+            . \pack('V', 0)
+            . \pack('V', 2013);
+
+        $data = $header . $body;
+
+        $result = $this->withStrictErrors(fn () => $this->parser->parse($data));
+        $this->assertSame(Type::Unknown, $result);
+    }
+
+    public function testMalformedBsonOuterDocumentLengthDoesNotCrash(): void
+    {
+        // Outer BSON document claims a length larger than the packet.
+        // hasBsonKey must reject before scanning.
+        $bsonBody = "\x10" . 'find' . "\x00" . \pack('V', 1) . "\x00";
+        // Declare a docLen far larger than actual content.
+        $bson = \pack('V', 0x7FFFFFFF) . $bsonBody;
+
+        $sectionKind = "\x00";
+        $flags = \pack('V', 0);
+        $body = $flags . $sectionKind . $bson;
+        $header = \pack('V', 16 + \strlen($body))
+            . \pack('V', 1)
+            . \pack('V', 0)
+            . \pack('V', 2013);
+
+        $data = $header . $body;
+
+        // hasBsonKey bails (returns false) and extractFirstBsonKey walks
+        // only to the first null — returning 'find', which classifies as Read.
+        // The important guarantee is no crash / out-of-bounds read, so we run
+        // under strict error handling.
+        $result = $this->withStrictErrors(fn () => $this->parser->parse($data));
+        $this->assertSame(Type::Read, $result);
+    }
+
+    public function testMalformedBsonRegexRunsToEofWithoutCrash(): void
+    {
+        // A regex element (type 0x0B) with no null terminator for either
+        // cstring. skipBsonRegex must return false, not run off the end.
+        $malicious = "\x0B" . 'rx' . "\x00"
+            . 'pattern-without-null-terminator-at-all';
+        $bsonBody = $malicious; // no trailing doc terminator
+        $bson = \pack('V', 4 + \strlen($bsonBody) + 1) . $bsonBody . "\x00";
+
+        $sectionKind = "\x00";
+        $flags = \pack('V', 0);
+        $body = $flags . $sectionKind . $bson;
+        $header = \pack('V', 16 + \strlen($body))
+            . \pack('V', 1)
+            . \pack('V', 0)
+            . \pack('V', 2013);
+
+        $data = $header . $body;
+
+        // No crash; first key 'rx' is unknown → Unknown.
+        $result = $this->withStrictErrors(fn () => $this->parser->parse($data));
+        $this->assertSame(Type::Unknown, $result);
+    }
+
+    public function testMalformedBsonDbPointerLengthDoesNotCrash(): void
+    {
+        // DBPointer (0x0C) = string + 12-byte ObjectId. The string part
+        // is valid, but there aren't 12 bytes after it for the ObjectId.
+        // skipBsonDbPointer must reject via the new advance() bound check.
+        $malicious = "\x0C" . 'ref' . "\x00"
+            . \pack('V', 2) . 'a' . "\x00"  // tiny valid string
+            . "\x01\x02\x03";               // only 3 bytes, not 12
+        $bsonBody = $malicious;
+        $bson = \pack('V', 4 + \strlen($bsonBody) + 1) . $bsonBody . "\x00";
+
+        $sectionKind = "\x00";
+        $flags = \pack('V', 0);
+        $body = $flags . $sectionKind . $bson;
+        $header = \pack('V', 16 + \strlen($body))
+            . \pack('V', 1)
+            . \pack('V', 0)
+            . \pack('V', 2013);
+
+        $data = $header . $body;
+
+        // First key 'ref' is unknown → Unknown. Important: no crash while
+        // hasBsonKey walks the malformed DBPointer.
+        $result = $this->withStrictErrors(fn () => $this->parser->parse($data));
+        $this->assertSame(Type::Unknown, $result);
+    }
+
+    /**
+     * Run a parser call with PHP warnings/notices promoted to exceptions.
+     *
+     * Out-of-bounds string index access in PHP emits a warning rather than
+     * failing hard. To prove the parser never reads past the buffer we run
+     * the call under a custom error handler that throws on any warning.
+     *
+     * @template T
+     *
+     * @param  callable(): T  $callback
+     * @return T
+     */
+    private function withStrictErrors(callable $callback): mixed
+    {
+        \set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
+            throw new \ErrorException($message, 0, $severity, $file, $line);
+        });
+
+        try {
+            return $callback();
+        } finally {
+            \restore_error_handler();
+        }
+    }
+
     public function testClassifySqlReturnsUnknown(): void
     {
         $this->assertSame(Type::Unknown, $this->parser->classifySQL('SELECT * FROM users'));

@@ -204,11 +204,14 @@ class MongoDB implements Parser
         }
 
         $docLen = $this->readUint32($data, $bsonOffset);
-        $docEnd = $bsonOffset + $docLen;
-        if ($docEnd > $len) {
-            $docEnd = $len;
+
+        // Reject negative (32-bit PHP signed overflow) or out-of-bounds lengths.
+        // A valid BSON document is at least 5 bytes (length prefix + terminator).
+        if ($docLen < 5 || $bsonOffset + $docLen > $len) {
+            return false;
         }
 
+        $docEnd = $bsonOffset + $docLen;
         $pos = $bsonOffset + 4;
 
         while ($pos < $docEnd) {
@@ -253,21 +256,34 @@ class MongoDB implements Parser
     private function skipBsonValue(string $data, int $pos, int $type, int $limit): int|false
     {
         return match ($type) {
-            0x01 => $pos + 8,                    // double (8 bytes)
-            0x02, 0x0D, 0x0E => $this->skipBsonString($data, $pos, $limit), // string, JavaScript, Symbol
-            0x03, 0x04 => $this->skipBsonDocument($data, $pos, $limit),     // document, array
-            0x05 => $this->skipBsonBinary($data, $pos, $limit),             // binary
-            0x06, 0x0A => $pos,                  // undefined, null (0 bytes)
-            0x07 => $pos + 12,                   // ObjectId (12 bytes)
-            0x08 => $pos + 1,                    // boolean (1 byte)
-            0x09, 0x11, 0x12 => $pos + 8,        // datetime, timestamp, int64
-            0x0B => $this->skipBsonRegex($data, $pos, $limit), // regex (2 cstrings)
-            0x0C => $this->skipBsonDbPointer($data, $pos, $limit), // DBPointer
-            0x10 => $pos + 4,                    // int32 (4 bytes)
-            0x13 => $pos + 16,                   // decimal128 (16 bytes)
-            0xFF, 0x7F => $pos,                  // min/max key (0 bytes)
+            0x01 => $this->advance($pos, 8, $limit),                          // double (8 bytes)
+            0x02, 0x0D, 0x0E => $this->skipBsonString($data, $pos, $limit),   // string, JavaScript, Symbol
+            0x03, 0x04 => $this->skipBsonDocument($data, $pos, $limit),       // document, array
+            0x05 => $this->skipBsonBinary($data, $pos, $limit),               // binary
+            0x06, 0x0A, 0xFF, 0x7F => $pos,                                   // undefined, null, min/max key (0 bytes)
+            0x07 => $this->advance($pos, 12, $limit),                         // ObjectId (12 bytes)
+            0x08 => $this->advance($pos, 1, $limit),                          // boolean (1 byte)
+            0x09, 0x11, 0x12 => $this->advance($pos, 8, $limit),              // datetime, timestamp, int64
+            0x0B => $this->skipBsonRegex($data, $pos, $limit),                // regex (2 cstrings)
+            0x0C => $this->skipBsonDbPointer($data, $pos, $limit),            // DBPointer
+            0x10 => $this->advance($pos, 4, $limit),                          // int32 (4 bytes)
+            0x13 => $this->advance($pos, 16, $limit),                         // decimal128 (16 bytes)
             default => false,
         };
+    }
+
+    /**
+     * Advance $pos by a fixed number of bytes, validating against $limit.
+     *
+     * @return int|false New position, or false if the advance overruns the buffer.
+     */
+    private function advance(int $pos, int $bytes, int $limit): int|false
+    {
+        if ($pos + $bytes > $limit) {
+            return false;
+        }
+
+        return $pos + $bytes;
     }
 
     private function skipBsonString(string $data, int $pos, int $limit): int|false
@@ -293,7 +309,9 @@ class MongoDB implements Parser
         }
         $docLen = $this->readUint32($data, $pos);
 
-        if ($pos + $docLen > $limit) {
+        // On 32-bit PHP `V` yields a signed int; treat negative as invalid.
+        // A valid BSON document is at least 5 bytes (length prefix + terminator).
+        if ($docLen < 5 || $docLen > $limit - $pos) {
             return false;
         }
 
@@ -316,15 +334,21 @@ class MongoDB implements Parser
         return $pos + 4 + 1 + $binLen; // length + subtype byte + data
     }
 
-    private function skipBsonRegex(string $data, int $pos, int $limit): int
+    private function skipBsonRegex(string $data, int $pos, int $limit): int|false
     {
         // Two cstrings: pattern + options
         while ($pos < $limit && $data[$pos] !== "\x00") {
             $pos++;
         }
+        if ($pos >= $limit) {
+            return false;
+        }
         $pos++; // skip null
         while ($pos < $limit && $data[$pos] !== "\x00") {
             $pos++;
+        }
+        if ($pos >= $limit) {
+            return false;
         }
 
         return $pos + 1;
@@ -338,7 +362,7 @@ class MongoDB implements Parser
             return false;
         }
 
-        return $newPos + 12;
+        return $this->advance($newPos, 12, $limit);
     }
 
     /**
