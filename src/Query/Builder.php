@@ -235,13 +235,43 @@ abstract class Builder implements
     }
 
     /**
-     * Hook called after JOIN clauses, before WHERE. Override to inject e.g. PREWHERE.
-     *
-     * @param  array<string>  $parts
+     * Hook called after JOIN clauses and before WHERE. Override to inject
+     * dialect-specific clauses such as PREWHERE (ClickHouse) or ARRAY JOIN.
+     * Implementations must add any bindings they emit via $this->addBindings()
+     * at the moment their fragment is emitted so ordering is preserved.
      */
-    protected function buildAfterJoins(array &$parts, GroupedQueries $grouped): void
+    protected function buildAfterJoinsClause(GroupedQueries $grouped): string
     {
-        // no-op by default
+        return '';
+    }
+
+    /**
+     * Hook called after GROUP BY and before HAVING. Override to emit
+     * dialect-specific group-by modifiers (e.g. ClickHouse WITH TOTALS).
+     */
+    protected function buildAfterGroupByClause(): string
+    {
+        return '';
+    }
+
+    /**
+     * Hook called after ORDER BY and before LIMIT. Override to emit
+     * dialect-specific clauses that bind between ordering and pagination
+     * (e.g. ClickHouse LIMIT BY).
+     */
+    protected function buildAfterOrderByClause(): string
+    {
+        return '';
+    }
+
+    /**
+     * Hook called at the very end of the SELECT statement (just before any
+     * UNION suffix). Override to emit dialect-specific settings fragments
+     * (e.g. ClickHouse SETTINGS).
+     */
+    protected function buildSettingsClause(): string
+    {
+        return '';
     }
 
     public function from(string $table = '', string $alias = ''): static
@@ -949,126 +979,269 @@ abstract class Builder implements
 
         $this->validateTable();
 
-        // CTE prefix
-        $ctePrefix = '';
-        if (! empty($this->ctes)) {
-            $hasRecursive = false;
-            $cteParts = [];
-            foreach ($this->ctes as $cte) {
-                if ($cte->recursive) {
-                    $hasRecursive = true;
-                }
-                $this->addBindings($cte->bindings);
-                $cteName = $this->quote($cte->name);
-                if (! empty($cte->columns)) {
-                    $cteName .= '(' . \implode(', ', \array_map(fn (string $col): string => $this->quote($col), $cte->columns)) . ')';
-                }
-                $cteParts[] = $cteName . ' AS (' . $cte->query . ')';
-            }
-            $keyword = $hasRecursive ? 'WITH RECURSIVE' : 'WITH';
-            $ctePrefix = $keyword . ' ' . \implode(', ', $cteParts) . ' ';
-        }
+        $ctePrefix = $this->buildCtePrefix();
 
         $grouped = Query::groupByType($this->pendingQueries);
 
-        $this->qualify = false;
-        $this->aggregationAliases = [];
-        if (! empty($grouped->joins) && $this->alias !== '') {
-            $this->qualify = true;
-            foreach ($grouped->aggregations as $agg) {
-                /** @var string $aggAlias */
-                $aggAlias = $agg->getValue('');
-                if ($aggAlias !== '') {
-                    $this->aggregationAliases[$aggAlias] = true;
-                }
-            }
-        }
+        $this->prepareAliasQualification($grouped);
 
         $parts = [];
+        $parts[] = $this->buildSelectClause($grouped);
 
-        // SELECT
+        $fromClause = $this->buildFromClause();
+        if ($fromClause !== '') {
+            $parts[] = $fromClause;
+        }
+
+        $joinFilterWhereClauses = [];
+        $joinsClause = $this->buildJoinsClause($grouped, $joinFilterWhereClauses);
+        if ($joinsClause !== '') {
+            $parts[] = $joinsClause;
+        }
+
+        $afterJoins = $this->buildAfterJoinsClause($grouped);
+        if ($afterJoins !== '') {
+            $parts[] = $afterJoins;
+        }
+
+        $whereClause = $this->buildWhereClause($grouped, $joinFilterWhereClauses);
+        if ($whereClause !== '') {
+            $parts[] = $whereClause;
+        }
+
+        $groupByClause = $this->buildGroupByClause($grouped);
+        if ($groupByClause !== '') {
+            $parts[] = $groupByClause;
+        }
+
+        $afterGroupBy = $this->buildAfterGroupByClause();
+        if ($afterGroupBy !== '') {
+            $parts[] = $afterGroupBy;
+        }
+
+        $havingClause = $this->buildHavingClause($grouped);
+        if ($havingClause !== '') {
+            $parts[] = $havingClause;
+        }
+
+        $windowClause = $this->buildWindowClause();
+        if ($windowClause !== '') {
+            $parts[] = $windowClause;
+        }
+
+        $orderByClause = $this->buildOrderByClause();
+        if ($orderByClause !== '') {
+            $parts[] = $orderByClause;
+        }
+
+        $afterOrderBy = $this->buildAfterOrderByClause();
+        if ($afterOrderBy !== '') {
+            $parts[] = $afterOrderBy;
+        }
+
+        $limitClause = $this->buildLimitClause($grouped);
+        if ($limitClause !== '') {
+            $parts[] = $limitClause;
+        }
+
+        $lockingClause = $this->buildLockingClause();
+        if ($lockingClause !== '') {
+            $parts[] = $lockingClause;
+        }
+
+        $settings = $this->buildSettingsClause();
+        if ($settings !== '') {
+            $parts[] = $settings;
+        }
+
+        $sql = \implode(' ', $parts);
+
+        $unionSuffix = $this->buildUnionSuffix();
+        if ($unionSuffix !== '') {
+            $sql = '(' . $sql . ')' . $unionSuffix;
+        }
+
+        $sql = $ctePrefix . $sql;
+
+        $result = new Plan($sql, $this->bindings, readOnly: true, executor: $this->executor);
+
+        foreach ($this->afterBuildCallbacks as $callback) {
+            $result = $callback($result);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Build the optional WITH / WITH RECURSIVE prefix. Adds CTE bindings to
+     * $this->bindings in document order. Returns an empty string when no
+     * CTEs are registered.
+     */
+    private function buildCtePrefix(): string
+    {
+        if (empty($this->ctes)) {
+            return '';
+        }
+
+        $hasRecursive = false;
+        $cteParts = [];
+        foreach ($this->ctes as $cte) {
+            if ($cte->recursive) {
+                $hasRecursive = true;
+            }
+            $this->addBindings($cte->bindings);
+            $cteName = $this->quote($cte->name);
+            if (! empty($cte->columns)) {
+                $cteName .= '(' . \implode(', ', \array_map(fn (string $col): string => $this->quote($col), $cte->columns)) . ')';
+            }
+            $cteParts[] = $cteName . ' AS (' . $cte->query . ')';
+        }
+
+        $keyword = $hasRecursive ? 'WITH RECURSIVE' : 'WITH';
+
+        return $keyword . ' ' . \implode(', ', $cteParts) . ' ';
+    }
+
+    /**
+     * Configure alias-qualification state prior to emitting SELECT. When joins
+     * are present and the base table has an alias, column references must be
+     * fully qualified — except aggregation aliases, which are captured here
+     * so they can be emitted bare.
+     */
+    private function prepareAliasQualification(GroupedQueries $grouped): void
+    {
+        $this->qualify = false;
+        $this->aggregationAliases = [];
+
+        if (empty($grouped->joins) || $this->alias === '') {
+            return;
+        }
+
+        $this->qualify = true;
+        foreach ($grouped->aggregations as $agg) {
+            /** @var string $aggAlias */
+            $aggAlias = $agg->getValue('');
+            if ($aggAlias !== '') {
+                $this->aggregationAliases[$aggAlias] = true;
+            }
+        }
+    }
+
+    /**
+     * Compile the SELECT [DISTINCT] ... clause, including aggregations,
+     * column selections, sub-selects, raw selects, window function selects,
+     * and CASE selects. Always returns a non-empty fragment (falls back
+     * to `SELECT *`).
+     */
+    private function buildSelectClause(GroupedQueries $grouped): string
+    {
         $selectParts = [];
 
-        if (! empty($grouped->aggregations)) {
-            foreach ($grouped->aggregations as $agg) {
-                $selectParts[] = $this->compileAggregate($agg);
-            }
+        foreach ($grouped->aggregations as $agg) {
+            $selectParts[] = $this->compileAggregate($agg);
         }
 
         if (! empty($grouped->selections)) {
             $selectParts[] = $this->compileSelect($grouped->selections[0]);
         }
 
-        // Sub-selects
         foreach ($this->subSelects as $subSelect) {
             $subResult = $subSelect->subquery->build();
             $selectParts[] = '(' . $subResult->query . ') AS ' . $this->quote($subSelect->alias);
             $this->addBindings($subResult->bindings);
         }
 
-        // Raw selects
         foreach ($this->rawSelects as $rawSelect) {
             $selectParts[] = $rawSelect->expression;
             $this->addBindings($rawSelect->bindings);
         }
 
-        // Window function selects
         foreach ($this->windowSelects as $win) {
-            if ($win->windowName !== null) {
-                $selectParts[] = $win->function . ' OVER ' . $this->quote($win->windowName) . ' AS ' . $this->quote($win->alias);
-            } else {
-                $overParts = [];
-
-                if ($win->partitionBy !== null && $win->partitionBy !== []) {
-                    $partCols = \array_map(
-                        fn (string $col): string => $this->resolveAndWrap($col),
-                        $win->partitionBy
-                    );
-                    $overParts[] = 'PARTITION BY ' . \implode(', ', $partCols);
-                }
-
-                if ($win->orderBy !== null && $win->orderBy !== []) {
-                    $orderCols = [];
-                    foreach ($win->orderBy as $col) {
-                        if (\str_starts_with($col, '-')) {
-                            $orderCols[] = $this->resolveAndWrap(\substr($col, 1)) . ' DESC';
-                        } else {
-                            $orderCols[] = $this->resolveAndWrap($col) . ' ASC';
-                        }
-                    }
-                    $overParts[] = 'ORDER BY ' . \implode(', ', $orderCols);
-                }
-
-                if ($win->frame !== null) {
-                    $overParts[] = $win->frame->toSql();
-                }
-
-                $overClause = \implode(' ', $overParts);
-                $selectParts[] = $win->function . ' OVER (' . $overClause . ') AS ' . $this->quote($win->alias);
-            }
+            $selectParts[] = $this->compileWindowSelect($win);
         }
 
-        // CASE selects
         foreach ($this->cases as $caseSelect) {
             $selectParts[] = $caseSelect->sql;
             $this->addBindings($caseSelect->bindings);
         }
 
         $selectSQL = ! empty($selectParts) ? \implode(', ', $selectParts) : '*';
-
         $selectKeyword = $grouped->distinct ? 'SELECT DISTINCT' : 'SELECT';
-        $parts[] = $selectKeyword . ' ' . $selectSQL;
 
-        // FROM
-        $tableClause = $this->buildTableClause();
-        if ($tableClause !== '') {
-            $parts[] = $tableClause;
+        return $selectKeyword . ' ' . $selectSQL;
+    }
+
+    /**
+     * Compile a single window-function SELECT item (inline or named window).
+     */
+    private function compileWindowSelect(WindowSelect $win): string
+    {
+        if ($win->windowName !== null) {
+            return $win->function . ' OVER ' . $this->quote($win->windowName) . ' AS ' . $this->quote($win->alias);
         }
 
-        // JOINS
-        $joinFilterWhereClauses = [];
+        $overParts = [];
+
+        if ($win->partitionBy !== null && $win->partitionBy !== []) {
+            $partCols = \array_map(
+                fn (string $col): string => $this->resolveAndWrap($col),
+                $win->partitionBy
+            );
+            $overParts[] = 'PARTITION BY ' . \implode(', ', $partCols);
+        }
+
+        if ($win->orderBy !== null && $win->orderBy !== []) {
+            $overParts[] = 'ORDER BY ' . $this->compileOrderByList($win->orderBy);
+        }
+
+        if ($win->frame !== null) {
+            $overParts[] = $win->frame->toSql();
+        }
+
+        return $win->function . ' OVER (' . \implode(' ', $overParts) . ') AS ' . $this->quote($win->alias);
+    }
+
+    /**
+     * Compile a list of ORDER BY column tokens (prefixed with '-' for DESC)
+     * into a comma-separated SQL fragment.
+     *
+     * @param  list<string>  $orderBy
+     */
+    private function compileOrderByList(array $orderBy): string
+    {
+        $orderCols = [];
+        foreach ($orderBy as $col) {
+            if (\str_starts_with($col, '-')) {
+                $orderCols[] = $this->resolveAndWrap(\substr($col, 1)) . ' DESC';
+            } else {
+                $orderCols[] = $this->resolveAndWrap($col) . ' ASC';
+            }
+        }
+
+        return \implode(', ', $orderCols);
+    }
+
+    /**
+     * Compile the FROM clause. Delegates the table/subquery portion to
+     * buildTableClause() so dialects can override it precisely.
+     */
+    private function buildFromClause(): string
+    {
+        return $this->buildTableClause();
+    }
+
+    /**
+     * Compile the JOIN section, including any lateral joins. Deferred join
+     * filter conditions that must land in WHERE are appended to the
+     * $joinFilterWhereClauses out-parameter.
+     *
+     * @param  list<Condition>  $joinFilterWhereClauses
+     */
+    private function buildJoinsClause(GroupedQueries $grouped, array &$joinFilterWhereClauses): string
+    {
+        $joinParts = [];
+
         if (! empty($grouped->joins)) {
-            // Build a map from pending query index to join index for JoinBuilder lookup
             $joinQueryIndices = [];
             foreach ($this->pendingQueries as $idx => $pq) {
                 if ($pq->getMethod()->isJoin()) {
@@ -1124,7 +1297,7 @@ abstract class Builder implements
                     }
                 }
 
-                $parts[] = $joinSQL;
+                $joinParts[] = $joinSQL;
             }
         }
 
@@ -1135,13 +1308,21 @@ abstract class Builder implements
                 JoinType::Left => 'LEFT JOIN',
                 default => 'JOIN',
             };
-            $parts[] = $joinKeyword . ' LATERAL (' . $subResult->query . ') AS ' . $this->quote($lateral->alias) . ' ON true';
+            $joinParts[] = $joinKeyword . ' LATERAL (' . $subResult->query . ') AS ' . $this->quote($lateral->alias) . ' ON true';
         }
 
-        // Hook: after joins (e.g. ClickHouse PREWHERE)
-        $this->buildAfterJoins($parts, $grouped);
+        return \implode(' ', $joinParts);
+    }
 
-        // WHERE
+    /**
+     * Compile the WHERE clause from query filters, filter hooks, deferred
+     * join-filter conditions, WHERE IN / NOT IN subqueries, EXISTS
+     * subqueries, and cursor pagination.
+     *
+     * @param  list<Condition>  $joinFilterWhereClauses
+     */
+    private function buildWhereClause(GroupedQueries $grouped, array $joinFilterWhereClauses): string
+    {
         $whereClauses = [];
 
         foreach ($grouped->filters as $filter) {
@@ -1159,7 +1340,6 @@ abstract class Builder implements
             $this->addBindings($condition->bindings);
         }
 
-        // WHERE IN subqueries
         foreach ($this->whereInSubqueries as $sub) {
             $subResult = $sub->subquery->build();
             $prefix = $sub->not ? 'NOT IN' : 'IN';
@@ -1167,7 +1347,6 @@ abstract class Builder implements
             $this->addBindings($subResult->bindings);
         }
 
-        // EXISTS subqueries
         foreach ($this->existsSubqueries as $sub) {
             $subResult = $sub->subquery->build();
             $prefix = $sub->not ? 'NOT EXISTS' : 'EXISTS';
@@ -1175,78 +1354,56 @@ abstract class Builder implements
             $this->addBindings($subResult->bindings);
         }
 
-        $cursorSQL = '';
         if ($grouped->cursor !== null && $grouped->cursorDirection !== null) {
             $cursorQueries = Query::getCursorQueries($this->pendingQueries, false);
             if (! empty($cursorQueries)) {
                 $cursorSQL = $this->compileCursor($cursorQueries[0]);
+                if ($cursorSQL !== '') {
+                    $whereClauses[] = $cursorSQL;
+                }
             }
         }
-        if ($cursorSQL !== '') {
-            $whereClauses[] = $cursorSQL;
+
+        if (empty($whereClauses)) {
+            return '';
         }
 
-        if (! empty($whereClauses)) {
-            $parts[] = 'WHERE ' . \implode(' AND ', $whereClauses);
-        }
+        return 'WHERE ' . \implode(' AND ', $whereClauses);
+    }
 
-        // GROUP BY
+    /**
+     * Compile the GROUP BY clause, including any raw group expressions.
+     */
+    private function buildGroupByClause(GroupedQueries $grouped): string
+    {
         $groupByParts = [];
         if (! empty($grouped->groupBy)) {
-            $groupByCols = \array_map(
-                fn (string $col): string => $this->resolveAndWrap($col),
-                $grouped->groupBy
-            );
-            $groupByParts = $groupByCols;
+            foreach ($grouped->groupBy as $col) {
+                $groupByParts[] = $this->resolveAndWrap($col);
+            }
         }
+
         foreach ($this->rawGroups as $rawGroup) {
             $groupByParts[] = $rawGroup->expression;
             $this->addBindings($rawGroup->bindings);
         }
-        if (! empty($groupByParts)) {
-            $parts[] = 'GROUP BY ' . \implode(', ', $groupByParts);
+
+        if (empty($groupByParts)) {
+            return '';
         }
 
-        // HAVING
+        return 'GROUP BY ' . \implode(', ', $groupByParts);
+    }
+
+    /**
+     * Compile the HAVING clause, resolving aggregation aliases to their
+     * underlying expressions so filters against alias names work portably.
+     */
+    private function buildHavingClause(GroupedQueries $grouped): string
+    {
+        $aliasToExpr = $this->buildAggregationAliasMap($grouped);
+
         $havingClauses = [];
-        $aliasToExpr = [];
-        if (! empty($grouped->aggregations)) {
-            foreach ($grouped->aggregations as $agg) {
-                /** @var string $alias */
-                $alias = $agg->getValue('');
-                if ($alias !== '') {
-                    $method = $agg->getMethod();
-                    $attr = $agg->getAttribute();
-                    $col = match (true) {
-                        $attr === '*', $attr === '' => '*',
-                        \is_numeric($attr) => $attr,
-                        default => $this->resolveAndWrap($attr),
-                    };
-                    if ($method === Method::CountDistinct) {
-                        $aliasToExpr[$alias] = 'COUNT(DISTINCT ' . $col . ')';
-                    } else {
-                        $func = match ($method) {
-                            Method::Count => 'COUNT',
-                            Method::Sum => 'SUM',
-                            Method::Avg => 'AVG',
-                            Method::Min => 'MIN',
-                            Method::Max => 'MAX',
-                            Method::Stddev => 'STDDEV',
-                            Method::StddevPop => 'STDDEV_POP',
-                            Method::StddevSamp => 'STDDEV_SAMP',
-                            Method::Variance => 'VARIANCE',
-                            Method::VarPop => 'VAR_POP',
-                            Method::VarSamp => 'VAR_SAMP',
-                            Method::BitAnd => 'BIT_AND',
-                            Method::BitOr => 'BIT_OR',
-                            Method::BitXor => 'BIT_XOR',
-                            default => $method->value,
-                        };
-                        $aliasToExpr[$alias] = $func . '(' . $col . ')';
-                    }
-                }
-            }
-        }
         if (! empty($grouped->having)) {
             foreach ($grouped->having as $havingQuery) {
                 foreach ($havingQuery->getValues() as $subQuery) {
@@ -1260,43 +1417,107 @@ abstract class Builder implements
                 }
             }
         }
+
         foreach ($this->rawHavings as $rawHaving) {
             $havingClauses[] = $rawHaving->expression;
             $this->addBindings($rawHaving->bindings);
         }
-        if (! empty($havingClauses)) {
-            $parts[] = 'HAVING ' . \implode(' AND ', $havingClauses);
+
+        if (empty($havingClauses)) {
+            return '';
         }
 
-        // WINDOW
-        if (! empty($this->windowDefinitions)) {
-            $windowParts = [];
-            foreach ($this->windowDefinitions as $winDef) {
-                $overParts = [];
-                if ($winDef->partitionBy !== null && $winDef->partitionBy !== []) {
-                    $partCols = \array_map(fn (string $col): string => $this->resolveAndWrap($col), $winDef->partitionBy);
-                    $overParts[] = 'PARTITION BY ' . \implode(', ', $partCols);
-                }
-                if ($winDef->orderBy !== null && $winDef->orderBy !== []) {
-                    $orderCols = [];
-                    foreach ($winDef->orderBy as $col) {
-                        if (\str_starts_with($col, '-')) {
-                            $orderCols[] = $this->resolveAndWrap(\substr($col, 1)) . ' DESC';
-                        } else {
-                            $orderCols[] = $this->resolveAndWrap($col) . ' ASC';
-                        }
-                    }
-                    $overParts[] = 'ORDER BY ' . \implode(', ', $orderCols);
-                }
-                if ($winDef->frame !== null) {
-                    $overParts[] = $winDef->frame->toSql();
-                }
-                $windowParts[] = $this->quote($winDef->name) . ' AS (' . \implode(' ', $overParts) . ')';
+        return 'HAVING ' . \implode(' AND ', $havingClauses);
+    }
+
+    /**
+     * Build a map of aggregation alias -> compiled aggregate expression so
+     * HAVING can refer to aliases portably across dialects that don't allow
+     * SELECT-list aliases in HAVING.
+     *
+     * @return array<string, string>
+     */
+    private function buildAggregationAliasMap(GroupedQueries $grouped): array
+    {
+        $aliasToExpr = [];
+        foreach ($grouped->aggregations as $agg) {
+            /** @var string $alias */
+            $alias = $agg->getValue('');
+            if ($alias === '') {
+                continue;
             }
-            $parts[] = 'WINDOW ' . \implode(', ', $windowParts);
+
+            $method = $agg->getMethod();
+            $attr = $agg->getAttribute();
+            $col = match (true) {
+                $attr === '*', $attr === '' => '*',
+                \is_numeric($attr) => $attr,
+                default => $this->resolveAndWrap($attr),
+            };
+
+            if ($method === Method::CountDistinct) {
+                $aliasToExpr[$alias] = 'COUNT(DISTINCT ' . $col . ')';
+
+                continue;
+            }
+
+            $func = match ($method) {
+                Method::Count => 'COUNT',
+                Method::Sum => 'SUM',
+                Method::Avg => 'AVG',
+                Method::Min => 'MIN',
+                Method::Max => 'MAX',
+                Method::Stddev => 'STDDEV',
+                Method::StddevPop => 'STDDEV_POP',
+                Method::StddevSamp => 'STDDEV_SAMP',
+                Method::Variance => 'VARIANCE',
+                Method::VarPop => 'VAR_POP',
+                Method::VarSamp => 'VAR_SAMP',
+                Method::BitAnd => 'BIT_AND',
+                Method::BitOr => 'BIT_OR',
+                Method::BitXor => 'BIT_XOR',
+                default => $method->value,
+            };
+            $aliasToExpr[$alias] = $func . '(' . $col . ')';
         }
 
-        // ORDER BY
+        return $aliasToExpr;
+    }
+
+    /**
+     * Compile the named-window (WINDOW w AS (...)) clause.
+     */
+    private function buildWindowClause(): string
+    {
+        if (empty($this->windowDefinitions)) {
+            return '';
+        }
+
+        $windowParts = [];
+        foreach ($this->windowDefinitions as $winDef) {
+            $overParts = [];
+            if ($winDef->partitionBy !== null && $winDef->partitionBy !== []) {
+                $partCols = \array_map(fn (string $col): string => $this->resolveAndWrap($col), $winDef->partitionBy);
+                $overParts[] = 'PARTITION BY ' . \implode(', ', $partCols);
+            }
+            if ($winDef->orderBy !== null && $winDef->orderBy !== []) {
+                $overParts[] = 'ORDER BY ' . $this->compileOrderByList($winDef->orderBy);
+            }
+            if ($winDef->frame !== null) {
+                $overParts[] = $winDef->frame->toSql();
+            }
+            $windowParts[] = $this->quote($winDef->name) . ' AS (' . \implode(' ', $overParts) . ')';
+        }
+
+        return 'WINDOW ' . \implode(', ', $windowParts);
+    }
+
+    /**
+     * Compile the ORDER BY clause, including vector-distance ordering, raw
+     * order expressions, and ordinary ORDER ASC/DESC/RANDOM queries.
+     */
+    private function buildOrderByClause(): string
+    {
         $orderClauses = [];
 
         $vectorOrderExpr = $this->compileVectorOrderExpr();
@@ -1309,6 +1530,7 @@ abstract class Builder implements
             $orderClauses[] = $rawOrder->expression;
             $this->addBindings($rawOrder->bindings);
         }
+
         $orderQueries = Query::getByType($this->pendingQueries, [
             Method::OrderAsc,
             Method::OrderDesc,
@@ -1317,59 +1539,78 @@ abstract class Builder implements
         foreach ($orderQueries as $orderQuery) {
             $orderClauses[] = $this->compileOrder($orderQuery);
         }
-        if (! empty($orderClauses)) {
-            $parts[] = 'ORDER BY ' . \implode(', ', $orderClauses);
+
+        if (empty($orderClauses)) {
+            return '';
         }
 
-        // LIMIT
+        return 'ORDER BY ' . \implode(', ', $orderClauses);
+    }
+
+    /**
+     * Compile the LIMIT / OFFSET / FETCH FIRST pagination tail. Emitted as
+     * a single space-joined fragment so bindings are added in document order.
+     */
+    private function buildLimitClause(GroupedQueries $grouped): string
+    {
+        $limitParts = [];
+
         if ($grouped->limit !== null) {
-            $parts[] = 'LIMIT ?';
+            $limitParts[] = 'LIMIT ?';
             $this->addBinding($grouped->limit);
         }
 
-        // OFFSET
         if ($this->shouldEmitOffset($grouped->offset, $grouped->limit)) {
-            $parts[] = 'OFFSET ?';
+            $limitParts[] = 'OFFSET ?';
             $this->addBinding($grouped->offset);
         }
 
-        // FETCH FIRST
         if ($this->fetchCount !== null) {
             $this->addBinding($this->fetchCount);
-            $parts[] = $this->fetchWithTies
+            $limitParts[] = $this->fetchWithTies
                 ? 'FETCH FIRST ? ROWS WITH TIES'
                 : 'FETCH FIRST ? ROWS ONLY';
         }
 
-        // LOCKING
-        if ($this->lockMode !== null) {
-            $lockSql = $this->lockMode->toSql();
-            if ($this->lockOfTable !== null) {
-                $lockSql .= ' OF ' . $this->quote($this->lockOfTable);
-            }
-            $parts[] = $lockSql;
+        return \implode(' ', $limitParts);
+    }
+
+    /**
+     * Compile the locking clause (FOR UPDATE / FOR SHARE / ...), optionally
+     * scoped with OF <table>.
+     */
+    private function buildLockingClause(): string
+    {
+        if ($this->lockMode === null) {
+            return '';
         }
 
-        $sql = \implode(' ', $parts);
-
-        // UNION
-        if (! empty($this->unions)) {
-            $sql = '(' . $sql . ')';
+        $lockSql = $this->lockMode->toSql();
+        if ($this->lockOfTable !== null) {
+            $lockSql .= ' OF ' . $this->quote($this->lockOfTable);
         }
+
+        return $lockSql;
+    }
+
+    /**
+     * Compile the trailing UNION chain. Returns the suffix to concatenate
+     * after the parenthesized primary query (including the leading space),
+     * or an empty string when no unions are registered.
+     */
+    private function buildUnionSuffix(): string
+    {
+        if (empty($this->unions)) {
+            return '';
+        }
+
+        $suffix = '';
         foreach ($this->unions as $union) {
-            $sql .= ' ' . $union->type->value . ' (' . $union->query . ')';
+            $suffix .= ' ' . $union->type->value . ' (' . $union->query . ')';
             $this->addBindings($union->bindings);
         }
 
-        $sql = $ctePrefix . $sql;
-
-        $result = new Plan($sql, $this->bindings, readOnly: true, executor: $this->executor);
-
-        foreach ($this->afterBuildCallbacks as $callback) {
-            $result = $callback($result);
-        }
-
-        return $result;
+        return $suffix;
     }
 
     /**
