@@ -5478,4 +5478,123 @@ class MongoDBTest extends TestCase
 
         $action(new Builder(), '');
     }
+
+    /**
+     * @return list<array{0: string}>
+     */
+    public static function reservedWordsProvider(): array
+    {
+        return [
+            ['select'],
+            ['from'],
+            ['where'],
+            ['order'],
+            ['group'],
+            ['having'],
+            ['user'],
+            ['table'],
+            ['insert'],
+            ['update'],
+            ['delete'],
+            ['join'],
+            ['on'],
+            ['and'],
+            ['or'],
+            ['not'],
+            ['in'],
+            ['between'],
+            ['like'],
+            ['is'],
+            ['null'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('reservedWordsProvider')]
+    public function testReservedWordInSelect(string $word): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->select([$word])
+            ->build();
+
+        $op = $this->decode($result->query);
+        $this->assertArrayHasKey('projection', $op);
+        $this->assertArrayHasKey($word, $op['projection']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('reservedWordsProvider')]
+    public function testReservedWordInFrom(string $word): void
+    {
+        $result = (new Builder())
+            ->from($word)
+            ->build();
+
+        $op = $this->decode($result->query);
+        $this->assertSame($word, $op['collection']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('reservedWordsProvider')]
+    public function testReservedWordInFilter(string $word): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::equal($word, ['x'])])
+            ->build();
+
+        $op = $this->decode($result->query);
+        $this->assertArrayHasKey('filter', $op);
+        $this->assertArrayHasKey($word, $op['filter']);
+        $this->assertSame(['x'], $result->bindings);
+    }
+
+    /**
+     * @return list<array{0: string}>
+     */
+    public static function unicodeIdentifiersProvider(): array
+    {
+        return [
+            ['café'],
+            ['日本'],
+            ['column_with_émoji'],
+            ['Ω_omega'],
+            ['данные'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('unicodeIdentifiersProvider')]
+    public function testUnicodeIdentifierInSelect(string $identifier): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->select([$identifier])
+            ->build();
+
+        $op = $this->decode($result->query);
+        $this->assertArrayHasKey($identifier, $op['projection']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('unicodeIdentifiersProvider')]
+    public function testUnicodeIdentifierInFrom(string $identifier): void
+    {
+        $result = (new Builder())
+            ->from($identifier)
+            ->build();
+
+        $op = $this->decode($result->query);
+        $this->assertSame($identifier, $op['collection']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('unicodeIdentifiersProvider')]
+    public function testUnicodeIdentifierInFilter(string $identifier): void
+    {
+        $result = (new Builder())
+            ->from('t')
+            ->filter([Query::equal($identifier, ['x'])])
+            ->build();
+
+        $op = $this->decode($result->query);
+        $this->assertArrayHasKey('filter', $op);
+        $this->assertArrayHasKey($identifier, $op['filter']);
+        $this->assertSame(['x'], $result->bindings);
+    }
 }
