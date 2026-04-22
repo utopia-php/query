@@ -168,6 +168,9 @@ abstract class Builder implements
     /** @var list<Condition> */
     protected array $rawHavings = [];
 
+    /** @var list<Condition> */
+    protected array $rawWheres = [];
+
     /** @var array<int, JoinBuilder> */
     protected array $joins = [];
 
@@ -431,6 +434,21 @@ abstract class Builder implements
     public function havingRaw(string $expression, array $bindings = []): static
     {
         $this->rawHavings[] = new Condition($expression, $bindings);
+
+        return $this;
+    }
+
+    /**
+     * Append a raw WHERE fragment with its own bindings.
+     *
+     * Caller owns the SQL fragment - no column or operator validation is performed.
+     * Use this sparingly; prefer `filter()` with typed `Query::*` factories when possible.
+     *
+     * @param  list<mixed>  $bindings
+     */
+    public function whereRaw(string $expression, array $bindings = []): static
+    {
+        $this->rawWheres[] = new Condition($expression, $bindings);
 
         return $this;
     }
@@ -1510,6 +1528,11 @@ abstract class Builder implements
             }
         }
 
+        foreach ($this->rawWheres as $rawWhere) {
+            $whereClauses[] = $rawWhere->expression;
+            $this->addBindings($rawWhere->bindings);
+        }
+
         if (empty($whereClauses)) {
             return '';
         }
@@ -1935,6 +1958,11 @@ abstract class Builder implements
             $this->addBindings($subResult->bindings);
         }
 
+        foreach ($this->rawWheres as $rawWhere) {
+            $whereClauses[] = $rawWhere->expression;
+            $this->addBindings($rawWhere->bindings);
+        }
+
         if (! empty($whereClauses)) {
             $parts[] = 'WHERE ' . \implode(' AND ', $whereClauses);
         }
@@ -2083,6 +2111,7 @@ abstract class Builder implements
         $this->rawOrders = [];
         $this->rawGroups = [];
         $this->rawHavings = [];
+        $this->rawWheres = [];
         $this->joins = [];
         $this->existsSubqueries = [];
         $this->lateralJoins = [];

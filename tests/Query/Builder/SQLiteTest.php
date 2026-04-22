@@ -1974,4 +1974,31 @@ class SQLiteTest extends TestCase
         $this->assertStringContainsString('`' . $identifier . '`', $result->query);
         $this->assertSame(['x'], $result->bindings);
     }
+
+    public function testWhereRawAppendsFragmentAndBindings(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->whereRaw('a = ?', [1])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('WHERE a = ?', $result->query);
+        $this->assertSame([1], $result->bindings);
+    }
+
+    public function testWhereRawCombinesWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->filter([Query::equal('b', [2])])
+            ->whereRaw('a = ?', [1])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('WHERE', $result->query);
+        $this->assertStringContainsString(' AND a = ?', $result->query);
+        $this->assertContains(1, $result->bindings);
+        $this->assertContains(2, $result->bindings);
+    }
 }

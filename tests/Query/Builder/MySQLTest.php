@@ -9577,6 +9577,33 @@ class MySQLTest extends TestCase
         $this->assertContains(5, $result->bindings);
     }
 
+    public function testWhereRawAppendsFragmentAndBindings(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->whereRaw('a = ?', [1])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('WHERE a = ?', $result->query);
+        $this->assertSame([1], $result->bindings);
+    }
+
+    public function testWhereRawCombinesWithFilter(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->filter([Query::equal('b', [2])])
+            ->whereRaw('a = ?', [1])
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('WHERE', $result->query);
+        $this->assertStringContainsString(' AND a = ?', $result->query);
+        $this->assertContains(1, $result->bindings);
+        $this->assertContains(2, $result->bindings);
+    }
+
     // Feature 4: countDistinct
 
     public function testCountDistinct(): void

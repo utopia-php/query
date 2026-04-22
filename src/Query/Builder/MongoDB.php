@@ -477,6 +477,15 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
+    /**
+     * @param  list<mixed>  $bindings
+     */
+    #[\Override]
+    public function whereRaw(string $expression, array $bindings = []): static
+    {
+        throw new ValidationException('whereRaw() is not supported on the MongoDB builder.');
+    }
+
     #[\Override]
     public function build(): Plan
     {
