@@ -417,4 +417,390 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $user1 = \array_values(\array_filter($rows, fn ($r) => $r['user_id'] === 1))[0];
         $this->assertEqualsWithDelta(79.98, $user1['total'], 0.01);
     }
+
+    public function testFieldUpdateSet(): void
+    {
+        $this->trackMongoCollection('mg_field_updates');
+        $this->mongoClient?->dropCollection('mg_field_updates');
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->into('mg_field_updates')
+                ->set(['id' => 1, 'name' => 'Alice', 'age' => 30, 'email' => 'alice@example.com'])
+                ->insert()
+        );
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_field_updates')
+                ->set(['nickname' => 'Ally'])
+                ->filter([Query::equal('id', [1])])
+                ->update()
+        );
+
+        $rows = $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_field_updates')
+                ->select(['id', 'name', 'nickname'])
+                ->filter([Query::equal('id', [1])])
+                ->build()
+        );
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('Ally', $rows[0]['nickname']);
+        $this->assertSame('Alice', $rows[0]['name']);
+    }
+
+    public function testFieldUpdateInc(): void
+    {
+        $this->trackMongoCollection('mg_field_updates');
+        $this->mongoClient?->dropCollection('mg_field_updates');
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->into('mg_field_updates')
+                ->set(['id' => 2, 'name' => 'Bob', 'age' => 25, 'email' => 'bob@example.com'])
+                ->insert()
+        );
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_field_updates')
+                ->increment('age', 1)
+                ->filter([Query::equal('id', [2])])
+                ->update()
+        );
+
+        $rows = $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_field_updates')
+                ->select(['id', 'age'])
+                ->filter([Query::equal('id', [2])])
+                ->build()
+        );
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(26, $rows[0]['age']);
+    }
+
+    public function testFieldUpdateRename(): void
+    {
+        $this->trackMongoCollection('mg_field_updates');
+        $this->mongoClient?->dropCollection('mg_field_updates');
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->into('mg_field_updates')
+                ->set(['id' => 3, 'name' => 'Carol', 'age' => 40, 'email' => 'carol@example.com'])
+                ->insert()
+        );
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_field_updates')
+                ->rename('email', 'contact')
+                ->filter([Query::equal('id', [3])])
+                ->update()
+        );
+
+        $rows = $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_field_updates')
+                ->select(['id', 'email', 'contact'])
+                ->filter([Query::equal('id', [3])])
+                ->build()
+        );
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('carol@example.com', $rows[0]['contact']);
+        $this->assertArrayNotHasKey('email', $rows[0]);
+    }
+
+    public function testFieldUpdateUnset(): void
+    {
+        $this->trackMongoCollection('mg_field_updates');
+        $this->mongoClient?->dropCollection('mg_field_updates');
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->into('mg_field_updates')
+                ->set(['id' => 4, 'name' => 'Dave', 'age' => 35, 'email' => 'dave@example.com'])
+                ->insert()
+        );
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_field_updates')
+                ->unsetFields('email')
+                ->filter([Query::equal('id', [4])])
+                ->update()
+        );
+
+        $rows = $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_field_updates')
+                ->select(['id', 'name', 'email'])
+                ->filter([Query::equal('id', [4])])
+                ->build()
+        );
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('Dave', $rows[0]['name']);
+        $this->assertArrayNotHasKey('email', $rows[0]);
+    }
+
+    public function testArrayPush(): void
+    {
+        $this->trackMongoCollection('mg_array_push');
+        $this->mongoClient?->dropCollection('mg_array_push');
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->into('mg_array_push')
+                ->set(['id' => 1, 'tags' => []])
+                ->insert()
+        );
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_array_push')
+                ->push('tags', 'alpha')
+                ->filter([Query::equal('id', [1])])
+                ->update()
+        );
+
+        $rows = $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_array_push')
+                ->select(['id', 'tags'])
+                ->filter([Query::equal('id', [1])])
+                ->build()
+        );
+
+        $this->assertCount(1, $rows);
+        /** @var array<int, string> $tags */
+        $tags = (array) $rows[0]['tags'];
+        $this->assertSame(['alpha'], \array_values($tags));
+    }
+
+    public function testArrayAddToSet(): void
+    {
+        $this->trackMongoCollection('mg_array_push');
+        $this->mongoClient?->dropCollection('mg_array_push');
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->into('mg_array_push')
+                ->set(['id' => 2, 'tags' => ['alpha']])
+                ->insert()
+        );
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_array_push')
+                ->addToSet('tags', 'alpha')
+                ->filter([Query::equal('id', [2])])
+                ->update()
+        );
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_array_push')
+                ->addToSet('tags', 'beta')
+                ->filter([Query::equal('id', [2])])
+                ->update()
+        );
+
+        $rows = $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_array_push')
+                ->select(['id', 'tags'])
+                ->filter([Query::equal('id', [2])])
+                ->build()
+        );
+
+        $this->assertCount(1, $rows);
+        /** @var array<int, string> $tags */
+        $tags = (array) $rows[0]['tags'];
+        $values = \array_values($tags);
+        $this->assertSame(['alpha', 'beta'], $values);
+    }
+
+    public function testArrayPushEach(): void
+    {
+        $this->trackMongoCollection('mg_array_push');
+        $this->mongoClient?->dropCollection('mg_array_push');
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->into('mg_array_push')
+                ->set(['id' => 3, 'tags' => []])
+                ->insert()
+        );
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_array_push')
+                ->pushEach('tags', ['x', 'y', 'z'])
+                ->filter([Query::equal('id', [3])])
+                ->update()
+        );
+
+        $rows = $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_array_push')
+                ->select(['id', 'tags'])
+                ->filter([Query::equal('id', [3])])
+                ->build()
+        );
+
+        $this->assertCount(1, $rows);
+        /** @var array<int, string> $tags */
+        $tags = (array) $rows[0]['tags'];
+        $this->assertSame(['x', 'y', 'z'], \array_values($tags));
+    }
+
+    public function testArrayPushEachWithSlice(): void
+    {
+        $this->trackMongoCollection('mg_array_push');
+        $this->mongoClient?->dropCollection('mg_array_push');
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->into('mg_array_push')
+                ->set(['id' => 4, 'tags' => ['a', 'b']])
+                ->insert()
+        );
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_array_push')
+                ->pushEach('tags', ['c', 'd', 'e'], slice: 3)
+                ->filter([Query::equal('id', [4])])
+                ->update()
+        );
+
+        $rows = $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_array_push')
+                ->select(['id', 'tags'])
+                ->filter([Query::equal('id', [4])])
+                ->build()
+        );
+
+        $this->assertCount(1, $rows);
+        /** @var array<int, string> $tags */
+        $tags = (array) $rows[0]['tags'];
+        $values = \array_values($tags);
+        $this->assertCount(3, $values);
+        $this->assertSame(['a', 'b', 'c'], $values);
+    }
+
+    public function testPipelineFacet(): void
+    {
+        $this->trackMongoCollection('mg_scores');
+        $this->mongoClient?->dropCollection('mg_scores');
+
+        $documents = [];
+        for ($i = 1; $i <= 10; $i++) {
+            $documents[] = ['id' => $i, 'score' => $i * 10];
+        }
+        $this->mongoClient?->insertMany('mg_scores', $documents);
+
+        $high = (new Builder())
+            ->from('mg_scores')
+            ->count('*', 'cnt')
+            ->filter([Query::greaterThan('score', 50)]);
+
+        $low = (new Builder())
+            ->from('mg_scores')
+            ->count('*', 'cnt')
+            ->filter([Query::lessThanEqual('score', 50)]);
+
+        $result = (new Builder())
+            ->from('mg_scores')
+            ->facet(['highScores' => $high, 'lowScores' => $low])
+            ->build();
+
+        $rows = $this->executeOnMongoDB($result);
+
+        $this->assertCount(1, $rows);
+        /** @var array<int, array<string, mixed>> $highBucket */
+        $highBucket = (array) $rows[0]['highScores'];
+        /** @var array<int, array<string, mixed>> $lowBucket */
+        $lowBucket = (array) $rows[0]['lowScores'];
+
+        $highFirst = (array) \array_values($highBucket)[0];
+        $lowFirst = (array) \array_values($lowBucket)[0];
+
+        $this->assertSame(5, $highFirst['cnt']);
+        $this->assertSame(5, $lowFirst['cnt']);
+    }
+
+    public function testPipelineBucket(): void
+    {
+        $this->trackMongoCollection('mg_scores');
+        $this->mongoClient?->dropCollection('mg_scores');
+
+        $documents = [
+            ['id' => 1, 'score' => 10],
+            ['id' => 2, 'score' => 20],
+            ['id' => 3, 'score' => 40],
+            ['id' => 4, 'score' => 50],
+            ['id' => 5, 'score' => 60],
+            ['id' => 6, 'score' => 80],
+            ['id' => 7, 'score' => 95],
+        ];
+        $this->mongoClient?->insertMany('mg_scores', $documents);
+
+        $result = (new Builder())
+            ->from('mg_scores')
+            ->bucket('score', [0, 50, 100], 'other', ['count' => ['$sum' => 1]])
+            ->build();
+
+        $rows = $this->executeOnMongoDB($result);
+
+        $counts = [];
+        foreach ($rows as $row) {
+            /** @var int $count */
+            $count = $row['count'];
+            $counts[] = $count;
+        }
+        \sort($counts);
+
+        $this->assertSame([3, 4], $counts);
+    }
+
+    /**
+     * Atlas $search requires a `mongot` sidecar process and an Atlas Search index.
+     * The vanilla `mongo:7` image shipped by our docker-compose does NOT include
+     * mongot, so `db.runCommand({aggregate, pipeline:[{$search:...}]})` is rejected
+     * with "$search is not allowed in this atlas tier". This is as close as we can
+     * get to "real" integration coverage without standing up Atlas Local
+     * (`mongodb/mongodb-atlas-local`) — we assert on the shape of the Plan the
+     * Builder produces and skip the actual round-trip.
+     */
+    public function testAtlasSearchQueryStructure(): void
+    {
+        $result = (new Builder())
+            ->from('mg_articles')
+            ->search(['text' => ['query' => 'hello world', 'path' => 'body']], 'default')
+            ->build();
+
+        /** @var array<string, mixed> $op */
+        $op = \json_decode($result->query, true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame('mg_articles', $op['collection']);
+        $this->assertSame('aggregate', $op['operation']);
+
+        /** @var list<array<string, mixed>> $pipeline */
+        $pipeline = $op['pipeline'];
+        $this->assertNotEmpty($pipeline);
+        $this->assertArrayHasKey('$search', $pipeline[0]);
+
+        /** @var array<string, mixed> $searchStage */
+        $searchStage = $pipeline[0]['$search'];
+        $this->assertSame('default', $searchStage['index']);
+        $this->assertSame(['query' => 'hello world', 'path' => 'body'], $searchStage['text']);
+    }
 }
