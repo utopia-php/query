@@ -827,6 +827,10 @@ class MongoDB extends BaseBuilder implements
             && $this->bucketStage === null && $this->bucketAutoStage === null) {
             $projection = $this->buildProjection($grouped);
             if (! empty($projection)) {
+                // Preserve window function output aliases in the projection
+                foreach ($this->windowSelects as $win) {
+                    $projection[$win->alias] = 1;
+                }
                 $pipeline[] = ['$project' => $projection];
             }
         }
