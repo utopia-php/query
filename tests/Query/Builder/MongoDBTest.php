@@ -5521,6 +5521,7 @@ class MongoDBTest extends TestCase
 
         $op = $this->decode($result->query);
         $this->assertArrayHasKey('projection', $op);
+        $this->assertIsArray($op['projection']);
         $this->assertArrayHasKey($word, $op['projection']);
     }
 
@@ -5545,6 +5546,7 @@ class MongoDBTest extends TestCase
 
         $op = $this->decode($result->query);
         $this->assertArrayHasKey('filter', $op);
+        $this->assertIsArray($op['filter']);
         $this->assertArrayHasKey($word, $op['filter']);
         $this->assertSame(['x'], $result->bindings);
     }
@@ -5572,6 +5574,8 @@ class MongoDBTest extends TestCase
             ->build();
 
         $op = $this->decode($result->query);
+        $this->assertArrayHasKey('projection', $op);
+        $this->assertIsArray($op['projection']);
         $this->assertArrayHasKey($identifier, $op['projection']);
     }
 
@@ -5596,6 +5600,7 @@ class MongoDBTest extends TestCase
 
         $op = $this->decode($result->query);
         $this->assertArrayHasKey('filter', $op);
+        $this->assertIsArray($op['filter']);
         $this->assertArrayHasKey($identifier, $op['filter']);
         $this->assertSame(['x'], $result->bindings);
     }

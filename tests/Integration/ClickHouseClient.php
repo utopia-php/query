@@ -45,7 +45,7 @@ class ClickHouseClient
             $url .= '&param_' . $key . '=' . urlencode((string) $value); // @phpstan-ignore cast.string
 
             return '{' . $key . ':' . $type . '}';
-        }, $query);
+        }, $query) ?? $query;
 
         $hasFormatClause = (bool) preg_match('/\bFORMAT\b/i', $sql);
         $sqlWithFormat = $hasFormatClause ? $sql : $sql . ' FORMAT JSONEachRow';

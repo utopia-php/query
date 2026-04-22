@@ -498,6 +498,7 @@ class QueryParseTest extends TestCase
         $this->assertSame(Method::Or, $parsed->getMethod());
         $nested = $parsed->getValues();
         $this->assertCount(2, $nested);
+        $this->assertInstanceOf(Query::class, $nested[1]);
         $this->assertSame(Method::Raw, $nested[1]->getMethod());
     }
 
