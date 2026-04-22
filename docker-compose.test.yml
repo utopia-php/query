@@ -10,7 +10,7 @@ services:
       - /var/lib/mysql
 
   postgres:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     ports:
       - "15432:5432"
     environment:

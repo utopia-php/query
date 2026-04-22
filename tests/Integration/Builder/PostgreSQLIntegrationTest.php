@@ -2,8 +2,10 @@
 
 namespace Tests\Integration\Builder;
 
+use PDOException;
 use Tests\Integration\IntegrationTestCase;
 use Utopia\Query\Builder\PostgreSQL as Builder;
+use Utopia\Query\Builder\VectorMetric;
 use Utopia\Query\Query;
 
 class PostgreSQLIntegrationTest extends IntegrationTestCase
@@ -59,6 +61,35 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
             (4, 'Widget', 29.99, 'cancelled'),
             (4, 'Gadget', 49.99, 'pending'),
             (5, 'Gizmo', 99.99, 'completed')
+        ");
+
+        $this->setUpEmbeddings();
+    }
+
+    private function setUpEmbeddings(): void
+    {
+        try {
+            $this->postgresStatement('CREATE EXTENSION IF NOT EXISTS vector');
+        } catch (PDOException $e) {
+            $this->markTestSkipped('pgvector extension is not available: ' . $e->getMessage());
+        }
+
+        $this->trackPostgresTable('embeddings');
+        $this->postgresStatement('DROP TABLE IF EXISTS "embeddings" CASCADE');
+        $this->postgresStatement('
+            CREATE TABLE "embeddings" (
+                "id" SERIAL PRIMARY KEY,
+                "label" TEXT NOT NULL,
+                "vec" vector(3) NOT NULL
+            )
+        ');
+        $this->postgresStatement("
+            INSERT INTO \"embeddings\" (\"label\", \"vec\") VALUES
+            ('mixed', '[0.5,0.5,0.01]'),
+            ('x-axis', '[1,0.01,0.01]'),
+            ('y-axis', '[0.01,1,0.01]'),
+            ('z-axis', '[0.01,0.01,1]'),
+            ('far', '[10,10,10]')
         ");
     }
 
@@ -456,5 +487,234 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         } finally {
             $pdo->rollBack();
         }
+    }
+
+    public function testVectorSearchL2Distance(): void
+    {
+        $result = (new Builder())
+            ->from('embeddings')
+            ->select(['label'])
+            ->orderByVectorDistance('vec', [0.95, 0.02, 0.02], VectorMetric::Euclidean)
+            ->limit(1)
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('x-axis', $rows[0]['label']);
+    }
+
+    public function testVectorSearchCosineDistance(): void
+    {
+        $result = (new Builder())
+            ->from('embeddings')
+            ->select(['label'])
+            ->orderByVectorDistance('vec', [1.0, 0.5, 0.01], VectorMetric::Cosine)
+            ->limit(2)
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $this->assertCount(2, $rows);
+        $this->assertSame('mixed', $rows[0]['label']);
+        $this->assertSame('x-axis', $rows[1]['label']);
+    }
+
+    public function testVectorSearchInnerProduct(): void
+    {
+        $result = (new Builder())
+            ->from('embeddings')
+            ->select(['label'])
+            ->orderByVectorDistance('vec', [1.0, 1.0, 1.0], VectorMetric::Dot)
+            ->limit(1)
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('far', $rows[0]['label']);
+    }
+
+    public function testMergeUpdateExistingAndInsertNew(): void
+    {
+        $this->trackPostgresTable('user_updates');
+        $this->postgresStatement('DROP TABLE IF EXISTS "user_updates" CASCADE');
+        $this->postgresStatement('
+            CREATE TABLE "user_updates" (
+                "id" INT PRIMARY KEY,
+                "name" VARCHAR(255) NOT NULL,
+                "city" VARCHAR(100) NOT NULL
+            )
+        ');
+        $this->postgresStatement("
+            INSERT INTO \"user_updates\" (\"id\", \"name\", \"city\") VALUES
+            (1, 'Alice', 'Seattle'),
+            (2, 'Bob', 'Dublin'),
+            (99, 'Zack', 'Oslo')
+        ");
+
+        $source = (new Builder())
+            ->from('user_updates')
+            ->select(['id', 'name', 'city']);
+
+        $merge = (new Builder())
+            ->mergeInto('users')
+            ->using($source, 'src')
+            ->on('"users"."id" = "src"."id"')
+            ->whenMatched('UPDATE SET "city" = "src"."city"')
+            ->whenNotMatched('INSERT ("name", "email", "age", "city", "active") VALUES ("src"."name", "src"."name" || \'+merged@example.com\', 0, "src"."city", TRUE)')
+            ->executeMerge();
+
+        $this->executeOnPostgres($merge);
+
+        $aliceCheck = (new Builder())
+            ->from('users')
+            ->select(['city'])
+            ->filter([Query::equal('name', ['Alice'])])
+            ->build();
+        $aliceRows = $this->executeOnPostgres($aliceCheck);
+        $this->assertCount(1, $aliceRows);
+        $this->assertSame('Seattle', $aliceRows[0]['city']);
+
+        $bobCheck = (new Builder())
+            ->from('users')
+            ->select(['city'])
+            ->filter([Query::equal('name', ['Bob'])])
+            ->build();
+        $bobRows = $this->executeOnPostgres($bobCheck);
+        $this->assertCount(1, $bobRows);
+        $this->assertSame('Dublin', $bobRows[0]['city']);
+
+        $zackCheck = (new Builder())
+            ->from('users')
+            ->select(['name', 'city'])
+            ->filter([Query::equal('name', ['Zack'])])
+            ->build();
+        $zackRows = $this->executeOnPostgres($zackCheck);
+        $this->assertCount(1, $zackRows);
+        $this->assertSame('Zack', $zackRows[0]['name']);
+        $this->assertSame('Oslo', $zackRows[0]['city']);
+    }
+
+    public function testAggregateFilter(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->selectAggregateFilter('SUM("amount")', '"status" = ?', 'completed_total', ['completed'])
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('309.96', (string) $rows[0]['completed_total']); // @phpstan-ignore cast.string
+    }
+
+    public function testDistinctOn(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->select(['user_id', 'product', 'amount'])
+            ->distinctOn(['user_id'])
+            ->sortAsc('user_id')
+            ->sortDesc('amount')
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $this->assertCount(5, $rows);
+        $this->assertSame(1, (int) $rows[0]['user_id']); // @phpstan-ignore cast.int
+        $this->assertSame('Gadget', $rows[0]['product']);
+        $this->assertSame(2, (int) $rows[1]['user_id']); // @phpstan-ignore cast.int
+        $this->assertSame('Widget', $rows[1]['product']);
+        $this->assertSame(3, (int) $rows[2]['user_id']); // @phpstan-ignore cast.int
+        $this->assertSame('Gizmo', $rows[2]['product']);
+        $this->assertSame(4, (int) $rows[3]['user_id']); // @phpstan-ignore cast.int
+        $this->assertSame('Gadget', $rows[3]['product']);
+        $this->assertSame(5, (int) $rows[4]['user_id']); // @phpstan-ignore cast.int
+        $this->assertSame('Gizmo', $rows[4]['product']);
+    }
+
+    public function testPercentileDisc(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->percentileDisc(0.5, 'age', 'median_age')
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(28, (int) $rows[0]['median_age']); // @phpstan-ignore cast.int
+    }
+
+    public function testModeAggregate(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->selectRaw('MODE() WITHIN GROUP (ORDER BY "city") AS "top_city"')
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('London', $rows[0]['top_city']);
+    }
+
+    public function testLateralJoin(): void
+    {
+        $topOrder = (new Builder())
+            ->from('orders')
+            ->select(['product', 'amount'])
+            ->filter([Query::raw('"user_id" = "u"."id"')])
+            ->sortDesc('amount')
+            ->limit(1);
+
+        $result = (new Builder())
+            ->from('users', 'u')
+            ->select(['u.name', 'top_order.product', 'top_order.amount'])
+            ->joinLateral($topOrder, 'top_order')
+            ->sortAsc('u.name')
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $this->assertCount(5, $rows);
+        $byName = [];
+        foreach ($rows as $row) {
+            /** @var string $name */
+            $name = $row['name'];
+            $byName[$name] = $row;
+        }
+
+        $this->assertSame('Gadget', $byName['Alice']['product']);
+        $this->assertSame('49.99', (string) $byName['Alice']['amount']); // @phpstan-ignore cast.string
+        $this->assertSame('Widget', $byName['Bob']['product']);
+        $this->assertSame('Gizmo', $byName['Charlie']['product']);
+        $this->assertSame('Gadget', $byName['Diana']['product']);
+        $this->assertSame('Gizmo', $byName['Eve']['product']);
+    }
+
+    public function testRecursiveCte(): void
+    {
+        $seed = (new Builder())
+            ->fromNone()
+            ->selectRaw('1');
+
+        $step = (new Builder())
+            ->from('t')
+            ->selectRaw('"n" + 1')
+            ->filter([Query::lessThan('n', 5)]);
+
+        $result = (new Builder())
+            ->withRecursiveSeedStep('t', $seed, $step, ['n'])
+            ->from('t')
+            ->select(['n'])
+            ->sortAsc('n')
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $values = array_map(static fn (array $row): int => (int) $row['n'], $rows); // @phpstan-ignore cast.int
+        $this->assertSame([1, 2, 3, 4, 5], $values);
     }
 }
