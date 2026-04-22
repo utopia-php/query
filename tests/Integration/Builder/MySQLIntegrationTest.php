@@ -498,4 +498,29 @@ class MySQLIntegrationTest extends IntegrationTestCase
             throw $e;
         }
     }
+
+    public function testRecursiveCte(): void
+    {
+        $seed = (new Builder())
+            ->from()
+            ->select('1 AS n');
+
+        $step = (new Builder())
+            ->from('t')
+            ->select('n + 1')
+            ->filter([Query::lessThan('n', 5)]);
+
+        $result = $this->fresh()
+            ->withRecursiveSeedStep('t', $seed, $step, ['n'])
+            ->from('t')
+            ->select(['n'])
+            ->sortAsc('n')
+            ->build();
+
+        $rows = $this->executeOnMysql($result);
+
+        $this->assertCount(5, $rows);
+        $values = array_map(fn (array $row): int => (int) $row['n'], $rows); // @phpstan-ignore cast.int
+        $this->assertSame([1, 2, 3, 4, 5], $values);
+    }
 }
