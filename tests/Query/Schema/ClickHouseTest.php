@@ -10,6 +10,7 @@ use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\ClickHouse as Schema;
+use Utopia\Query\Schema\ClickHouse\Engine;
 use Utopia\Query\Schema\Feature\ColumnComments;
 use Utopia\Query\Schema\Feature\DropPartition;
 use Utopia\Query\Schema\Feature\ForeignKeys;
@@ -598,5 +599,120 @@ class ClickHouseTest extends TestCase
         $schema->alter('events', function (Blueprint $table) {
             // no alterations
         });
+    }
+
+    public function testCreateReplacingMergeTreeEmitsEngineWithVersion(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Blueprint $table) {
+            $table->bigInteger('id')->primary();
+            $table->integer('version');
+            $table->engine(Engine::ReplacingMergeTree, 'version');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ENGINE = ReplacingMergeTree(`version`)', $result->query);
+        $this->assertStringContainsString('ORDER BY (`id`)', $result->query);
+    }
+
+    public function testCreateSummingMergeTreeEmitsEngineWithColumns(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('metrics', function (Blueprint $table) {
+            $table->integer('key')->primary();
+            $table->bigInteger('total')->unsigned();
+            $table->bigInteger('count')->unsigned();
+            $table->engine(Engine::SummingMergeTree, 'total', 'count');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ENGINE = SummingMergeTree(`total`, `count`)', $result->query);
+    }
+
+    public function testCreateCollapsingMergeTreeRejectsMissingSignColumn(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('CollapsingMergeTree requires a sign column.');
+
+        $schema = new Schema();
+        $schema->create('events', function (Blueprint $table) {
+            $table->integer('id')->primary();
+            $table->engine(Engine::CollapsingMergeTree);
+        });
+    }
+
+    public function testCreateMemoryEngineSkipsOrderBy(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('cache', function (Blueprint $table) {
+            $table->integer('id')->primary();
+            $table->string('value');
+            $table->engine(Engine::Memory);
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ENGINE = Memory', $result->query);
+        $this->assertStringNotContainsString('ORDER BY', $result->query);
+    }
+
+    public function testCreateAggregatingMergeTreeEmitsEmptyArgs(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('agg', function (Blueprint $table) {
+            $table->integer('key')->primary();
+            $table->engine(Engine::AggregatingMergeTree);
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ENGINE = AggregatingMergeTree()', $result->query);
+    }
+
+    public function testCreateReplicatedMergeTreeRejectsMissingArgs(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->create('events', function (Blueprint $table) {
+            $table->integer('id')->primary();
+            $table->engine(Engine::ReplicatedMergeTree, '/clickhouse/tables/events');
+        });
+    }
+
+    public function testTableLevelTTL(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Blueprint $table) {
+            $table->integer('id')->primary();
+            $table->datetime('ts');
+            $table->ttl('ts + INTERVAL 1 DAY');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('TTL ts + INTERVAL 1 DAY', $result->query);
+        $this->assertStringContainsString('ORDER BY (`id`)', $result->query);
+    }
+
+    public function testTableLevelTTLRejectsSemicolon(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->create('events', function (Blueprint $table) {
+            $table->integer('id')->primary();
+            $table->ttl('ts + INTERVAL 1 DAY;');
+        });
+    }
+
+    public function testColumnLevelTTL(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Blueprint $table) {
+            $table->integer('id')->primary();
+            $table->string('temporary')->ttl('ts + INTERVAL 1 DAY');
+            $table->datetime('ts');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('`temporary` String TTL ts + INTERVAL 1 DAY', $result->query);
     }
 }

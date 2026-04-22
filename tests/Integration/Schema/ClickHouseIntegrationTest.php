@@ -5,6 +5,7 @@ namespace Tests\Integration\Schema;
 use Tests\Integration\IntegrationTestCase;
 use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\ClickHouse;
+use Utopia\Query\Schema\ClickHouse\Engine;
 use Utopia\Query\Schema\ColumnType;
 
 class ClickHouseIntegrationTest extends IntegrationTestCase
@@ -153,20 +154,17 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
 
     public function testCreateReplacingMergeTree(): void
     {
-        // Schema builder only emits MergeTree engine — no API for
-        // ReplacingMergeTree. Create via raw DDL, then exercise the engine
-        // semantics (duplicate inserts collapse on merge via FINAL).
         $table = 'test_replacing_' . uniqid();
         $this->trackClickhouseTable($table);
 
-        $this->clickhouseStatement('
-            CREATE TABLE `' . $table . '` (
-                `id` UInt32,
-                `name` String,
-                `version` UInt32
-            ) ENGINE = ReplacingMergeTree(`version`)
-            ORDER BY `id`
-        ');
+        $result = $this->schema->create($table, function (Blueprint $bp) {
+            $bp->integer('id')->unsigned()->primary();
+            $bp->string('name');
+            $bp->integer('version')->unsigned();
+            $bp->engine(Engine::ReplacingMergeTree, 'version');
+        });
+
+        $this->clickhouseStatement($result->query);
 
         $this->clickhouseStatement(
             'INSERT INTO `' . $table . "` (`id`, `name`, `version`) VALUES (1, 'v1', 1)"
@@ -189,17 +187,16 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
 
     public function testCreateSummingMergeTree(): void
     {
-        // Schema builder lacks SummingMergeTree support — use raw DDL.
         $table = 'test_summing_' . uniqid();
         $this->trackClickhouseTable($table);
 
-        $this->clickhouseStatement('
-            CREATE TABLE `' . $table . '` (
-                `key` UInt32,
-                `total` UInt64
-            ) ENGINE = SummingMergeTree(`total`)
-            ORDER BY `key`
-        ');
+        $result = $this->schema->create($table, function (Blueprint $bp) {
+            $bp->integer('key')->unsigned()->primary();
+            $bp->bigInteger('total')->unsigned();
+            $bp->engine(Engine::SummingMergeTree, 'total');
+        });
+
+        $this->clickhouseStatement($result->query);
 
         $this->clickhouseStatement(
             'INSERT INTO `' . $table . '` (`key`, `total`) VALUES (1, 10), (1, 20), (2, 5)'
