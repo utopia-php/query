@@ -23,6 +23,19 @@ jobs:
           --health-timeout=5s
           --health-retries=5
 
+      mariadb:
+        image: mariadb:11
+        ports:
+          - 13307:3306
+        env:
+          MARIADB_ROOT_PASSWORD: test
+          MARIADB_DATABASE: query_test
+        options: >-
+          --health-cmd="mariadb-admin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
       postgres:
         image: pgvector/pgvector:pg16
         ports:

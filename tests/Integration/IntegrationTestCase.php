@@ -10,6 +10,8 @@ abstract class IntegrationTestCase extends TestCase
 {
     protected ?PDO $mysql = null;
 
+    protected ?PDO $mariadb = null;
+
     protected ?PDO $postgres = null;
 
     protected ?PDO $sqlite = null;
@@ -20,6 +22,9 @@ abstract class IntegrationTestCase extends TestCase
 
     /** @var list<string> */
     private array $mysqlCleanup = [];
+
+    /** @var list<string> */
+    private array $mariadbCleanup = [];
 
     /** @var list<string> */
     private array $postgresCleanup = [];
@@ -42,6 +47,20 @@ abstract class IntegrationTestCase extends TestCase
         }
 
         return $this->mysql;
+    }
+
+    protected function connectMariadb(): PDO
+    {
+        if ($this->mariadb === null) {
+            $this->mariadb = new PDO(
+                'mysql:host=127.0.0.1;port=13307;dbname=query_test',
+                'root',
+                'test',
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+            );
+        }
+
+        return $this->mariadb;
     }
 
     protected function connectPostgres(): PDO
@@ -157,6 +176,29 @@ abstract class IntegrationTestCase extends TestCase
     /**
      * @return list<array<string, mixed>>
      */
+    protected function executeOnMariadb(Plan $result): array
+    {
+        $pdo = $this->connectMariadb();
+        $stmt = $pdo->prepare($result->query);
+
+        foreach ($result->bindings as $i => $value) {
+            $type = match (true) {
+                is_bool($value) => PDO::PARAM_BOOL,
+                is_int($value) => PDO::PARAM_INT,
+                $value === null => PDO::PARAM_NULL,
+                default => PDO::PARAM_STR,
+            };
+            $stmt->bindValue($i + 1, $value, $type);
+        }
+        $stmt->execute();
+
+        /** @var list<array<string, mixed>> */
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
     protected function executeOnPostgres(Plan $result): array
     {
         $pdo = $this->connectPostgres();
@@ -192,6 +234,11 @@ abstract class IntegrationTestCase extends TestCase
         $this->connectMysql()->prepare($sql)->execute();
     }
 
+    protected function mariadbStatement(string $sql): void
+    {
+        $this->connectMariadb()->prepare($sql)->execute();
+    }
+
     protected function postgresStatement(string $sql): void
     {
         $this->connectPostgres()->prepare($sql)->execute();
@@ -205,6 +252,11 @@ abstract class IntegrationTestCase extends TestCase
     protected function trackMysqlTable(string $table): void
     {
         $this->mysqlCleanup[] = $table;
+    }
+
+    protected function trackMariadbTable(string $table): void
+    {
+        $this->mariadbCleanup[] = $table;
     }
 
     protected function trackPostgresTable(string $table): void
@@ -228,6 +280,15 @@ abstract class IntegrationTestCase extends TestCase
         }
         $this->mysql?->exec('SET FOREIGN_KEY_CHECKS = 1');
 
+        $this->mariadb?->exec('SET FOREIGN_KEY_CHECKS = 0');
+        foreach ($this->mariadbCleanup as $table) {
+            $stmt = $this->mariadb?->prepare("DROP TABLE IF EXISTS `{$table}`");
+            if ($stmt !== null && $stmt !== false) {
+                $stmt->execute();
+            }
+        }
+        $this->mariadb?->exec('SET FOREIGN_KEY_CHECKS = 1');
+
         foreach ($this->postgresCleanup as $table) {
             $stmt = $this->postgres?->prepare("DROP TABLE IF EXISTS \"{$table}\" CASCADE");
             if ($stmt !== null && $stmt !== false) {
@@ -244,6 +305,7 @@ abstract class IntegrationTestCase extends TestCase
         }
 
         $this->mysqlCleanup = [];
+        $this->mariadbCleanup = [];
         $this->postgresCleanup = [];
         $this->clickhouseCleanup = [];
         $this->mongoCleanup = [];

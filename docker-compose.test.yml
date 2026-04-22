@@ -9,6 +9,16 @@ services:
     tmpfs:
       - /var/lib/mysql
 
+  mariadb:
+    image: mariadb:11
+    ports:
+      - "13307:3306"
+    environment:
+      MARIADB_ROOT_PASSWORD: test
+      MARIADB_DATABASE: query_test
+    tmpfs:
+      - /var/lib/mysql
+
   postgres:
     image: pgvector/pgvector:pg16
     ports:
