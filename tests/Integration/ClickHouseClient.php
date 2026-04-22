@@ -2,6 +2,9 @@
 
 namespace Tests\Integration;
 
+use InvalidArgumentException;
+use RuntimeException;
+
 class ClickHouseClient
 {
     public function __construct(
@@ -22,11 +25,13 @@ class ClickHouseClient
         $isInsert = (bool) preg_match('/^\s*INSERT\b/i', $query);
 
         $placeholderCount = substr_count($query, '?');
-        if ($placeholderCount !== count($params)) {
-            throw new \InvalidArgumentException(sprintf(
-                'Query has %d placeholder(s) but %d param(s) were provided.',
+        $paramCount = count($params);
+
+        if ($placeholderCount > $paramCount) {
+            throw new InvalidArgumentException(sprintf(
+                'Query has %d placeholder(s) but only %d param(s) were provided.',
                 $placeholderCount,
-                count($params)
+                $paramCount
             ));
         }
 
@@ -47,7 +52,15 @@ class ClickHouseClient
             return '{' . $key . ':' . $type . '}';
         }, $query) ?? $query;
 
-        $hasFormatClause = (bool) preg_match('/\bFORMAT\b/i', $sql);
+        if ($placeholderIndex < $paramCount) {
+            throw new InvalidArgumentException(sprintf(
+                'Query consumed %d placeholder(s) but %d param(s) were provided.',
+                $placeholderIndex,
+                $paramCount
+            ));
+        }
+
+        $hasFormatClause = (bool) preg_match('/\bFORMAT\s+\w+\s*;?\s*$/i', $sql);
         $sqlWithFormat = $hasFormatClause ? $sql : $sql . ' FORMAT JSONEachRow';
 
         $context = stream_context_create([
@@ -63,12 +76,17 @@ class ClickHouseClient
         $response = file_get_contents($url, false, $context);
 
         if ($response === false) {
-            throw new \RuntimeException('ClickHouse request failed');
+            throw new RuntimeException('ClickHouse request failed');
         }
 
         $statusLine = $http_response_header[0] ?? '';
-        if (! $this->isSuccessStatus($statusLine)) {
-            throw new \RuntimeException('ClickHouse error: ' . $response);
+        $statusCode = $this->parseStatusCode($statusLine);
+        if ($statusCode === null || $statusCode < 200 || $statusCode >= 300) {
+            throw new RuntimeException(sprintf(
+                'ClickHouse error (HTTP %s): %s',
+                $statusCode !== null ? (string) $statusCode : 'unknown',
+                $response
+            ));
         }
 
         $trimmed = trim($response);
@@ -105,25 +123,30 @@ class ClickHouseClient
         $response = file_get_contents($url, false, $context);
 
         if ($response === false) {
-            throw new \RuntimeException('ClickHouse request failed');
+            throw new RuntimeException('ClickHouse request failed');
         }
 
         $statusLine = $http_response_header[0] ?? '';
-        if (! $this->isSuccessStatus($statusLine)) {
-            throw new \RuntimeException('ClickHouse error: ' . $response);
+        $statusCode = $this->parseStatusCode($statusLine);
+        if ($statusCode === null || $statusCode < 200 || $statusCode >= 300) {
+            throw new RuntimeException(sprintf(
+                'ClickHouse error (HTTP %s): %s',
+                $statusCode !== null ? (string) $statusCode : 'unknown',
+                $response
+            ));
         }
     }
 
     /**
-     * Returns true when the HTTP status line indicates a 2xx success response.
+     * Parses the numeric HTTP status code from a status line like "HTTP/1.1 200 OK".
+     * Returns null when the line does not match the expected format.
      */
-    private function isSuccessStatus(string $statusLine): bool
+    private function parseStatusCode(string $statusLine): ?int
     {
-        // Status line format: "HTTP/1.x 200 OK"
-        if (preg_match('/^HTTP\/\S+\s+(\d{3})/', $statusLine, $matches)) {
-            $code = (int) $matches[1];
-            return $code >= 200 && $code < 300;
+        if (preg_match('#^HTTP/\S+\s+(\d{3})#', $statusLine, $matches)) {
+            return (int) $matches[1];
         }
-        return false;
+
+        return null;
     }
 }
