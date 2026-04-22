@@ -12,6 +12,9 @@ use Utopia\Query\Builder\Feature\MongoDB\FieldUpdates;
 use Utopia\Query\Builder\Feature\MongoDB\PipelineStages;
 use Utopia\Query\Builder\Feature\TableSampling;
 use Utopia\Query\Builder\Feature\Upsert;
+use Utopia\Query\Builder\MongoDB\Operation;
+use Utopia\Query\Builder\MongoDB\PipelineStage;
+use Utopia\Query\Builder\MongoDB\UpdateOperator;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
@@ -27,48 +30,17 @@ class MongoDB extends BaseBuilder implements
     PipelineStages,
     AtlasSearch
 {
-    /** @var array<string, mixed> */
-    protected array $pushOps = [];
-
-    /** @var array<string, mixed> */
-    protected array $pullOps = [];
-
-    /** @var array<string, mixed> */
-    protected array $addToSetOps = [];
-
-    /** @var array<string, int|float> */
-    protected array $incOps = [];
-
-    /** @var list<string> */
-    protected array $unsetOps = [];
+    /**
+     * Update operations keyed by UpdateOperator->value.
+     * Each entry maps field-name => payload (value, modifier dict, rename target, etc.).
+     *
+     * @var array<string, array<string, mixed>>
+     */
+    protected array $updateOperations = [];
 
     protected ?string $textSearchTerm = null;
 
     protected ?float $sampleSize = null;
-
-    /** @var array<string, string> */
-    protected array $renameOps = [];
-
-    /** @var array<string, int|float> */
-    protected array $mulOps = [];
-
-    /** @var array<string, int> */
-    protected array $popOps = [];
-
-    /** @var array<string, array<mixed>> */
-    protected array $pullAllOps = [];
-
-    /** @var array<string, mixed> */
-    protected array $minOps = [];
-
-    /** @var array<string, mixed> */
-    protected array $maxOps = [];
-
-    /** @var array<string, array<string, string>> */
-    protected array $currentDateOps = [];
-
-    /** @var array<string, array{values: list<mixed>, position?: int, slice?: int, sort?: mixed}> */
-    protected array $pushEachOps = [];
 
     /** @var list<array<string, mixed>> */
     protected array $arrayFilters = [];
@@ -132,6 +104,11 @@ class MongoDB extends BaseBuilder implements
         }
     }
 
+    private function setUpdateField(UpdateOperator $operator, string $field, mixed $payload): void
+    {
+        $this->updateOperations[$operator->value][$field] = $payload;
+    }
+
     public function set(array $row): static
     {
         foreach (\array_keys($row) as $field) {
@@ -144,7 +121,7 @@ class MongoDB extends BaseBuilder implements
     public function push(string $field, mixed $value): static
     {
         $this->validateFieldName($field);
-        $this->pushOps[$field] = $value;
+        $this->setUpdateField(UpdateOperator::Push, $field, $value);
 
         return $this;
     }
@@ -152,7 +129,7 @@ class MongoDB extends BaseBuilder implements
     public function pull(string $field, mixed $value): static
     {
         $this->validateFieldName($field);
-        $this->pullOps[$field] = $value;
+        $this->setUpdateField(UpdateOperator::Pull, $field, $value);
 
         return $this;
     }
@@ -160,7 +137,7 @@ class MongoDB extends BaseBuilder implements
     public function addToSet(string $field, mixed $value): static
     {
         $this->validateFieldName($field);
-        $this->addToSetOps[$field] = $value;
+        $this->setUpdateField(UpdateOperator::AddToSet, $field, $value);
 
         return $this;
     }
@@ -168,7 +145,7 @@ class MongoDB extends BaseBuilder implements
     public function increment(string $field, int|float $amount = 1): static
     {
         $this->validateFieldName($field);
-        $this->incOps[$field] = $amount;
+        $this->setUpdateField(UpdateOperator::Increment, $field, $amount);
 
         return $this;
     }
@@ -177,7 +154,7 @@ class MongoDB extends BaseBuilder implements
     {
         foreach ($fields as $field) {
             $this->validateFieldName($field);
-            $this->unsetOps[] = $field;
+            $this->setUpdateField(UpdateOperator::Unset, $field, '');
         }
 
         return $this;
@@ -206,7 +183,7 @@ class MongoDB extends BaseBuilder implements
     {
         $this->validateFieldName($oldField);
         $this->validateFieldName($newField);
-        $this->renameOps[$oldField] = $newField;
+        $this->setUpdateField(UpdateOperator::Rename, $oldField, $newField);
 
         return $this;
     }
@@ -214,7 +191,7 @@ class MongoDB extends BaseBuilder implements
     public function multiply(string $field, int|float $factor): static
     {
         $this->validateFieldName($field);
-        $this->mulOps[$field] = $factor;
+        $this->setUpdateField(UpdateOperator::Multiply, $field, $factor);
 
         return $this;
     }
@@ -222,7 +199,7 @@ class MongoDB extends BaseBuilder implements
     public function popFirst(string $field): static
     {
         $this->validateFieldName($field);
-        $this->popOps[$field] = -1;
+        $this->setUpdateField(UpdateOperator::Pop, $field, -1);
 
         return $this;
     }
@@ -230,7 +207,7 @@ class MongoDB extends BaseBuilder implements
     public function popLast(string $field): static
     {
         $this->validateFieldName($field);
-        $this->popOps[$field] = 1;
+        $this->setUpdateField(UpdateOperator::Pop, $field, 1);
 
         return $this;
     }
@@ -238,7 +215,7 @@ class MongoDB extends BaseBuilder implements
     public function pullAll(string $field, array $values): static
     {
         $this->validateFieldName($field);
-        $this->pullAllOps[$field] = $values;
+        $this->setUpdateField(UpdateOperator::PullAll, $field, $values);
 
         return $this;
     }
@@ -246,7 +223,7 @@ class MongoDB extends BaseBuilder implements
     public function updateMin(string $field, mixed $value): static
     {
         $this->validateFieldName($field);
-        $this->minOps[$field] = $value;
+        $this->setUpdateField(UpdateOperator::Min, $field, $value);
 
         return $this;
     }
@@ -254,7 +231,7 @@ class MongoDB extends BaseBuilder implements
     public function updateMax(string $field, mixed $value): static
     {
         $this->validateFieldName($field);
-        $this->maxOps[$field] = $value;
+        $this->setUpdateField(UpdateOperator::Max, $field, $value);
 
         return $this;
     }
@@ -262,7 +239,7 @@ class MongoDB extends BaseBuilder implements
     public function currentDate(string $field, string $type = 'date'): static
     {
         $this->validateFieldName($field);
-        $this->currentDateOps[$field] = ['$type' => $type];
+        $this->setUpdateField(UpdateOperator::CurrentDate, $field, ['$type' => $type]);
 
         return $this;
     }
@@ -280,7 +257,9 @@ class MongoDB extends BaseBuilder implements
         if ($sort !== null) {
             $modifier['sort'] = $sort;
         }
-        $this->pushEachOps[$field] = $modifier;
+        // Stored under Push with an '__each' marker wrapper so buildUpdate()
+        // can distinguish modifier-form entries from plain push values.
+        $this->updateOperations[UpdateOperator::Push->value][$field] = ['__each' => $modifier];
 
         return $this;
     }
@@ -451,21 +430,9 @@ class MongoDB extends BaseBuilder implements
     public function reset(): static
     {
         parent::reset();
-        $this->pushOps = [];
-        $this->pullOps = [];
-        $this->addToSetOps = [];
-        $this->incOps = [];
-        $this->unsetOps = [];
+        $this->updateOperations = [];
         $this->textSearchTerm = null;
         $this->sampleSize = null;
-        $this->renameOps = [];
-        $this->mulOps = [];
-        $this->popOps = [];
-        $this->pullAllOps = [];
-        $this->minOps = [];
-        $this->maxOps = [];
-        $this->currentDateOps = [];
-        $this->pushEachOps = [];
         $this->arrayFilters = [];
         $this->bucketStage = null;
         $this->bucketAutoStage = null;
@@ -525,7 +492,7 @@ class MongoDB extends BaseBuilder implements
 
         $operation = [
             'collection' => $this->table,
-            'operation' => 'insertMany',
+            'operation' => Operation::InsertMany->value,
             'documents' => $documents,
         ];
 
@@ -559,7 +526,7 @@ class MongoDB extends BaseBuilder implements
 
         $operation = [
             'collection' => $this->table,
-            'operation' => 'updateMany',
+            'operation' => Operation::UpdateMany->value,
             'filter' => ! empty($filter) ? $filter : new stdClass(),
             'update' => $update,
         ];
@@ -585,7 +552,7 @@ class MongoDB extends BaseBuilder implements
 
         $operation = [
             'collection' => $this->table,
-            'operation' => 'deleteMany',
+            'operation' => Operation::DeleteMany->value,
             'filter' => ! empty($filter) ? $filter : new stdClass(),
         ];
 
@@ -626,9 +593,9 @@ class MongoDB extends BaseBuilder implements
 
         $operation = [
             'collection' => $this->table,
-            'operation' => 'updateOne',
+            'operation' => Operation::UpdateOne->value,
             'filter' => $filter,
-            'update' => ['$set' => $setDoc],
+            'update' => [UpdateOperator::Set->value => $setDoc],
             'options' => ['upsert' => true],
         ];
 
@@ -660,7 +627,7 @@ class MongoDB extends BaseBuilder implements
 
         $operation = [
             'collection' => $this->table,
-            'operation' => 'insertMany',
+            'operation' => Operation::InsertMany->value,
             'documents' => $documents,
             'options' => ['ordered' => false],
         ];
@@ -718,7 +685,7 @@ class MongoDB extends BaseBuilder implements
 
         $operation = [
             'collection' => $this->table,
-            'operation' => 'find',
+            'operation' => Operation::Find->value,
         ];
 
         if (! empty($filter)) {
@@ -759,11 +726,11 @@ class MongoDB extends BaseBuilder implements
 
         // $searchMeta replaces other stages (returns metadata only)
         if ($this->searchMetaStage !== null) {
-            $pipeline[] = ['$searchMeta' => $this->searchMetaStage];
+            $pipeline[] = [PipelineStage::SearchMeta->value => $this->searchMetaStage];
 
             $operation = [
                 'collection' => $this->table,
-                'operation' => 'aggregate',
+                'operation' => Operation::Aggregate->value,
                 'pipeline' => $pipeline,
             ];
 
@@ -781,24 +748,24 @@ class MongoDB extends BaseBuilder implements
 
         // Atlas $search must be FIRST stage
         if ($this->searchStage !== null) {
-            $pipeline[] = ['$search' => $this->searchStage];
+            $pipeline[] = [PipelineStage::Search->value => $this->searchStage];
         }
 
         // $vectorSearch must be FIRST stage
         if ($this->vectorSearchStage !== null) {
-            $pipeline[] = ['$vectorSearch' => $this->vectorSearchStage];
+            $pipeline[] = [PipelineStage::VectorSearch->value => $this->vectorSearchStage];
         }
 
         // Text search must be first (after Atlas search)
         if ($this->textSearchTerm !== null) {
             $this->addBinding($this->textSearchTerm);
-            $pipeline[] = ['$match' => ['$text' => ['$search' => '?']]];
+            $pipeline[] = [PipelineStage::Match->value => [PipelineStage::Text->value => ['$search' => '?']]];
         }
 
         // $sample for table sampling
         if ($this->sampleSize !== null) {
             $size = (int) \ceil($this->sampleSize);
-            $pipeline[] = ['$sample' => ['size' => $size]];
+            $pipeline[] = [PipelineStage::Sample->value => ['size' => $size]];
         }
 
         // JOINs via $lookup
@@ -811,7 +778,7 @@ class MongoDB extends BaseBuilder implements
 
         // $graphLookup (after $match, similar position to $lookup)
         if ($this->graphLookupStage !== null) {
-            $pipeline[] = ['$graphLookup' => $this->graphLookupStage];
+            $pipeline[] = [PipelineStage::GraphLookup->value => $this->graphLookupStage];
         }
 
         // WHERE IN subqueries
@@ -833,7 +800,7 @@ class MongoDB extends BaseBuilder implements
         // $match (WHERE filter)
         $filter = $this->buildFilter($grouped);
         if (! empty($filter)) {
-            $pipeline[] = ['$match' => $filter];
+            $pipeline[] = [PipelineStage::Match->value => $filter];
         }
 
         // DISTINCT without GROUP BY
@@ -846,29 +813,29 @@ class MongoDB extends BaseBuilder implements
 
         // $bucket replaces $group
         if ($this->bucketStage !== null) {
-            $pipeline[] = ['$bucket' => $this->bucketStage];
+            $pipeline[] = [PipelineStage::Bucket->value => $this->bucketStage];
         } elseif ($this->bucketAutoStage !== null) {
-            $pipeline[] = ['$bucketAuto' => $this->bucketAutoStage];
+            $pipeline[] = [PipelineStage::BucketAuto->value => $this->bucketAutoStage];
         } elseif (! empty($grouped->groupBy) || ! empty($grouped->aggregations)) {
             // GROUP BY + Aggregation
-            $pipeline[] = ['$group' => $this->buildGroup($grouped)];
+            $pipeline[] = [PipelineStage::Group->value => $this->buildGroup($grouped)];
 
             $reshape = $this->buildProjectFromGroup($grouped);
             if (! empty($reshape)) {
-                $pipeline[] = ['$project' => $reshape];
+                $pipeline[] = [PipelineStage::Project->value => $reshape];
             }
         }
 
         // $replaceRoot (after $group or as needed)
         if ($this->replaceRootExpr !== null) {
-            $pipeline[] = ['$replaceRoot' => ['newRoot' => $this->replaceRootExpr]];
+            $pipeline[] = [PipelineStage::ReplaceRoot->value => ['newRoot' => $this->replaceRootExpr]];
         }
 
         // HAVING
         if (! empty($grouped->having) || ! empty($this->rawHavings)) {
             $havingFilter = $this->buildHaving($grouped);
             if (! empty($havingFilter)) {
-                $pipeline[] = ['$match' => $havingFilter];
+                $pipeline[] = [PipelineStage::Match->value => $havingFilter];
             }
         }
 
@@ -889,7 +856,7 @@ class MongoDB extends BaseBuilder implements
                 foreach ($this->windowSelects as $win) {
                     $projection[$win->alias] = 1;
                 }
-                $pipeline[] = ['$project' => $projection];
+                $pipeline[] = [PipelineStage::Project->value => $projection];
             }
         }
 
@@ -902,7 +869,7 @@ class MongoDB extends BaseBuilder implements
                     $this->addBinding($binding);
                 }
             }
-            $pipeline[] = ['$facet' => $facetDoc];
+            $pipeline[] = [PipelineStage::Facet->value => $facetDoc];
         }
 
         // UNION ($unionWith)
@@ -918,7 +885,7 @@ class MongoDB extends BaseBuilder implements
             if (! empty($subPipeline)) {
                 $unionWith['pipeline'] = $subPipeline;
             }
-            $pipeline[] = ['$unionWith' => $unionWith];
+            $pipeline[] = [PipelineStage::UnionWith->value => $unionWith];
             $this->addBindings($union->bindings);
         }
 
@@ -927,7 +894,7 @@ class MongoDB extends BaseBuilder implements
         $orderQueries = Query::getByType($this->pendingQueries, [Method::OrderRandom], false);
         if (! empty($orderQueries)) {
             $hasRandomOrder = true;
-            $pipeline[] = ['$addFields' => ['_rand' => ['$rand' => new stdClass()]]];
+            $pipeline[] = [PipelineStage::AddFields->value => ['_rand' => ['$rand' => new stdClass()]]];
         }
 
         // ORDER BY
@@ -936,41 +903,41 @@ class MongoDB extends BaseBuilder implements
             $sort['_rand'] = 1;
         }
         if (! empty($sort)) {
-            $pipeline[] = ['$sort' => $sort];
+            $pipeline[] = [PipelineStage::Sort->value => $sort];
         }
 
         // Remove _rand field
         if ($hasRandomOrder) {
-            $pipeline[] = ['$unset' => '_rand'];
+            $pipeline[] = [PipelineStage::Unset->value => '_rand'];
         }
 
         // OFFSET
         if ($grouped->offset !== null) {
-            $pipeline[] = ['$skip' => $grouped->offset];
+            $pipeline[] = [PipelineStage::Skip->value => $grouped->offset];
         }
 
         // LIMIT
         if ($grouped->limit !== null) {
-            $pipeline[] = ['$limit' => $grouped->limit];
+            $pipeline[] = [PipelineStage::Limit->value => $grouped->limit];
         }
 
         // $merge at the very end of pipeline
         if ($this->mergeStage !== null) {
-            $pipeline[] = ['$merge' => $this->mergeStage];
+            $pipeline[] = [PipelineStage::Merge->value => $this->mergeStage];
         }
 
         // $out at the very end of pipeline (only one of $merge/$out allowed)
         if ($this->outStage !== null && $this->mergeStage === null) {
             if (isset($this->outStage['db'])) {
-                $pipeline[] = ['$out' => $this->outStage];
+                $pipeline[] = [PipelineStage::Out->value => $this->outStage];
             } else {
-                $pipeline[] = ['$out' => $this->outStage['coll']];
+                $pipeline[] = [PipelineStage::Out->value => $this->outStage['coll']];
             }
         }
 
         $operation = [
             'collection' => $this->table,
-            'operation' => 'aggregate',
+            'operation' => Operation::Aggregate->value,
             'pipeline' => $pipeline,
         ];
 
@@ -1478,7 +1445,7 @@ class MongoDB extends BaseBuilder implements
         $localField = $this->stripTablePrefix($leftCol);
         $foreignField = $this->stripTablePrefix($rightCol);
 
-        $stages[] = ['$lookup' => [
+        $stages[] = [PipelineStage::Lookup->value => [
             'from' => $table,
             'localField' => $localField,
             'foreignField' => $foreignField,
@@ -1488,9 +1455,9 @@ class MongoDB extends BaseBuilder implements
         $isLeftJoin = $joinQuery->getMethod() === Method::LeftJoin;
 
         if ($isLeftJoin) {
-            $stages[] = ['$unwind' => ['path' => '$' . $alias, 'preserveNullAndEmptyArrays' => true]];
+            $stages[] = [PipelineStage::Unwind->value => ['path' => '$' . $alias, 'preserveNullAndEmptyArrays' => true]];
         } else {
-            $stages[] = ['$unwind' => '$' . $alias];
+            $stages[] = [PipelineStage::Unwind->value => '$' . $alias];
         }
 
         return $stages;
@@ -1518,13 +1485,13 @@ class MongoDB extends BaseBuilder implements
                 $id[$resolved[$field]] = '$' . $resolved[$field];
             }
 
-            $stages[] = ['$group' => ['_id' => $id]];
+            $stages[] = [PipelineStage::Group->value => ['_id' => $id]];
 
             $project = ['_id' => 0];
             foreach ($fields as $field) {
                 $project[$resolved[$field]] = '$_id.' . $resolved[$field];
             }
-            $stages[] = ['$project' => $project];
+            $stages[] = [PipelineStage::Project->value => $project];
         }
 
         return $stages;
@@ -1618,17 +1585,17 @@ class MongoDB extends BaseBuilder implements
                 }
             }
 
-            $stage = ['$setWindowFields' => ['output' => $output]];
+            $stage = [PipelineStage::SetWindowFields->value => ['output' => $output]];
 
             if ($win->partitionBy !== null && $win->partitionBy !== []) {
                 if (\count($win->partitionBy) === 1) {
-                    $stage['$setWindowFields']['partitionBy'] = '$' . $win->partitionBy[0];
+                    $stage[PipelineStage::SetWindowFields->value]['partitionBy'] = '$' . $win->partitionBy[0];
                 } else {
                     $partitionBy = [];
                     foreach ($win->partitionBy as $col) {
                         $partitionBy[$col] = '$' . $col;
                     }
-                    $stage['$setWindowFields']['partitionBy'] = $partitionBy;
+                    $stage[PipelineStage::SetWindowFields->value]['partitionBy'] = $partitionBy;
                 }
             }
 
@@ -1641,7 +1608,7 @@ class MongoDB extends BaseBuilder implements
                         $sortBy[$col] = 1;
                     }
                 }
-                $stage['$setWindowFields']['sortBy'] = $sortBy;
+                $stage[PipelineStage::SetWindowFields->value]['sortBy'] = $sortBy;
             }
 
             $stages[] = $stage;
@@ -1672,13 +1639,13 @@ class MongoDB extends BaseBuilder implements
         $subField = $this->extractProjectionField($subPipeline);
         $lookupAlias = '_sub_' . $idx;
 
-        $stages[] = ['$lookup' => [
+        $stages[] = [PipelineStage::Lookup->value => [
             'from' => $subCollection,
             'pipeline' => $subPipeline,
             'as' => $lookupAlias,
         ]];
 
-        $stages[] = ['$addFields' => [
+        $stages[] = [PipelineStage::AddFields->value => [
             '_sub_ids_' . $idx => ['$map' => [
                 'input' => '$' . $lookupAlias,
                 'as' => 's',
@@ -1689,16 +1656,16 @@ class MongoDB extends BaseBuilder implements
         $column = $this->resolveAttribute($sub->column);
 
         if ($sub->not) {
-            $stages[] = ['$match' => [
+            $stages[] = [PipelineStage::Match->value => [
                 '$expr' => ['$not' => ['$in' => ['$' . $column, '$_sub_ids_' . $idx]]],
             ]];
         } else {
-            $stages[] = ['$match' => [
+            $stages[] = [PipelineStage::Match->value => [
                 '$expr' => ['$in' => ['$' . $column, '$_sub_ids_' . $idx]],
             ]];
         }
 
-        $stages[] = ['$unset' => [$lookupAlias, '_sub_ids_' . $idx]];
+        $stages[] = [PipelineStage::Unset->value => [$lookupAlias, '_sub_ids_' . $idx]];
 
         return $stages;
     }
@@ -1725,30 +1692,30 @@ class MongoDB extends BaseBuilder implements
         // Ensure limit 1 for exists checks
         $hasLimit = false;
         foreach ($subPipeline as $stage) {
-            if (isset($stage['$limit'])) {
+            if (isset($stage[PipelineStage::Limit->value])) {
                 $hasLimit = true;
                 break;
             }
         }
         if (! $hasLimit) {
-            $subPipeline[] = ['$limit' => 1];
+            $subPipeline[] = [PipelineStage::Limit->value => 1];
         }
 
         $lookupAlias = '_exists_' . $idx;
 
-        $stages[] = ['$lookup' => [
+        $stages[] = [PipelineStage::Lookup->value => [
             'from' => $subCollection,
             'pipeline' => $subPipeline,
             'as' => $lookupAlias,
         ]];
 
         if ($sub->not) {
-            $stages[] = ['$match' => [$lookupAlias => ['$size' => 0]]];
+            $stages[] = [PipelineStage::Match->value => [$lookupAlias => ['$size' => 0]]];
         } else {
-            $stages[] = ['$match' => [$lookupAlias => ['$ne' => []]]];
+            $stages[] = [PipelineStage::Match->value => [$lookupAlias => ['$ne' => []]]];
         }
 
-        $stages[] = ['$unset' => $lookupAlias];
+        $stages[] = [PipelineStage::Unset->value => $lookupAlias];
 
         return $stages;
     }
@@ -1766,115 +1733,114 @@ class MongoDB extends BaseBuilder implements
                 $this->addBinding($value);
                 $setDoc[$col] = '?';
             }
-            $update['$set'] = $setDoc;
+            $update[UpdateOperator::Set->value] = $setDoc;
         }
 
-        // Build $push with support for $each modifiers
-        $pushDoc = [];
-        foreach ($this->pushOps as $field => $value) {
-            $this->addBinding($value);
-            $pushDoc[$field] = '?';
-        }
-        foreach ($this->pushEachOps as $field => $modifier) {
-            $eachValues = [];
-            foreach ($modifier['values'] as $val) {
-                $this->addBinding($val);
-                $eachValues[] = '?';
+        foreach ($this->updateOperations as $operatorValue => $fields) {
+            if (empty($fields)) {
+                continue;
             }
-            $eachDoc = ['$each' => $eachValues];
-            if (isset($modifier['position'])) {
-                $eachDoc['$position'] = $modifier['position'];
-            }
-            if (isset($modifier['slice'])) {
-                $eachDoc['$slice'] = $modifier['slice'];
-            }
-            if (isset($modifier['sort'])) {
-                $eachDoc['$sort'] = $modifier['sort'];
-            }
-            $pushDoc[$field] = $eachDoc;
-        }
-        if (! empty($pushDoc)) {
-            $update['$push'] = $pushDoc;
-        }
 
-        if (! empty($this->pullOps)) {
-            $pullDoc = [];
-            foreach ($this->pullOps as $field => $value) {
-                $this->addBinding($value);
-                $pullDoc[$field] = '?';
-            }
-            $update['$pull'] = $pullDoc;
-        }
-
-        if (! empty($this->addToSetOps)) {
-            $addDoc = [];
-            foreach ($this->addToSetOps as $field => $value) {
-                $this->addBinding($value);
-                $addDoc[$field] = '?';
-            }
-            $update['$addToSet'] = $addDoc;
-        }
-
-        if (! empty($this->incOps)) {
-            $update['$inc'] = $this->incOps;
-        }
-
-        if (! empty($this->unsetOps)) {
-            $unsetDoc = [];
-            foreach ($this->unsetOps as $field) {
-                $unsetDoc[$field] = '';
-            }
-            $update['$unset'] = $unsetDoc;
-        }
-
-        if (! empty($this->renameOps)) {
-            $update['$rename'] = $this->renameOps;
-        }
-
-        if (! empty($this->mulOps)) {
-            $update['$mul'] = $this->mulOps;
-        }
-
-        if (! empty($this->popOps)) {
-            $update['$pop'] = $this->popOps;
-        }
-
-        if (! empty($this->pullAllOps)) {
-            $pullAllDoc = [];
-            foreach ($this->pullAllOps as $field => $values) {
-                $placeholders = [];
-                foreach ($values as $val) {
-                    $this->addBinding($val);
-                    $placeholders[] = '?';
-                }
-                $pullAllDoc[$field] = $placeholders;
-            }
-            $update['$pullAll'] = $pullAllDoc;
-        }
-
-        if (! empty($this->minOps)) {
-            $minDoc = [];
-            foreach ($this->minOps as $field => $value) {
-                $this->addBinding($value);
-                $minDoc[$field] = '?';
-            }
-            $update['$min'] = $minDoc;
-        }
-
-        if (! empty($this->maxOps)) {
-            $maxDoc = [];
-            foreach ($this->maxOps as $field => $value) {
-                $this->addBinding($value);
-                $maxDoc[$field] = '?';
-            }
-            $update['$max'] = $maxDoc;
-        }
-
-        if (! empty($this->currentDateOps)) {
-            $update['$currentDate'] = $this->currentDateOps;
+            $update[$operatorValue] = $this->emitUpdateOperator($operatorValue, $fields);
         }
 
         return $update;
+    }
+
+    /**
+     * Shape a single update operator's field map into the final payload (with bindings).
+     *
+     * @param array<string, mixed> $fields
+     * @return array<string, mixed>|array<string, array<mixed>>
+     */
+    private function emitUpdateOperator(string $operatorValue, array $fields): array
+    {
+        return match ($operatorValue) {
+            UpdateOperator::Push->value => $this->emitPushFields($fields),
+            UpdateOperator::Pull->value,
+            UpdateOperator::AddToSet->value,
+            UpdateOperator::Min->value,
+            UpdateOperator::Max->value => $this->emitBoundValues($fields),
+            UpdateOperator::PullAll->value => $this->emitPullAllFields($fields),
+            UpdateOperator::Increment->value,
+            UpdateOperator::Multiply->value,
+            UpdateOperator::Unset->value,
+            UpdateOperator::Rename->value,
+            UpdateOperator::Pop->value,
+            UpdateOperator::CurrentDate->value => $fields,
+            default => $fields,
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $fields
+     * @return array<string, mixed>
+     */
+    private function emitPushFields(array $fields): array
+    {
+        $pushDoc = [];
+        foreach ($fields as $field => $value) {
+            if (\is_array($value) && \array_key_exists('__each', $value)) {
+                /** @var array{values: list<mixed>, position?: int, slice?: int, sort?: mixed} $modifier */
+                $modifier = $value['__each'];
+                $eachValues = [];
+                foreach ($modifier['values'] as $val) {
+                    $this->addBinding($val);
+                    $eachValues[] = '?';
+                }
+                $eachDoc = ['$each' => $eachValues];
+                if (isset($modifier['position'])) {
+                    $eachDoc['$position'] = $modifier['position'];
+                }
+                if (isset($modifier['slice'])) {
+                    $eachDoc['$slice'] = $modifier['slice'];
+                }
+                if (isset($modifier['sort'])) {
+                    $eachDoc['$sort'] = $modifier['sort'];
+                }
+                $pushDoc[$field] = $eachDoc;
+            } else {
+                $this->addBinding($value);
+                $pushDoc[$field] = '?';
+            }
+        }
+
+        return $pushDoc;
+    }
+
+    /**
+     * @param array<string, mixed> $fields
+     * @return array<string, string>
+     */
+    private function emitBoundValues(array $fields): array
+    {
+        $doc = [];
+        foreach ($fields as $field => $value) {
+            $this->addBinding($value);
+            $doc[$field] = '?';
+        }
+
+        return $doc;
+    }
+
+    /**
+     * @param array<string, mixed> $fields
+     * @return array<string, array<string>>
+     */
+    private function emitPullAllFields(array $fields): array
+    {
+        $doc = [];
+        foreach ($fields as $field => $values) {
+            /** @var array<mixed> $values */
+            $placeholders = [];
+            foreach ($values as $val) {
+                $this->addBinding($val);
+                $placeholders[] = '?';
+            }
+            $doc[$field] = $placeholders;
+        }
+
+        return $doc;
     }
 
     private function stripTablePrefix(string $field): string
@@ -1894,7 +1860,7 @@ class MongoDB extends BaseBuilder implements
      */
     private function operationToPipeline(array $op): array
     {
-        if (($op['operation'] ?? '') === 'aggregate') {
+        if (($op['operation'] ?? '') === Operation::Aggregate->value) {
             /** @var list<array<string, mixed>> */
             return $op['pipeline'] ?? [];
         }
@@ -1902,19 +1868,19 @@ class MongoDB extends BaseBuilder implements
         $pipeline = [];
 
         if (! empty($op['filter'])) {
-            $pipeline[] = ['$match' => $op['filter']];
+            $pipeline[] = [PipelineStage::Match->value => $op['filter']];
         }
         if (! empty($op['projection'])) {
-            $pipeline[] = ['$project' => $op['projection']];
+            $pipeline[] = [PipelineStage::Project->value => $op['projection']];
         }
         if (! empty($op['sort'])) {
-            $pipeline[] = ['$sort' => $op['sort']];
+            $pipeline[] = [PipelineStage::Sort->value => $op['sort']];
         }
         if (isset($op['skip'])) {
-            $pipeline[] = ['$skip' => $op['skip']];
+            $pipeline[] = [PipelineStage::Skip->value => $op['skip']];
         }
         if (isset($op['limit'])) {
-            $pipeline[] = ['$limit' => $op['limit']];
+            $pipeline[] = [PipelineStage::Limit->value => $op['limit']];
         }
 
         return $pipeline;
@@ -1928,9 +1894,9 @@ class MongoDB extends BaseBuilder implements
     private function extractProjectionField(array $pipeline): string
     {
         foreach ($pipeline as $stage) {
-            if (isset($stage['$project'])) {
+            if (isset($stage[PipelineStage::Project->value])) {
                 /** @var array<string, mixed> $projection */
-                $projection = $stage['$project'];
+                $projection = $stage[PipelineStage::Project->value];
                 foreach ($projection as $field => $value) {
                     if ($field !== '_id' && $value === 1) {
                         return $field;
