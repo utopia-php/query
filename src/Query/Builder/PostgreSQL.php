@@ -29,6 +29,13 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
 {
     use Trait\FullOuterJoins;
     use Trait\LateralJoins;
+    use Trait\PostgreSQL\AggregateFilter;
+    use Trait\PostgreSQL\DistinctOn;
+    use Trait\PostgreSQL\LockingOf;
+    use Trait\PostgreSQL\Merge;
+    use Trait\PostgreSQL\OrderedSetAggregates;
+    use Trait\PostgreSQL\Returning;
+    use Trait\PostgreSQL\VectorSearch;
 
     protected string $wrapChar = '"';
 
@@ -159,35 +166,6 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     protected function shouldEmitOffset(?int $offset, ?int $limit): bool
     {
         return $offset !== null;
-    }
-
-    /**
-     * @param  list<string>  $columns
-     */
-    #[\Override]
-    public function returning(array $columns = ['*']): static
-    {
-        $this->returningColumns = $columns;
-
-        return $this;
-    }
-
-    #[\Override]
-    public function forUpdateOf(string $table): static
-    {
-        $this->lockMode = LockMode::ForUpdate;
-        $this->lockOfTable = $table;
-
-        return $this;
-    }
-
-    #[\Override]
-    public function forShareOf(string $table): static
-    {
-        $this->lockMode = LockMode::ForShare;
-        $this->lockOfTable = $table;
-
-        return $this;
     }
 
     #[\Override]
@@ -389,18 +367,6 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $result->bindings,
             executor: $this->executor,
         );
-    }
-
-    #[\Override]
-    public function orderByVectorDistance(string $attribute, array $vector, VectorMetric $metric = VectorMetric::Cosine): static
-    {
-        $this->vectorOrder = [
-            'attribute' => $attribute,
-            'vector' => $vector,
-            'metric' => $metric,
-        ];
-
-        return $this;
     }
 
     #[\Override]
@@ -679,83 +645,6 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     }
 
     #[\Override]
-    public function mergeInto(string $target): static
-    {
-        $this->mergeTarget = $target;
-
-        return $this;
-    }
-
-    #[\Override]
-    public function using(BaseBuilder $source, string $alias): static
-    {
-        $this->mergeSource = $source;
-        $this->mergeSourceAlias = $alias;
-
-        return $this;
-    }
-
-    #[\Override]
-    public function on(string $condition, mixed ...$bindings): static
-    {
-        $this->mergeCondition = $condition;
-        $this->mergeConditionBindings = \array_values($bindings);
-
-        return $this;
-    }
-
-    #[\Override]
-    public function whenMatched(string $action, mixed ...$bindings): static
-    {
-        $this->mergeClauses[] = new MergeClause($action, true, \array_values($bindings));
-
-        return $this;
-    }
-
-    #[\Override]
-    public function whenNotMatched(string $action, mixed ...$bindings): static
-    {
-        $this->mergeClauses[] = new MergeClause($action, false, \array_values($bindings));
-
-        return $this;
-    }
-
-    #[\Override]
-    public function executeMerge(): Plan
-    {
-        if ($this->mergeTarget === '') {
-            throw new ValidationException('No merge target specified. Call mergeInto() before executeMerge().');
-        }
-        if ($this->mergeSource === null) {
-            throw new ValidationException('No merge source specified. Call using() before executeMerge().');
-        }
-        if ($this->mergeCondition === '') {
-            throw new ValidationException('No merge condition specified. Call on() before executeMerge().');
-        }
-
-        $this->bindings = [];
-
-        $sourceResult = $this->mergeSource->build();
-        $this->addBindings($sourceResult->bindings);
-
-        $sql = 'MERGE INTO ' . $this->quote($this->mergeTarget)
-            . ' USING (' . $sourceResult->query . ') AS ' . $this->quote($this->mergeSourceAlias)
-            . ' ON ' . $this->mergeCondition;
-
-        foreach ($this->mergeConditionBindings as $binding) {
-            $this->addBinding($binding);
-        }
-
-        foreach ($this->mergeClauses as $clause) {
-            $keyword = $clause->matched ? 'WHEN MATCHED THEN' : 'WHEN NOT MATCHED THEN';
-            $sql .= ' ' . $keyword . ' ' . $clause->action;
-            $this->addBindings($clause->bindings);
-        }
-
-        return new Plan($sql, $this->bindings, executor: $this->executor);
-    }
-
-    #[\Override]
     public function groupConcat(string $column, string $separator = ',', string $alias = '', ?array $orderBy = null): static
     {
         $col = $this->resolveAndWrap($column);
@@ -799,102 +688,6 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         }
 
         return $this->select($expr);
-    }
-
-    #[\Override]
-    public function arrayAgg(string $column, string $alias = ''): static
-    {
-        $expr = 'ARRAY_AGG(' . $this->resolveAndWrap($column) . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr);
-    }
-
-    #[\Override]
-    public function boolAnd(string $column, string $alias = ''): static
-    {
-        $expr = 'BOOL_AND(' . $this->resolveAndWrap($column) . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr);
-    }
-
-    #[\Override]
-    public function boolOr(string $column, string $alias = ''): static
-    {
-        $expr = 'BOOL_OR(' . $this->resolveAndWrap($column) . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr);
-    }
-
-    #[\Override]
-    public function every(string $column, string $alias = ''): static
-    {
-        $expr = 'EVERY(' . $this->resolveAndWrap($column) . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr);
-    }
-
-    #[\Override]
-    public function mode(string $column, string $alias = ''): static
-    {
-        $expr = 'MODE() WITHIN GROUP (ORDER BY ' . $this->resolveAndWrap($column) . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr);
-    }
-
-    #[\Override]
-    public function percentileCont(float $fraction, string $orderColumn, string $alias = ''): static
-    {
-        $expr = 'PERCENTILE_CONT(?) WITHIN GROUP (ORDER BY ' . $this->resolveAndWrap($orderColumn) . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, [$fraction]);
-    }
-
-    #[\Override]
-    public function percentileDisc(float $fraction, string $orderColumn, string $alias = ''): static
-    {
-        $expr = 'PERCENTILE_DISC(?) WITHIN GROUP (ORDER BY ' . $this->resolveAndWrap($orderColumn) . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, [$fraction]);
-    }
-
-    #[\Override]
-    public function distinctOn(array $columns): static
-    {
-        $this->distinctOnColumns = $columns;
-
-        return $this;
-    }
-
-    #[\Override]
-    public function selectAggregateFilter(string $aggregateExpr, string $filterCondition, string $alias = '', array $bindings = []): static
-    {
-        $expr = $aggregateExpr . ' FILTER (WHERE ' . $filterCondition . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, $bindings);
     }
 
     #[\Override]
