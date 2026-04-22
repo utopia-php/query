@@ -295,6 +295,10 @@ class MongoDBTest extends TestCase
 
     public function testParsePerformance(): void
     {
+        if (\getenv('CI') !== false) {
+            $this->markTestSkipped('Performance targets assume dedicated hardware; CI runners are too variable.');
+        }
+
         $data = $this->buildOpMsg(['find' => 'users', '$db' => 'mydb']);
         $iterations = 100_000;
 
@@ -314,6 +318,10 @@ class MongoDBTest extends TestCase
 
     public function testTransactionScanPerformance(): void
     {
+        if (\getenv('CI') !== false) {
+            $this->markTestSkipped('Performance targets assume dedicated hardware; CI runners are too variable.');
+        }
+
         // Document with many keys before startTransaction to test scanning
         $data = $this->buildOpMsg([
             'find' => 'users',

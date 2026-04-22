@@ -179,6 +179,10 @@ class MySQLTest extends TestCase
 
     public function testParsePerformance(): void
     {
+        if (\getenv('CI') !== false) {
+            $this->markTestSkipped('Performance targets assume dedicated hardware; CI runners are too variable.');
+        }
+
         $data = $this->buildQuery('SELECT * FROM users WHERE id = 1');
         $iterations = 100_000;
 

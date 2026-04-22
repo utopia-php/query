@@ -165,6 +165,10 @@ class SQLTest extends TestCase
 
     public function testClassifySqlPerformance(): void
     {
+        if (\getenv('CI') !== false) {
+            $this->markTestSkipped('Performance targets assume dedicated hardware; CI runners are too variable.');
+        }
+
         $queries = [
             'SELECT * FROM users WHERE id = 1',
             "INSERT INTO logs (msg) VALUES ('test')",
