@@ -183,9 +183,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     {
         $this->bindings = [];
         [$sql, $bindings] = $this->compileInsertBody();
-        foreach ($bindings as $binding) {
-            $this->addBinding($binding);
-        }
+        $this->addBindings($bindings);
 
         // Replace "INSERT INTO" with "INSERT IGNORE INTO"
         $sql = \preg_replace('/^INSERT INTO/', 'INSERT IGNORE INTO', $sql, 1) ?? $sql;

@@ -2,6 +2,7 @@
 
 namespace Utopia\Query\Schema;
 
+use stdClass;
 use Utopia\Query\Builder;
 use Utopia\Query\Builder\Plan;
 use Utopia\Query\Exception\UnsupportedException;
@@ -188,7 +189,7 @@ class MongoDB extends Schema
             \json_encode([
                 'command' => 'deleteMany',
                 'collection' => $table,
-                'filter' => new \stdClass(),
+                'filter' => new stdClass(),
             ], JSON_THROW_ON_ERROR),
             [],
             executor: $this->executor,

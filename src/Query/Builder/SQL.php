@@ -246,9 +246,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
             . ' (' . \implode(', ', $wrappedColumns) . ')'
             . ' ' . $sourceResult->query;
 
-        foreach ($sourceResult->bindings as $binding) {
-            $this->addBinding($binding);
-        }
+        $this->addBindings($sourceResult->bindings);
 
         $sql .= ' ' . $this->compileConflictClause();
 

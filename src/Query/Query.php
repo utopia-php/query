@@ -5,6 +5,7 @@ namespace Utopia\Query;
 use JsonException;
 use Utopia\Query\Builder\GroupedQueries;
 use Utopia\Query\Exception as QueryException;
+use Utopia\Query\Exception\ValidationException;
 
 /** @phpstan-consistent-constructor */
 class Query
@@ -1312,10 +1313,10 @@ class Query
     public static function page(int $page, int $perPage = 25): array
     {
         if ($page < 1) {
-            throw new \Utopia\Query\Exception\ValidationException('Page must be >= 1, got ' . $page);
+            throw new ValidationException('Page must be >= 1, got ' . $page);
         }
         if ($perPage < 1) {
-            throw new \Utopia\Query\Exception\ValidationException('Per page must be >= 1, got ' . $perPage);
+            throw new ValidationException('Per page must be >= 1, got ' . $perPage);
         }
 
         return [
@@ -1412,7 +1413,7 @@ class Query
             if ($method->isNested()) {
                 /** @var array<static> $nested */
                 $nested = $query->getValues();
-                $errors = \array_merge($errors, static::validate($nested, $allowedAttributes));
+                \array_push($errors, ...static::validate($nested, $allowedAttributes));
 
                 continue;
             }

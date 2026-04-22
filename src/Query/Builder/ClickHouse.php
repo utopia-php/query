@@ -806,9 +806,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         $fromSub = $this->fromSubquery;
         if ($fromSub !== null) {
             $subResult = $fromSub->subquery->build();
-            foreach ($subResult->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($subResult->bindings);
 
             return 'FROM (' . $subResult->query . ') AS ' . $this->quote($fromSub->alias);
         }

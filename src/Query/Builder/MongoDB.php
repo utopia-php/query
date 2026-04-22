@@ -2,6 +2,7 @@
 
 namespace Utopia\Query\Builder;
 
+use stdClass;
 use Utopia\Query\Builder as BaseBuilder;
 use Utopia\Query\Builder\Feature\FullTextSearch;
 use Utopia\Query\Builder\Feature\MongoDB\ArrayPushModifiers;
@@ -521,7 +522,7 @@ class MongoDB extends BaseBuilder implements
         $operation = [
             'collection' => $this->table,
             'operation' => 'updateMany',
-            'filter' => ! empty($filter) ? $filter : new \stdClass(),
+            'filter' => ! empty($filter) ? $filter : new stdClass(),
             'update' => $update,
         ];
 
@@ -547,7 +548,7 @@ class MongoDB extends BaseBuilder implements
         $operation = [
             'collection' => $this->table,
             'operation' => 'deleteMany',
-            'filter' => ! empty($filter) ? $filter : new \stdClass(),
+            'filter' => ! empty($filter) ? $filter : new stdClass(),
         ];
 
         return new Plan(
@@ -861,9 +862,7 @@ class MongoDB extends BaseBuilder implements
                 $unionWith['pipeline'] = $subPipeline;
             }
             $pipeline[] = ['$unionWith' => $unionWith];
-            foreach ($union->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($union->bindings);
         }
 
         // Random ordering via $addFields + $sort
@@ -871,7 +870,7 @@ class MongoDB extends BaseBuilder implements
         $orderQueries = Query::getByType($this->pendingQueries, [Method::OrderRandom], false);
         if (! empty($orderQueries)) {
             $hasRandomOrder = true;
-            $pipeline[] = ['$addFields' => ['_rand' => ['$rand' => new \stdClass()]]];
+            $pipeline[] = ['$addFields' => ['_rand' => ['$rand' => new stdClass()]]];
         }
 
         // ORDER BY
@@ -1498,7 +1497,7 @@ class MongoDB extends BaseBuilder implements
             };
 
             if ($mongoFunc !== null) {
-                $output[$win->alias] = [$mongoFunc => new \stdClass()];
+                $output[$win->alias] = [$mongoFunc => new stdClass()];
             } else {
                 // Try to parse function with argument like SUM(amount)
                 if (\preg_match('/^(\w+)\((.+)\)$/i', $win->function, $matches)) {
@@ -1567,9 +1566,7 @@ class MongoDB extends BaseBuilder implements
             throw new UnsupportedException('Cannot parse subquery for MongoDB WHERE IN.');
         }
 
-        foreach ($subResult->bindings as $binding) {
-            $this->addBinding($binding);
-        }
+        $this->addBindings($subResult->bindings);
 
         $subCollection = $subOp['collection'] ?? '';
         $subPipeline = $this->operationToPipeline($subOp);
@@ -1622,9 +1619,7 @@ class MongoDB extends BaseBuilder implements
             throw new UnsupportedException('Cannot parse subquery for MongoDB EXISTS.');
         }
 
-        foreach ($subResult->bindings as $binding) {
-            $this->addBinding($binding);
-        }
+        $this->addBindings($subResult->bindings);
 
         $subCollection = $subOp['collection'] ?? '';
         $subPipeline = $this->operationToPipeline($subOp);

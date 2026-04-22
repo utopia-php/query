@@ -216,9 +216,7 @@ abstract class Builder implements
         $fromSub = $this->fromSubquery;
         if ($fromSub !== null) {
             $subResult = $fromSub->subquery->build();
-            foreach ($subResult->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($subResult->bindings);
 
             return 'FROM (' . $subResult->query . ') AS ' . $this->quote($fromSub->alias);
         }
@@ -762,9 +760,7 @@ abstract class Builder implements
             . ' (' . \implode(', ', $wrappedColumns) . ')'
             . ' ' . $sourceResult->query;
 
-        foreach ($sourceResult->bindings as $binding) {
-            $this->addBinding($binding);
-        }
+        $this->addBindings($sourceResult->bindings);
 
         return new Plan($sql, $this->bindings, executor: $this->executor);
     }
@@ -954,9 +950,7 @@ abstract class Builder implements
                 if ($cte->recursive) {
                     $hasRecursive = true;
                 }
-                foreach ($cte->bindings as $binding) {
-                    $this->addBinding($binding);
-                }
+                $this->addBindings($cte->bindings);
                 $cteName = $this->quote($cte->name);
                 if (! empty($cte->columns)) {
                     $cteName .= '(' . \implode(', ', \array_map(fn (string $col): string => $this->quote($col), $cte->columns)) . ')';
@@ -1001,17 +995,13 @@ abstract class Builder implements
         foreach ($this->subSelects as $subSelect) {
             $subResult = $subSelect->subquery->build();
             $selectParts[] = '(' . $subResult->query . ') AS ' . $this->quote($subSelect->alias);
-            foreach ($subResult->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($subResult->bindings);
         }
 
         // Raw selects
         foreach ($this->rawSelects as $rawSelect) {
             $selectParts[] = $rawSelect->expression;
-            foreach ($rawSelect->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($rawSelect->bindings);
         }
 
         // Window function selects
@@ -1053,9 +1043,7 @@ abstract class Builder implements
         // CASE selects
         foreach ($this->cases as $caseSelect) {
             $selectParts[] = $caseSelect->sql;
-            foreach ($caseSelect->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($caseSelect->bindings);
         }
 
         $selectSQL = ! empty($selectParts) ? \implode(', ', $selectParts) : '*';
@@ -1122,9 +1110,7 @@ abstract class Builder implements
 
                     if ($placement === Placement::On) {
                         $joinSQL .= ' AND ' . $result->condition->expression;
-                        foreach ($result->condition->bindings as $binding) {
-                            $this->addBinding($binding);
-                        }
+                        $this->addBindings($result->condition->bindings);
                     } else {
                         $joinFilterWhereClauses[] = $result->condition;
                     }
@@ -1136,9 +1122,7 @@ abstract class Builder implements
 
         foreach ($this->lateralJoins as $lateral) {
             $subResult = $lateral->subquery->build();
-            foreach ($subResult->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($subResult->bindings);
             $joinKeyword = match ($lateral->type) {
                 JoinType::Left => 'LEFT JOIN',
                 default => 'JOIN',
@@ -1159,16 +1143,12 @@ abstract class Builder implements
         foreach ($this->filterHooks as $hook) {
             $condition = $hook->filter($this->alias ?: $this->table);
             $whereClauses[] = $condition->expression;
-            foreach ($condition->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($condition->bindings);
         }
 
         foreach ($joinFilterWhereClauses as $condition) {
             $whereClauses[] = $condition->expression;
-            foreach ($condition->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($condition->bindings);
         }
 
         // WHERE IN subqueries
@@ -1176,9 +1156,7 @@ abstract class Builder implements
             $subResult = $sub->subquery->build();
             $prefix = $sub->not ? 'NOT IN' : 'IN';
             $whereClauses[] = $this->resolveAndWrap($sub->column) . ' ' . $prefix . ' (' . $subResult->query . ')';
-            foreach ($subResult->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($subResult->bindings);
         }
 
         // EXISTS subqueries
@@ -1186,9 +1164,7 @@ abstract class Builder implements
             $subResult = $sub->subquery->build();
             $prefix = $sub->not ? 'NOT EXISTS' : 'EXISTS';
             $whereClauses[] = $prefix . ' (' . $subResult->query . ')';
-            foreach ($subResult->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($subResult->bindings);
         }
 
         $cursorSQL = '';
@@ -1217,9 +1193,7 @@ abstract class Builder implements
         }
         foreach ($this->rawGroups as $rawGroup) {
             $groupByParts[] = $rawGroup->expression;
-            foreach ($rawGroup->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($rawGroup->bindings);
         }
         if (! empty($groupByParts)) {
             $parts[] = 'GROUP BY ' . \implode(', ', $groupByParts);
@@ -1280,9 +1254,7 @@ abstract class Builder implements
         }
         foreach ($this->rawHavings as $rawHaving) {
             $havingClauses[] = $rawHaving->expression;
-            foreach ($rawHaving->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($rawHaving->bindings);
         }
         if (! empty($havingClauses)) {
             $parts[] = 'HAVING ' . \implode(' AND ', $havingClauses);
@@ -1322,16 +1294,12 @@ abstract class Builder implements
         $vectorOrderExpr = $this->compileVectorOrderExpr();
         if ($vectorOrderExpr !== null) {
             $orderClauses[] = $vectorOrderExpr->expression;
-            foreach ($vectorOrderExpr->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($vectorOrderExpr->bindings);
         }
 
         foreach ($this->rawOrders as $rawOrder) {
             $orderClauses[] = $rawOrder->expression;
-            foreach ($rawOrder->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($rawOrder->bindings);
         }
         $orderQueries = Query::getByType($this->pendingQueries, [
             Method::OrderAsc,
@@ -1382,9 +1350,7 @@ abstract class Builder implements
         }
         foreach ($this->unions as $union) {
             $sql .= ' ' . $union->type->value . ' (' . $union->query . ')';
-            foreach ($union->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($union->bindings);
         }
 
         $sql = $ctePrefix . $sql;
@@ -1453,9 +1419,7 @@ abstract class Builder implements
     {
         $this->bindings = [];
         [$sql, $bindings] = $this->compileInsertBody();
-        foreach ($bindings as $binding) {
-            $this->addBinding($binding);
-        }
+        $this->addBindings($bindings);
 
         return new Plan($sql, $this->bindings, executor: $this->executor);
     }
@@ -1495,9 +1459,7 @@ abstract class Builder implements
 
         foreach ($this->caseSets as $col => $caseData) {
             $assignments[] = $this->resolveAndWrap($col) . ' = ' . $caseData->sql;
-            foreach ($caseData->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($caseData->bindings);
         }
 
         return $assignments;
@@ -1556,9 +1518,7 @@ abstract class Builder implements
         foreach ($this->filterHooks as $hook) {
             $condition = $hook->filter($this->alias ?: $this->table);
             $whereClauses[] = $condition->expression;
-            foreach ($condition->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($condition->bindings);
         }
 
         // WHERE IN subqueries
@@ -1566,9 +1526,7 @@ abstract class Builder implements
             $subResult = $sub->subquery->build();
             $prefix = $sub->not ? 'NOT IN' : 'IN';
             $whereClauses[] = $this->resolveAndWrap($sub->column) . ' ' . $prefix . ' (' . $subResult->query . ')';
-            foreach ($subResult->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($subResult->bindings);
         }
 
         // EXISTS subqueries
@@ -1576,9 +1534,7 @@ abstract class Builder implements
             $subResult = $sub->subquery->build();
             $prefix = $sub->not ? 'NOT EXISTS' : 'EXISTS';
             $whereClauses[] = $prefix . ' (' . $subResult->query . ')';
-            foreach ($subResult->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($subResult->bindings);
         }
 
         if (! empty($whereClauses)) {
@@ -1604,9 +1560,7 @@ abstract class Builder implements
         }
         foreach ($this->rawOrders as $rawOrder) {
             $orderClauses[] = $rawOrder->expression;
-            foreach ($rawOrder->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($rawOrder->bindings);
         }
         if (! empty($orderClauses)) {
             $parts[] = 'ORDER BY ' . \implode(', ', $orderClauses);
@@ -2028,9 +1982,7 @@ abstract class Builder implements
 
         foreach ($joinBuilder->wheres as $where) {
             $onParts[] = $where->expression;
-            foreach ($where->bindings as $binding) {
-                $this->addBinding($binding);
-            }
+            $this->addBindings($where->bindings);
         }
 
         if (empty($onParts)) {
@@ -2067,6 +2019,14 @@ abstract class Builder implements
     protected function addBinding(mixed $value): void
     {
         $this->bindings[] = $value;
+    }
+
+    /**
+     * @param  array<mixed>  $bindings
+     */
+    protected function addBindings(array $bindings): void
+    {
+        \array_push($this->bindings, ...$bindings);
     }
 
     /**
@@ -3033,7 +2993,8 @@ abstract class Builder implements
         if ($expression instanceof Binary && \strtoupper($expression->operator) === 'AND') {
             $left = $this->astWhereToQueries($expression->left);
             $right = $this->astWhereToQueries($expression->right);
-            return \array_merge($left, $right);
+            \array_push($left, ...$right);
+            return $left;
         }
 
         $query = $this->astExpressionToSingleQuery($expression);
@@ -3053,8 +3014,8 @@ abstract class Builder implements
             if ($op === 'AND') {
                 $leftQueries = $this->astWhereToQueries($expression->left);
                 $rightQueries = $this->astWhereToQueries($expression->right);
-                $all = \array_merge($leftQueries, $rightQueries);
-                return Query::and($all);
+                \array_push($leftQueries, ...$rightQueries);
+                return Query::and($leftQueries);
             }
 
             if ($op === 'OR') {
