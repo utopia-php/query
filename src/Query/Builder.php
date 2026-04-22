@@ -21,7 +21,9 @@ use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Star;
 use Utopia\Query\AST\Statement\Select;
-use Utopia\Query\Builder\Case\Result as CaseResult;
+use Utopia\Query\Builder\Case\Expression as CaseExpression;
+use Utopia\Query\Builder\Case\Kind as CaseKind;
+use Utopia\Query\Builder\Case\WhenClause;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\CteClause;
 use Utopia\Query\Builder\ExistsSubquery;
@@ -121,10 +123,10 @@ abstract class Builder implements
     /** @var ?array{percent: float, method: string} */
     protected ?array $sample = null;
 
-    /** @var list<CaseResult> */
+    /** @var list<CaseExpression> */
     protected array $cases = [];
 
-    /** @var array<string, CaseResult> */
+    /** @var array<string, CaseExpression> */
     protected array $caseSets = [];
 
     /** @var string[] */
@@ -910,19 +912,137 @@ abstract class Builder implements
         return $this;
     }
 
-    public function selectCase(CaseResult $case): static
+    public function selectCase(CaseExpression $case): static
     {
         $this->cases[] = $case;
 
         return $this;
     }
 
-    public function setCase(string $column, CaseResult $case): static
+    public function setCase(string $column, CaseExpression $case): static
     {
         $this->caseSets[$column] = $case;
 
         return $this;
     }
+
+    /**
+     * Compile a CASE expression to SQL, appending bindings to $this->bindings
+     * in the order WHEN-value, THEN-value, ..., ELSE-value.
+     */
+    protected function compileCase(CaseExpression $case): string
+    {
+        $whens = $case->getWhens();
+
+        if ($whens === []) {
+            throw new ValidationException('CASE expression requires at least one WHEN clause.');
+        }
+
+        $sql = 'CASE';
+
+        foreach ($whens as $when) {
+            $sql .= ' WHEN ' . $this->compileWhenCondition($when) . ' THEN ?';
+            $this->addBinding($when->then);
+        }
+
+        if ($case->hasElse()) {
+            $sql .= ' ELSE ?';
+            $this->addBinding($case->getElse());
+        }
+
+        $sql .= ' END';
+
+        $alias = $case->getAlias();
+
+        if ($alias !== '') {
+            $sql .= ' AS ' . $this->quote($alias);
+        }
+
+        return $sql;
+    }
+
+    /**
+     * Compile the predicate of a single WHEN clause, adding any operand
+     * bindings to $this->bindings in left-to-right order.
+     */
+    private function compileWhenCondition(WhenClause $when): string
+    {
+        switch ($when->kind) {
+            case CaseKind::Comparison:
+                if ($when->column === null || $when->operator === null) {
+                    throw new ValidationException('Comparison WHEN clause requires column and operator.');
+                }
+
+                if (! \in_array($when->operator, self::COMPARISON_OPERATORS, true)) {
+                    throw new ValidationException(
+                        'Unsupported CASE WHEN operator: ' . $when->operator
+                    );
+                }
+
+                $this->addBinding($when->value);
+
+                return $this->quote($when->column) . ' ' . $when->operator . ' ?';
+
+            case CaseKind::Null:
+                if ($when->column === null) {
+                    throw new ValidationException('Null WHEN clause requires column.');
+                }
+
+                return $this->quote($when->column) . ' IS NULL';
+
+            case CaseKind::NotNull:
+                if ($when->column === null) {
+                    throw new ValidationException('NotNull WHEN clause requires column.');
+                }
+
+                return $this->quote($when->column) . ' IS NOT NULL';
+
+            case CaseKind::In:
+                if ($when->column === null) {
+                    throw new ValidationException('In WHEN clause requires column.');
+                }
+
+                if ($when->values === []) {
+                    throw new ValidationException('In WHEN clause requires at least one value.');
+                }
+
+                $placeholders = \implode(', ', \array_fill(0, \count($when->values), '?'));
+
+                foreach ($when->values as $value) {
+                    $this->addBinding($value);
+                }
+
+                return $this->quote($when->column) . ' IN (' . $placeholders . ')';
+
+            case CaseKind::Raw:
+                if ($when->rawCondition === null) {
+                    throw new ValidationException('Raw WHEN clause requires condition.');
+                }
+
+                foreach ($when->rawBindings as $binding) {
+                    $this->addBinding($binding);
+                }
+
+                return $when->rawCondition;
+        }
+    }
+
+    /**
+     * Comparison operators accepted by CaseExpression::when().
+     */
+    public const array COMPARISON_OPERATORS = [
+        '=',
+        '!=',
+        '<>',
+        '<',
+        '>',
+        '<=',
+        '>=',
+        'LIKE',
+        'NOT LIKE',
+        'IS',
+        'IS NOT',
+    ];
 
     #[\Override]
     public function when(bool $condition, Closure $callback): static
@@ -1211,8 +1331,7 @@ abstract class Builder implements
         }
 
         foreach ($this->cases as $caseSelect) {
-            $selectParts[] = $caseSelect->sql;
-            $this->addBindings($caseSelect->bindings);
+            $selectParts[] = $this->compileCase($caseSelect);
         }
 
         $selectSQL = ! empty($selectParts) ? \implode(', ', $selectParts) : '*';
@@ -1759,8 +1878,7 @@ abstract class Builder implements
         }
 
         foreach ($this->caseSets as $col => $caseData) {
-            $assignments[] = $this->resolveAndWrap($col) . ' = ' . $caseData->sql;
-            $this->addBindings($caseData->bindings);
+            $assignments[] = $this->resolveAndWrap($col) . ' = ' . $this->compileCase($caseData);
         }
 
         return $assignments;
