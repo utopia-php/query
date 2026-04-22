@@ -676,4 +676,25 @@ class SQLiteTest extends TestCase
         $this->assertStringContainsString('DROP COLUMN `age`', $result->query);
         $this->assertStringContainsString('RENAME COLUMN `bio` TO `biography`', $result->query);
     }
+
+    public function testSerialColumnMapsToInteger(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('t', function (Blueprint $table) {
+            $table->serial('id')->primary();
+        });
+
+        $this->assertStringContainsString('`id` INTEGER', $result->query);
+    }
+
+    public function testUserTypeColumnThrowsUnsupported(): void
+    {
+        $this->expectException(UnsupportedException::class);
+
+        $schema = new Schema();
+        $schema->create('t', function (Blueprint $table) {
+            $table->integer('id')->primary();
+            $table->string('mood')->userType('mood_type');
+        });
+    }
 }

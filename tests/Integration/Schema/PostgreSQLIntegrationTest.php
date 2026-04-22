@@ -313,10 +313,11 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $this->trackPostgresTable($table);
 
         $result = $this->schema->create($table, function (Blueprint $bp) {
-            $bp->rawColumn('"id" BIGSERIAL PRIMARY KEY');
+            $bp->bigSerial('id')->primary();
             $bp->string('label', 50);
         });
 
+        $this->assertStringContainsString('BIGSERIAL', $result->query);
         $this->postgresStatement($result->query);
 
         $pdo = $this->connectPostgres();
@@ -351,8 +352,10 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
 
             $result = $this->schema->create($table, function (Blueprint $bp) use ($typeName) {
                 $bp->integer('id')->primary();
-                $bp->rawColumn('"mood" "' . $typeName . '" NOT NULL');
+                $bp->string('mood')->userType($typeName);
             });
+
+            $this->assertStringContainsString('"mood" "' . $typeName . '"', $result->query);
 
             $this->postgresStatement($result->query);
 

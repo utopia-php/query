@@ -9,10 +9,15 @@ class SQLite extends SQL
 {
     protected function compileColumnType(Column $column): string
     {
+        if ($column->userTypeName !== null) {
+            throw new UnsupportedException('User-defined types are not supported in SQLite.');
+        }
+
         return match ($column->type) {
             ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'VARCHAR(' . ($column->length ?? 255) . ')',
             ColumnType::Text, ColumnType::MediumText, ColumnType::LongText => 'TEXT',
-            ColumnType::Integer, ColumnType::BigInteger, ColumnType::Id => 'INTEGER',
+            ColumnType::Integer, ColumnType::BigInteger, ColumnType::Id,
+            ColumnType::Serial, ColumnType::BigSerial, ColumnType::SmallSerial => 'INTEGER',
             ColumnType::Float, ColumnType::Double => 'REAL',
             ColumnType::Boolean => 'INTEGER',
             ColumnType::Datetime, ColumnType::Timestamp => 'TEXT',

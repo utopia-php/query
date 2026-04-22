@@ -1197,4 +1197,37 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString("COMMENT = 'trailing\\\\'", $result->query);
     }
+
+    public function testSerialColumnMapsToIntWithAutoIncrement(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('t', function (Blueprint $table) {
+            $table->serial('id')->primary();
+        });
+
+        $this->assertStringContainsString('`id` INT', $result->query);
+        $this->assertStringContainsString('AUTO_INCREMENT', $result->query);
+    }
+
+    public function testBigSerialColumnMapsToBigIntWithAutoIncrement(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('t', function (Blueprint $table) {
+            $table->bigSerial('id')->primary();
+        });
+
+        $this->assertStringContainsString('`id` BIGINT', $result->query);
+        $this->assertStringContainsString('AUTO_INCREMENT', $result->query);
+    }
+
+    public function testUserTypeColumnThrowsUnsupported(): void
+    {
+        $this->expectException(UnsupportedException::class);
+
+        $schema = new Schema();
+        $schema->create('t', function (Blueprint $table) {
+            $table->integer('id')->primary();
+            $table->string('mood')->userType('mood_type');
+        });
+    }
 }

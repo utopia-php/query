@@ -17,10 +17,15 @@ class MongoDB extends Schema
 
     protected function compileColumnType(Column $column): string
     {
+        if ($column->userTypeName !== null) {
+            throw new UnsupportedException('User-defined types are not supported in MongoDB.');
+        }
+
         return match ($column->type) {
             ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'string',
             ColumnType::Text, ColumnType::MediumText, ColumnType::LongText => 'string',
-            ColumnType::Integer, ColumnType::BigInteger, ColumnType::Id => 'int',
+            ColumnType::Integer, ColumnType::BigInteger, ColumnType::Id,
+            ColumnType::Serial, ColumnType::BigSerial, ColumnType::SmallSerial => 'int',
             ColumnType::Float, ColumnType::Double => 'double',
             ColumnType::Boolean => 'bool',
             ColumnType::Datetime, ColumnType::Timestamp => 'date',

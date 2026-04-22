@@ -27,4 +27,7 @@ enum ColumnType: string
     case Uuid7 = 'uuid7';
     case Object = 'object';
     case Relationship = 'relationship';
+    case Serial = 'serial';
+    case BigSerial = 'bigserial';
+    case SmallSerial = 'smallserial';
 }

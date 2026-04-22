@@ -12,13 +12,18 @@ class MySQL extends SQL implements TableComments, CreatePartition, DropPartition
 {
     protected function compileColumnType(Column $column): string
     {
+        if ($column->userTypeName !== null) {
+            throw new UnsupportedException('User-defined types are not supported in MySQL.');
+        }
+
         return match ($column->type) {
             ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'VARCHAR(' . ($column->length ?? 255) . ')',
             ColumnType::Text => 'TEXT',
             ColumnType::MediumText => 'MEDIUMTEXT',
             ColumnType::LongText => 'LONGTEXT',
-            ColumnType::Integer => 'INT',
-            ColumnType::BigInteger, ColumnType::Id => 'BIGINT',
+            ColumnType::Integer, ColumnType::Serial => 'INT',
+            ColumnType::BigInteger, ColumnType::Id, ColumnType::BigSerial => 'BIGINT',
+            ColumnType::SmallSerial => 'SMALLINT',
             ColumnType::Float, ColumnType::Double => 'DOUBLE',
             ColumnType::Boolean => 'TINYINT(1)',
             ColumnType::Datetime => $column->precision ? 'DATETIME(' . $column->precision . ')' : 'DATETIME',
