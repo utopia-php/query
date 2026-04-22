@@ -665,7 +665,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $topOrder = (new Builder())
             ->from('orders')
             ->select(['product', 'amount'])
-            ->filter([Query::raw('"user_id" = "u"."id"')])
+            ->whereRaw('"user_id" = "u"."id"')
             ->sortDesc('amount')
             ->limit(1);
 
