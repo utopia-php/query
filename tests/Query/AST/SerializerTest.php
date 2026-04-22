@@ -362,7 +362,89 @@ class SerializerTest extends TestCase
     {
         $serializer = new Serializer();
         $expression = new Unary('-', new Literal(5));
-        $this->assertSame('-(5)', $serializer->serializeExpression($expression));
+        $this->assertSame('- (5)', $serializer->serializeExpression($expression));
+    }
+
+    public function testUnaryMinusOfNegativeLiteralDoesNotProduceDoubleDash(): void
+    {
+        $serializer = new Serializer();
+        $expression = new Unary('-', new Literal(-5));
+        $result = $serializer->serializeExpression($expression);
+
+        $this->assertStringNotContainsString('--', $result);
+        $this->assertSame('- (-5)', $result);
+    }
+
+    public function testUnaryMinusOfUnaryMinusDoesNotProduceDoubleDash(): void
+    {
+        $serializer = new Serializer();
+        $expression = new Unary('-', new Unary('-', new Literal(5)));
+        $result = $serializer->serializeExpression($expression);
+
+        $this->assertStringNotContainsString('--', $result);
+    }
+
+    public function testSubtractionRightAssociativityParenthesized(): void
+    {
+        $serializer = new Serializer();
+        $expression = new Binary(
+            new Column('a'),
+            '-',
+            new Binary(new Column('b'), '-', new Column('c')),
+        );
+        $this->assertSame('`a` - (`b` - `c`)', $serializer->serializeExpression($expression));
+    }
+
+    public function testSubtractionLeftAssociativityNoExtraParens(): void
+    {
+        $serializer = new Serializer();
+        $expression = new Binary(
+            new Binary(new Column('a'), '-', new Column('b')),
+            '-',
+            new Column('c'),
+        );
+        $this->assertSame('`a` - `b` - `c`', $serializer->serializeExpression($expression));
+    }
+
+    public function testDivisionRightAssociativityParenthesized(): void
+    {
+        $serializer = new Serializer();
+        $expression = new Binary(
+            new Column('a'),
+            '/',
+            new Binary(new Column('b'), '/', new Column('c')),
+        );
+        $this->assertSame('`a` / (`b` / `c`)', $serializer->serializeExpression($expression));
+    }
+
+    public function testModuloRightAssociativityParenthesized(): void
+    {
+        $serializer = new Serializer();
+        $expression = new Binary(
+            new Column('a'),
+            '%',
+            new Binary(new Column('b'), '%', new Column('c')),
+        );
+        $this->assertSame('`a` % (`b` % `c`)', $serializer->serializeExpression($expression));
+    }
+
+    public function testLiteralEscapesBackslash(): void
+    {
+        $serializer = new Serializer();
+        $this->assertSame("'a\\\\b'", $serializer->serializeExpression(new Literal('a\\b')));
+        $this->assertSame("'trailing\\\\'", $serializer->serializeExpression(new Literal('trailing\\')));
+    }
+
+    public function testLiteralEscapesSingleQuote(): void
+    {
+        $serializer = new Serializer();
+        $this->assertSame("'O''Brien'", $serializer->serializeExpression(new Literal("O'Brien")));
+    }
+
+    public function testLiteralEscapesBackslashBeforeQuote(): void
+    {
+        $serializer = new Serializer();
+        $this->assertSame("'a\\\\''b'", $serializer->serializeExpression(new Literal("a\\'b")));
     }
 
     public function testCaseSimple(): void

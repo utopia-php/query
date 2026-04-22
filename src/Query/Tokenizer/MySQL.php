@@ -82,6 +82,15 @@ class MySQL extends Tokenizer
                 $i++;
                 while ($i < $len) {
                     $c = $sql[$i];
+                    if ($c === '\\') {
+                        $result .= $c;
+                        $i++;
+                        if ($i < $len) {
+                            $result .= $sql[$i];
+                            $i++;
+                        }
+                        continue;
+                    }
                     if ($c === '"') {
                         $result .= $c;
                         $i++;
@@ -99,7 +108,7 @@ class MySQL extends Tokenizer
             }
 
             if ($char === '#') {
-                $result .= '-- ';
+                $result .= '--';
                 $i++;
                 continue;
             }

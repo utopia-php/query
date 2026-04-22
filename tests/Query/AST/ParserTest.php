@@ -696,4 +696,22 @@ class ParserTest extends TestCase
         $this->assertInstanceOf(Literal::class, $stmt->limit);
         $this->assertSame(10, $stmt->limit->value);
     }
+
+    public function testBacktickIdentifierUndoublesEscapedDelimiter(): void
+    {
+        $stmt = $this->parse('SELECT `foo``bar` FROM t');
+
+        $this->assertCount(1, $stmt->columns);
+        $this->assertInstanceOf(Column::class, $stmt->columns[0]);
+        $this->assertSame('foo`bar', $stmt->columns[0]->name);
+    }
+
+    public function testDoubleQuotedIdentifierUndoublesEscapedDelimiter(): void
+    {
+        $stmt = $this->parse('SELECT "foo""bar" FROM t');
+
+        $this->assertCount(1, $stmt->columns);
+        $this->assertInstanceOf(Column::class, $stmt->columns[0]);
+        $this->assertSame('foo"bar', $stmt->columns[0]->name);
+    }
 }

@@ -138,8 +138,14 @@ class Serializer
     {
         $prec = $this->operatorPrecedence($expression->operator);
 
+        // Non-commutative left-associative operators require a stricter precedence
+        // on the right child so equal-precedence right subtrees keep their grouping.
+        $rightPrec = in_array(strtoupper($expression->operator), ['-', '/', '%'], true)
+            ? $prec + 1
+            : $prec;
+
         $left = $this->serializeBinaryChild($expression->left, $prec);
-        $right = $this->serializeBinaryChild($expression->right, $prec);
+        $right = $this->serializeBinaryChild($expression->right, $rightPrec);
 
         $sql = $left . ' ' . $expression->operator . ' ' . $right;
 
@@ -162,12 +168,11 @@ class Serializer
     private function serializeUnary(Unary $expression): string
     {
         if ($expression->prefix) {
-            $op = $expression->operator;
             $operand = $this->serializeExpression($expression->operand);
-            if (strlen($op) === 1) {
-                return $op . '(' . $operand . ')';
-            }
-            return $op . ' (' . $operand . ')';
+            // Always separate prefix operator from operand with parens so a
+            // negative numeric literal or nested unary cannot produce '--',
+            // which MySQL parses as the start of a line comment.
+            return $expression->operator . ' (' . $operand . ')';
         }
 
         $operand = $this->serializeExpression($expression->operand);
@@ -201,7 +206,8 @@ class Serializer
         if (is_float($expression->value)) {
             return (string) $expression->value;
         }
-        return "'" . str_replace("'", "''", $expression->value) . "'";
+        $escaped = str_replace(['\\', "'"], ['\\\\', "''"], $expression->value);
+        return "'" . $escaped . "'";
     }
 
     private function serializeStar(Star $expression): string
