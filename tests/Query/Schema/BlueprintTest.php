@@ -3,7 +3,9 @@
 namespace Tests\Query\Schema;
 
 use PHPUnit\Framework\TestCase;
+use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\Blueprint;
+use Utopia\Query\Schema\CheckConstraint;
 use Utopia\Query\Schema\Column;
 use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\ForeignKey;
@@ -396,5 +398,97 @@ class BlueprintTest extends TestCase
         $this->assertSame('updated_at', $bp->columns[1]->name);
         $this->assertSame(ColumnType::Datetime, $bp->columns[0]->type);
         $this->assertSame(ColumnType::Datetime, $bp->columns[1]->type);
+    }
+
+    public function testChecksPropertyIsReadable(): void
+    {
+        $bp = new Blueprint();
+        $this->assertSame([], $bp->checks);
+    }
+
+    public function testCheckPopulatesChecksList(): void
+    {
+        $bp = new Blueprint();
+        $bp->check('age_range', '`age` >= 0 AND `age` < 150');
+
+        $this->assertCount(1, $bp->checks);
+        $this->assertInstanceOf(CheckConstraint::class, $bp->checks[0]);
+        $this->assertSame('age_range', $bp->checks[0]->name);
+        $this->assertSame('`age` >= 0 AND `age` < 150', $bp->checks[0]->expression);
+    }
+
+    public function testCheckRejectsInvalidName(): void
+    {
+        $bp = new Blueprint();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid check constraint name');
+
+        $bp->check('bad name;', 'x > 0');
+    }
+
+    public function testColumnCheckAttachesExpression(): void
+    {
+        $bp = new Blueprint();
+        $col = $bp->integer('age')->check('`age` >= 0');
+
+        $this->assertSame('`age` >= 0', $col->checkExpression);
+    }
+
+    public function testColumnGeneratedAsDefaultsToVirtualOnCompile(): void
+    {
+        $col = new Column('area', ColumnType::Integer);
+        $col->generatedAs('`width` * `height`');
+
+        $this->assertSame('`width` * `height`', $col->generatedExpression);
+        $this->assertNull($col->generatedStored);
+    }
+
+    public function testColumnStoredAndVirtualAreMutuallyExclusive(): void
+    {
+        $col = new Column('area', ColumnType::Integer);
+        $col->generatedAs('`width` * `height`')->stored();
+        $this->assertTrue($col->generatedStored);
+
+        $col->virtual();
+        $this->assertFalse($col->generatedStored);
+
+        $col->stored();
+        $this->assertTrue($col->generatedStored);
+    }
+
+    public function testPartitionByHashWithCount(): void
+    {
+        $bp = new Blueprint();
+        $bp->partitionByHash('`id`', 4);
+
+        $this->assertSame(4, $bp->partitionCount);
+    }
+
+    public function testPartitionByHashWithoutCount(): void
+    {
+        $bp = new Blueprint();
+        $bp->partitionByHash('`id`');
+
+        $this->assertNull($bp->partitionCount);
+    }
+
+    public function testPartitionByHashRejectsZeroCount(): void
+    {
+        $bp = new Blueprint();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Partition count must be at least 1.');
+
+        $bp->partitionByHash('`id`', 0);
+    }
+
+    public function testPartitionByHashRejectsNegativeCount(): void
+    {
+        $bp = new Blueprint();
+
+        $this->expectException(ValidationException::class);
+
+        $bp->partitionByHash('`id`', -5);
     }
 }

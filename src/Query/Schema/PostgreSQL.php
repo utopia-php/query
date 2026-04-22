@@ -3,6 +3,7 @@
 namespace Utopia\Query\Schema;
 
 use Utopia\Query\Builder\Plan;
+use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\Feature\ColumnComments;
 use Utopia\Query\Schema\Feature\CreatePartition;
@@ -17,6 +18,10 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
 
     protected function compileColumnType(Column $column): string
     {
+        if ($column->userTypeName !== null) {
+            return $this->quote($column->userTypeName);
+        }
+
         return match ($column->type) {
             ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'VARCHAR(' . ($column->length ?? 255) . ')',
             ColumnType::Text, ColumnType::MediumText, ColumnType::LongText => 'TEXT',
@@ -34,6 +39,9 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             ColumnType::Polygon => 'GEOMETRY(POLYGON' . ($column->srid !== null ? ', ' . $column->srid : '') . ')',
             ColumnType::Uuid7 => 'VARCHAR(36)',
             ColumnType::Vector => 'VECTOR(' . ($column->dimensions ?? 0) . ')',
+            ColumnType::Serial => 'SERIAL',
+            ColumnType::BigSerial => 'BIGSERIAL',
+            ColumnType::SmallSerial => 'SMALLSERIAL',
         };
     }
 
@@ -61,7 +69,27 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             }
         }
 
-        if ($column->isAutoIncrement) {
+        if ($column->generatedExpression !== null) {
+            $parts[] = $this->compileGeneratedClause($column);
+
+            if (! $column->isNullable) {
+                $parts[] = 'NOT NULL';
+            } else {
+                $parts[] = 'NULL';
+            }
+
+            if ($column->checkExpression !== null) {
+                $parts[] = 'CHECK (' . $column->checkExpression . ')';
+            }
+
+            return \implode(' ', $parts);
+        }
+
+        $isSerial = $column->type === ColumnType::Serial
+            || $column->type === ColumnType::BigSerial
+            || $column->type === ColumnType::SmallSerial;
+
+        if ($column->isAutoIncrement && ! $isSerial) {
             $parts[] = $this->compileAutoIncrement();
         }
 
@@ -81,9 +109,31 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             $parts[] = 'CHECK (' . $this->quote($column->name) . ' IN (' . \implode(', ', $values) . '))';
         }
 
+        if ($column->checkExpression !== null) {
+            $parts[] = 'CHECK (' . $column->checkExpression . ')';
+        }
+
         // No inline COMMENT in PostgreSQL (use COMMENT ON COLUMN separately)
 
         return \implode(' ', $parts);
+    }
+
+    /**
+     * PostgreSQL only supports STORED generated columns. Virtual generated columns
+     * are rejected with UnsupportedException.
+     *
+     * @throws UnsupportedException if a VIRTUAL generated column is requested.
+     */
+    #[\Override]
+    protected function compileGeneratedClause(Column $column): string
+    {
+        if ($column->generatedStored === false) {
+            throw new UnsupportedException(
+                'PostgreSQL does not support VIRTUAL generated columns. Use stored() instead.'
+            );
+        }
+
+        return 'GENERATED ALWAYS AS (' . $column->generatedExpression . ') STORED';
     }
 
     /**

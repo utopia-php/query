@@ -8,6 +8,7 @@ use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\QuotesIdentifiers;
 use Utopia\Query\Schema;
+use Utopia\Query\Schema\ClickHouse\Engine;
 use Utopia\Query\Schema\Feature\ColumnComments;
 use Utopia\Query\Schema\Feature\DropPartition;
 use Utopia\Query\Schema\Feature\TableComments;
@@ -18,6 +19,10 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
 
     protected function compileColumnType(Column $column): string
     {
+        if ($column->userTypeName !== null) {
+            throw new UnsupportedException('User-defined types are not supported in ClickHouse.');
+        }
+
         $type = match ($column->type) {
             ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'String',
             ColumnType::Text => 'String',
@@ -36,6 +41,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             ColumnType::Polygon => 'Array(Array(Tuple(Float64, Float64)))',
             ColumnType::Uuid7 => 'FixedString(36)',
             ColumnType::Vector => 'Array(Float64)',
+            ColumnType::Serial, ColumnType::BigSerial, ColumnType::SmallSerial => throw new UnsupportedException('SERIAL types are not supported in ClickHouse.'),
         };
 
         if ($column->isNullable) {
@@ -57,6 +63,14 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
 
     protected function compileColumnDefinition(Column $column): string
     {
+        if ($column->generatedExpression !== null) {
+            throw new UnsupportedException('Generated columns are not supported in ClickHouse.');
+        }
+
+        if ($column->checkExpression !== null) {
+            throw new UnsupportedException('CHECK constraints are not supported in ClickHouse.');
+        }
+
         $parts = [
             $this->quote($column->name),
             $this->compileColumnType($column),
@@ -64,6 +78,10 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
 
         if ($column->hasDefault) {
             $parts[] = 'DEFAULT ' . $this->compileDefaultValue($column->default);
+        }
+
+        if ($column->ttl !== null) {
+            $parts[] = 'TTL ' . $column->ttl;
         }
 
         if ($column->comment !== null) {
@@ -161,19 +179,69 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
         }
 
+        if (! empty($blueprint->checks)) {
+            throw new UnsupportedException('CHECK constraints are not supported in ClickHouse.');
+        }
+
+        $engine = $blueprint->engine ?? Engine::MergeTree;
+
         $sql = 'CREATE TABLE ' . ($ifNotExists ? 'IF NOT EXISTS ' : '') . $this->quote($table)
             . ' (' . \implode(', ', $columnDefs) . ')'
-            . ' ENGINE = MergeTree()';
+            . ' ENGINE = ' . $this->compileEngine($engine, $blueprint->engineArgs);
 
         if ($blueprint->partitionType !== null) {
             $sql .= ' PARTITION BY ' . $blueprint->partitionExpression;
         }
 
-        $sql .= ! empty($primaryKeys)
-            ? ' ORDER BY (' . \implode(', ', $primaryKeys) . ')'
-            : ' ORDER BY tuple()';
+        if ($engine->requiresOrderBy()) {
+            $sql .= ! empty($primaryKeys)
+                ? ' ORDER BY (' . \implode(', ', $primaryKeys) . ')'
+                : ' ORDER BY tuple()';
+        }
+
+        if ($blueprint->ttl !== null) {
+            $sql .= ' TTL ' . $blueprint->ttl;
+        }
 
         return new Plan($sql, [], executor: $this->executor);
+    }
+
+    /**
+     * Compile an engine declaration: `<Name>` or `<Name>(<args...>)`.
+     *
+     * Identifier-type args (version column, sign column, column lists) are
+     * quoted. Zookeeper path and replica name for ReplicatedMergeTree are
+     * emitted as single-quoted string literals.
+     *
+     * @param  list<string>  $args
+     */
+    private function compileEngine(Engine $engine, array $args): string
+    {
+        return match ($engine) {
+            Engine::MergeTree,
+            Engine::AggregatingMergeTree => $engine->value . '()',
+
+            Engine::ReplacingMergeTree => $engine->value . '('
+                . (isset($args[0]) ? $this->quote($args[0]) : '')
+                . ')',
+
+            Engine::SummingMergeTree => $engine->value . '('
+                . (empty($args)
+                    ? ''
+                    : \implode(', ', \array_map(fn (string $c): string => $this->quote($c), $args)))
+                . ')',
+
+            Engine::CollapsingMergeTree => $engine->value . '(' . $this->quote($args[0]) . ')',
+
+            Engine::ReplicatedMergeTree => $engine->value
+                . "('" . \str_replace("'", "''", $args[0]) . "'"
+                . ", '" . \str_replace("'", "''", $args[1]) . "')",
+
+            Engine::Memory,
+            Engine::Log,
+            Engine::TinyLog,
+            Engine::StripeLog => $engine->value,
+        };
     }
 
     public function createView(string $name, Builder $query): Plan

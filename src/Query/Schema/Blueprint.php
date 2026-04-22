@@ -2,6 +2,9 @@
 
 namespace Utopia\Query\Schema;
 
+use Utopia\Query\Exception\ValidationException;
+use Utopia\Query\Schema\ClickHouse\Engine;
+
 class Blueprint
 {
     /** @var list<Column> */
@@ -31,8 +34,35 @@ class Blueprint
     /** @var list<string> Raw SQL index definitions (bypass typed Index objects) */
     public private(set) array $rawIndexDefs = [];
 
+    /** @var list<CheckConstraint> */
+    public private(set) array $checks = [];
+
     public private(set) ?PartitionType $partitionType = null;
     public private(set) string $partitionExpression = '';
+    public private(set) ?int $partitionCount = null;
+
+    public private(set) ?Engine $engine = null;
+
+    /** @var list<string> */
+    public private(set) array $engineArgs = [];
+
+    public private(set) ?string $ttl = null;
+
+    /**
+     * Add a table-level CHECK constraint.
+     *
+     * The expression is emitted verbatim inside `CHECK (...)` and must come from
+     * trusted (developer-controlled) source — never from untrusted input. The
+     * constraint name is validated as a standard SQL identifier.
+     *
+     * @throws ValidationException if $name is not a valid identifier.
+     */
+    public function check(string $name, string $expression): static
+    {
+        $this->checks[] = new CheckConstraint($name, $expression);
+
+        return $this;
+    }
 
     public function id(string $name = 'id'): Column
     {
@@ -88,6 +118,45 @@ class Blueprint
     public function bigInteger(string $name): Column
     {
         $col = new Column($name, ColumnType::BigInteger);
+        $this->columns[] = $col;
+
+        return $col;
+    }
+
+    /**
+     * Auto-incrementing integer column (PostgreSQL SERIAL; INT AUTO_INCREMENT on MySQL;
+     * INTEGER on SQLite; throws UnsupportedException on ClickHouse/MongoDB).
+     */
+    public function serial(string $name): Column
+    {
+        $col = (new Column($name, ColumnType::Serial))
+            ->autoIncrement();
+        $this->columns[] = $col;
+
+        return $col;
+    }
+
+    /**
+     * Auto-incrementing big integer column (PostgreSQL BIGSERIAL; BIGINT AUTO_INCREMENT on MySQL;
+     * INTEGER on SQLite; throws UnsupportedException on ClickHouse/MongoDB).
+     */
+    public function bigSerial(string $name): Column
+    {
+        $col = (new Column($name, ColumnType::BigSerial))
+            ->autoIncrement();
+        $this->columns[] = $col;
+
+        return $col;
+    }
+
+    /**
+     * Auto-incrementing small integer column (PostgreSQL SMALLSERIAL; SMALLINT AUTO_INCREMENT on MySQL;
+     * INTEGER on SQLite; throws UnsupportedException on ClickHouse/MongoDB).
+     */
+    public function smallSerial(string $name): Column
+    {
+        $col = (new Column($name, ColumnType::SmallSerial))
+            ->autoIncrement();
         $this->columns[] = $col;
 
         return $col;
@@ -364,18 +433,85 @@ class Blueprint
     {
         $this->partitionType = PartitionType::Range;
         $this->partitionExpression = $expression;
+        $this->partitionCount = null;
     }
 
     public function partitionByList(string $expression): void
     {
         $this->partitionType = PartitionType::List;
         $this->partitionExpression = $expression;
+        $this->partitionCount = null;
     }
 
-    public function partitionByHash(string $expression): void
+    /**
+     * Partition by hash of the given expression.
+     *
+     * When $partitions is non-null, the DDL emits `PARTITIONS <count>`. Per
+     * MySQL/MariaDB semantics, this only applies to HASH (and KEY/LINEAR HASH/
+     * LINEAR KEY variants) partitioning.
+     *
+     * @throws ValidationException if $partitions is less than 1.
+     */
+    public function partitionByHash(string $expression, ?int $partitions = null): static
     {
+        if ($partitions !== null && $partitions < 1) {
+            throw new ValidationException('Partition count must be at least 1.');
+        }
+
         $this->partitionType = PartitionType::Hash;
         $this->partitionExpression = $expression;
+        $this->partitionCount = $partitions;
+
+        return $this;
     }
 
+    /**
+     * Select the table engine (ClickHouse only). Other dialects ignore this.
+     *
+     * Engine-specific arguments are validated against the engine variant:
+     * - CollapsingMergeTree requires exactly one sign column.
+     * - ReplicatedMergeTree requires a zookeeper path and replica name.
+     *
+     * @throws ValidationException if required engine arguments are missing.
+     */
+    public function engine(Engine $engine, string ...$args): static
+    {
+        if ($engine === Engine::CollapsingMergeTree && ! isset($args[0])) {
+            throw new ValidationException('CollapsingMergeTree requires a sign column.');
+        }
+
+        if ($engine === Engine::ReplicatedMergeTree && (! isset($args[0]) || ! isset($args[1]))) {
+            throw new ValidationException('ReplicatedMergeTree requires zookeeper_path and replica_name.');
+        }
+
+        $this->engine = $engine;
+        $this->engineArgs = \array_values($args);
+
+        return $this;
+    }
+
+    /**
+     * Attach a table-level TTL expression (ClickHouse only).
+     *
+     * Emitted verbatim as `TTL <expression>` after ORDER BY/PARTITION BY.
+     * Other dialects throw UnsupportedException when compiling the blueprint.
+     *
+     * @throws ValidationException if the expression is empty or contains a semicolon.
+     */
+    public function ttl(string $expression): static
+    {
+        $trimmed = \trim($expression);
+
+        if ($trimmed === '') {
+            throw new ValidationException('TTL expression must not be empty.');
+        }
+
+        if (\str_contains($trimmed, ';')) {
+            throw new ValidationException('TTL expression must not contain ";".');
+        }
+
+        $this->ttl = $trimmed;
+
+        return $this;
+    }
 }

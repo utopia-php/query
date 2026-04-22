@@ -2,6 +2,8 @@
 
 namespace Utopia\Query\Schema;
 
+use Utopia\Query\Exception\ValidationException;
+
 class Column
 {
     public private(set) bool $isNullable = false;
@@ -32,6 +34,20 @@ class Column
     public private(set) bool $isModify = false;
 
     public private(set) ?string $collation = null;
+
+    public private(set) ?string $checkExpression = null;
+
+    public private(set) ?string $generatedExpression = null;
+
+    /**
+     * Null when {@see generatedAs()} has not been called.
+     * True = STORED, false = VIRTUAL.
+     */
+    public private(set) ?bool $generatedStored = null;
+
+    public private(set) ?string $ttl = null;
+
+    public private(set) ?string $userTypeName = null;
 
     public function __construct(
         public string $name,
@@ -132,6 +148,100 @@ class Column
     public function modify(): static
     {
         $this->isModify = true;
+
+        return $this;
+    }
+
+    /**
+     * Attach a column-level CHECK constraint.
+     *
+     * The expression is emitted verbatim inside `CHECK (...)` and must come from
+     * trusted (developer-controlled) source — never from untrusted input.
+     */
+    public function check(string $expression): static
+    {
+        $this->checkExpression = $expression;
+
+        return $this;
+    }
+
+    /**
+     * Mark the column as a generated column computed from the given expression.
+     *
+     * The expression is emitted verbatim inside `GENERATED ALWAYS AS (...)` and
+     * must come from trusted (developer-controlled) source — never from untrusted
+     * input.
+     */
+    public function generatedAs(string $expression): static
+    {
+        $this->generatedExpression = $expression;
+
+        return $this;
+    }
+
+    /**
+     * Mark a generated column as STORED. Mutually exclusive with {@see virtual()}.
+     */
+    public function stored(): static
+    {
+        $this->generatedStored = true;
+
+        return $this;
+    }
+
+    /**
+     * Mark a generated column as VIRTUAL. Mutually exclusive with {@see stored()}.
+     */
+    public function virtual(): static
+    {
+        $this->generatedStored = false;
+
+        return $this;
+    }
+
+    /**
+     * Attach a column-level TTL expression (ClickHouse only).
+     *
+     * Emitted verbatim as `TTL <expression>` inline with the column
+     * definition. Other dialects throw UnsupportedException when compiling
+     * the column.
+     *
+     * @throws ValidationException if the expression is empty or contains a semicolon.
+     */
+    public function ttl(string $expression): static
+    {
+        $trimmed = \trim($expression);
+
+        if ($trimmed === '') {
+            throw new ValidationException('TTL expression must not be empty.');
+        }
+
+        if (\str_contains($trimmed, ';')) {
+            throw new ValidationException('TTL expression must not contain ";".');
+        }
+
+        $this->ttl = $trimmed;
+
+        return $this;
+    }
+
+    /**
+     * Reference a user-defined type (e.g. a PostgreSQL enum type created via CREATE TYPE).
+     *
+     * The column's emitted type will be the quoted identifier, overriding the mapping
+     * implied by its ColumnType. Only supported by dialects that implement user-defined
+     * types (currently PostgreSQL); other dialects throw UnsupportedException when
+     * compiling the column.
+     *
+     * @throws ValidationException if $name is not a valid identifier.
+     */
+    public function userType(string $name): static
+    {
+        if (! \preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name)) {
+            throw new ValidationException('Invalid user-defined type name: ' . $name);
+        }
+
+        $this->userTypeName = $name;
 
         return $this;
     }

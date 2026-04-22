@@ -4,6 +4,7 @@ namespace Utopia\Query;
 
 use Closure;
 use Utopia\Query\Builder\Plan;
+use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\Column;
@@ -46,6 +47,10 @@ abstract class Schema
         $blueprint = new Blueprint();
         $definition($blueprint);
 
+        if ($blueprint->ttl !== null) {
+            throw new UnsupportedException('TTL is only supported in ClickHouse.');
+        }
+
         $columnDefs = [];
         $primaryKeys = [];
         $uniqueColumns = [];
@@ -75,6 +80,11 @@ abstract class Schema
         // Inline UNIQUE constraints for columns marked unique
         foreach ($uniqueColumns as $col) {
             $columnDefs[] = 'UNIQUE (' . $this->quote($col) . ')';
+        }
+
+        // Table-level CHECK constraints
+        foreach ($blueprint->checks as $check) {
+            $columnDefs[] = 'CONSTRAINT ' . $this->quote($check->name) . ' CHECK (' . $check->expression . ')';
         }
 
         // Indexes
@@ -113,6 +123,9 @@ abstract class Schema
 
         if ($blueprint->partitionType !== null) {
             $sql .= ' PARTITION BY ' . $blueprint->partitionType->value . '(' . $blueprint->partitionExpression . ')';
+            if ($blueprint->partitionCount !== null) {
+                $sql .= ' PARTITIONS ' . $blueprint->partitionCount;
+            }
         }
 
         return new Plan($sql, [], executor: $this->executor);
@@ -282,6 +295,10 @@ abstract class Schema
 
     protected function compileColumnDefinition(Column $column): string
     {
+        if ($column->ttl !== null) {
+            throw new UnsupportedException('TTL is only supported in ClickHouse.');
+        }
+
         $parts = [
             $this->quote($column->name),
             $this->compileColumnType($column),
@@ -292,6 +309,26 @@ abstract class Schema
             if ($unsigned !== '') {
                 $parts[] = $unsigned;
             }
+        }
+
+        if ($column->generatedExpression !== null) {
+            $parts[] = $this->compileGeneratedClause($column);
+
+            if (! $column->isNullable) {
+                $parts[] = 'NOT NULL';
+            } else {
+                $parts[] = 'NULL';
+            }
+
+            if ($column->checkExpression !== null) {
+                $parts[] = 'CHECK (' . $column->checkExpression . ')';
+            }
+
+            if ($column->comment !== null) {
+                $parts[] = "COMMENT '" . \str_replace(['\\', "'"], ['\\\\', "''"], $column->comment) . "'";
+            }
+
+            return \implode(' ', $parts);
         }
 
         if ($column->isAutoIncrement) {
@@ -308,11 +345,28 @@ abstract class Schema
             $parts[] = 'DEFAULT ' . $this->compileDefaultValue($column->default);
         }
 
+        if ($column->checkExpression !== null) {
+            $parts[] = 'CHECK (' . $column->checkExpression . ')';
+        }
+
         if ($column->comment !== null) {
             $parts[] = "COMMENT '" . \str_replace(['\\', "'"], ['\\\\', "''"], $column->comment) . "'";
         }
 
         return \implode(' ', $parts);
+    }
+
+    /**
+     * Compile the `GENERATED ALWAYS AS (...) [STORED|VIRTUAL]` clause.
+     *
+     * Default storage is VIRTUAL when unspecified, per SQL standard.
+     */
+    protected function compileGeneratedClause(Column $column): string
+    {
+        $clause = 'GENERATED ALWAYS AS (' . $column->generatedExpression . ')';
+        $stored = $column->generatedStored ?? false;
+
+        return $clause . ' ' . ($stored ? 'STORED' : 'VIRTUAL');
     }
 
     protected function compileDefaultValue(mixed $value): string
