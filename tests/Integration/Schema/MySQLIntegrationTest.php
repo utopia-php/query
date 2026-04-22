@@ -254,6 +254,154 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $this->assertSame('0', (string) $scoreCol['COLUMN_DEFAULT']); // @phpstan-ignore cast.string
     }
 
+    public function testCreateTableWithCheckConstraint(): void
+    {
+        $table = 'test_check_' . uniqid();
+        $this->trackMysqlTable($table);
+
+        $result = $this->schema->create($table, function (Blueprint $bp) {
+            $bp->id();
+            $bp->integer('age');
+            $bp->rawColumn('CHECK (`age` >= 0 AND `age` < 150)');
+        });
+
+        $this->mysqlStatement($result->query);
+
+        $pdo = $this->connectMysql();
+        $insert = $pdo->prepare("INSERT INTO `{$table}` (`age`) VALUES (30)");
+        \assert($insert !== false);
+        $insert->execute();
+
+        $violation = $pdo->prepare("INSERT INTO `{$table}` (`age`) VALUES (-5)");
+        \assert($violation !== false);
+        try {
+            $violation->execute();
+            $this->fail('Expected CHECK constraint violation');
+        } catch (\PDOException $e) {
+            $this->assertStringContainsString('3819', (string) $e->getCode());
+        }
+    }
+
+    public function testCreateTableWithGeneratedColumn(): void
+    {
+        $table = 'test_generated_' . uniqid();
+        $this->trackMysqlTable($table);
+
+        $result = $this->schema->create($table, function (Blueprint $bp) {
+            $bp->id();
+            $bp->integer('width');
+            $bp->integer('height');
+            $bp->rawColumn('`area` INT GENERATED ALWAYS AS (`width` * `height`) STORED');
+        });
+
+        $this->mysqlStatement($result->query);
+
+        $pdo = $this->connectMysql();
+        $stmt = $pdo->prepare(
+            "SELECT EXTRA FROM information_schema.COLUMNS "
+            . "WHERE TABLE_SCHEMA = 'query_test' AND TABLE_NAME = ? AND COLUMN_NAME = 'area'"
+        );
+        \assert($stmt !== false);
+        $stmt->execute([$table]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        \assert(\is_array($row));
+
+        $this->assertStringContainsString('STORED GENERATED', (string) $row['EXTRA']); // @phpstan-ignore cast.string
+
+        $insert = $pdo->prepare("INSERT INTO `{$table}` (`width`, `height`) VALUES (3, 4)");
+        \assert($insert !== false);
+        $insert->execute();
+
+        $select = $pdo->prepare("SELECT `area` FROM `{$table}`");
+        \assert($select !== false);
+        $select->execute();
+        $area = $select->fetchColumn();
+        $this->assertSame(12, (int) $area);
+    }
+
+    public function testCreateTableWithPartitioning(): void
+    {
+        $table = 'test_partition_' . uniqid();
+        $this->trackMysqlTable($table);
+
+        $result = $this->schema->create($table, function (Blueprint $bp) {
+            $bp->integer('id')->primary();
+            $bp->partitionByHash('`id`');
+        });
+
+        $this->assertStringContainsString('PARTITION BY HASH(`id`)', $result->query);
+        $this->mysqlStatement($result->query);
+
+        $pdo = $this->connectMysql();
+        $stmt = $pdo->prepare(
+            "SELECT COUNT(*) AS cnt FROM information_schema.PARTITIONS "
+            . "WHERE TABLE_SCHEMA = 'query_test' AND TABLE_NAME = ? AND PARTITION_NAME IS NOT NULL"
+        );
+        \assert($stmt !== false);
+        $stmt->execute([$table]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        \assert(\is_array($row));
+
+        $this->assertGreaterThanOrEqual(1, (int) $row['cnt']); // @phpstan-ignore cast.int
+    }
+
+    public function testCreateTableWithCompositeIndex(): void
+    {
+        $table = 'test_composite_idx_' . uniqid();
+        $this->trackMysqlTable($table);
+
+        $result = $this->schema->create($table, function (Blueprint $bp) {
+            $bp->id();
+            $bp->string('first_name', 100);
+            $bp->string('last_name', 100);
+            $bp->addIndex('idx_name', ['last_name', 'first_name']);
+        });
+
+        $this->mysqlStatement($result->query);
+
+        $pdo = $this->connectMysql();
+        $stmt = $pdo->prepare(
+            "SELECT COLUMN_NAME, SEQ_IN_INDEX FROM information_schema.STATISTICS "
+            . "WHERE TABLE_SCHEMA = 'query_test' AND TABLE_NAME = ? AND INDEX_NAME = 'idx_name' "
+            . "ORDER BY SEQ_IN_INDEX"
+        );
+        \assert($stmt !== false);
+        $stmt->execute([$table]);
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $this->assertCount(2, $rows);
+        $this->assertSame('last_name', $rows[0]['COLUMN_NAME']);
+        $this->assertSame('first_name', $rows[1]['COLUMN_NAME']);
+    }
+
+    public function testCreateTableWithFullTextIndex(): void
+    {
+        $table = 'test_fulltext_' . uniqid();
+        $this->trackMysqlTable($table);
+
+        $result = $this->schema->create($table, function (Blueprint $bp) {
+            $bp->id();
+            $bp->string('title', 200);
+            $bp->text('body');
+            $bp->fulltextIndex(['title', 'body'], 'ft_title_body');
+        });
+
+        $this->mysqlStatement($result->query);
+
+        $pdo = $this->connectMysql();
+        $stmt = $pdo->prepare(
+            "SELECT INDEX_TYPE FROM information_schema.STATISTICS "
+            . "WHERE TABLE_SCHEMA = 'query_test' AND TABLE_NAME = ? AND INDEX_NAME = 'ft_title_body' LIMIT 1"
+        );
+        \assert($stmt !== false);
+        $stmt->execute([$table]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        \assert(\is_array($row));
+
+        $this->assertSame('FULLTEXT', (string) $row['INDEX_TYPE']); // @phpstan-ignore cast.string
+    }
+
     public function testTruncateTable(): void
     {
         $table = 'test_truncate_' . uniqid();

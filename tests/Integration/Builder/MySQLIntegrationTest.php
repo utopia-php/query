@@ -523,4 +523,370 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $values = array_map(fn (array $row): int => (int) $row['n'], $rows); // @phpstan-ignore cast.int
         $this->assertSame([1, 2, 3, 4, 5], $values);
     }
+
+    private function createJsonDocsTable(): void
+    {
+        $this->trackMysqlTable('json_docs');
+        $this->mysqlStatement('DROP TABLE IF EXISTS `json_docs`');
+        $this->mysqlStatement('
+            CREATE TABLE `json_docs` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `tags` JSON NOT NULL,
+                `metadata` JSON NOT NULL
+            ) ENGINE=InnoDB
+        ');
+
+        $pdo = $this->connectMysql();
+        $stmt = $pdo->prepare('INSERT INTO `json_docs` (`tags`, `metadata`) VALUES (?, ?), (?, ?), (?, ?), (?, ?)');
+        $stmt->execute([
+            '["php", "mysql"]', '{"level": 3, "active": true}',
+            '["go", "mysql"]', '{"level": 7, "active": true}',
+            '["rust"]', '{"level": 10, "active": false}',
+            '["php", "rust"]', '{"level": 5, "active": true}',
+        ]);
+    }
+
+    public function testJsonFilterContains(): void
+    {
+        $this->createJsonDocsTable();
+
+        $result = $this->fresh()
+            ->from('json_docs')
+            ->select(['id'])
+            ->filterJsonContains('tags', 'php')
+            ->sortAsc('id')
+            ->build();
+
+        $rows = $this->executeOnMysql($result);
+
+        $ids = array_map(fn (array $row): int => (int) $row['id'], $rows); // @phpstan-ignore cast.int
+        $this->assertSame([1, 4], $ids);
+    }
+
+    public function testJsonFilterPath(): void
+    {
+        $this->createJsonDocsTable();
+
+        $result = $this->fresh()
+            ->from('json_docs')
+            ->select(['id'])
+            ->filterJsonPath('metadata', 'level', '>', 5)
+            ->sortAsc('id')
+            ->build();
+
+        $rows = $this->executeOnMysql($result);
+
+        $ids = array_map(fn (array $row): int => (int) $row['id'], $rows); // @phpstan-ignore cast.int
+        $this->assertSame([2, 3], $ids);
+    }
+
+    public function testJsonSetAppend(): void
+    {
+        $this->createJsonDocsTable();
+
+        $update = $this->fresh()
+            ->from('json_docs')
+            ->setJsonAppend('tags', ['added'])
+            ->filter([Query::equal('id', [1])])
+            ->update();
+
+        $this->executeOnMysql($update);
+
+        $pdo = $this->connectMysql();
+        $stmt = $pdo->prepare('SELECT `tags` FROM `json_docs` WHERE `id` = 1');
+        $stmt->execute();
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        \assert(\is_array($row));
+
+        /** @var string $tagsJson */
+        $tagsJson = $row['tags'];
+        $tags = \json_decode($tagsJson, true);
+        $this->assertIsArray($tags);
+        $this->assertContains('added', $tags);
+        $this->assertContains('php', $tags);
+    }
+
+    public function testJsonSetRemove(): void
+    {
+        $this->createJsonDocsTable();
+
+        $update = $this->fresh()
+            ->from('json_docs')
+            ->setJsonRemove('tags', 'mysql')
+            ->filter([Query::equal('id', [1])])
+            ->update();
+
+        $this->executeOnMysql($update);
+
+        $pdo = $this->connectMysql();
+        $stmt = $pdo->prepare('SELECT `tags` FROM `json_docs` WHERE `id` = 1');
+        $stmt->execute();
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        \assert(\is_array($row));
+
+        /** @var string $tagsJson */
+        $tagsJson = $row['tags'];
+        $tags = \json_decode($tagsJson, true);
+        $this->assertIsArray($tags);
+        $this->assertNotContains('mysql', $tags);
+        $this->assertContains('php', $tags);
+    }
+
+    public function testHintUsesIndex(): void
+    {
+        $this->mysqlStatement('CREATE INDEX `idx_users_age` ON `users`(`age`)');
+
+        $result = $this->fresh()
+            ->from('users')
+            ->select(['name', 'age'])
+            ->hint('INDEX(`users` `idx_users_age`)')
+            ->filter([Query::greaterThan('age', 20)])
+            ->sortAsc('age')
+            ->build();
+
+        $this->assertStringContainsString('/*+ INDEX(`users` `idx_users_age`) */', $result->query);
+
+        $rows = $this->executeOnMysql($result);
+
+        $this->assertCount(5, $rows);
+        $this->assertSame('Eve', $rows[0]['name']);
+    }
+
+    public function testLateralJoin(): void
+    {
+        $topOrder = (new Builder())
+            ->from('orders')
+            ->select(['product', 'amount'])
+            ->whereColumn('user_id', '=', 'u.id')
+            ->sortDesc('amount')
+            ->limit(1);
+
+        $result = $this->fresh()
+            ->from('users', 'u')
+            ->select(['u.name', 'top_order.product', 'top_order.amount'])
+            ->joinLateral($topOrder, 'top_order')
+            ->sortAsc('u.name')
+            ->build();
+
+        $rows = $this->executeOnMysql($result);
+
+        $byName = [];
+        foreach ($rows as $row) {
+            /** @var string $name */
+            $name = $row['name'];
+            $byName[$name] = $row;
+        }
+
+        $this->assertCount(4, $rows);
+        $this->assertSame('Gadget', $byName['Alice']['product']);
+        $this->assertSame('49.99', (string) $byName['Alice']['amount']); // @phpstan-ignore cast.string
+        $this->assertSame('Widget', $byName['Bob']['product']);
+        $this->assertSame('Gizmo', $byName['Charlie']['product']);
+        $this->assertSame('Gadget', $byName['Diana']['product']);
+    }
+
+    public function testGroupConcat(): void
+    {
+        $result = $this->fresh()
+            ->from('orders')
+            ->select(['user_id'])
+            ->groupConcat('product', ',', 'products', ['product'])
+            ->groupBy(['user_id'])
+            ->sortAsc('user_id')
+            ->build();
+
+        $rows = $this->executeOnMysql($result);
+
+        $map = [];
+        foreach ($rows as $row) {
+            /** @var int $userId */
+            $userId = (int) $row['user_id']; // @phpstan-ignore cast.int
+            /** @var string $products */
+            $products = (string) $row['products']; // @phpstan-ignore cast.string
+            $map[$userId] = $products;
+        }
+
+        $this->assertSame('Gadget,Widget', $map[1]);
+        $this->assertSame('Widget', $map[2]);
+        $this->assertSame('Gizmo', $map[3]);
+        $this->assertSame('Gadget,Widget', $map[4]);
+    }
+
+    public function testGroupByWithRollup(): void
+    {
+        $result = $this->fresh()
+            ->from('orders')
+            ->select(['status'])
+            ->count('*', 'total')
+            ->groupBy(['status'])
+            ->withRollup()
+            ->build();
+
+        $rows = $this->executeOnMysql($result);
+
+        $statuses = array_column($rows, 'status');
+        $this->assertContains(null, $statuses, 'Expected a NULL rollup row');
+
+        $grandTotal = 0;
+        foreach ($rows as $row) {
+            if ($row['status'] === null) {
+                $grandTotal = (int) $row['total']; // @phpstan-ignore cast.int
+            }
+        }
+        $this->assertSame(6, $grandTotal);
+    }
+
+    public function testCountWhen(): void
+    {
+        $result = $this->fresh()
+            ->from('orders')
+            ->countWhen('`status` = ?', 'completed_count', 'completed')
+            ->build();
+
+        $rows = $this->executeOnMysql($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(3, (int) $rows[0]['completed_count']); // @phpstan-ignore cast.int
+    }
+
+    public function testSumWhen(): void
+    {
+        $result = $this->fresh()
+            ->from('orders')
+            ->sumWhen('amount', '`status` = ?', 'completed_total', 'completed')
+            ->build();
+
+        $rows = $this->executeOnMysql($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('99.97', (string) $rows[0]['completed_total']); // @phpstan-ignore cast.string
+    }
+
+    public function testAvgWhen(): void
+    {
+        $result = $this->fresh()
+            ->from('orders')
+            ->avgWhen('amount', '`status` = ?', 'completed_avg', 'completed')
+            ->build();
+
+        $rows = $this->executeOnMysql($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertEqualsWithDelta(33.32, (float) $rows[0]['completed_avg'], 0.01); // @phpstan-ignore cast.double
+    }
+
+    public function testMaxWhen(): void
+    {
+        $result = $this->fresh()
+            ->from('orders')
+            ->maxWhen('amount', '`status` = ?', 'completed_max', 'completed')
+            ->build();
+
+        $rows = $this->executeOnMysql($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('49.99', (string) $rows[0]['completed_max']); // @phpstan-ignore cast.string
+    }
+
+    private function createPlacesTable(): void
+    {
+        $this->trackMysqlTable('places');
+        $this->mysqlStatement('DROP TABLE IF EXISTS `places`');
+        $this->mysqlStatement('
+            CREATE TABLE `places` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `name` VARCHAR(100) NOT NULL,
+                `location` POINT SRID 4326 NOT NULL,
+                SPATIAL INDEX `sp_location` (`location`)
+            ) ENGINE=InnoDB
+        ');
+
+        $pdo = $this->connectMysql();
+        $stmt = $pdo->prepare(
+            'INSERT INTO `places` (`name`, `location`) VALUES '
+            . "(?, ST_GeomFromText(?, 4326, 'axis-order=long-lat')), "
+            . "(?, ST_GeomFromText(?, 4326, 'axis-order=long-lat')), "
+            . "(?, ST_GeomFromText(?, 4326, 'axis-order=long-lat')), "
+            . "(?, ST_GeomFromText(?, 4326, 'axis-order=long-lat'))"
+        );
+        $stmt->execute([
+            'Inside1', 'POINT(0.5 0.5)',
+            'Inside2', 'POINT(0.2 0.8)',
+            'Outside1', 'POINT(5 5)',
+            'Outside2', 'POINT(-1 -1)',
+        ]);
+    }
+
+    public function testSpatialIntersects(): void
+    {
+        $this->createPlacesTable();
+
+        $polygon = [[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.0, 0.0]]];
+
+        $result = $this->fresh()
+            ->from('places')
+            ->select(['name'])
+            ->filterIntersects('location', $polygon)
+            ->sortAsc('name')
+            ->build();
+
+        $rows = $this->executeOnMysql($result);
+
+        $names = array_column($rows, 'name');
+        $this->assertSame(['Inside1', 'Inside2'], $names);
+    }
+
+    public function testSpatialDistance(): void
+    {
+        $this->createPlacesTable();
+
+        $result = $this->fresh()
+            ->from('places')
+            ->select(['name'])
+            ->filterDistance('location', [0.0, 0.0], '<', 2.0)
+            ->sortAsc('name')
+            ->build();
+
+        $rows = $this->executeOnMysql($result);
+
+        $names = array_column($rows, 'name');
+        $this->assertContains('Inside1', $names);
+        $this->assertContains('Inside2', $names);
+        $this->assertContains('Outside2', $names);
+        $this->assertNotContains('Outside1', $names);
+    }
+
+    public function testFullTextSearch(): void
+    {
+        $this->trackMysqlTable('articles');
+        $this->mysqlStatement('DROP TABLE IF EXISTS `articles`');
+        $this->mysqlStatement('
+            CREATE TABLE `articles` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `title` VARCHAR(200) NOT NULL,
+                `body` TEXT NOT NULL,
+                FULLTEXT KEY `ft_body` (`body`)
+            ) ENGINE=InnoDB
+        ');
+
+        $pdo = $this->connectMysql();
+        $stmt = $pdo->prepare('INSERT INTO `articles` (`title`, `body`) VALUES (?, ?), (?, ?), (?, ?)');
+        $stmt->execute([
+            'Gardening', 'Planting tomatoes in the garden is rewarding',
+            'Cooking', 'A great recipe uses fresh tomatoes and basil',
+            'Tech', 'Database internals and query optimization',
+        ]);
+
+        $result = $this->fresh()
+            ->from('articles')
+            ->select(['title'])
+            ->filterSearch('body', 'tomatoes')
+            ->sortAsc('title')
+            ->build();
+
+        $rows = $this->executeOnMysql($result);
+
+        $titles = array_column($rows, 'title');
+        $this->assertSame(['Cooking', 'Gardening'], $titles);
+    }
 }
