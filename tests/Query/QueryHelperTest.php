@@ -259,6 +259,24 @@ class QueryHelperTest extends TestCase
         $this->assertSame(CursorDirection::Before, $grouped->cursorDirection);
     }
 
+    /**
+     * Regression: previously `cursor = $values[0] ?? $limit`, which coerced a
+     * null cursor into the row-count limit. A missing cursor value must stay
+     * null, never fall back to an unrelated numeric limit.
+     */
+    public function testGroupByTypeCursorFallsBackToNullNotLimit(): void
+    {
+        $queries = [
+            Query::limit(25),
+            Query::cursorAfter(null),
+        ];
+
+        $grouped = Query::groupByType($queries);
+        $this->assertSame(25, $grouped->limit);
+        $this->assertNull($grouped->cursor);
+        $this->assertSame(CursorDirection::After, $grouped->cursorDirection);
+    }
+
     public function testGroupByTypeEmpty(): void
     {
         $grouped = Query::groupByType([]);

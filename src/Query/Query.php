@@ -137,11 +137,16 @@ class Query
     }
 
     /**
-     * Parse query
+     * Parse query from a JSON string.
+     *
+     * Raw queries (`Method::Raw`) are rejected by default: they bypass the
+     * binding/escaping pipeline and are a known SQL injection vector when
+     * the JSON comes from an untrusted source. Set `$allowRaw = true` only
+     * when the JSON is trusted (e.g. round-tripped from an in-process cache).
      *
      * @throws QueryException
      */
-    public static function parse(string $query): static
+    public static function parse(string $query, bool $allowRaw = false): static
     {
         try {
             $query = \json_decode($query, true, flags: JSON_THROW_ON_ERROR);
@@ -154,17 +159,19 @@ class Query
         }
 
         /** @var array<string, mixed> $query */
-        return static::parseQuery($query);
+        return static::parseQuery($query, $allowRaw);
     }
 
     /**
-     * Parse query
+     * Parse query from a decoded array.
+     *
+     * Raw queries (`Method::Raw`) are rejected by default — see `parse()`.
      *
      * @param  array<string, mixed>  $query
      *
      * @throws QueryException
      */
-    public static function parseQuery(array $query): static
+    public static function parseQuery(array $query, bool $allowRaw = false): static
     {
         $method = $query['method'] ?? '';
         $attribute = $query['attribute'] ?? '';
@@ -188,10 +195,14 @@ class Query
 
         $methodEnum = Method::from($method);
 
+        if ($methodEnum === Method::Raw && ! $allowRaw) {
+            throw new ValidationException('Raw queries cannot be parsed from untrusted input; construct via Query::raw() in code');
+        }
+
         if ($methodEnum->isNested()) {
             foreach ($values as $index => $value) {
                 /** @var array<string, mixed> $value */
-                $values[$index] = static::parseQuery($value);
+                $values[$index] = static::parseQuery($value, $allowRaw);
             }
         }
 
@@ -199,19 +210,21 @@ class Query
     }
 
     /**
-     * Parse an array of queries
+     * Parse an array of queries.
+     *
+     * Raw queries (`Method::Raw`) are rejected by default — see `parse()`.
      *
      * @param  array<string>  $queries
      * @return array<static>
      *
      * @throws QueryException
      */
-    public static function parseQueries(array $queries): array
+    public static function parseQueries(array $queries, bool $allowRaw = false): array
     {
         $parsed = [];
 
         foreach ($queries as $query) {
-            $parsed[] = static::parse($query);
+            $parsed[] = static::parse($query, $allowRaw);
         }
 
         return $parsed;
@@ -755,11 +768,14 @@ class Query
             $attribute = $query->getAttribute();
             $values = $query->getValues();
 
-            match (true) {
-                $method === Method::OrderAsc,
-                $method === Method::OrderDesc,
-                $method === Method::OrderRandom => (function () use ($method, $attribute, &$orderAttributes, &$orderTypes): void {
-                    if (! empty($attribute)) {
+            switch (true) {
+                case $method === Method::OrderAsc:
+                case $method === Method::OrderDesc:
+                case $method === Method::OrderRandom:
+                    // OrderRandom has no attribute to qualify, so the guard
+                    // intentionally skips pushing an empty attribute onto
+                    // $orderAttributes while still recording the direction.
+                    if ($attribute !== '') {
                         $orderAttributes[] = $attribute;
                     }
                     $orderTypes[] = match ($method) {
@@ -767,69 +783,85 @@ class Query
                         Method::OrderDesc => OrderDirection::Desc,
                         Method::OrderRandom => OrderDirection::Random,
                     };
-                })(),
+                    break;
 
-                $method === Method::Limit => (function () use ($values, &$limit): void {
+                case $method === Method::Limit:
                     if ($limit === null && isset($values[0]) && \is_numeric($values[0])) {
                         $limit = \intval($values[0]);
                     }
-                })(),
+                    break;
 
-                $method === Method::Offset => (function () use ($values, &$offset): void {
+                case $method === Method::Offset:
                     if ($offset === null && isset($values[0]) && \is_numeric($values[0])) {
                         $offset = \intval($values[0]);
                     }
-                })(),
+                    break;
 
-                $method === Method::CursorAfter,
-                $method === Method::CursorBefore => (function () use ($method, $values, $limit, &$cursor, &$cursorDirection): void {
+                case $method === Method::CursorAfter:
+                case $method === Method::CursorBefore:
                     if ($cursor === null) {
-                        $cursor = $values[0] ?? $limit;
-                        $cursorDirection = $method === Method::CursorAfter ? CursorDirection::After : CursorDirection::Before;
+                        $cursor = $values[0] ?? null;
+                        $cursorDirection = $method === Method::CursorAfter
+                            ? CursorDirection::After
+                            : CursorDirection::Before;
                     }
-                })(),
+                    break;
 
-                $method === Method::Select => $selections[] = clone $query,
+                case $method === Method::Select:
+                    $selections[] = clone $query;
+                    break;
 
-                $method === Method::Count,
-                $method === Method::CountDistinct,
-                $method === Method::Sum,
-                $method === Method::Avg,
-                $method === Method::Min,
-                $method === Method::Max,
-                $method === Method::Stddev,
-                $method === Method::StddevPop,
-                $method === Method::StddevSamp,
-                $method === Method::Variance,
-                $method === Method::VarPop,
-                $method === Method::VarSamp,
-                $method === Method::BitAnd,
-                $method === Method::BitOr,
-                $method === Method::BitXor => $aggregations[] = clone $query,
+                case $method === Method::Count:
+                case $method === Method::CountDistinct:
+                case $method === Method::Sum:
+                case $method === Method::Avg:
+                case $method === Method::Min:
+                case $method === Method::Max:
+                case $method === Method::Stddev:
+                case $method === Method::StddevPop:
+                case $method === Method::StddevSamp:
+                case $method === Method::Variance:
+                case $method === Method::VarPop:
+                case $method === Method::VarSamp:
+                case $method === Method::BitAnd:
+                case $method === Method::BitOr:
+                case $method === Method::BitXor:
+                    $aggregations[] = clone $query;
+                    break;
 
-                $method === Method::GroupBy => (function () use ($values, &$groupBy): void {
+                case $method === Method::GroupBy:
                     /** @var array<string> $values */
                     foreach ($values as $col) {
                         $groupBy[] = $col;
                     }
-                })(),
+                    break;
 
-                $method === Method::Having => $having[] = clone $query,
+                case $method === Method::Having:
+                    $having[] = clone $query;
+                    break;
 
-                $method === Method::Distinct => $distinct = true,
+                case $method === Method::Distinct:
+                    $distinct = true;
+                    break;
 
-                $method === Method::Join,
-                $method === Method::LeftJoin,
-                $method === Method::RightJoin,
-                $method === Method::CrossJoin,
-                $method === Method::FullOuterJoin,
-                $method === Method::NaturalJoin => $joins[] = clone $query,
+                case $method === Method::Join:
+                case $method === Method::LeftJoin:
+                case $method === Method::RightJoin:
+                case $method === Method::CrossJoin:
+                case $method === Method::FullOuterJoin:
+                case $method === Method::NaturalJoin:
+                    $joins[] = clone $query;
+                    break;
 
-                $method === Method::Union,
-                $method === Method::UnionAll => $unions[] = clone $query,
+                case $method === Method::Union:
+                case $method === Method::UnionAll:
+                    $unions[] = clone $query;
+                    break;
 
-                default => $filters[] = clone $query,
-            };
+                default:
+                    $filters[] = clone $query;
+                    break;
+            }
         }
 
         return new GroupedQueries(

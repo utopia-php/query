@@ -4,6 +4,7 @@ namespace Tests\Query;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Exception;
+use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
 
@@ -254,11 +255,16 @@ class QueryParseTest extends TestCase
         $this->assertEquals('colors', $parsed->getAttribute());
     }
 
+    /**
+     * Raw round-tripping is only permitted when the caller explicitly opts in
+     * via `$allowRaw = true`. Raw queries bypass the binding pipeline and are
+     * therefore rejected by default when parsed from JSON.
+     */
     public function testRoundTripRaw(): void
     {
         $original = Query::raw('score > ?', [10]);
         $json = $original->toString();
-        $parsed = Query::parse($json);
+        $parsed = Query::parse($json, allowRaw: true);
         $this->assertSame(Method::Raw, $parsed->getMethod());
         $this->assertEquals('score > ?', $parsed->getAttribute());
         $this->assertEquals([10], $parsed->getValues());
@@ -373,22 +379,126 @@ class QueryParseTest extends TestCase
         $this->assertInstanceOf(Query::class, $parsed->getValues()[0]);
     }
 
+    /**
+     * Raw round-tripping is only permitted when the caller explicitly opts in
+     * via `$allowRaw = true`.
+     */
     public function testRoundTripRawNoBindings(): void
     {
         $original = Query::raw('1 = 1');
         $json = $original->toString();
-        $parsed = Query::parse($json);
+        $parsed = Query::parse($json, allowRaw: true);
         $this->assertSame(Method::Raw, $parsed->getMethod());
         $this->assertEquals('1 = 1', $parsed->getAttribute());
         $this->assertEquals([], $parsed->getValues());
     }
 
+    /**
+     * Raw round-tripping is only permitted when the caller explicitly opts in
+     * via `$allowRaw = true`.
+     */
     public function testRoundTripRawWithMultipleBindings(): void
     {
         $original = Query::raw('a > ? AND b < ?', [10, 20]);
         $json = $original->toString();
-        $parsed = Query::parse($json);
+        $parsed = Query::parse($json, allowRaw: true);
         $this->assertEquals([10, 20], $parsed->getValues());
+    }
+
+    public function testParseQueryRejectsRawByDefault(): void
+    {
+        $json = (string) \json_encode([
+            'method' => 'raw',
+            'attribute' => 'DROP TABLE users;--',
+            'values' => [],
+        ]);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Raw queries cannot be parsed from untrusted input');
+        Query::parse($json);
+    }
+
+    public function testParseQueryRejectsRawInParseQueryByDefault(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Raw queries cannot be parsed from untrusted input');
+        Query::parseQuery([
+            'method' => 'raw',
+            'attribute' => 'SELECT 1',
+            'values' => [],
+        ]);
+    }
+
+    public function testParseQueriesRejectsRawByDefault(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Raw queries cannot be parsed from untrusted input');
+        Query::parseQueries([
+            '{"method":"equal","attribute":"name","values":["John"]}',
+            '{"method":"raw","attribute":"1=1","values":[]}',
+        ]);
+    }
+
+    public function testParseQueryAcceptsRawWhenOptedIn(): void
+    {
+        $json = '{"method":"raw","attribute":"score > ?","values":[10]}';
+        $parsed = Query::parse($json, allowRaw: true);
+        $this->assertSame(Method::Raw, $parsed->getMethod());
+        $this->assertEquals('score > ?', $parsed->getAttribute());
+        $this->assertEquals([10], $parsed->getValues());
+    }
+
+    public function testParseQueryAcceptsRawInParseQueryWhenOptedIn(): void
+    {
+        $parsed = Query::parseQuery([
+            'method' => 'raw',
+            'attribute' => 'SELECT 1',
+            'values' => [],
+        ], allowRaw: true);
+        $this->assertSame(Method::Raw, $parsed->getMethod());
+    }
+
+    public function testParseQueriesAcceptsRawWhenOptedIn(): void
+    {
+        $parsed = Query::parseQueries([
+            '{"method":"equal","attribute":"name","values":["John"]}',
+            '{"method":"raw","attribute":"1=1","values":[]}',
+        ], allowRaw: true);
+        $this->assertCount(2, $parsed);
+        $this->assertSame(Method::Raw, $parsed[1]->getMethod());
+    }
+
+    public function testParseQueryRejectsRawNestedInsideLogicalByDefault(): void
+    {
+        $json = (string) \json_encode([
+            'method' => 'or',
+            'attribute' => '',
+            'values' => [
+                ['method' => 'equal', 'attribute' => 'name', 'values' => ['John']],
+                ['method' => 'raw', 'attribute' => '1=1', 'values' => []],
+            ],
+        ]);
+
+        $this->expectException(ValidationException::class);
+        Query::parse($json);
+    }
+
+    public function testParseQueryAcceptsRawNestedInsideLogicalWhenOptedIn(): void
+    {
+        $json = (string) \json_encode([
+            'method' => 'or',
+            'attribute' => '',
+            'values' => [
+                ['method' => 'equal', 'attribute' => 'name', 'values' => ['John']],
+                ['method' => 'raw', 'attribute' => '1=1', 'values' => []],
+            ],
+        ]);
+
+        $parsed = Query::parse($json, allowRaw: true);
+        $this->assertSame(Method::Or, $parsed->getMethod());
+        $nested = $parsed->getValues();
+        $this->assertCount(2, $nested);
+        $this->assertSame(Method::Raw, $nested[1]->getMethod());
     }
 
     public function testRoundTripComplexNested(): void
