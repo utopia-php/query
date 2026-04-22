@@ -1,0 +1,83 @@
+<?php
+
+namespace Tests\Query\Builder\Feature;
+
+use PHPUnit\Framework\TestCase;
+use Utopia\Query\Builder\ClickHouse as ClickHouseBuilder;
+use Utopia\Query\Builder\MySQL as MySQLBuilder;
+use Utopia\Query\Query;
+
+class BitwiseAggregatesTest extends TestCase
+{
+    public function testBitAndWithAliasEmitsBitAndAndAsAlias(): void
+    {
+        $result = (new ClickHouseBuilder())
+            ->from('events')
+            ->bitAnd('flags', 'and_flags')
+            ->build();
+
+        $this->assertStringContainsString('BIT_AND(`flags`) AS `and_flags`', $result->query);
+    }
+
+    public function testBitOrWithAliasEmitsBitOr(): void
+    {
+        $result = (new ClickHouseBuilder())
+            ->from('events')
+            ->bitOr('flags', 'or_flags')
+            ->build();
+
+        $this->assertStringContainsString('BIT_OR(`flags`) AS `or_flags`', $result->query);
+    }
+
+    public function testBitXorWithAliasEmitsBitXor(): void
+    {
+        $result = (new ClickHouseBuilder())
+            ->from('events')
+            ->bitXor('flags', 'xor_flags')
+            ->build();
+
+        $this->assertStringContainsString('BIT_XOR(`flags`) AS `xor_flags`', $result->query);
+    }
+
+    public function testBitAndWithoutAliasOmitsAsClause(): void
+    {
+        $result = (new ClickHouseBuilder())
+            ->from('events')
+            ->bitAnd('flags')
+            ->build();
+
+        $this->assertStringContainsString('BIT_AND(`flags`)', $result->query);
+        $this->assertStringNotContainsString('AS ``', $result->query);
+    }
+
+    public function testBitAndOnMySQLBuilderUsesSameSyntax(): void
+    {
+        $result = (new MySQLBuilder())
+            ->from('events')
+            ->bitAnd('flags', 'a')
+            ->build();
+
+        $this->assertStringContainsString('BIT_AND(`flags`) AS `a`', $result->query);
+    }
+
+    public function testBitwiseAggregateDoesNotAddBindings(): void
+    {
+        $result = (new ClickHouseBuilder())
+            ->from('events')
+            ->bitOr('flags', 'o')
+            ->build();
+
+        $this->assertSame([], $result->bindings);
+    }
+
+    public function testBitAndChainedWithWhereUsesCorrectBindingOrder(): void
+    {
+        $result = (new ClickHouseBuilder())
+            ->from('events')
+            ->bitAnd('flags', 'a')
+            ->filter([Query::equal('tenant', ['acme'])])
+            ->build();
+
+        $this->assertSame(['acme'], $result->bindings);
+    }
+}
