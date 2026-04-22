@@ -6,6 +6,7 @@ use Tests\Integration\IntegrationTestCase;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\Case\Operator;
 use Utopia\Query\Builder\ClickHouse as Builder;
+use Utopia\Query\Builder\WindowFrame;
 use Utopia\Query\Query;
 
 class ClickHouseIntegrationTest extends IntegrationTestCase
@@ -481,5 +482,209 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
 
         // Subquery has rows, so all users are returned.
         $this->assertCount(5, $rows);
+    }
+
+    public function testAsofJoin(): void
+    {
+        $this->markTestSkipped(
+            'Builder AsofJoins API only emits `ON left = right` (hardcoded equality). '
+            . 'ClickHouse requires the ASOF JOIN ON clause to include at least one '
+            . 'equi-join column AND an inequality (e.g. `ON t.symbol = q.symbol AND t.ts >= q.ts`). '
+            . 'The current asofJoin() signature cannot express the inequality condition, '
+            . 'so a valid ASOF query is not constructible via the builder.'
+        );
+    }
+
+    public function testAsofLeftJoin(): void
+    {
+        $this->markTestSkipped(
+            'Builder AsofJoins API only emits `ON left = right` (hardcoded equality). '
+            . 'ClickHouse requires the ASOF LEFT JOIN ON clause to include at least one '
+            . 'equi-join column AND an inequality (e.g. `ON t.symbol = q.symbol AND t.ts >= q.ts`). '
+            . 'The current asofLeftJoin() signature cannot express the inequality condition.'
+        );
+    }
+
+    public function testApproxDistinctCount(): void
+    {
+        $this->trackClickhouseTable('ch_approx');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_approx`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_approx` (
+                `id` UInt64,
+                `user_id` UInt64,
+                `value` Float64
+            ) ENGINE = MergeTree()
+            ORDER BY `id`
+        ');
+
+        $values = [];
+        for ($id = 1; $id <= 120; $id++) {
+            $userId = (($id - 1) % 10) + 1;
+            $value = (float) $id;
+            $values[] = '(' . $id . ', ' . $userId . ', ' . $value . ')';
+        }
+        $this->clickhouseStatement(
+            'INSERT INTO `ch_approx` (`id`, `user_id`, `value`) VALUES '
+            . \implode(', ', $values)
+        );
+
+        $result = (new Builder())
+            ->from('ch_approx')
+            ->uniq('user_id', 'approx_distinct')
+            ->uniqExact('user_id', 'exact_distinct')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(1, $rows);
+        $exact = (int) $rows[0]['exact_distinct']; // @phpstan-ignore cast.int
+        $approx = (int) $rows[0]['approx_distinct']; // @phpstan-ignore cast.int
+
+        $this->assertSame(10, $exact);
+        $this->assertGreaterThanOrEqual((int) \floor(10 * 0.95), $approx);
+        $this->assertLessThanOrEqual((int) \ceil(10 * 1.05), $approx);
+    }
+
+    public function testApproxQuantile(): void
+    {
+        $this->trackClickhouseTable('ch_approx');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_approx`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_approx` (
+                `id` UInt64,
+                `user_id` UInt64,
+                `value` Float64
+            ) ENGINE = MergeTree()
+            ORDER BY `id`
+        ');
+
+        $values = [];
+        for ($id = 1; $id <= 101; $id++) {
+            $userId = (($id - 1) % 10) + 1;
+            $value = (float) $id;
+            $values[] = '(' . $id . ', ' . $userId . ', ' . $value . ')';
+        }
+        $this->clickhouseStatement(
+            'INSERT INTO `ch_approx` (`id`, `user_id`, `value`) VALUES '
+            . \implode(', ', $values)
+        );
+
+        $result = (new Builder())
+            ->from('ch_approx')
+            ->quantile(0.5, 'value', 'p50')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(1, $rows);
+        $median = (float) $rows[0]['p50']; // @phpstan-ignore cast.double
+
+        // Values are 1..101; true median is 51. Allow +/-10% tolerance.
+        $this->assertGreaterThanOrEqual(51.0 * 0.9, $median);
+        $this->assertLessThanOrEqual(51.0 * 1.1, $median);
+    }
+
+    public function testApproxQuantiles(): void
+    {
+        $this->trackClickhouseTable('ch_approx');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_approx`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_approx` (
+                `id` UInt64,
+                `user_id` UInt64,
+                `value` Float64
+            ) ENGINE = MergeTree()
+            ORDER BY `id`
+        ');
+
+        $values = [];
+        for ($id = 1; $id <= 100; $id++) {
+            $userId = (($id - 1) % 10) + 1;
+            $value = (float) $id;
+            $values[] = '(' . $id . ', ' . $userId . ', ' . $value . ')';
+        }
+        $this->clickhouseStatement(
+            'INSERT INTO `ch_approx` (`id`, `user_id`, `value`) VALUES '
+            . \implode(', ', $values)
+        );
+
+        // Builder has no `quantiles(level, level, ...)` helper; use selectRaw.
+        $result = (new Builder())
+            ->from('ch_approx')
+            ->selectRaw('quantiles(0.25, 0.5, 0.75)(`value`) AS `qs`')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertArrayHasKey('qs', $rows[0]);
+        $qs = $rows[0]['qs'];
+        $this->assertIsArray($qs);
+        $this->assertCount(3, $qs);
+
+        $q25 = (float) $qs[0]; // @phpstan-ignore cast.double
+        $q50 = (float) $qs[1]; // @phpstan-ignore cast.double
+        $q75 = (float) $qs[2]; // @phpstan-ignore cast.double
+
+        $this->assertLessThanOrEqual($q50, $q25);
+        $this->assertLessThanOrEqual($q75, $q50);
+    }
+
+    public function testWindowFunctionWithRowsFrame(): void
+    {
+        $this->trackClickhouseTable('ch_window');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_window`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_window` (
+                `id` UInt64,
+                `user_id` UInt64,
+                `value` Float64
+            ) ENGINE = MergeTree()
+            ORDER BY (`user_id`, `id`)
+        ');
+
+        $this->clickhouseStatement("
+            INSERT INTO `ch_window` (`id`, `user_id`, `value`) VALUES
+            (1, 1, 10.0),
+            (2, 1, 20.0),
+            (3, 1, 30.0),
+            (4, 1, 40.0),
+            (5, 1, 50.0),
+            (6, 2, 100.0),
+            (7, 2, 200.0),
+            (8, 2, 300.0)
+        ");
+
+        $frame = new WindowFrame('ROWS', '2 PRECEDING', 'CURRENT ROW');
+
+        $result = (new Builder())
+            ->from('ch_window')
+            ->select(['id', 'user_id', 'value'])
+            ->selectWindow('sum(`value`)', 'rolling_sum', ['user_id'], ['id'], null, $frame)
+            ->filter([Query::equal('user_id', [1])])
+            ->sortAsc('id')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(5, $rows);
+        $sums = \array_map(
+            static fn (array $row): float => (float) $row['rolling_sum'], // @phpstan-ignore cast.double
+            $rows,
+        );
+
+        // user_id=1 values are 10,20,30,40,50 ordered by id.
+        // Rolling sum (2 preceding + current):
+        //   id=1 -> 10
+        //   id=2 -> 10+20 = 30
+        //   id=3 -> 10+20+30 = 60
+        //   id=4 -> 20+30+40 = 90
+        //   id=5 -> 30+40+50 = 120
+        $this->assertSame(10.0, $sums[0]);
+        $this->assertSame(30.0, $sums[1]);
+        $this->assertSame(60.0, $sums[2]);
+        $this->assertSame(90.0, $sums[3]);
+        $this->assertSame(120.0, $sums[4]);
     }
 }
