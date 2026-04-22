@@ -3,6 +3,7 @@
 namespace Tests\Integration\Builder;
 
 use Tests\Integration\IntegrationTestCase;
+use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\ClickHouse as Builder;
 use Utopia\Query\Query;
 
@@ -363,5 +364,122 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
 
         $this->assertCount(8, $rows);
         $this->assertEquals('click', $rows[0]['action']);
+    }
+
+    public function testSelectWithBetween(): void
+    {
+        $result = (new Builder())
+            ->from('ch_users')
+            ->select(['id', 'name', 'age'])
+            ->filter([Query::between('age', 25, 30)])
+            ->sortAsc('id')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $ages = array_column($rows, 'age');
+        foreach ($ages as $age) {
+            $this->assertGreaterThanOrEqual(25, (int) $age); // @phpstan-ignore cast.int
+            $this->assertLessThanOrEqual(30, (int) $age); // @phpstan-ignore cast.int
+        }
+        $this->assertContains('Alice', array_column($rows, 'name'));
+    }
+
+    public function testSelectWithStartsWithAndContains(): void
+    {
+        $result = (new Builder())
+            ->from('ch_users')
+            ->select(['id', 'name', 'email'])
+            ->filter([
+                Query::startsWith('email', 'a'),
+                Query::contains('name', ['Alice']),
+            ])
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertEquals('Alice', $rows[0]['name']);
+    }
+
+    public function testSelectWithCaseExpression(): void
+    {
+        $case = (new CaseExpression())
+            ->when('`age` < ?', "'young'", [30])
+            ->when('`age` < ?', "'mid'", [35])
+            ->elseResult("'senior'")
+            ->alias('`bucket`')
+            ->build();
+
+        $result = (new Builder())
+            ->from('ch_users')
+            ->select(['id', 'name'])
+            ->selectCase($case)
+            ->sortAsc('id')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(5, $rows);
+        $buckets = array_column($rows, 'bucket');
+        $this->assertContains('young', $buckets);
+        $this->assertContains('mid', $buckets);
+        $this->assertContains('senior', $buckets);
+    }
+
+    public function testSelectWithArrayJoin(): void
+    {
+        $this->trackClickhouseTable('ch_tags');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_tags`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_tags` (
+                `id` UInt32,
+                `name` String,
+                `tags` Array(String)
+            ) ENGINE = MergeTree()
+            ORDER BY `id`
+        ');
+        $this->clickhouseStatement("
+            INSERT INTO `ch_tags` (`id`, `name`, `tags`) VALUES
+            (1, 'Post A', ['news', 'sport']),
+            (2, 'Post B', ['tech']),
+            (3, 'Post C', ['news', 'tech', 'culture'])
+        ");
+
+        $result = (new Builder())
+            ->from('ch_tags')
+            ->select(['id', 'name'])
+            ->arrayJoin('tags', 'tag')
+            ->filter([Query::equal('tag', ['news'])])
+            ->sortAsc('id')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(2, $rows);
+        $this->assertEquals('Post A', $rows[0]['name']);
+        $this->assertEquals('Post C', $rows[1]['name']);
+    }
+
+    public function testSelectWithExistsSubquery(): void
+    {
+        $subquery = (new Builder())
+            ->from('ch_events')
+            ->filter([
+                Query::equal('action', ['purchase']),
+                Query::equal('user_id', [1]),
+            ]);
+
+        $result = (new Builder())
+            ->from('ch_users')
+            ->select(['id', 'name'])
+            ->filterExists($subquery)
+            ->sortAsc('id')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        // Subquery has rows, so all users are returned.
+        $this->assertCount(5, $rows);
     }
 }
