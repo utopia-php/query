@@ -64,6 +64,10 @@ class MongoDBClient
         /** @var array<string, mixed> $options */
         $options = $op['options'] ?? [];
 
+        if (isset($op['validator']) && ! isset($options['validator'])) {
+            $options['validator'] = $op['validator'];
+        }
+
         match ($command) {
             'createCollection' => $this->database->createCollection($collectionName, $options),
             'drop' => $this->dropCollection($collectionName),
@@ -77,6 +81,49 @@ class MongoDBClient
     public function dropCollection(string $name): void
     {
         $this->database->dropCollection($name);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function listCollectionNames(): array
+    {
+        $names = [];
+        foreach ($this->database->listCollectionNames() as $name) {
+            $names[] = $name;
+        }
+
+        return $names;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function listIndexNames(string $collection): array
+    {
+        $names = [];
+        foreach ($this->database->selectCollection($collection)->listIndexes() as $index) {
+            $names[] = $index->getName();
+        }
+
+        return $names;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public function getIndexKey(string $collection, string $name): array
+    {
+        foreach ($this->database->selectCollection($collection)->listIndexes() as $index) {
+            if ($index->getName() === $name) {
+                /** @var array<string, int> $key */
+                $key = $index->getKey();
+
+                return $key;
+            }
+        }
+
+        return [];
     }
 
     /**
@@ -175,7 +222,9 @@ class MongoDBClient
         $filter = $op['filter'] ?? [];
         /** @var array<string, mixed> $update */
         $update = $op['update'] ?? [];
-        $collection->updateMany($filter, $update);
+        /** @var array<string, mixed> $options */
+        $options = $op['options'] ?? [];
+        $collection->updateMany($filter, $update, $options);
 
         return [];
     }

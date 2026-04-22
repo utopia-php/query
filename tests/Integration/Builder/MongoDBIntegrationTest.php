@@ -803,4 +803,367 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $this->assertSame('default', $searchStage['index']);
         $this->assertSame(['query' => 'hello world', 'path' => 'body'], $searchStage['text']);
     }
+
+    public function testArrayFilterUpdate(): void
+    {
+        $this->trackMongoCollection('mg_students');
+        $this->mongoClient?->dropCollection('mg_students');
+
+        $this->mongoClient?->insertMany('mg_students', [
+            [
+                'id' => 1,
+                'name' => 'Alice',
+                'grades' => [
+                    ['subject' => 'math', 'grade' => 90, 'mean' => 0],
+                    ['subject' => 'history', 'grade' => 70, 'mean' => 0],
+                    ['subject' => 'science', 'grade' => 85, 'mean' => 0],
+                ],
+            ],
+        ]);
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_students')
+                ->set(['grades.$[elem].mean' => 100])
+                ->arrayFilter('elem', ['elem.grade' => ['$gte' => 85]])
+                ->filter([Query::equal('id', [1])])
+                ->update()
+        );
+
+        $rows = $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_students')
+                ->select(['id', 'grades'])
+                ->filter([Query::equal('id', [1])])
+                ->build()
+        );
+
+        $this->assertCount(1, $rows);
+        /** @var list<array<string, mixed>> $grades */
+        $grades = (array) $rows[0]['grades'];
+        $bySubject = [];
+        foreach ($grades as $entry) {
+            $row = (array) $entry;
+            /** @var string $subject */
+            $subject = $row['subject'];
+            $bySubject[$subject] = $row;
+        }
+
+        $this->assertSame(100, $bySubject['math']['mean']);
+        $this->assertSame(100, $bySubject['science']['mean']);
+        $this->assertSame(0, $bySubject['history']['mean']);
+    }
+
+    public function testFieldUpdateMultiply(): void
+    {
+        $this->trackMongoCollection('mg_products');
+        $this->mongoClient?->dropCollection('mg_products');
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->into('mg_products')
+                ->set(['id' => 1, 'name' => 'Widget', 'price' => 10.0])
+                ->insert()
+        );
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_products')
+                ->multiply('price', 1.5)
+                ->filter([Query::equal('id', [1])])
+                ->update()
+        );
+
+        $rows = $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_products')
+                ->select(['id', 'price'])
+                ->filter([Query::equal('id', [1])])
+                ->build()
+        );
+
+        $this->assertCount(1, $rows);
+        $this->assertEqualsWithDelta(15.0, $rows[0]['price'], 0.0001);
+    }
+
+    public function testFieldUpdatePopFirst(): void
+    {
+        $this->trackMongoCollection('mg_pop');
+        $this->mongoClient?->dropCollection('mg_pop');
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->into('mg_pop')
+                ->set(['id' => 1, 'tags' => ['a', 'b', 'c']])
+                ->insert()
+        );
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_pop')
+                ->popFirst('tags')
+                ->filter([Query::equal('id', [1])])
+                ->update()
+        );
+
+        $rows = $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_pop')
+                ->select(['id', 'tags'])
+                ->filter([Query::equal('id', [1])])
+                ->build()
+        );
+
+        /** @var array<int, string> $tags */
+        $tags = (array) $rows[0]['tags'];
+        $this->assertSame(['b', 'c'], \array_values($tags));
+    }
+
+    public function testFieldUpdatePopLast(): void
+    {
+        $this->trackMongoCollection('mg_pop');
+        $this->mongoClient?->dropCollection('mg_pop');
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->into('mg_pop')
+                ->set(['id' => 2, 'tags' => ['a', 'b', 'c']])
+                ->insert()
+        );
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_pop')
+                ->popLast('tags')
+                ->filter([Query::equal('id', [2])])
+                ->update()
+        );
+
+        $rows = $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_pop')
+                ->select(['id', 'tags'])
+                ->filter([Query::equal('id', [2])])
+                ->build()
+        );
+
+        /** @var array<int, string> $tags */
+        $tags = (array) $rows[0]['tags'];
+        $this->assertSame(['a', 'b'], \array_values($tags));
+    }
+
+    public function testFieldUpdatePullAll(): void
+    {
+        $this->trackMongoCollection('mg_pull');
+        $this->mongoClient?->dropCollection('mg_pull');
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->into('mg_pull')
+                ->set(['id' => 1, 'scores' => [10, 20, 30, 20, 40]])
+                ->insert()
+        );
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_pull')
+                ->pullAll('scores', [20, 40])
+                ->filter([Query::equal('id', [1])])
+                ->update()
+        );
+
+        $rows = $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_pull')
+                ->select(['id', 'scores'])
+                ->filter([Query::equal('id', [1])])
+                ->build()
+        );
+
+        /** @var array<int, int> $scores */
+        $scores = (array) $rows[0]['scores'];
+        $this->assertSame([10, 30], \array_values($scores));
+    }
+
+    public function testFieldUpdateMin(): void
+    {
+        $this->trackMongoCollection('mg_minmax');
+        $this->mongoClient?->dropCollection('mg_minmax');
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->into('mg_minmax')
+                ->set(['id' => 1, 'low_score' => 50])
+                ->insert()
+        );
+
+        // $min with 30 (smaller) should update to 30.
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_minmax')
+                ->updateMin('low_score', 30)
+                ->filter([Query::equal('id', [1])])
+                ->update()
+        );
+
+        // $min with 80 (larger) should NOT update.
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_minmax')
+                ->updateMin('low_score', 80)
+                ->filter([Query::equal('id', [1])])
+                ->update()
+        );
+
+        $rows = $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_minmax')
+                ->select(['id', 'low_score'])
+                ->filter([Query::equal('id', [1])])
+                ->build()
+        );
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(30, $rows[0]['low_score']);
+    }
+
+    public function testFieldUpdateMax(): void
+    {
+        $this->trackMongoCollection('mg_minmax');
+        $this->mongoClient?->dropCollection('mg_minmax');
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->into('mg_minmax')
+                ->set(['id' => 2, 'high_score' => 50])
+                ->insert()
+        );
+
+        // $max with 80 (larger) should update to 80.
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_minmax')
+                ->updateMax('high_score', 80)
+                ->filter([Query::equal('id', [2])])
+                ->update()
+        );
+
+        // $max with 20 (smaller) should NOT update.
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_minmax')
+                ->updateMax('high_score', 20)
+                ->filter([Query::equal('id', [2])])
+                ->update()
+        );
+
+        $rows = $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_minmax')
+                ->select(['id', 'high_score'])
+                ->filter([Query::equal('id', [2])])
+                ->build()
+        );
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(80, $rows[0]['high_score']);
+    }
+
+    public function testFieldUpdateCurrentDate(): void
+    {
+        $this->trackMongoCollection('mg_dates');
+        $this->mongoClient?->dropCollection('mg_dates');
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->into('mg_dates')
+                ->set(['id' => 1, 'name' => 'Alice'])
+                ->insert()
+        );
+
+        $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_dates')
+                ->currentDate('modified', 'date')
+                ->filter([Query::equal('id', [1])])
+                ->update()
+        );
+
+        $rows = $this->executeOnMongoDB(
+            (new Builder())
+                ->from('mg_dates')
+                ->select(['id', 'modified'])
+                ->filter([Query::equal('id', [1])])
+                ->build()
+        );
+
+        $this->assertCount(1, $rows);
+        $this->assertArrayHasKey('modified', $rows[0]);
+        // Executed with MongoDB driver, $currentDate produces a BSON date/UTCDateTime.
+        $this->assertNotNull($rows[0]['modified']);
+    }
+
+    public function testPipelineGraphLookup(): void
+    {
+        $this->trackMongoCollection('mg_employees');
+        $this->mongoClient?->dropCollection('mg_employees');
+
+        // CEO (null manager) -> VP -> Dir -> Eng (self-referencing by manager field).
+        $this->mongoClient?->insertMany('mg_employees', [
+            ['id' => 1, 'name' => 'CEO', 'manager' => null],
+            ['id' => 2, 'name' => 'VP', 'manager' => 1],
+            ['id' => 3, 'name' => 'Director', 'manager' => 2],
+            ['id' => 4, 'name' => 'Engineer', 'manager' => 3],
+        ]);
+
+        $result = (new Builder())
+            ->from('mg_employees')
+            ->graphLookup('mg_employees', 'manager', 'manager', 'id', 'reporting_chain')
+            ->filter([Query::equal('id', [4])])
+            ->build();
+
+        $rows = $this->executeOnMongoDB($result);
+
+        $this->assertCount(1, $rows);
+        /** @var list<array<string, mixed>> $chain */
+        $chain = (array) $rows[0]['reporting_chain'];
+        $names = [];
+        foreach ($chain as $entry) {
+            $row = (array) $entry;
+            /** @var string $name */
+            $name = $row['name'];
+            $names[] = $name;
+        }
+        \sort($names);
+
+        // Engineer's reporting chain traverses upward through Director, VP, CEO.
+        $this->assertSame(['CEO', 'Director', 'VP'], $names);
+    }
+
+    public function testPipelineReplaceRoot(): void
+    {
+        $this->trackMongoCollection('mg_orders_nested');
+        $this->mongoClient?->dropCollection('mg_orders_nested');
+
+        $this->mongoClient?->insertMany('mg_orders_nested', [
+            ['id' => 1, 'customer' => ['name' => 'Alice', 'city' => 'NY']],
+            ['id' => 2, 'customer' => ['name' => 'Bob', 'city' => 'LA']],
+        ]);
+
+        $result = (new Builder())
+            ->from('mg_orders_nested')
+            ->replaceRoot('$customer')
+            ->sortAsc('name')
+            ->build();
+
+        $rows = $this->executeOnMongoDB($result);
+
+        $this->assertCount(2, $rows);
+        $this->assertSame('Alice', $rows[0]['name']);
+        $this->assertSame('NY', $rows[0]['city']);
+        $this->assertSame('Bob', $rows[1]['name']);
+        $this->assertSame('LA', $rows[1]['city']);
+        // Original top-level `id` is gone because root was replaced.
+        $this->assertArrayNotHasKey('id', $rows[0]);
+    }
 }
