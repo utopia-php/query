@@ -4,19 +4,27 @@ namespace Tests\Query\Builder\Feature\ClickHouse;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Builder\ClickHouse as Builder;
+use Utopia\Query\Builder\ClickHouse\AsofOperator;
+use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
 
 class AsofJoinsTest extends TestCase
 {
-    public function testAsofJoinEmitsAsofJoinWithQualifiedColumns(): void
+    public function testAsofJoinEmitsEquiAndInequalityConditions(): void
     {
         $result = (new Builder())
             ->from('trades')
-            ->asofJoin('quotes', 'trades.timestamp', 'quotes.timestamp')
+            ->asofJoin(
+                'quotes',
+                ['trades.symbol' => 'quotes.symbol'],
+                'trades.ts',
+                AsofOperator::GreaterThanEqual,
+                'quotes.ts',
+            )
             ->build();
 
         $this->assertStringContainsString(
-            'ASOF JOIN `quotes` ON `trades`.`timestamp` = `quotes`.`timestamp`',
+            'ASOF JOIN `quotes` ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`ts` >= `quotes`.`ts`',
             $result->query,
         );
     }
@@ -25,40 +33,88 @@ class AsofJoinsTest extends TestCase
     {
         $result = (new Builder())
             ->from('trades')
-            ->asofJoin('quotes', 'trades.timestamp', 'q.timestamp', 'q')
+            ->asofJoin(
+                'quotes',
+                ['trades.symbol' => 'q.symbol'],
+                'trades.ts',
+                AsofOperator::GreaterThan,
+                'q.ts',
+                'q',
+            )
             ->build();
 
         $this->assertStringContainsString(
-            'ASOF JOIN `quotes` AS `q` ON `trades`.`timestamp` = `q`.`timestamp`',
+            'ASOF JOIN `quotes` AS `q` ON `trades`.`symbol` = `q`.`symbol` AND `trades`.`ts` > `q`.`ts`',
             $result->query,
         );
     }
 
-    public function testAsofLeftJoinEmitsAsofLeftJoin(): void
+    public function testAsofJoinSupportsMultipleEquiPairs(): void
     {
         $result = (new Builder())
             ->from('trades')
-            ->asofLeftJoin('quotes', 'trades.timestamp', 'quotes.timestamp')
+            ->asofJoin(
+                'quotes',
+                [
+                    'trades.symbol' => 'quotes.symbol',
+                    'trades.exchange' => 'quotes.exchange',
+                ],
+                'trades.ts',
+                AsofOperator::GreaterThanEqual,
+                'quotes.ts',
+            )
+            ->build();
+
+        $this->assertStringContainsString(
+            'ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`exchange` = `quotes`.`exchange` AND `trades`.`ts` >= `quotes`.`ts`',
+            $result->query,
+        );
+    }
+
+    public function testAsofLeftJoinEmitsAsofLeftJoinKeyword(): void
+    {
+        $result = (new Builder())
+            ->from('trades')
+            ->asofLeftJoin(
+                'quotes',
+                ['trades.symbol' => 'quotes.symbol'],
+                'trades.ts',
+                AsofOperator::GreaterThanEqual,
+                'quotes.ts',
+            )
             ->build();
 
         $this->assertStringContainsString('ASOF LEFT JOIN `quotes`', $result->query);
     }
 
-    public function testAsofJoinWithEmptyAliasSkipsAsClause(): void
+    public function testAsofJoinRejectsEmptyEquiPairs(): void
     {
-        $result = (new Builder())
-            ->from('trades')
-            ->asofJoin('quotes', 'trades.timestamp', 'quotes.timestamp', '')
-            ->build();
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('ASOF JOIN requires at least one equi-join column pair.');
 
-        $this->assertStringNotContainsString('AS ``', $result->query);
+        (new Builder())
+            ->from('trades')
+            ->asofJoin(
+                'quotes',
+                [],
+                'trades.ts',
+                AsofOperator::GreaterThanEqual,
+                'quotes.ts',
+            )
+            ->build();
     }
 
     public function testAsofJoinPrecedesWhereClause(): void
     {
         $result = (new Builder())
             ->from('trades')
-            ->asofJoin('quotes', 'trades.timestamp', 'quotes.timestamp')
+            ->asofJoin(
+                'quotes',
+                ['trades.symbol' => 'quotes.symbol'],
+                'trades.ts',
+                AsofOperator::GreaterThanEqual,
+                'quotes.ts',
+            )
             ->filter([Query::equal('trades.symbol', ['AAPL'])])
             ->build();
 
@@ -70,7 +126,13 @@ class AsofJoinsTest extends TestCase
     {
         $result = (new Builder())
             ->from('trades')
-            ->asofJoin('quotes', 'trades.timestamp', 'quotes.timestamp')
+            ->asofJoin(
+                'quotes',
+                ['trades.symbol' => 'quotes.symbol'],
+                'trades.ts',
+                AsofOperator::LessThanEqual,
+                'quotes.ts',
+            )
             ->build();
 
         $this->assertSame([], $result->bindings);

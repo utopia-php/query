@@ -6,6 +6,7 @@ use Tests\Integration\IntegrationTestCase;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\Case\Operator;
 use Utopia\Query\Builder\ClickHouse as Builder;
+use Utopia\Query\Builder\ClickHouse\AsofOperator;
 use Utopia\Query\Builder\WindowFrame;
 use Utopia\Query\Query;
 
@@ -486,23 +487,112 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
 
     public function testAsofJoin(): void
     {
-        $this->markTestSkipped(
-            'Builder AsofJoins API only emits `ON left = right` (hardcoded equality). '
-            . 'ClickHouse requires the ASOF JOIN ON clause to include at least one '
-            . 'equi-join column AND an inequality (e.g. `ON t.symbol = q.symbol AND t.ts >= q.ts`). '
-            . 'The current asofJoin() signature cannot express the inequality condition, '
-            . 'so a valid ASOF query is not constructible via the builder.'
-        );
+        $this->trackClickhouseTable('ch_quotes');
+        $this->trackClickhouseTable('ch_trades');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_quotes`');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_trades`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_quotes` (
+                `symbol` String,
+                `ts` DateTime,
+                `bid` Float64
+            ) ENGINE = MergeTree()
+            ORDER BY (`symbol`, `ts`)
+        ');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_trades` (
+                `symbol` String,
+                `ts` DateTime,
+                `price` Float64
+            ) ENGINE = MergeTree()
+            ORDER BY (`symbol`, `ts`)
+        ');
+        $this->clickhouseStatement("
+            INSERT INTO `ch_quotes` (`symbol`, `ts`, `bid`) VALUES
+            ('AAPL', '2026-01-01 10:00:00', 100.0),
+            ('AAPL', '2026-01-01 10:00:05', 101.0),
+            ('AAPL', '2026-01-01 10:00:10', 102.0)
+        ");
+        $this->clickhouseStatement("
+            INSERT INTO `ch_trades` (`symbol`, `ts`, `price`) VALUES
+            ('AAPL', '2026-01-01 10:00:03', 100.5),
+            ('AAPL', '2026-01-01 10:00:07', 101.5)
+        ");
+
+        $result = (new Builder())
+            ->from('ch_trades', 't')
+            ->select(['t.symbol', 't.ts', 't.price', 'q.bid'])
+            ->asofJoin(
+                'ch_quotes',
+                ['t.symbol' => 'q.symbol'],
+                't.ts',
+                AsofOperator::GreaterThanEqual,
+                'q.ts',
+                'q',
+            )
+            ->sortAsc('t.ts')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(2, $rows);
+        $this->assertSame(100.0, (float) $rows[0]['bid']); // @phpstan-ignore cast.double
+        $this->assertSame(101.0, (float) $rows[1]['bid']); // @phpstan-ignore cast.double
     }
 
     public function testAsofLeftJoin(): void
     {
-        $this->markTestSkipped(
-            'Builder AsofJoins API only emits `ON left = right` (hardcoded equality). '
-            . 'ClickHouse requires the ASOF LEFT JOIN ON clause to include at least one '
-            . 'equi-join column AND an inequality (e.g. `ON t.symbol = q.symbol AND t.ts >= q.ts`). '
-            . 'The current asofLeftJoin() signature cannot express the inequality condition.'
-        );
+        $this->trackClickhouseTable('ch_quotes');
+        $this->trackClickhouseTable('ch_trades');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_quotes`');
+        $this->clickhouseStatement('DROP TABLE IF EXISTS `ch_trades`');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_quotes` (
+                `symbol` String,
+                `ts` DateTime,
+                `bid` Nullable(Float64)
+            ) ENGINE = MergeTree()
+            ORDER BY (`symbol`, `ts`)
+        ');
+        $this->clickhouseStatement('
+            CREATE TABLE `ch_trades` (
+                `symbol` String,
+                `ts` DateTime,
+                `price` Float64
+            ) ENGINE = MergeTree()
+            ORDER BY (`symbol`, `ts`)
+        ');
+        $this->clickhouseStatement("
+            INSERT INTO `ch_quotes` (`symbol`, `ts`, `bid`) VALUES
+            ('AAPL', '2026-01-01 10:00:00', 100.0)
+        ");
+        $this->clickhouseStatement("
+            INSERT INTO `ch_trades` (`symbol`, `ts`, `price`) VALUES
+            ('AAPL', '2026-01-01 10:00:05', 100.5),
+            ('MSFT', '2026-01-01 10:00:05', 200.5)
+        ");
+
+        $result = (new Builder())
+            ->from('ch_trades', 't')
+            ->select(['t.symbol', 't.ts', 't.price', 'q.bid'])
+            ->asofLeftJoin(
+                'ch_quotes',
+                ['t.symbol' => 'q.symbol'],
+                't.ts',
+                AsofOperator::GreaterThanEqual,
+                'q.ts',
+                'q',
+            )
+            ->sortAsc('t.symbol')
+            ->build();
+
+        $rows = $this->executeOnClickhouse($result);
+
+        $this->assertCount(2, $rows);
+        $this->assertSame('AAPL', $rows[0]['symbol']);
+        $this->assertSame(100.0, (float) $rows[0]['bid']); // @phpstan-ignore cast.double
+        $this->assertSame('MSFT', $rows[1]['symbol']);
+        $this->assertNull($rows[1]['bid']);
     }
 
     public function testApproxDistinctCount(): void

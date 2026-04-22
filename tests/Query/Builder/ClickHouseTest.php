@@ -7,6 +7,7 @@ use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\Case\Operator;
 use Utopia\Query\Builder\ClickHouse as Builder;
+use Utopia\Query\Builder\ClickHouse\AsofOperator;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\Feature\Aggregates;
 use Utopia\Query\Builder\Feature\BitwiseAggregates;
@@ -9724,51 +9725,83 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('trades')
-            ->asofJoin('quotes', 'trades.timestamp', 'quotes.timestamp')
+            ->asofJoin(
+                'quotes',
+                ['trades.symbol' => 'quotes.symbol'],
+                'trades.ts',
+                AsofOperator::GreaterThanEqual,
+                'quotes.ts',
+            )
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ASOF JOIN `quotes` ON `trades`.`timestamp` = `quotes`.`timestamp`', $result->query);
+        $this->assertStringContainsString('ASOF JOIN `quotes` ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`ts` >= `quotes`.`ts`', $result->query);
     }
 
     public function testAsofJoinWithAlias(): void
     {
         $result = (new Builder())
             ->from('trades')
-            ->asofJoin('quotes', 'trades.timestamp', 'q.timestamp', 'q')
+            ->asofJoin(
+                'quotes',
+                ['trades.symbol' => 'q.symbol'],
+                'trades.ts',
+                AsofOperator::GreaterThanEqual,
+                'q.ts',
+                'q',
+            )
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ASOF JOIN `quotes` AS `q` ON `trades`.`timestamp` = `q`.`timestamp`', $result->query);
+        $this->assertStringContainsString('ASOF JOIN `quotes` AS `q` ON `trades`.`symbol` = `q`.`symbol` AND `trades`.`ts` >= `q`.`ts`', $result->query);
     }
 
     public function testAsofLeftJoinBasic(): void
     {
         $result = (new Builder())
             ->from('trades')
-            ->asofLeftJoin('quotes', 'trades.timestamp', 'quotes.timestamp')
+            ->asofLeftJoin(
+                'quotes',
+                ['trades.symbol' => 'quotes.symbol'],
+                'trades.ts',
+                AsofOperator::GreaterThanEqual,
+                'quotes.ts',
+            )
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ASOF LEFT JOIN `quotes` ON `trades`.`timestamp` = `quotes`.`timestamp`', $result->query);
+        $this->assertStringContainsString('ASOF LEFT JOIN `quotes` ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`ts` >= `quotes`.`ts`', $result->query);
     }
 
     public function testAsofLeftJoinWithAlias(): void
     {
         $result = (new Builder())
             ->from('trades')
-            ->asofLeftJoin('quotes', 'trades.timestamp', 'q.timestamp', 'q')
+            ->asofLeftJoin(
+                'quotes',
+                ['trades.symbol' => 'q.symbol'],
+                'trades.ts',
+                AsofOperator::GreaterThanEqual,
+                'q.ts',
+                'q',
+            )
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ASOF LEFT JOIN `quotes` AS `q` ON `trades`.`timestamp` = `q`.`timestamp`', $result->query);
+        $this->assertStringContainsString('ASOF LEFT JOIN `quotes` AS `q` ON `trades`.`symbol` = `q`.`symbol` AND `trades`.`ts` >= `q`.`ts`', $result->query);
     }
 
     public function testAsofJoinWithFilter(): void
     {
         $result = (new Builder())
             ->from('trades')
-            ->asofJoin('quotes', 'trades.timestamp', 'quotes.timestamp')
+            ->asofJoin(
+                'quotes',
+                ['trades.symbol' => 'quotes.symbol'],
+                'trades.ts',
+                AsofOperator::GreaterThanEqual,
+                'quotes.ts',
+            )
             ->filter([Query::equal('trades.symbol', ['AAPL'])])
             ->build();
         $this->assertBindingCount($result);
@@ -9783,15 +9816,21 @@ class ClickHouseTest extends TestCase
     public function testAsofJoinFluentChaining(): void
     {
         $builder = new Builder();
-        $this->assertSame($builder, $builder->from('t')->asofJoin('q', 'a', 'b'));
-        $this->assertSame($builder, $builder->asofLeftJoin('r', 'c', 'd'));
+        $this->assertSame($builder, $builder->from('t')->asofJoin('q', ['t.k' => 'q.k'], 't.ts', AsofOperator::GreaterThanEqual, 'q.ts'));
+        $this->assertSame($builder, $builder->asofLeftJoin('r', ['t.k' => 'r.k'], 't.ts', AsofOperator::LessThanEqual, 'r.ts'));
     }
 
     public function testAsofJoinReset(): void
     {
         $builder = (new Builder())
             ->from('trades')
-            ->asofJoin('quotes', 'trades.ts', 'quotes.ts');
+            ->asofJoin(
+                'quotes',
+                ['trades.symbol' => 'quotes.symbol'],
+                'trades.ts',
+                AsofOperator::GreaterThanEqual,
+                'quotes.ts',
+            );
 
         $builder->build();
         $builder->reset();
@@ -10495,7 +10534,13 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('trades')
-            ->asofJoin('quotes', 'trades.ts', 'quotes.ts')
+            ->asofJoin(
+                'quotes',
+                ['trades.symbol' => 'quotes.symbol'],
+                'trades.ts',
+                AsofOperator::GreaterThanEqual,
+                'quotes.ts',
+            )
             ->prewhere([Query::equal('trades.exchange', ['NYSE'])])
             ->build();
         $this->assertBindingCount($result);
@@ -10596,7 +10641,13 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('trades')
             ->join('instruments', 'trades.symbol', 'instruments.symbol')
-            ->asofJoin('quotes', 'trades.timestamp', 'quotes.timestamp')
+            ->asofJoin(
+                'quotes',
+                ['trades.symbol' => 'quotes.symbol'],
+                'trades.ts',
+                AsofOperator::GreaterThanEqual,
+                'quotes.ts',
+            )
             ->build();
         $this->assertBindingCount($result);
 
@@ -10915,7 +10966,13 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('trades')
-            ->asofJoin('quotes', 'trades.ts', 'quotes.ts')
+            ->asofJoin(
+                'quotes',
+                ['trades.symbol' => 'quotes.symbol'],
+                'trades.ts',
+                AsofOperator::GreaterThanEqual,
+                'quotes.ts',
+            )
             ->settings(['max_threads' => '2'])
             ->build();
         $this->assertBindingCount($result);
@@ -10946,7 +11003,7 @@ class ClickHouseTest extends TestCase
             ->sample(0.5)
             ->prewhere([Query::equal('type', ['click'])])
             ->arrayJoin('tags', 'tag')
-            ->asofJoin('quotes', 'a', 'b')
+            ->asofJoin('quotes', ['t.k' => 'q.k'], 't.ts', AsofOperator::GreaterThanEqual, 'q.ts')
             ->limitBy(3, ['user_id'])
             ->withTotals()
             ->settings(['max_threads' => '4']);

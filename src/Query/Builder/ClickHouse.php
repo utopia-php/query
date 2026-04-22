@@ -3,6 +3,7 @@
 namespace Utopia\Query\Builder;
 
 use Utopia\Query\Builder as BaseBuilder;
+use Utopia\Query\Builder\ClickHouse\AsofOperator;
 use Utopia\Query\Builder\Feature\BitwiseAggregates;
 use Utopia\Query\Builder\Feature\ClickHouse\ApproximateAggregates;
 use Utopia\Query\Builder\Feature\ClickHouse\ArrayJoins;
@@ -319,30 +320,84 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this;
     }
 
+    /**
+     * @param  array<string, string>  $equiPairs
+     */
     #[\Override]
-    public function asofJoin(string $table, string $left, string $right, string $alias = ''): static
-    {
-        $tableExpr = $this->quote($table);
-        if ($alias !== '') {
-            $tableExpr .= ' AS ' . $this->quote($alias);
-        }
-
-        $this->rawJoinClauses[] = 'ASOF JOIN ' . $tableExpr . ' ON ' . $this->resolveAndWrap($left) . ' = ' . $this->resolveAndWrap($right);
+    public function asofJoin(
+        string $table,
+        array $equiPairs,
+        string $leftInequality,
+        AsofOperator $operator,
+        string $rightInequality,
+        string $alias = '',
+    ): static {
+        $this->rawJoinClauses[] = $this->buildAsofJoin(
+            keyword: 'ASOF JOIN',
+            table: $table,
+            equiPairs: $equiPairs,
+            leftInequality: $leftInequality,
+            operator: $operator,
+            rightInequality: $rightInequality,
+            alias: $alias,
+        );
 
         return $this;
     }
 
+    /**
+     * @param  array<string, string>  $equiPairs
+     */
     #[\Override]
-    public function asofLeftJoin(string $table, string $left, string $right, string $alias = ''): static
-    {
+    public function asofLeftJoin(
+        string $table,
+        array $equiPairs,
+        string $leftInequality,
+        AsofOperator $operator,
+        string $rightInequality,
+        string $alias = '',
+    ): static {
+        $this->rawJoinClauses[] = $this->buildAsofJoin(
+            keyword: 'ASOF LEFT JOIN',
+            table: $table,
+            equiPairs: $equiPairs,
+            leftInequality: $leftInequality,
+            operator: $operator,
+            rightInequality: $rightInequality,
+            alias: $alias,
+        );
+
+        return $this;
+    }
+
+    /**
+     * @param  array<string, string>  $equiPairs
+     */
+    private function buildAsofJoin(
+        string $keyword,
+        string $table,
+        array $equiPairs,
+        string $leftInequality,
+        AsofOperator $operator,
+        string $rightInequality,
+        string $alias,
+    ): string {
+        if ($equiPairs === []) {
+            throw new ValidationException('ASOF JOIN requires at least one equi-join column pair.');
+        }
+
         $tableExpr = $this->quote($table);
         if ($alias !== '') {
             $tableExpr .= ' AS ' . $this->quote($alias);
         }
 
-        $this->rawJoinClauses[] = 'ASOF LEFT JOIN ' . $tableExpr . ' ON ' . $this->resolveAndWrap($left) . ' = ' . $this->resolveAndWrap($right);
+        $conditions = [];
+        foreach ($equiPairs as $left => $right) {
+            $conditions[] = $this->resolveAndWrap($left) . ' = ' . $this->resolveAndWrap($right);
+        }
+        $conditions[] = $this->resolveAndWrap($leftInequality) . ' ' . $operator->value . ' ' . $this->resolveAndWrap($rightInequality);
 
-        return $this;
+        return $keyword . ' ' . $tableExpr . ' ON ' . \implode(' AND ', $conditions);
     }
 
     #[\Override]
