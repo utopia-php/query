@@ -324,4 +324,12 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
 
         return $this;
     }
+
+    #[\Override]
+    protected function wrapUnionMember(string $sql): string
+    {
+        // SQLite's compound-SELECT parser rejects parenthesised members,
+        // so emit the bare SELECT and rely on the UNION keyword alone.
+        return $sql;
+    }
 }

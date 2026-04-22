@@ -3,7 +3,6 @@
 namespace Tests\Integration\Builder;
 
 use Tests\Integration\IntegrationTestCase;
-use Utopia\Query\Builder\Plan;
 use Utopia\Query\Builder\SQLite as Builder;
 use Utopia\Query\Query;
 
@@ -245,14 +244,9 @@ class SQLiteIntegrationTest extends IntegrationTestCase
             ->union($query1)
             ->build();
 
-        // SQLite does not accept the parenthesised compound-select syntax the
-        // builder emits (`(SELECT ...) UNION (SELECT ...)`). Strip the outer
-        // parens before executing so we can still verify the UNION semantics.
-        $sql = \preg_replace('/^\((.*)\) UNION \((.*)\)$/s', '$1 UNION $2', $result->query);
-        $this->assertIsString($sql);
-        $plan = new Plan($sql, $result->bindings);
+        $this->assertStringNotContainsString('(SELECT', $result->query);
 
-        $rows = $this->executeOnSqlite($plan);
+        $rows = $this->executeOnSqlite($result);
 
         $names = array_column($rows, 'name');
         sort($names);

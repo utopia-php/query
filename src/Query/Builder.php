@@ -496,7 +496,7 @@ abstract class Builder implements
 
         $unionSuffix = $this->buildUnionSuffix();
         if ($unionSuffix !== '') {
-            $sql = '(' . $sql . ')' . $unionSuffix;
+            $sql = $this->wrapUnionMember($sql) . $unionSuffix;
         }
 
         $sql = $ctePrefix . $sql;
@@ -1054,11 +1054,22 @@ abstract class Builder implements
 
         $suffix = '';
         foreach ($this->unions as $union) {
-            $suffix .= ' ' . $union->type->value . ' (' . $union->query . ')';
+            $suffix .= ' ' . $union->type->value . ' ' . $this->wrapUnionMember($union->query);
             $this->addBindings($union->bindings);
         }
 
         return $suffix;
+    }
+
+    /**
+     * Wrap a compound-SELECT member for inclusion in a UNION chain. The
+     * default wraps each arm in parentheses, matching the shape most
+     * dialects expect. Override in dialects whose parsers reject the
+     * parenthesised form (e.g. SQLite).
+     */
+    protected function wrapUnionMember(string $sql): string
+    {
+        return '(' . $sql . ')';
     }
 
     /**

@@ -1258,8 +1258,28 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('UNION (SELECT', $result->query);
-        $this->assertStringContainsString('UNION ALL (SELECT', $result->query);
+        $this->assertStringContainsString('UNION SELECT', $result->query);
+        $this->assertStringContainsString('UNION ALL SELECT', $result->query);
+        $this->assertStringNotContainsString('(SELECT', $result->query);
+    }
+
+    public function testUnionEmitsBareCompoundSelect(): void
+    {
+        $other = (new Builder())
+            ->from('archived_users')
+            ->select(['id', 'name']);
+
+        $result = (new Builder())
+            ->from('users')
+            ->select(['id', 'name'])
+            ->union($other)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'SELECT `id`, `name` FROM `users` UNION SELECT `id`, `name` FROM `archived_users`',
+            $result->query,
+        );
     }
 
     public function testMultipleUnions(): void
