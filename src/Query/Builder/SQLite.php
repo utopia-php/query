@@ -159,6 +159,21 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
     }
 
     #[\Override]
+    public function setJsonPath(string $column, string $path, mixed $value): static
+    {
+        if (! \str_starts_with($path, '$')) {
+            throw new ValidationException('JSON path must start with \'$\': ' . $path);
+        }
+
+        $this->jsonSets[$column] = new Condition(
+            'json_set(' . $this->resolveAndWrap($column) . ', ?, ?)',
+            [$path, $value],
+        );
+
+        return $this;
+    }
+
+    #[\Override]
     public function update(): Plan
     {
         foreach ($this->jsonSets as $col => $condition) {

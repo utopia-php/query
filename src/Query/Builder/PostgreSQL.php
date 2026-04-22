@@ -438,6 +438,36 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     }
 
     #[\Override]
+    public function setJsonPath(string $column, string $path, mixed $value): static
+    {
+        if (! \str_starts_with($path, '$')) {
+            throw new ValidationException('JSON path must start with \'$\': ' . $path);
+        }
+
+        $trimmed = \ltrim(\substr($path, 1), '.');
+
+        if ($trimmed === '') {
+            throw new ValidationException('JSON path must reference at least one key: ' . $path);
+        }
+
+        $segments = \explode('.', $trimmed);
+        foreach ($segments as $segment) {
+            if ($segment === '') {
+                throw new ValidationException('JSON path contains an empty segment: ' . $path);
+            }
+        }
+
+        $pathArray = '{' . \implode(',', $segments) . '}';
+
+        $this->jsonSets[$column] = new Condition(
+            'jsonb_set(' . $this->resolveAndWrap($column) . ', ?, to_jsonb(?::text)::jsonb, true)',
+            [$pathArray, $value],
+        );
+
+        return $this;
+    }
+
+    #[\Override]
     public function explain(bool $analyze = false, bool $verbose = false, bool $buffers = false, string $format = ''): Plan
     {
         $normalizedFormat = \strtoupper($format);

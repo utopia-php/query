@@ -174,6 +174,21 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return $this;
     }
 
+    #[\Override]
+    public function setJsonPath(string $column, string $path, mixed $value): static
+    {
+        if (! \str_starts_with($path, '$')) {
+            throw new ValidationException('JSON path must start with \'$\': ' . $path);
+        }
+
+        $this->jsonSets[$column] = new Condition(
+            'JSON_SET(' . $this->resolveAndWrap($column) . ', ?, ?)',
+            [$path, $value],
+        );
+
+        return $this;
+    }
+
     public function maxExecutionTime(int $ms): static
     {
         return $this->hint("MAX_EXECUTION_TIME({$ms})");

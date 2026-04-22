@@ -788,12 +788,12 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         ');
         $this->postgresStatement('
             INSERT INTO "profiles" ("id", "data") VALUES
-            (1, \'{"role":"user","level":1}\'::jsonb)
+            (1, \'{"name":"OldValue","level":1}\'::jsonb)
         ');
 
         $result = (new Builder())
             ->from('profiles')
-            ->setRaw('data', 'jsonb_set("data", \'{role}\', ?::jsonb, true)', ['"admin"'])
+            ->setJsonPath('data', '$.name', 'NewValue')
             ->filter([Query::equal('id', [1])])
             ->update();
 
@@ -802,7 +802,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $check = (new Builder())
             ->from('profiles')
             ->select(['id'])
-            ->filterJsonPath('data', 'role', '=', 'admin')
+            ->filterJsonPath('data', 'name', '=', 'NewValue')
             ->build();
 
         $rows = $this->executeOnPostgres($check);

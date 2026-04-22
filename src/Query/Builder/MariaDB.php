@@ -42,7 +42,27 @@ class MariaDB extends MySQL implements Returning
     #[\Override]
     public function upsert(): Plan
     {
-        return $this->appendReturning(parent::upsert());
+        if (! empty($this->returningColumns)) {
+            throw new ValidationException(
+                'MariaDB does not support RETURNING with ON DUPLICATE KEY UPDATE. '
+                . 'Call returning([]) to clear before upsert(), or use a separate update() statement.'
+            );
+        }
+
+        return parent::upsert();
+    }
+
+    #[\Override]
+    public function upsertSelect(): Plan
+    {
+        if (! empty($this->returningColumns)) {
+            throw new ValidationException(
+                'MariaDB does not support RETURNING with ON DUPLICATE KEY UPDATE. '
+                . 'Call returning([]) to clear before upsert(), or use a separate update() statement.'
+            );
+        }
+
+        return parent::upsertSelect();
     }
 
     #[\Override]

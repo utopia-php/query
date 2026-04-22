@@ -7394,6 +7394,33 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('JSON_REMOVE', $result->query);
     }
+
+    public function testSetJsonPath(): void
+    {
+        $result = (new Builder())
+            ->from('docs')
+            ->setJsonPath('data', '$.name', 'NewValue')
+            ->filter([Query::equal('id', [1])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'UPDATE `docs` SET `data` = JSON_SET(`data`, ?, ?) WHERE `id` IN (?)',
+            $result->query
+        );
+        $this->assertSame('$.name', $result->bindings[0]);
+        $this->assertSame('NewValue', $result->bindings[1]);
+        $this->assertSame(1, $result->bindings[2]);
+    }
+
+    public function testSetJsonPathRejectsInvalidPath(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->from('docs')
+            ->setJsonPath('data', 'name', 'NewValue');
+    }
     //  Hints feature interface
 
     public function testImplementsHints(): void

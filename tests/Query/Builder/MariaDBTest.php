@@ -378,6 +378,19 @@ class MariaDBTest extends TestCase
         );
     }
 
+    public function testUpsertWithReturningThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('MariaDB does not support RETURNING with ON DUPLICATE KEY UPDATE');
+
+        (new Builder())
+            ->into('users')
+            ->set(['id' => 1, 'name' => 'Alice', 'email' => 'a@b.com'])
+            ->onConflict(['id'], ['name', 'email'])
+            ->returning(['id'])
+            ->upsert();
+    }
+
     public function testInsertOrIgnore(): void
     {
         $result = (new Builder())
@@ -562,6 +575,24 @@ class MariaDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('JSON_REMOVE', $result->query);
+    }
+
+    public function testSetJsonPath(): void
+    {
+        $result = (new Builder())
+            ->from('docs')
+            ->setJsonPath('data', '$.name', 'NewValue')
+            ->filter([Query::equal('id', [1])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'UPDATE `docs` SET `data` = JSON_SET(`data`, ?, ?) WHERE `id` IN (?)',
+            $result->query
+        );
+        $this->assertSame('$.name', $result->bindings[0]);
+        $this->assertSame('NewValue', $result->bindings[1]);
+        $this->assertSame(1, $result->bindings[2]);
     }
 
     public function testSetJsonIntersect(): void

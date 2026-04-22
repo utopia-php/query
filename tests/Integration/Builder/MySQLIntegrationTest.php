@@ -632,6 +632,32 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $this->assertContains('php', $tags);
     }
 
+    public function testJsonSetPath(): void
+    {
+        $this->createJsonDocsTable();
+
+        $update = $this->fresh()
+            ->from('json_docs')
+            ->setJsonPath('metadata', '$.level', 42)
+            ->filter([Query::equal('id', [1])])
+            ->update();
+
+        $this->executeOnMysql($update);
+
+        $pdo = $this->connectMysql();
+        $stmt = $pdo->prepare('SELECT `metadata` FROM `json_docs` WHERE `id` = 1');
+        $stmt->execute();
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        \assert(\is_array($row));
+
+        /** @var string $metadataJson */
+        $metadataJson = $row['metadata'];
+        $metadata = \json_decode($metadataJson, true);
+        $this->assertIsArray($metadata);
+        $this->assertSame(42, $metadata['level']);
+        $this->assertTrue($metadata['active']);
+    }
+
     public function testHintUsesIndex(): void
     {
         $this->mysqlStatement('CREATE INDEX `idx_users_age` ON `users`(`age`)');

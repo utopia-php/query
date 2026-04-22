@@ -654,6 +654,47 @@ class PostgreSQLTest extends TestCase
 
         $this->assertStringContainsString('jsonb_insert', $result->query);
     }
+
+    public function testSetJsonPath(): void
+    {
+        $result = (new Builder())
+            ->from('docs')
+            ->setJsonPath('data', '$.name', 'NewValue')
+            ->filter([Query::equal('id', [1])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'UPDATE "docs" SET "data" = jsonb_set("data", ?, to_jsonb(?::text)::jsonb, true) WHERE "id" IN (?)',
+            $result->query
+        );
+        $this->assertSame('{name}', $result->bindings[0]);
+        $this->assertSame('NewValue', $result->bindings[1]);
+        $this->assertSame(1, $result->bindings[2]);
+    }
+
+    public function testSetJsonPathNested(): void
+    {
+        $result = (new Builder())
+            ->from('docs')
+            ->setJsonPath('data', '$.profile.name', 'Alice')
+            ->filter([Query::equal('id', [1])])
+            ->update();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('jsonb_set("data", ?, to_jsonb(?::text)::jsonb, true)', $result->query);
+        $this->assertSame('{profile,name}', $result->bindings[0]);
+        $this->assertSame('Alice', $result->bindings[1]);
+    }
+
+    public function testSetJsonPathRejectsInvalidPath(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->from('docs')
+            ->setJsonPath('data', 'name', 'NewValue');
+    }
     //  Window functions
 
     public function testImplementsWindows(): void

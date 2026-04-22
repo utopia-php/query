@@ -44,4 +44,16 @@ interface Json
     public function setJsonDiff(string $column, array $values): static;
 
     public function setJsonUnique(string $column): static;
+
+    /**
+     * Set a JSON path to a value (or NULL to clear).
+     *
+     * Dialect mapping:
+     *   MySQL:      JSON_SET(<col>, <path>, <value>)
+     *   PostgreSQL: jsonb_set(<col>, <path-array>, to_jsonb(<value>), true)
+     *
+     * The <path> must start with '$' in MySQL / JSONPath style. The implementation
+     * translates to PG's text[] form for jsonb_set.
+     */
+    public function setJsonPath(string $column, string $path, mixed $value): static;
 }
