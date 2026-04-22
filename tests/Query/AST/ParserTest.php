@@ -28,6 +28,8 @@ use Utopia\Query\AST\Star;
 use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\AST\SubquerySource;
 use Utopia\Query\Exception\ValidationException;
+use Utopia\Query\NullsPosition;
+use Utopia\Query\OrderDirection;
 use Utopia\Query\Tokenizer\Tokenizer;
 
 class ParserTest extends TestCase
@@ -296,7 +298,7 @@ class ParserTest extends TestCase
 
         $this->assertCount(1, $stmt->orderBy);
         $this->assertInstanceOf(OrderByItem::class, $stmt->orderBy[0]);
-        $this->assertSame('ASC', $stmt->orderBy[0]->direction);
+        $this->assertSame(OrderDirection::Asc, $stmt->orderBy[0]->direction);
         $this->assertInstanceOf(Column::class, $stmt->orderBy[0]->expression);
         $this->assertSame('name', $stmt->orderBy[0]->expression->name);
     }
@@ -306,7 +308,7 @@ class ParserTest extends TestCase
         $stmt = $this->parse('SELECT * FROM users ORDER BY created_at DESC');
 
         $this->assertCount(1, $stmt->orderBy);
-        $this->assertSame('DESC', $stmt->orderBy[0]->direction);
+        $this->assertSame(OrderDirection::Desc, $stmt->orderBy[0]->direction);
     }
 
     public function testOrderByMultiple(): void
@@ -314,8 +316,8 @@ class ParserTest extends TestCase
         $stmt = $this->parse('SELECT * FROM users ORDER BY status ASC, name DESC');
 
         $this->assertCount(2, $stmt->orderBy);
-        $this->assertSame('ASC', $stmt->orderBy[0]->direction);
-        $this->assertSame('DESC', $stmt->orderBy[1]->direction);
+        $this->assertSame(OrderDirection::Asc, $stmt->orderBy[0]->direction);
+        $this->assertSame(OrderDirection::Desc, $stmt->orderBy[1]->direction);
     }
 
     public function testOrderByNulls(): void
@@ -323,8 +325,8 @@ class ParserTest extends TestCase
         $stmt = $this->parse('SELECT * FROM users ORDER BY name ASC NULLS LAST');
 
         $this->assertCount(1, $stmt->orderBy);
-        $this->assertSame('ASC', $stmt->orderBy[0]->direction);
-        $this->assertSame('LAST', $stmt->orderBy[0]->nulls);
+        $this->assertSame(OrderDirection::Asc, $stmt->orderBy[0]->direction);
+        $this->assertSame(NullsPosition::Last, $stmt->orderBy[0]->nulls);
     }
 
     public function testGroupBy(): void
@@ -570,7 +572,7 @@ class ParserTest extends TestCase
         $this->assertInstanceOf(Column::class, $window->specification->partitionBy[0]);
         $this->assertSame('dept', $window->specification->partitionBy[0]->name);
         $this->assertCount(1, $window->specification->orderBy);
-        $this->assertSame('DESC', $window->specification->orderBy[0]->direction);
+        $this->assertSame(OrderDirection::Desc, $window->specification->orderBy[0]->direction);
     }
 
     public function testNamedWindow(): void
@@ -668,7 +670,7 @@ class ParserTest extends TestCase
         $this->assertCount(1, $stmt->groupBy);
         $this->assertInstanceOf(Binary::class, $stmt->having);
         $this->assertCount(1, $stmt->orderBy);
-        $this->assertSame('DESC', $stmt->orderBy[0]->direction);
+        $this->assertSame(OrderDirection::Desc, $stmt->orderBy[0]->direction);
         $this->assertInstanceOf(Literal::class, $stmt->limit);
         $this->assertSame(10, $stmt->limit->value);
         $this->assertInstanceOf(Literal::class, $stmt->offset);

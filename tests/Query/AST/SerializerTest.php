@@ -17,6 +17,7 @@ use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Star;
 use Utopia\Query\AST\Statement\Select;
+use Utopia\Query\OrderDirection;
 use Utopia\Query\Tokenizer\Tokenizer;
 
 class SerializerTest extends TestCase
@@ -263,7 +264,7 @@ class SerializerTest extends TestCase
                 '>',
                 new Literal(5),
             ),
-            orderBy: [new OrderByItem(new Column('name'), 'ASC')],
+            orderBy: [new OrderByItem(new Column('name'), OrderDirection::Asc)],
             limit: new Literal(10),
         );
 

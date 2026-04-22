@@ -2699,18 +2699,18 @@ abstract class Builder implements
             $method = $orderQuery->getMethod();
 
             if ($method === Method::OrderRandom) {
-                $items[] = new OrderByItem(new Raw('RAND()'), 'ASC');
+                $items[] = new OrderByItem(new Raw('RAND()'), OrderDirection::Asc);
                 continue;
             }
 
-            $direction = $method === Method::OrderAsc ? 'ASC' : 'DESC';
+            $direction = $method === Method::OrderAsc ? OrderDirection::Asc : OrderDirection::Desc;
             $attr = $orderQuery->getAttribute();
             $expr = $this->columnNameToAstExpression($attr);
 
             $nulls = null;
             $nullsVal = $orderQuery->getValue(null);
             if ($nullsVal instanceof NullsPosition) {
-                $nulls = $nullsVal->value;
+                $nulls = $nullsVal;
             }
 
             $items[] = new OrderByItem($expr, $direction, $nulls);
@@ -3162,20 +3162,16 @@ abstract class Builder implements
         foreach ($ast->orderBy as $item) {
             if ($item->expression instanceof Column) {
                 $attr = $this->astColumnReferenceToString($item->expression);
-                $nulls = null;
-                if ($item->nulls !== null) {
-                    $nulls = NullsPosition::tryFrom($item->nulls);
-                }
 
-                if (\strtoupper($item->direction) === 'DESC') {
-                    $this->sortDesc($attr, $nulls);
+                if ($item->direction === OrderDirection::Desc) {
+                    $this->sortDesc($attr, $item->nulls);
                 } else {
-                    $this->sortAsc($attr, $nulls);
+                    $this->sortAsc($attr, $item->nulls);
                 }
             } else {
                 $serializer = $this->createAstSerializer();
                 $rawExpr = $serializer->serializeExpression($item->expression);
-                $dir = \strtoupper($item->direction) === 'DESC' ? ' DESC' : ' ASC';
+                $dir = $item->direction === OrderDirection::Desc ? ' DESC' : ' ASC';
                 $this->orderByRaw($rawExpr . $dir);
             }
         }

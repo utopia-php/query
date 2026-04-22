@@ -29,6 +29,8 @@ use Utopia\Query\AST\Specification\Window as WindowSpecification;
 use Utopia\Query\AST\Star;
 use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\AST\SubquerySource;
+use Utopia\Query\NullsPosition;
+use Utopia\Query\OrderDirection;
 
 class NodeTest extends TestCase
 {
@@ -289,7 +291,7 @@ class NodeTest extends TestCase
         $fn = new Func('ROW_NUMBER');
         $specification = new WindowSpecification(
             partitionBy: [new Column('department')],
-            orderBy: [new OrderByItem(new Column('salary'), 'DESC')],
+            orderBy: [new OrderByItem(new Column('salary'), OrderDirection::Desc)],
         );
         $window = new Window($fn, specification: $specification);
 
@@ -384,24 +386,33 @@ class NodeTest extends TestCase
     public function testOrderByItem(): void
     {
         $item = new OrderByItem(new Column('name'));
-        $this->assertSame('ASC', $item->direction);
+        $this->assertSame(OrderDirection::Asc, $item->direction);
         $this->assertNull($item->nulls);
 
-        $desc = new OrderByItem(new Column('created_at'), 'DESC');
-        $this->assertSame('DESC', $desc->direction);
+        $desc = new OrderByItem(new Column('created_at'), OrderDirection::Desc);
+        $this->assertSame(OrderDirection::Desc, $desc->direction);
 
-        $nullsFirst = new OrderByItem(new Column('score'), 'ASC', 'FIRST');
-        $this->assertSame('FIRST', $nullsFirst->nulls);
+        $nullsFirst = new OrderByItem(new Column('score'), OrderDirection::Asc, NullsPosition::First);
+        $this->assertSame(NullsPosition::First, $nullsFirst->nulls);
 
-        $nullsLast = new OrderByItem(new Column('score'), 'DESC', 'LAST');
-        $this->assertSame('LAST', $nullsLast->nulls);
+        $nullsLast = new OrderByItem(new Column('score'), OrderDirection::Desc, NullsPosition::Last);
+        $this->assertSame(NullsPosition::Last, $nullsLast->nulls);
+    }
+
+    public function testOrderByItemEnumTypes(): void
+    {
+        $item = new OrderByItem(new Column('name'), OrderDirection::Desc, NullsPosition::First);
+        $this->assertInstanceOf(OrderDirection::class, $item->direction);
+        $this->assertInstanceOf(NullsPosition::class, $item->nulls);
+        $this->assertSame(OrderDirection::Desc, $item->direction);
+        $this->assertSame(NullsPosition::First, $item->nulls);
     }
 
     public function testWindowDefinition(): void
     {
         $specification = new WindowSpecification(
             partitionBy: [new Column('dept')],
-            orderBy: [new OrderByItem(new Column('salary'), 'DESC')],
+            orderBy: [new OrderByItem(new Column('salary'), OrderDirection::Desc)],
         );
         $def = new WindowDefinition('w', $specification);
 

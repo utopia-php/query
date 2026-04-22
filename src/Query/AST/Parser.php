@@ -22,6 +22,8 @@ use Utopia\Query\AST\Specification\Window as WindowSpecification;
 use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\Exception;
 use Utopia\Query\Exception\ValidationException;
+use Utopia\Query\NullsPosition;
+use Utopia\Query\OrderDirection;
 use Utopia\Query\Tokenizer\Token;
 use Utopia\Query\Tokenizer\TokenType;
 
@@ -914,13 +916,13 @@ class Parser
     {
         $expression = $this->parseExpression();
 
-        $direction = 'ASC';
+        $direction = OrderDirection::Asc;
         if ($this->matchKeyword('ASC')) {
             $this->advance();
-            $direction = 'ASC';
+            $direction = OrderDirection::Asc;
         } elseif ($this->matchKeyword('DESC')) {
             $this->advance();
-            $direction = 'DESC';
+            $direction = OrderDirection::Desc;
         }
 
         $nulls = null;
@@ -928,10 +930,10 @@ class Parser
             $this->advance();
             if ($this->matchKeyword('FIRST')) {
                 $this->advance();
-                $nulls = 'FIRST';
+                $nulls = NullsPosition::First;
             } elseif ($this->matchKeyword('LAST')) {
                 $this->advance();
-                $nulls = 'LAST';
+                $nulls = NullsPosition::Last;
             } else {
                 throw new Exception(
                     "Expected FIRST or LAST after NULLS at position {$this->current()->position}, got '{$this->current()->value}'"

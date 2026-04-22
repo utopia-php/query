@@ -352,9 +352,9 @@ class Serializer
 
     private function serializeOrderByItem(OrderByItem $item): string
     {
-        $sql = $this->serializeExpression($item->expression) . ' ' . $item->direction;
+        $sql = $this->serializeExpression($item->expression) . ' ' . $item->direction->value;
         if ($item->nulls !== null) {
-            $sql .= ' NULLS ' . $item->nulls;
+            $sql .= ' NULLS ' . $item->nulls->value;
         }
         return $sql;
     }

@@ -30,6 +30,8 @@ use Utopia\Query\AST\Visitor\FilterInjector;
 use Utopia\Query\AST\Visitor\TableRenamer;
 use Utopia\Query\AST\Walker;
 use Utopia\Query\Exception;
+use Utopia\Query\NullsPosition;
+use Utopia\Query\OrderDirection;
 
 class VisitorTest extends TestCase
 {
@@ -541,7 +543,7 @@ class VisitorTest extends TestCase
             null,
             new WindowSpecification(
                 partitionBy: [new Column('department')],
-                orderBy: [new OrderByItem(new Column('salary'), 'DESC')],
+                orderBy: [new OrderByItem(new Column('salary'), OrderDirection::Desc)],
             ),
         );
 
@@ -607,7 +609,7 @@ class VisitorTest extends TestCase
                 new WindowDefinition(
                     'w',
                     new WindowSpecification(
-                        orderBy: [new OrderByItem(new Column('salary'), 'DESC')],
+                        orderBy: [new OrderByItem(new Column('salary'), OrderDirection::Desc)],
                     ),
                 ),
             ],
@@ -629,8 +631,8 @@ class VisitorTest extends TestCase
             columns: [new Column('name'), new Column('age')],
             from: new Table('users'),
             orderBy: [
-                new OrderByItem(new Column('name'), 'ASC', 'FIRST'),
-                new OrderByItem(new Column('age'), 'DESC', 'LAST'),
+                new OrderByItem(new Column('name'), OrderDirection::Asc, NullsPosition::First),
+                new OrderByItem(new Column('age'), OrderDirection::Desc, NullsPosition::Last),
             ],
         );
 

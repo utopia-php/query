@@ -19,6 +19,7 @@ use Utopia\Query\AST\Star;
 use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\Builder\MySQL;
 use Utopia\Query\Builder\PostgreSQL;
+use Utopia\Query\OrderDirection;
 use Utopia\Query\Query;
 
 class BuilderIntegrationTest extends TestCase
@@ -99,11 +100,11 @@ class BuilderIntegrationTest extends TestCase
 
         $this->assertCount(2, $ast->orderBy);
         $this->assertInstanceOf(OrderByItem::class, $ast->orderBy[0]);
-        $this->assertSame('ASC', $ast->orderBy[0]->direction);
+        $this->assertSame(OrderDirection::Asc, $ast->orderBy[0]->direction);
         $this->assertInstanceOf(Column::class, $ast->orderBy[0]->expression);
         $this->assertSame('name', $ast->orderBy[0]->expression->name);
 
-        $this->assertSame('DESC', $ast->orderBy[1]->direction);
+        $this->assertSame(OrderDirection::Desc, $ast->orderBy[1]->direction);
         $this->assertInstanceOf(Column::class, $ast->orderBy[1]->expression);
         $this->assertSame('created_at', $ast->orderBy[1]->expression->name);
     }
@@ -253,8 +254,8 @@ class BuilderIntegrationTest extends TestCase
             columns: [new Star()],
             from: new Table('users'),
             orderBy: [
-                new OrderByItem(new Column('name'), 'ASC'),
-                new OrderByItem(new Column('age'), 'DESC'),
+                new OrderByItem(new Column('name'), OrderDirection::Asc),
+                new OrderByItem(new Column('age'), OrderDirection::Desc),
             ],
         );
 
@@ -317,7 +318,7 @@ class BuilderIntegrationTest extends TestCase
                 '>',
                 new Literal(18),
             ),
-            orderBy: [new OrderByItem(new Column('name'), 'ASC')],
+            orderBy: [new OrderByItem(new Column('name'), OrderDirection::Asc)],
             limit: new Literal(10),
         );
 
@@ -357,7 +358,7 @@ class BuilderIntegrationTest extends TestCase
                 new Literal('active'),
             ),
             groupBy: [new Column('id')],
-            orderBy: [new OrderByItem(new Func('COUNT', [new Star()]), 'DESC')],
+            orderBy: [new OrderByItem(new Func('COUNT', [new Star()]), OrderDirection::Desc)],
             limit: new Literal(10),
         );
 
