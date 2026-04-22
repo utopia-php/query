@@ -90,7 +90,7 @@ class MongoDB implements Parser
         }
 
         // Verify opcode is OP_MSG (2013)
-        $opcode = \unpack('V', $data, 12)[1];
+        $opcode = $this->readUint32($data, 12);
         if ($opcode !== self::OP_MSG) {
             return Type::Unknown;
         }
@@ -104,10 +104,6 @@ class MongoDB implements Parser
         // BSON doc: 4-byte length, then elements
         // Each element: type byte, cstring name, value
         $bsonOffset = 21;
-
-        if ($bsonOffset + 4 > $len) {
-            return Type::Unknown;
-        }
 
         // Check for startTransaction flag in the document
         if ($this->hasBsonKey($data, $bsonOffset, 'startTransaction')) {
@@ -207,7 +203,7 @@ class MongoDB implements Parser
             return false;
         }
 
-        $docLen = \unpack('V', $data, $bsonOffset)[1];
+        $docLen = $this->readUint32($data, $bsonOffset);
         $docEnd = $bsonOffset + $docLen;
         if ($docEnd > $len) {
             $docEnd = $len;
@@ -279,7 +275,7 @@ class MongoDB implements Parser
         if ($pos + 4 > $limit) {
             return false;
         }
-        $strLen = \unpack('V', $data, $pos)[1];
+        $strLen = $this->readUint32($data, $pos);
 
         return $pos + 4 + $strLen;
     }
@@ -289,7 +285,7 @@ class MongoDB implements Parser
         if ($pos + 4 > $limit) {
             return false;
         }
-        $docLen = \unpack('V', $data, $pos)[1];
+        $docLen = $this->readUint32($data, $pos);
 
         return $pos + $docLen;
     }
@@ -299,12 +295,12 @@ class MongoDB implements Parser
         if ($pos + 4 > $limit) {
             return false;
         }
-        $binLen = \unpack('V', $data, $pos)[1];
+        $binLen = $this->readUint32($data, $pos);
 
         return $pos + 4 + 1 + $binLen; // length + subtype byte + data
     }
 
-    private function skipBsonRegex(string $data, int $pos, int $limit): int|false
+    private function skipBsonRegex(string $data, int $pos, int $limit): int
     {
         // Two cstrings: pattern + options
         while ($pos < $limit && $data[$pos] !== "\x00") {
@@ -327,5 +323,19 @@ class MongoDB implements Parser
         }
 
         return $newPos + 12;
+    }
+
+    /**
+     * Read a little-endian uint32 at $offset. Caller must ensure bounds.
+     */
+    private function readUint32(string $data, int $offset): int
+    {
+        /** @var array{1: int}|false $unpacked */
+        $unpacked = \unpack('V', $data, $offset);
+        if ($unpacked === false) {
+            return 0;
+        }
+
+        return $unpacked[1];
     }
 }

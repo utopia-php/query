@@ -66,7 +66,7 @@ class MongoDB extends BaseBuilder implements
     /** @var array<string, array<string, string>> */
     protected array $currentDateOps = [];
 
-    /** @var array<string, array<string, mixed>> */
+    /** @var array<string, array{values: list<mixed>, position?: int, slice?: int, sort?: mixed}> */
     protected array $pushEachOps = [];
 
     /** @var list<array<string, mixed>> */
@@ -78,7 +78,7 @@ class MongoDB extends BaseBuilder implements
     /** @var array<string, mixed>|null */
     protected ?array $bucketAutoStage = null;
 
-    /** @var array<string, array<string, mixed>>|null */
+    /** @var array<string, array{pipeline: list<array<string, mixed>>, bindings: list<mixed>}>|null */
     protected ?array $facetStages = null;
 
     /** @var array<string, mixed>|null */
@@ -238,7 +238,7 @@ class MongoDB extends BaseBuilder implements
 
     public function pushEach(string $field, array $values, ?int $position = null, ?int $slice = null, ?array $sort = null): static
     {
-        $modifier = ['values' => $values];
+        $modifier = ['values' => \array_values($values)];
         if ($position !== null) {
             $modifier['position'] = $position;
         }
@@ -310,7 +310,7 @@ class MongoDB extends BaseBuilder implements
         return $this;
     }
 
-    public function graphLookup(string $from, mixed $startWith, string $connectFromField, string $connectToField, string $as, ?int $maxDepth = null, ?string $depthField = null): static
+    public function graphLookup(string $from, string $startWith, string $connectFromField, string $connectToField, string $as, ?int $maxDepth = null, ?string $depthField = null): static
     {
         $stage = [
             'from' => $from,

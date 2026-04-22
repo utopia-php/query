@@ -492,6 +492,7 @@ class NodeTest extends TestCase
         $this->assertTrue($modified->distinct);
         $this->assertInstanceOf(Literal::class, $modified->limit);
         $this->assertSame(20, $modified->limit->value);
+        $this->assertInstanceOf(Literal::class, $original->limit);
         $this->assertSame(10, $original->limit->value);
         $this->assertFalse($original->distinct);
 

@@ -4,12 +4,12 @@ namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
-use Utopia\Query\Builder\Plan;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\Hints;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\LateralJoins;
 use Utopia\Query\Builder\MariaDB as Builder;
+use Utopia\Query\Builder\Plan;
 use Utopia\Query\Compiler;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;

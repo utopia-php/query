@@ -21,8 +21,6 @@ use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Star;
 use Utopia\Query\AST\Statement\Select;
-use Utopia\Query\AST\SubquerySource;
-use Utopia\Query\Builder\Plan;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\CteClause;
@@ -33,6 +31,7 @@ use Utopia\Query\Builder\JoinBuilder;
 use Utopia\Query\Builder\JoinType;
 use Utopia\Query\Builder\LateralJoin;
 use Utopia\Query\Builder\LockMode;
+use Utopia\Query\Builder\Plan;
 use Utopia\Query\Builder\SubSelect;
 use Utopia\Query\Builder\UnionClause;
 use Utopia\Query\Builder\UnionType;
@@ -480,7 +479,7 @@ abstract class Builder implements
     }
 
     /**
-     * @param  array<mixed>  $bindings
+     * @param  list<mixed>  $bindings
      */
     public function selectRaw(string $expression, array $bindings = []): static
     {
@@ -2458,7 +2457,7 @@ abstract class Builder implements
         return $funcCall;
     }
 
-    private function buildAstFrom(): Table|SubquerySource|null
+    private function buildAstFrom(): ?Table
     {
         if ($this->tableless) {
             return null;

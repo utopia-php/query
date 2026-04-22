@@ -6,7 +6,6 @@ use PHPUnit\Framework\TestCase;
 use Utopia\Query\AST\Call\Func;
 use Utopia\Query\AST\Definition\Cte;
 use Utopia\Query\AST\Definition\Window as WindowDefinition;
-use Utopia\Query\AST\Expression;
 use Utopia\Query\AST\Expression\Aliased;
 use Utopia\Query\AST\Expression\Between;
 use Utopia\Query\AST\Expression\Binary;
@@ -20,31 +19,20 @@ use Utopia\Query\AST\Expression\Window;
 use Utopia\Query\AST\JoinClause;
 use Utopia\Query\AST\Literal;
 use Utopia\Query\AST\OrderByItem;
-use Utopia\Query\AST\Parser;
 use Utopia\Query\AST\Reference\Column;
 use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Specification\Window as WindowSpecification;
 use Utopia\Query\AST\Star;
 use Utopia\Query\AST\Statement\Select;
-use Utopia\Query\AST\Visitor;
 use Utopia\Query\AST\Visitor\ColumnValidator;
 use Utopia\Query\AST\Visitor\FilterInjector;
 use Utopia\Query\AST\Visitor\TableRenamer;
 use Utopia\Query\AST\Walker;
 use Utopia\Query\Exception;
-use Utopia\Query\Tokenizer\Tokenizer;
 
 class VisitorTest extends TestCase
 {
-    private function parse(string $sql): Select
-    {
-        $tokenizer = new Tokenizer();
-        $tokens = Tokenizer::filter($tokenizer->tokenize($sql));
-        $parser = new Parser();
-        return $parser->parse($tokens);
-    }
-
     private function serialize(Select $stmt): string
     {
         $serializer = new Serializer();
@@ -435,30 +423,9 @@ class VisitorTest extends TestCase
         $this->assertSame($before, $this->serialize($result));
     }
 
-    private function createCollectingVisitor(): Visitor
+    private function createCollectingVisitor(): CollectingVisitor
     {
-        return new class implements Visitor {
-            /** @var string[] */
-            public array $visited = [];
-
-            public function visitExpression(Expression $expression): Expression
-            {
-                $class = get_class($expression);
-                $short = substr($class, strrpos($class, '\\') + 1);
-                $this->visited[] = $short;
-                return $expression;
-            }
-
-            public function visitTableReference(Table $reference): Table
-            {
-                return $reference;
-            }
-
-            public function visitSelect(Select $stmt): Select
-            {
-                return $stmt;
-            }
-        };
+        return new CollectingVisitor();
     }
 
     public function testWalkerWithCastExpression(): void

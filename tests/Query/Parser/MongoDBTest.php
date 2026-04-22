@@ -58,6 +58,7 @@ class MongoDBTest extends TestCase
                 $body .= "\x08" . $key . "\x00" . ($value ? "\x01" : "\x00");
             } elseif (\is_array($value)) {
                 // Type 0x03: embedded document
+                /** @var array<string, mixed> $value */
                 $body .= "\x03" . $key . "\x00" . $this->encodeBsonDocument($value);
             }
         }

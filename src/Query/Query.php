@@ -11,6 +11,15 @@ class Query
 {
     public const DEFAULT_ALIAS = 'main';
 
+    /**
+     * @var list<Method>
+     */
+    protected const array LOGICAL_TYPES = [
+        Method::And,
+        Method::Or,
+        Method::ElemMatch,
+    ];
+
     protected Method $method;
 
     protected string $attribute = '';
@@ -284,7 +293,7 @@ class Query
             $id = \spl_object_id($node);
 
             if (! \in_array($node->method, self::LOGICAL_TYPES, true)) {
-                $shapes[$id] = $node->method.':'.$node->attribute;
+                $shapes[$id] = $node->method->value.':'.$node->attribute;
 
                 continue;
             }
@@ -298,7 +307,7 @@ class Query
             \sort($childShapes);
 
             // Attribute is empty for and/or; meaningful for elemMatch (the field being matched).
-            $shapes[$id] = $node->method.':'.$node->attribute.'('.\implode('|', $childShapes).')';
+            $shapes[$id] = $node->method->value.':'.$node->attribute.'('.\implode('|', $childShapes).')';
         }
 
         return $shapes[\spl_object_id($this)];

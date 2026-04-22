@@ -22,12 +22,12 @@ interface PipelineStages
      */
     public function facet(array $facets): static;
 
-    public function graphLookup(string $from, mixed $startWith, string $connectFromField, string $connectToField, string $as, ?int $maxDepth = null, ?string $depthField = null): static;
+    public function graphLookup(string $from, string $startWith, string $connectFromField, string $connectToField, string $as, ?int $maxDepth = null, ?string $depthField = null): static;
 
     /**
      * @param array<string>|null $on
-     * @param array<string, mixed>|null $whenMatched
-     * @param array<string, mixed>|null $whenNotMatched
+     * @param array<mixed>|null $whenMatched
+     * @param array<mixed>|null $whenNotMatched
      */
     public function mergeIntoCollection(string $collection, ?array $on = null, ?array $whenMatched = null, ?array $whenNotMatched = null): static;
 

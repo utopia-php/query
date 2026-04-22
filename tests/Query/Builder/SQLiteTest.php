@@ -4,9 +4,9 @@ namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
-use Utopia\Query\Builder\Plan;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\Json;
+use Utopia\Query\Builder\Plan;
 use Utopia\Query\Builder\SQLite as Builder;
 use Utopia\Query\Compiler;
 use Utopia\Query\Exception\UnsupportedException;

@@ -34,15 +34,6 @@ class ClickHouseTest extends TestCase
         return array_map(fn (Token $t) => $t->type, $tokens);
     }
 
-    /**
-     * @param Token[] $tokens
-     * @return string[]
-     */
-    private function values(array $tokens): array
-    {
-        return array_map(fn (Token $t) => $t->value, $tokens);
-    }
-
     public function testBasicTokenization(): void
     {
         $tokens = $this->meaningful('SELECT * FROM users WHERE id = 1');

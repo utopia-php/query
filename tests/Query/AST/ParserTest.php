@@ -167,6 +167,7 @@ class ParserTest extends TestCase
 
         $this->assertInstanceOf(In::class, $stmt->where);
         $this->assertTrue($stmt->where->negated);
+        $this->assertIsArray($stmt->where->list);
         $this->assertCount(3, $stmt->where->list);
     }
 
@@ -190,7 +191,9 @@ class ParserTest extends TestCase
 
         $this->assertInstanceOf(Between::class, $stmt->where);
         $this->assertTrue($stmt->where->negated);
+        $this->assertInstanceOf(Literal::class, $stmt->where->low);
         $this->assertSame(100, $stmt->where->low->value);
+        $this->assertInstanceOf(Literal::class, $stmt->where->high);
         $this->assertSame(200, $stmt->where->high->value);
     }
 

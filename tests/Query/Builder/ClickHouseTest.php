@@ -4,7 +4,6 @@ namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
-use Utopia\Query\Builder\Plan;
 use Utopia\Query\Builder\Case\Builder as CaseBuilder;
 use Utopia\Query\Builder\ClickHouse as Builder;
 use Utopia\Query\Builder\Condition;
@@ -39,6 +38,7 @@ use Utopia\Query\Builder\Feature\Upsert;
 use Utopia\Query\Builder\Feature\Windows;
 use Utopia\Query\Builder\JoinBuilder;
 use Utopia\Query\Builder\JoinType;
+use Utopia\Query\Builder\Plan;
 use Utopia\Query\Compiler;
 use Utopia\Query\Exception;
 use Utopia\Query\Exception\UnsupportedException;
