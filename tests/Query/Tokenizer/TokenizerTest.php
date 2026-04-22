@@ -701,4 +701,20 @@ class TokenizerTest extends TestCase
         // 'abc\  — opening quote, three chars, backslash, then EOF.
         $this->tokenizer->tokenize("'abc\\");
     }
+
+    public function testUnterminatedStringLiteralThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Unterminated string literal');
+
+        $this->tokenizer->tokenize("SELECT 'unclosed");
+    }
+
+    public function testUnterminatedQuotedIdentifierThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Unterminated quoted identifier');
+
+        $this->tokenizer->tokenize('SELECT `unclosed');
+    }
 }

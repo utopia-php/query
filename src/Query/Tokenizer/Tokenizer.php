@@ -268,6 +268,7 @@ class Tokenizer
     private function readString(int $start): Token
     {
         $this->pos++;
+        $terminated = false;
         while ($this->pos < $this->length) {
             $char = $this->sql[$this->pos];
             if ($char === '\\') {
@@ -285,9 +286,14 @@ class Tokenizer
                     $this->pos++;
                     continue;
                 }
+                $terminated = true;
                 break;
             }
             $this->pos++;
+        }
+
+        if (!$terminated) {
+            throw new ValidationException('Unterminated string literal');
         }
 
         return new Token(TokenType::String, substr($this->sql, $start, $this->pos - $start), $start);
@@ -296,6 +302,7 @@ class Tokenizer
     private function readQuotedIdentifier(int $start, string $quote): Token
     {
         $this->pos++;
+        $terminated = false;
         while ($this->pos < $this->length) {
             if ($this->sql[$this->pos] === $quote) {
                 $this->pos++;
@@ -304,9 +311,14 @@ class Tokenizer
                     $this->pos++;
                     continue;
                 }
+                $terminated = true;
                 break;
             }
             $this->pos++;
+        }
+
+        if (!$terminated) {
+            throw new ValidationException('Unterminated quoted identifier');
         }
 
         return new Token(TokenType::QuotedIdentifier, substr($this->sql, $start, $this->pos - $start), $start);
