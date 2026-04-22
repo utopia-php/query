@@ -5,6 +5,7 @@ namespace Utopia\Query\Schema;
 use Utopia\Query\Builder;
 use Utopia\Query\Builder\Plan;
 use Utopia\Query\Exception\UnsupportedException;
+use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\QuotesIdentifiers;
 use Utopia\Query\Schema;
 use Utopia\Query\Schema\Feature\ColumnComments;
@@ -118,6 +119,10 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
         }
 
+        if (empty($alterations)) {
+            throw new ValidationException('ALTER TABLE requires at least one alteration.');
+        }
+
         $sql = 'ALTER TABLE ' . $this->quote($table)
             . ' ' . \implode(', ', $alterations);
 
@@ -164,9 +169,9 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $sql .= ' PARTITION BY ' . $blueprint->partitionExpression;
         }
 
-        if (! empty($primaryKeys)) {
-            $sql .= ' ORDER BY (' . \implode(', ', $primaryKeys) . ')';
-        }
+        $sql .= ! empty($primaryKeys)
+            ? ' ORDER BY (' . \implode(', ', $primaryKeys) . ')'
+            : ' ORDER BY tuple()';
 
         return new Plan($sql, [], executor: $this->executor);
     }

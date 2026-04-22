@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\ClickHouse as ClickHouseBuilder;
 use Utopia\Query\Exception\UnsupportedException;
+use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\ClickHouse as Schema;
@@ -572,5 +573,30 @@ class ClickHouseTest extends TestCase
 
         // Output literal: 'a\\\'b' (a, 2 backslashes, escaped quote, b)
         $this->assertStringContainsString("'a\\\\\\'b'", $result->query);
+    }
+
+    public function testCreateMergeTreeWithoutPrimaryKeysEmitsOrderByTuple(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Blueprint $table) {
+            $table->string('name');
+            $table->integer('count');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ENGINE = MergeTree()', $result->query);
+        $this->assertStringContainsString('ORDER BY tuple()', $result->query);
+        $this->assertStringNotContainsString('ORDER BY (', $result->query);
+    }
+
+    public function testAlterTableWithNoAlterationsThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('ALTER TABLE requires at least one alteration.');
+
+        $schema = new Schema();
+        $schema->alter('events', function (Blueprint $table) {
+            // no alterations
+        });
     }
 }
