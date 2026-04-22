@@ -486,7 +486,7 @@ class MongoDBTest extends TestCase
         $this->assertEquals('updateMany', $op['operation']);
         $this->assertEquals(['$set' => ['city' => '?']], $op['update']);
         $this->assertEquals(['name' => '?'], $op['filter']);
-        $this->assertEquals(['New York', 'Alice'], $result->bindings);
+        $this->assertEquals(['Alice', 'New York'], $result->bindings);
     }
 
     public function testUpdateWithIncrement(): void
@@ -514,7 +514,7 @@ class MongoDBTest extends TestCase
 
         $op = $this->decode($result->query);
         $this->assertEquals(['$push' => ['tags' => '?']], $op['update']);
-        $this->assertEquals(['admin', 'Alice'], $result->bindings);
+        $this->assertEquals(['Alice', 'admin'], $result->bindings);
     }
 
     public function testUpdateWithPull(): void
@@ -528,7 +528,7 @@ class MongoDBTest extends TestCase
 
         $op = $this->decode($result->query);
         $this->assertEquals(['$pull' => ['tags' => '?']], $op['update']);
-        $this->assertEquals(['guest', 'Alice'], $result->bindings);
+        $this->assertEquals(['Alice', 'guest'], $result->bindings);
     }
 
     public function testUpdateWithAddToSet(): void
@@ -542,7 +542,7 @@ class MongoDBTest extends TestCase
 
         $op = $this->decode($result->query);
         $this->assertEquals(['$addToSet' => ['roles' => '?']], $op['update']);
-        $this->assertEquals(['editor', 'Alice'], $result->bindings);
+        $this->assertEquals(['Alice', 'editor'], $result->bindings);
     }
 
     public function testUpdateWithUnset(): void
@@ -3001,7 +3001,7 @@ class MongoDBTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['banned', 'violation', 'user', -10], $result->bindings);
+        $this->assertEquals(['user', -10, 'banned', 'violation'], $result->bindings);
     }
 
     public function testInsertMultipleRowsBindingPositions(): void

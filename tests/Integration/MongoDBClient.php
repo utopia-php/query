@@ -24,8 +24,9 @@ class MongoDBClient
      */
     public function execute(string $queryJson, array $bindings = []): array
     {
+        $decoded = \json_decode($queryJson, false, 512, JSON_THROW_ON_ERROR);
         /** @var array<string, mixed> $op */
-        $op = \json_decode($queryJson, true, 512, JSON_THROW_ON_ERROR);
+        $op = $this->objectToArray($decoded);
 
         $op = $this->replaceBindings($op, $bindings);
 
@@ -259,6 +260,38 @@ class MongoDBClient
             } elseif (\is_array($value)) {
                 $data[$key] = $this->walkAndReplace($value, $bindings, $index);
             }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Recursively convert stdClass objects to associative arrays while
+     * preserving empty objects as stdClass so MongoDB encodes them as BSON
+     * documents (not BSON arrays).
+     */
+    private function objectToArray(mixed $data): mixed
+    {
+        if ($data instanceof \stdClass) {
+            $vars = \get_object_vars($data);
+            if ($vars === []) {
+                return $data;
+            }
+            $out = [];
+            foreach ($vars as $key => $value) {
+                $out[$key] = $this->objectToArray($value);
+            }
+
+            return $out;
+        }
+
+        if (\is_array($data)) {
+            $out = [];
+            foreach ($data as $key => $value) {
+                $out[$key] = $this->objectToArray($value);
+            }
+
+            return $out;
         }
 
         return $data;

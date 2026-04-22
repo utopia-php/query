@@ -509,10 +509,10 @@ class MongoDB extends BaseBuilder implements
         $this->bindings = [];
         $this->validateTable();
 
-        $update = $this->buildUpdate();
-
         $grouped = Query::groupByType($this->pendingQueries);
         $filter = $this->buildFilter($grouped);
+
+        $update = $this->buildUpdate();
 
         if (empty($update)) {
             throw new ValidationException('No update operations specified. Call set() before update().');
