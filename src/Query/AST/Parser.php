@@ -1147,8 +1147,7 @@ class Parser
         }
         if ($token->type === TokenType::QuotedIdentifier) {
             $this->advance();
-            $raw = $token->value;
-            return substr($raw, 1, -1);
+            return $this->unquoteIdentifier($token->value);
         }
         if ($token->type === TokenType::Keyword) {
             $this->advance();
@@ -1165,7 +1164,7 @@ class Parser
             return $token->value;
         }
         if ($token->type === TokenType::QuotedIdentifier) {
-            return substr($token->value, 1, -1);
+            return $this->unquoteIdentifier($token->value);
         }
         if ($token->type === TokenType::Keyword) {
             return $token->value;
@@ -1173,5 +1172,23 @@ class Parser
         throw new Exception(
             "Expected identifier at position {$token->position}, got '{$token->value}' ({$token->type->name})"
         );
+    }
+
+    /**
+     * Strip the quote delimiters from a quoted identifier token value and
+     * un-double any doubled delimiters inside (SQL convention for escaping
+     * the delimiter character within a quoted identifier).
+     */
+    private function unquoteIdentifier(string $raw): string
+    {
+        $open = $raw[0];
+        $inner = substr($raw, 1, -1);
+
+        return match ($open) {
+            '`' => str_replace('``', '`', $inner),
+            '"' => str_replace('""', '"', $inner),
+            '[' => str_replace(']]', ']', $inner),
+            default => $inner,
+        };
     }
 }

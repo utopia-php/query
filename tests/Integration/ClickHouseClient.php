@@ -19,13 +19,20 @@ class ClickHouseClient
         $url = $this->host . '/?database=' . urlencode($this->database);
 
         $placeholderIndex = 0;
-        $paramMap = [];
         $isInsert = (bool) preg_match('/^\s*INSERT\b/i', $query);
 
-        $sql = preg_replace_callback('/\?/', function () use (&$placeholderIndex, $params, &$paramMap, &$url) {
+        $placeholderCount = substr_count($query, '?');
+        if ($placeholderCount !== count($params)) {
+            throw new \InvalidArgumentException(sprintf(
+                'Query has %d placeholder(s) but %d param(s) were provided.',
+                $placeholderCount,
+                count($params)
+            ));
+        }
+
+        $sql = preg_replace_callback('/\?/', function () use (&$placeholderIndex, $params, &$url) {
             $key = 'param_p' . $placeholderIndex;
-            $value = $params[$placeholderIndex] ?? null;
-            $paramMap[$key] = $value;
+            $value = $params[$placeholderIndex];
             $placeholderIndex++;
 
             $type = match (true) {
@@ -40,11 +47,14 @@ class ClickHouseClient
             return '{' . $key . ':' . $type . '}';
         }, $query);
 
+        $hasFormatClause = (bool) preg_match('/\bFORMAT\b/i', $sql);
+        $sqlWithFormat = $hasFormatClause ? $sql : $sql . ' FORMAT JSONEachRow';
+
         $context = stream_context_create([
             'http' => [
                 'method' => 'POST',
                 'header' => "Content-Type: text/plain\r\n",
-                'content' => $isInsert ? $sql : $sql . ' FORMAT JSONEachRow',
+                'content' => $isInsert ? $sql : $sqlWithFormat,
                 'ignore_errors' => true,
                 'timeout' => 10,
             ],
@@ -57,7 +67,7 @@ class ClickHouseClient
         }
 
         $statusLine = $http_response_header[0] ?? '';
-        if (! str_contains($statusLine, '200')) {
+        if (! $this->isSuccessStatus($statusLine)) {
             throw new \RuntimeException('ClickHouse error: ' . $response);
         }
 
@@ -99,8 +109,21 @@ class ClickHouseClient
         }
 
         $statusLine = $http_response_header[0] ?? '';
-        if (! str_contains($statusLine, '200')) {
+        if (! $this->isSuccessStatus($statusLine)) {
             throw new \RuntimeException('ClickHouse error: ' . $response);
         }
+    }
+
+    /**
+     * Returns true when the HTTP status line indicates a 2xx success response.
+     */
+    private function isSuccessStatus(string $statusLine): bool
+    {
+        // Status line format: "HTTP/1.x 200 OK"
+        if (preg_match('/^HTTP\/\S+\s+(\d{3})/', $statusLine, $matches)) {
+            $code = (int) $matches[1];
+            return $code >= 200 && $code < 300;
+        }
+        return false;
     }
 }

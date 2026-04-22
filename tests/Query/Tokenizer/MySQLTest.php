@@ -3,6 +3,7 @@
 namespace Tests\Query\Tokenizer;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use Utopia\Query\Tokenizer\MySQL;
 use Utopia\Query\Tokenizer\Token;
 use Utopia\Query\Tokenizer\Tokenizer;
@@ -219,5 +220,22 @@ class MySQLTest extends TestCase
             }
         }
         $this->assertTrue($found, 'Escaped double-quoted identifier with # should be preserved');
+    }
+
+    public function testHashInsideDoubleQuotedStringWithBackslashEscapeIsNotRewritten(): void
+    {
+        // MySQL default mode (no ANSI_QUOTES): " opens a string literal and
+        // \" is an escaped quote. The # inside must not be rewritten to --.
+        $sql = 'SELECT "a\\"# not a comment" FROM t';
+
+        $reflection = new ReflectionClass(MySQL::class);
+        $method = $reflection->getMethod('replaceHashComments');
+        $method->setAccessible(true);
+        $rewritten = $method->invoke($this->tokenizer, $sql);
+
+        $this->assertIsString($rewritten);
+        $this->assertStringContainsString('# not a comment', $rewritten);
+        $this->assertStringNotContainsString('-- not a comment', $rewritten);
+        $this->assertSame($sql, $rewritten);
     }
 }
