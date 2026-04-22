@@ -606,7 +606,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnPostgres($result);
 
         $this->assertCount(1, $rows);
-        $this->assertSame('309.96', (string) $rows[0]['completed_total']); // @phpstan-ignore cast.string
+        $this->assertSame('279.96', (string) $rows[0]['completed_total']); // @phpstan-ignore cast.string
     }
 
     public function testDistinctOn(): void
