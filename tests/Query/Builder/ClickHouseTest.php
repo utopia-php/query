@@ -11008,4 +11008,49 @@ class ClickHouseTest extends TestCase
             ->from('t')
             ->selectWindow('ROW_NUMBER()); DROP --', 'w');
     }
+
+    public function testStructuredSlotsDoNotMutateIdentifiersOrLiterals(): void
+    {
+        // Table/column identifiers and bound string literals containing
+        // SQL keywords (ARRAY JOIN, LIMIT, SETTINGS, PREWHERE, WHERE, ORDER
+        // BY, GROUP BY) must pass through the builder untouched. The legacy
+        // regex-based afterBuild() could in principle match these keywords
+        // inside identifiers/literals; the structured slots cannot.
+        $result = (new Builder())
+            ->from('settings_table', 'settings_alias')
+            ->select(['id', 'array_join_col', 'limit_by_col'])
+            ->filter([
+                Query::equal('label', ['LIMIT 1 SETTINGS foo']),
+                Query::equal('description', ['ARRAY JOIN tags']),
+                Query::equal('note', ['PREWHERE condition']),
+            ])
+            ->sortAsc('order_by_col')
+            ->limit(10)
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertSame([
+            'LIMIT 1 SETTINGS foo',
+            'ARRAY JOIN tags',
+            'PREWHERE condition',
+            10,
+        ], $result->bindings);
+
+        $this->assertStringContainsString('`settings_table`', $result->query);
+        $this->assertStringContainsString('`settings_alias`', $result->query);
+        $this->assertStringContainsString('`array_join_col`', $result->query);
+        $this->assertStringContainsString('`limit_by_col`', $result->query);
+        $this->assertStringContainsString('`order_by_col`', $result->query);
+
+        // Literals must not appear un-parameterised in the SQL.
+        $this->assertStringNotContainsString('LIMIT 1 SETTINGS foo', $result->query);
+        $this->assertStringNotContainsString('ARRAY JOIN tags', $result->query);
+        $this->assertStringNotContainsString('PREWHERE condition', $result->query);
+
+        // No spurious clause keywords were injected anywhere.
+        $this->assertStringNotContainsString('ARRAY JOIN `', $result->query);
+        $this->assertStringNotContainsString(' SETTINGS ', $result->query);
+        $this->assertStringNotContainsString('PREWHERE ', $result->query);
+        $this->assertStringNotContainsString(' LIMIT BY ', $result->query);
+    }
 }

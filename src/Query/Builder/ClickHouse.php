@@ -697,110 +697,6 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return Placement::Where;
     }
 
-    public function build(): Plan
-    {
-        $result = parent::build();
-
-        $sql = $result->query;
-        $bindings = $result->bindings;
-
-        // Inject ARRAY JOIN clauses after FROM/JOIN section (before PREWHERE/WHERE/GROUP BY)
-        if (! empty($this->arrayJoins)) {
-            $arrayJoinParts = [];
-            foreach ($this->arrayJoins as $aj) {
-                $clause = $aj['type'] . ' ' . $this->resolveAndWrap($aj['column']);
-                if ($aj['alias'] !== '') {
-                    $clause .= ' AS ' . $this->quote($aj['alias']);
-                }
-                $arrayJoinParts[] = $clause;
-            }
-            $arrayJoinSql = \implode(' ', $arrayJoinParts);
-            $sql = $this->injectBeforeFirstKeyword($sql, $arrayJoinSql, ['PREWHERE', 'WHERE', 'GROUP BY', 'ORDER BY', 'LIMIT']);
-        }
-
-        // Inject raw join clauses (ASOF JOIN) after FROM/JOIN section
-        if (! empty($this->rawJoinClauses)) {
-            $rawJoinSql = \implode(' ', $this->rawJoinClauses);
-            $sql = $this->injectBeforeFirstKeyword($sql, $rawJoinSql, ['PREWHERE', 'WHERE', 'GROUP BY', 'ORDER BY', 'LIMIT']);
-        }
-
-        // Inject GROUP BY modifier (WITH TOTALS, WITH ROLLUP, WITH CUBE) after GROUP BY clause
-        if ($this->groupByModifier !== null) {
-            $sql = $this->injectBeforeFirstKeyword($sql, $this->groupByModifier, ['HAVING', 'WINDOW', 'ORDER BY', 'LIMIT']);
-        }
-
-        // Inject LIMIT BY clause after ORDER BY, before final LIMIT
-        if ($this->limitByClause !== null) {
-            $cols = \array_map(
-                fn (string $col): string => $this->resolveAndWrap($col),
-                $this->limitByClause['columns']
-            );
-            $limitBySql = 'LIMIT ? BY ' . \implode(', ', $cols);
-            $limitByBinding = $this->limitByClause['count'];
-
-            // Find where to insert LIMIT BY and its binding
-            // LIMIT BY goes after ORDER BY but before the final LIMIT/OFFSET
-            $insertPos = $this->findKeywordPosition($sql, 'LIMIT');
-            if ($insertPos !== false) {
-                $before = \rtrim(\substr($sql, 0, $insertPos));
-                $after = \substr($sql, $insertPos);
-                $sql = $before . ' ' . $limitBySql . ' ' . $after;
-
-                // Count placeholders before the insertion point to find binding index
-                $bindingIndex = (int) \preg_match_all('/(?<!\?)\?(?![|&?])/', $before);
-                \array_splice($bindings, $bindingIndex, 0, [$limitByBinding]);
-            } else {
-                $sql .= ' ' . $limitBySql;
-                $bindings[] = $limitByBinding;
-            }
-        }
-
-        // Append SETTINGS clause
-        if (! empty($this->hints)) {
-            $settingsStr = \implode(', ', $this->hints);
-            $sql .= ' SETTINGS ' . $settingsStr;
-        }
-
-        if ($sql !== $result->query || $bindings !== $result->bindings) {
-            return new Plan($sql, $bindings, $result->readOnly, $this->executor);
-        }
-
-        return $result;
-    }
-
-    /**
-     * Inject a SQL fragment before the first matching keyword, or append at the end.
-     *
-     * @param  list<string>  $keywords
-     */
-    private function injectBeforeFirstKeyword(string $sql, string $fragment, array $keywords): string
-    {
-        foreach ($keywords as $keyword) {
-            $pos = $this->findKeywordPosition($sql, $keyword);
-            if ($pos !== false) {
-                $before = \rtrim(\substr($sql, 0, $pos));
-                $after = \substr($sql, $pos);
-
-                return $before . ' ' . $fragment . ' ' . $after;
-            }
-        }
-
-        return $sql . ' ' . $fragment;
-    }
-
-    /**
-     * Find the position of a SQL keyword as a whole word in the query string.
-     * Returns false if not found.
-     */
-    private function findKeywordPosition(string $sql, string $keyword): int|false
-    {
-        if (\preg_match('/\b' . \preg_quote($keyword, '/') . '\b/', $sql, $matches, PREG_OFFSET_CAPTURE)) {
-            return $matches[0][1];
-        }
-
-        return false;
-    }
-
     protected function buildTableClause(): string
     {
         $fromSub = $this->fromSubquery;
@@ -829,10 +725,30 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     }
 
     /**
-     * @param  array<string>  $parts
+     * Emit PREWHERE (before reading all columns), ARRAY JOIN, and raw ASOF
+     * joins between the JOIN section and WHERE. These are structural
+     * ClickHouse clauses that do not carry bindings.
      */
-    protected function buildAfterJoins(array &$parts, GroupedQueries $grouped): void
+    protected function buildAfterJoinsClause(GroupedQueries $grouped): string
     {
+        $parts = [];
+
+        if (! empty($this->arrayJoins)) {
+            $arrayJoinParts = [];
+            foreach ($this->arrayJoins as $aj) {
+                $clause = $aj['type'] . ' ' . $this->resolveAndWrap($aj['column']);
+                if ($aj['alias'] !== '') {
+                    $clause .= ' AS ' . $this->quote($aj['alias']);
+                }
+                $arrayJoinParts[] = $clause;
+            }
+            $parts[] = \implode(' ', $arrayJoinParts);
+        }
+
+        if (! empty($this->rawJoinClauses)) {
+            $parts[] = \implode(' ', $this->rawJoinClauses);
+        }
+
         if (! empty($this->prewhereQueries)) {
             $clauses = [];
             foreach ($this->prewhereQueries as $query) {
@@ -840,5 +756,49 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             }
             $parts[] = 'PREWHERE ' . \implode(' AND ', $clauses);
         }
+
+        return \implode(' ', $parts);
+    }
+
+    /**
+     * Emit the ClickHouse GROUP BY modifier (WITH TOTALS / WITH ROLLUP /
+     * WITH CUBE) between GROUP BY and HAVING.
+     */
+    protected function buildAfterGroupByClause(): string
+    {
+        return $this->groupByModifier ?? '';
+    }
+
+    /**
+     * Emit LIMIT BY between ORDER BY and LIMIT. The count binding is added
+     * here so ordering is naturally correct: LIMIT BY binding precedes the
+     * outer LIMIT binding emitted by the parent.
+     */
+    protected function buildAfterOrderByClause(): string
+    {
+        if ($this->limitByClause === null) {
+            return '';
+        }
+
+        $cols = \array_map(
+            fn (string $col): string => $this->resolveAndWrap($col),
+            $this->limitByClause['columns']
+        );
+
+        $this->addBinding($this->limitByClause['count']);
+
+        return 'LIMIT ? BY ' . \implode(', ', $cols);
+    }
+
+    /**
+     * Emit the trailing SETTINGS fragment from registered hints.
+     */
+    protected function buildSettingsClause(): string
+    {
+        if (empty($this->hints)) {
+            return '';
+        }
+
+        return 'SETTINGS ' . \implode(', ', $this->hints);
     }
 }
