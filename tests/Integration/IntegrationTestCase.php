@@ -12,6 +12,8 @@ abstract class IntegrationTestCase extends TestCase
 
     protected ?PDO $postgres = null;
 
+    protected ?PDO $sqlite = null;
+
     protected ?ClickHouseClient $clickhouse = null;
 
     protected ?MongoDBClient $mongoClient = null;
@@ -72,6 +74,46 @@ abstract class IntegrationTestCase extends TestCase
         }
 
         return $this->mongoClient;
+    }
+
+    protected function connectSqlite(): PDO
+    {
+        if ($this->sqlite === null) {
+            $this->sqlite = new PDO('sqlite::memory:', null, null, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            ]);
+            $this->sqlite->exec('PRAGMA foreign_keys = ON');
+        }
+
+        return $this->sqlite;
+    }
+
+    protected function sqliteStatement(string $sql): void
+    {
+        $this->connectSqlite()->prepare($sql)->execute();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function executeOnSqlite(Plan $result): array
+    {
+        $pdo = $this->connectSqlite();
+        $stmt = $pdo->prepare($result->query);
+
+        foreach ($result->bindings as $i => $value) {
+            $type = match (true) {
+                is_bool($value) => PDO::PARAM_BOOL,
+                is_int($value) => PDO::PARAM_INT,
+                $value === null => PDO::PARAM_NULL,
+                default => PDO::PARAM_STR,
+            };
+            $stmt->bindValue($i + 1, $value, $type);
+        }
+        $stmt->execute();
+
+        /** @var list<array<string, mixed>> */
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     /**
