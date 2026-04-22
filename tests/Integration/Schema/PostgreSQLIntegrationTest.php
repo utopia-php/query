@@ -251,6 +251,177 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $this->assertSame('0', (string) $row['cnt']); // @phpstan-ignore cast.string
     }
 
+    public function testCreateTableWithCheckConstraint(): void
+    {
+        $table = 'test_check_' . uniqid();
+        $this->trackPostgresTable($table);
+
+        $result = $this->schema->create($table, function (Blueprint $bp) {
+            $bp->integer('id')->primary();
+            $bp->integer('age');
+            $bp->rawColumn('CHECK ("age" >= 18)');
+        });
+
+        $this->postgresStatement($result->query);
+
+        $pdo = $this->connectPostgres();
+        $insertOk = $pdo->prepare("INSERT INTO \"{$table}\" (\"id\", \"age\") VALUES (1, 21)");
+        \assert($insertOk !== false);
+        $insertOk->execute();
+
+        $this->expectException(\PDOException::class);
+        $insertFail = $pdo->prepare("INSERT INTO \"{$table}\" (\"id\", \"age\") VALUES (2, 10)");
+        \assert($insertFail !== false);
+        $insertFail->execute();
+    }
+
+    public function testCreateTableWithGeneratedColumn(): void
+    {
+        $table = 'test_generated_' . uniqid();
+        $this->trackPostgresTable($table);
+
+        $result = $this->schema->create($table, function (Blueprint $bp) {
+            $bp->integer('id')->primary();
+            $bp->integer('price');
+            $bp->integer('quantity');
+            $bp->rawColumn('"total" INTEGER GENERATED ALWAYS AS ("price" * "quantity") STORED');
+        });
+
+        $this->postgresStatement($result->query);
+
+        $pdo = $this->connectPostgres();
+        $insert = $pdo->prepare("INSERT INTO \"{$table}\" (\"id\", \"price\", \"quantity\") VALUES (1, 5, 3)");
+        \assert($insert !== false);
+        $insert->execute();
+
+        $stmt = $pdo->prepare("SELECT \"total\" FROM \"{$table}\" WHERE \"id\" = 1");
+        \assert($stmt !== false);
+        $stmt->execute();
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        \assert(\is_array($row));
+
+        $this->assertSame(15, (int) $row['total']); // @phpstan-ignore cast.int
+
+        $columns = $this->fetchPostgresColumns($table);
+        $totalCol = $this->findColumn($columns, 'total');
+        $this->assertSame('ALWAYS', $totalCol['is_generated']);
+    }
+
+    public function testCreateTableWithSerial(): void
+    {
+        $table = 'test_serial_' . uniqid();
+        $this->trackPostgresTable($table);
+
+        $result = $this->schema->create($table, function (Blueprint $bp) {
+            $bp->rawColumn('"id" BIGSERIAL PRIMARY KEY');
+            $bp->string('label', 50);
+        });
+
+        $this->postgresStatement($result->query);
+
+        $pdo = $this->connectPostgres();
+        $stmt = $pdo->prepare("SELECT pg_get_serial_sequence(:table, 'id') AS seq");
+        \assert($stmt !== false);
+        $stmt->execute(['table' => $table]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        \assert(\is_array($row));
+
+        $this->assertNotNull($row['seq']);
+        $this->assertStringContainsString($table, (string) $row['seq']); // @phpstan-ignore cast.string
+
+        $insert = $pdo->prepare("INSERT INTO \"{$table}\" (\"label\") VALUES ('a'), ('b') RETURNING \"id\"");
+        \assert($insert !== false);
+        $insert->execute();
+        $ids = $insert->fetchAll(\PDO::FETCH_COLUMN);
+        $this->assertCount(2, $ids);
+        $first = (int) $ids[0]; // @phpstan-ignore cast.int
+        $second = (int) $ids[1]; // @phpstan-ignore cast.int
+        $this->assertGreaterThan($first, $second);
+    }
+
+    public function testCreateEnumType(): void
+    {
+        $typeName = 'mood_' . uniqid();
+        $table = 'test_enum_type_' . uniqid();
+        $this->trackPostgresTable($table);
+
+        try {
+            $createType = $this->schema->createType($typeName, ['happy', 'sad', 'neutral']);
+            $this->postgresStatement($createType->query);
+
+            $result = $this->schema->create($table, function (Blueprint $bp) use ($typeName) {
+                $bp->integer('id')->primary();
+                $bp->rawColumn('"mood" "' . $typeName . '" NOT NULL');
+            });
+
+            $this->postgresStatement($result->query);
+
+            $pdo = $this->connectPostgres();
+            $insert = $pdo->prepare("INSERT INTO \"{$table}\" (\"id\", \"mood\") VALUES (1, 'happy')");
+            \assert($insert !== false);
+            $insert->execute();
+
+            $stmt = $pdo->prepare("SELECT \"mood\" FROM \"{$table}\" WHERE \"id\" = 1");
+            \assert($stmt !== false);
+            $stmt->execute();
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            \assert(\is_array($row));
+            $this->assertSame('happy', $row['mood']);
+
+            $typeStmt = $pdo->prepare(
+                "SELECT typname FROM pg_type WHERE typname = :name"
+            );
+            $typeStmt->execute(['name' => $typeName]);
+            $typeRow = $typeStmt->fetch(\PDO::FETCH_ASSOC);
+            $this->assertNotFalse($typeRow);
+            \assert(\is_array($typeRow));
+            $this->assertSame($typeName, $typeRow['typname']);
+        } finally {
+            $this->postgresStatement("DROP TABLE IF EXISTS \"{$table}\" CASCADE");
+            $this->postgresStatement("DROP TYPE IF EXISTS \"{$typeName}\"");
+        }
+    }
+
+    public function testCreatePartitionedTable(): void
+    {
+        $table = 'test_partitioned_' . uniqid();
+        $partition = $table . '_2024';
+        $this->trackPostgresTable($partition);
+        $this->trackPostgresTable($table);
+
+        $result = $this->schema->create($table, function (Blueprint $bp) {
+            $bp->rawColumn('"id" INT NOT NULL');
+            $bp->rawColumn('"created_at" DATE NOT NULL');
+            $bp->rawColumn('PRIMARY KEY ("id", "created_at")');
+            $bp->partitionByRange('"created_at"');
+        });
+
+        $this->postgresStatement($result->query);
+
+        $partitionPlan = $this->schema->createPartition($table, $partition, "FROM ('2024-01-01') TO ('2025-01-01')");
+        $this->postgresStatement($partitionPlan->query);
+
+        $pdo = $this->connectPostgres();
+        $insert = $pdo->prepare("INSERT INTO \"{$table}\" (\"id\", \"created_at\") VALUES (1, '2024-06-15')");
+        \assert($insert !== false);
+        $insert->execute();
+
+        $stmt = $pdo->prepare("SELECT COUNT(*) AS cnt FROM \"{$partition}\"");
+        \assert($stmt !== false);
+        $stmt->execute();
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        \assert(\is_array($row));
+        $this->assertSame('1', (string) $row['cnt']); // @phpstan-ignore cast.string
+
+        $partitionCheck = $pdo->prepare(
+            "SELECT relkind FROM pg_class WHERE relname = :name"
+        );
+        $partitionCheck->execute(['name' => $table]);
+        $relRow = $partitionCheck->fetch(\PDO::FETCH_ASSOC);
+        \assert(\is_array($relRow));
+        $this->assertSame('p', $relRow['relkind']);
+    }
+
     /**
      * @return list<array<string, mixed>>
      */

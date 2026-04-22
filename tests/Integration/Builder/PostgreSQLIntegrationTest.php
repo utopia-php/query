@@ -717,4 +717,277 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $values = array_map(static fn (array $row): int => (int) $row['n'], $rows); // @phpstan-ignore cast.int
         $this->assertSame([1, 2, 3, 4, 5], $values);
     }
+
+    public function testJsonbFilterContains(): void
+    {
+        $this->trackPostgresTable('profiles');
+        $this->postgresStatement('DROP TABLE IF EXISTS "profiles" CASCADE');
+        $this->postgresStatement('
+            CREATE TABLE "profiles" (
+                "id" SERIAL PRIMARY KEY,
+                "data" JSONB NOT NULL
+            )
+        ');
+        $this->postgresStatement('
+            INSERT INTO "profiles" ("data") VALUES
+            (\'{"role":"admin","tags":["php","go"]}\'::jsonb),
+            (\'{"role":"user","tags":["php"]}\'::jsonb),
+            (\'{"role":"user","tags":["rust"]}\'::jsonb)
+        ');
+
+        $result = (new Builder())
+            ->from('profiles')
+            ->select(['id'])
+            ->filterJsonContains('data', ['role' => 'admin'])
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(1, (int) $rows[0]['id']); // @phpstan-ignore cast.int
+    }
+
+    public function testJsonbFilterPath(): void
+    {
+        $this->trackPostgresTable('profiles');
+        $this->postgresStatement('DROP TABLE IF EXISTS "profiles" CASCADE');
+        $this->postgresStatement('
+            CREATE TABLE "profiles" (
+                "id" SERIAL PRIMARY KEY,
+                "data" JSONB NOT NULL
+            )
+        ');
+        $this->postgresStatement('
+            INSERT INTO "profiles" ("data") VALUES
+            (\'{"role":"admin"}\'::jsonb),
+            (\'{"role":"user"}\'::jsonb),
+            (\'{"role":"user"}\'::jsonb)
+        ');
+
+        $result = (new Builder())
+            ->from('profiles')
+            ->select(['id'])
+            ->filterJsonPath('data', 'role', '=', 'admin')
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(1, (int) $rows[0]['id']); // @phpstan-ignore cast.int
+    }
+
+    public function testJsonbSetPath(): void
+    {
+        $this->trackPostgresTable('profiles');
+        $this->postgresStatement('DROP TABLE IF EXISTS "profiles" CASCADE');
+        $this->postgresStatement('
+            CREATE TABLE "profiles" (
+                "id" SERIAL PRIMARY KEY,
+                "data" JSONB NOT NULL
+            )
+        ');
+        $this->postgresStatement('
+            INSERT INTO "profiles" ("id", "data") VALUES
+            (1, \'{"role":"user","level":1}\'::jsonb)
+        ');
+
+        $result = (new Builder())
+            ->from('profiles')
+            ->setRaw('data', 'jsonb_set("data", \'{role}\', ?::jsonb, true)', ['"admin"'])
+            ->filter([Query::equal('id', [1])])
+            ->update();
+
+        $this->executeOnPostgres($result);
+
+        $check = (new Builder())
+            ->from('profiles')
+            ->select(['id'])
+            ->filterJsonPath('data', 'role', '=', 'admin')
+            ->build();
+
+        $rows = $this->executeOnPostgres($check);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(1, (int) $rows[0]['id']); // @phpstan-ignore cast.int
+    }
+
+    public function testFullOuterJoin(): void
+    {
+        $this->trackPostgresTable('left_side');
+        $this->trackPostgresTable('right_side');
+        $this->postgresStatement('DROP TABLE IF EXISTS "left_side" CASCADE');
+        $this->postgresStatement('DROP TABLE IF EXISTS "right_side" CASCADE');
+        $this->postgresStatement('
+            CREATE TABLE "left_side" (
+                "id" INT PRIMARY KEY,
+                "label" TEXT NOT NULL
+            )
+        ');
+        $this->postgresStatement('
+            CREATE TABLE "right_side" (
+                "id" INT PRIMARY KEY,
+                "label" TEXT NOT NULL
+            )
+        ');
+        $this->postgresStatement("
+            INSERT INTO \"left_side\" (\"id\", \"label\") VALUES (1, 'a'), (2, 'b')
+        ");
+        $this->postgresStatement("
+            INSERT INTO \"right_side\" (\"id\", \"label\") VALUES (2, 'b'), (3, 'c')
+        ");
+
+        $result = (new Builder())
+            ->from('left_side', 'l')
+            ->select(['l.id', 'r.id'])
+            ->fullOuterJoin('right_side', 'l.id', 'r.id', '=', 'r')
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $this->assertCount(3, $rows);
+
+        $leftIds = array_map(static fn (array $r): ?int => $r['id'] === null ? null : (int) $r['id'], $rows); // @phpstan-ignore cast.int
+        sort($leftIds);
+        $this->assertContains(null, $leftIds);
+        $this->assertContains(1, $leftIds);
+        $this->assertContains(2, $leftIds);
+    }
+
+    public function testTableSampleBernoulli(): void
+    {
+        $this->trackPostgresTable('samples');
+        $this->postgresStatement('DROP TABLE IF EXISTS "samples" CASCADE');
+        $this->postgresStatement('
+            CREATE TABLE "samples" (
+                "id" SERIAL PRIMARY KEY,
+                "value" INT NOT NULL
+            )
+        ');
+        $this->postgresStatement('
+            INSERT INTO "samples" ("value")
+            SELECT generate_series(1, 100)
+        ');
+
+        $result = (new Builder())
+            ->from('samples')
+            ->select(['id'])
+            ->tablesample(10, 'BERNOULLI')
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $count = count($rows);
+        $this->assertGreaterThanOrEqual(1, $count);
+        $this->assertLessThanOrEqual(30, $count);
+    }
+
+    public function testFullTextSearch(): void
+    {
+        $this->trackPostgresTable('docs');
+        $this->postgresStatement('DROP TABLE IF EXISTS "docs" CASCADE');
+        $this->postgresStatement('
+            CREATE TABLE "docs" (
+                "id" SERIAL PRIMARY KEY,
+                "body" TEXT NOT NULL
+            )
+        ');
+        $this->postgresStatement("
+            CREATE INDEX \"docs_body_fts_idx\" ON \"docs\"
+            USING GIN (to_tsvector('english', \"body\"))
+        ");
+        $this->postgresStatement("
+            INSERT INTO \"docs\" (\"body\") VALUES
+            ('The quick brown fox jumps over the lazy dog'),
+            ('PostgreSQL full text search is powerful'),
+            ('Completely unrelated content about cooking')
+        ");
+
+        $result = (new Builder())
+            ->from('docs')
+            ->select(['id'])
+            ->filterSearch('body', 'postgresql search')
+            ->sortAsc('id')
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(2, (int) $rows[0]['id']); // @phpstan-ignore cast.int
+    }
+
+    public function testForUpdateOfSpecificTable(): void
+    {
+        $pdo = $this->connectPostgres();
+        $pdo->beginTransaction();
+
+        try {
+            $result = (new Builder())
+                ->from('users')
+                ->select(['id', 'name'])
+                ->filter([Query::equal('city', ['New York'])])
+                ->forUpdateOf('users')
+                ->sortAsc('id')
+                ->build();
+
+            $rows = $this->executeOnPostgres($result);
+
+            $this->assertStringContainsString('FOR UPDATE OF "users"', $result->query);
+            $this->assertCount(2, $rows);
+            $this->assertSame('Alice', $rows[0]['name']);
+            $this->assertSame('Charlie', $rows[1]['name']);
+        } finally {
+            $pdo->rollBack();
+        }
+    }
+
+    public function testCountWhenCompleted(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->countWhen('"status" = ?', 'completed_count', 'completed')
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(4, (int) $rows[0]['completed_count']); // @phpstan-ignore cast.int
+    }
+
+    public function testSumWhenCompleted(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->sumWhen('amount', '"status" = ?', 'completed_total', 'completed')
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('279.96', (string) $rows[0]['completed_total']); // @phpstan-ignore cast.string
+    }
+
+    public function testGroupByRollup(): void
+    {
+        $result = (new Builder())
+            ->from('orders')
+            ->select(['status'])
+            ->count('*', 'total')
+            ->groupBy(['status'])
+            ->withRollup()
+            ->sortAsc('status')
+            ->build();
+
+        $rows = $this->executeOnPostgres($result);
+
+        $this->assertStringContainsString('GROUP BY ROLLUP', $result->query);
+        $this->assertCount(4, $rows);
+
+        $grandTotal = null;
+        foreach ($rows as $row) {
+            if ($row['status'] === null) {
+                $grandTotal = (int) $row['total']; // @phpstan-ignore cast.int
+            }
+        }
+        $this->assertSame(7, $grandTotal);
+    }
 }
