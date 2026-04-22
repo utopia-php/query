@@ -137,52 +137,13 @@ abstract class SQL implements Parser
     /**
      * Extract the first SQL keyword from a query string
      *
-     * Skips leading whitespace and SQL comments efficiently.
-     * Returns the keyword in uppercase for classification.
+     * Skips leading whitespace, SQL comments, and string/identifier literals
+     * before the first token. Returns the keyword in uppercase.
      */
     public function extractKeyword(string $query): string
     {
         $len = \strlen($query);
-        $pos = 0;
-
-        // Skip leading whitespace and comments
-        while ($pos < $len) {
-            $c = $query[$pos];
-
-            // Skip whitespace
-            if ($c === ' ' || $c === "\t" || $c === "\n" || $c === "\r" || $c === "\f") {
-                $pos++;
-
-                continue;
-            }
-
-            // Skip line comments: -- ...
-            if ($c === '-' && ($pos + 1) < $len && $query[$pos + 1] === '-') {
-                $pos += 2;
-                while ($pos < $len && $query[$pos] !== "\n") {
-                    $pos++;
-                }
-
-                continue;
-            }
-
-            // Skip block comments: /* ... */
-            if ($c === '/' && ($pos + 1) < $len && $query[$pos + 1] === '*') {
-                $pos += 2;
-                while ($pos < ($len - 1)) {
-                    if ($query[$pos] === '*' && $query[$pos + 1] === '/') {
-                        $pos += 2;
-
-                        break;
-                    }
-                    $pos++;
-                }
-
-                continue;
-            }
-
-            break;
-        }
+        $pos = $this->skipInsignificant($query, 0, $len);
 
         if ($pos >= $len) {
             return '';
@@ -203,6 +164,205 @@ abstract class SQL implements Parser
         }
 
         return \strtoupper(\substr($query, $start, $pos - $start));
+    }
+
+    /**
+     * Advance past whitespace, comments, and quoted literals/identifiers.
+     *
+     * Returns the new position, which may be $len if the rest of the input
+     * was entirely insignificant.
+     */
+    private function skipInsignificant(string $query, int $pos, int $len): int
+    {
+        while ($pos < $len) {
+            $c = $query[$pos];
+
+            // Whitespace
+            if ($c === ' ' || $c === "\t" || $c === "\n" || $c === "\r" || $c === "\f") {
+                $pos++;
+
+                continue;
+            }
+
+            // Line comment: -- ...
+            if ($c === '-' && ($pos + 1) < $len && $query[$pos + 1] === '-') {
+                $pos = $this->skipLineComment($query, $pos + 2, $len);
+
+                continue;
+            }
+
+            // Block comment: /* ... */
+            if ($c === '/' && ($pos + 1) < $len && $query[$pos + 1] === '*') {
+                $pos = $this->skipBlockComment($query, $pos + 2, $len);
+
+                continue;
+            }
+
+            // Single-quoted string literal
+            if ($c === "'") {
+                $pos = $this->skipSingleQuoted($query, $pos + 1, $len);
+
+                continue;
+            }
+
+            // Double-quoted identifier
+            if ($c === '"') {
+                $pos = $this->skipDoubleQuoted($query, $pos + 1, $len);
+
+                continue;
+            }
+
+            // Backtick-quoted identifier (MySQL)
+            if ($c === '`') {
+                $pos = $this->skipBacktickQuoted($query, $pos + 1, $len);
+
+                continue;
+            }
+
+            // Dollar-quoted string ($tag$...$tag$)
+            if ($c === '$') {
+                $skipped = $this->tryskipDollarQuoted($query, $pos, $len);
+                if ($skipped !== null) {
+                    $pos = $skipped;
+
+                    continue;
+                }
+            }
+
+            break;
+        }
+
+        return $pos;
+    }
+
+    private function skipLineComment(string $query, int $pos, int $len): int
+    {
+        while ($pos < $len && $query[$pos] !== "\n") {
+            $pos++;
+        }
+        if ($pos < $len) {
+            $pos++; // consume the newline
+        }
+
+        return $pos;
+    }
+
+    private function skipBlockComment(string $query, int $pos, int $len): int
+    {
+        while ($pos < ($len - 1)) {
+            if ($query[$pos] === '*' && $query[$pos + 1] === '/') {
+                return $pos + 2;
+            }
+            $pos++;
+        }
+
+        return $len;
+    }
+
+    private function skipSingleQuoted(string $query, int $pos, int $len): int
+    {
+        while ($pos < $len) {
+            $c = $query[$pos];
+            if ($c === "\\" && ($pos + 1) < $len) {
+                $pos += 2;
+
+                continue;
+            }
+            if ($c === "'") {
+                // Doubled-up single quote is an escape for ' inside the literal
+                if (($pos + 1) < $len && $query[$pos + 1] === "'") {
+                    $pos += 2;
+
+                    continue;
+                }
+
+                return $pos + 1;
+            }
+            $pos++;
+        }
+
+        return $len;
+    }
+
+    private function skipDoubleQuoted(string $query, int $pos, int $len): int
+    {
+        while ($pos < $len) {
+            $c = $query[$pos];
+            if ($c === '"') {
+                if (($pos + 1) < $len && $query[$pos + 1] === '"') {
+                    $pos += 2;
+
+                    continue;
+                }
+
+                return $pos + 1;
+            }
+            $pos++;
+        }
+
+        return $len;
+    }
+
+    private function skipBacktickQuoted(string $query, int $pos, int $len): int
+    {
+        while ($pos < $len) {
+            $c = $query[$pos];
+            if ($c === '`') {
+                if (($pos + 1) < $len && $query[$pos + 1] === '`') {
+                    $pos += 2;
+
+                    continue;
+                }
+
+                return $pos + 1;
+            }
+            $pos++;
+        }
+
+        return $len;
+    }
+
+    /**
+     * Try to parse and skip a dollar-quoted PostgreSQL string: $tag$...$tag$.
+     *
+     * Returns the new position if a valid dollar-quoted block is found,
+     * or null if the `$` at $pos does not start a dollar-quoted string.
+     */
+    private function tryskipDollarQuoted(string $query, int $pos, int $len): ?int
+    {
+        // Find the closing '$' that ends the opening tag
+        $tagStart = $pos + 1;
+        $tagEnd = $tagStart;
+        while ($tagEnd < $len) {
+            $c = $query[$tagEnd];
+            if ($c === '$') {
+                break;
+            }
+            // Valid tag: letters, digits, underscore
+            if (! (($c >= 'A' && $c <= 'Z') || ($c >= 'a' && $c <= 'z') || ($c >= '0' && $c <= '9') || $c === '_')) {
+                return null;
+            }
+            $tagEnd++;
+        }
+
+        if ($tagEnd >= $len) {
+            return null;
+        }
+
+        $tag = \substr($query, $pos, $tagEnd - $pos + 1); // includes both $ delimiters
+        $tagLen = \strlen($tag);
+
+        $scan = $tagEnd + 1;
+        while ($scan < $len) {
+            if ($query[$scan] === '$' && ($scan + $tagLen) <= $len
+                && \substr($query, $scan, $tagLen) === $tag
+            ) {
+                return $scan + $tagLen;
+            }
+            $scan++;
+        }
+
+        return $len;
     }
 
     /**
@@ -228,7 +388,10 @@ abstract class SQL implements Parser
      * Classify CTE (WITH ... AS (...) SELECT/INSERT/UPDATE/DELETE ...)
      *
      * After the CTE definitions, the first read/write keyword at
-     * parenthesis depth 0 is the main statement.
+     * parenthesis depth 0 is the main statement. The scanner skips over
+     * string literals, quoted identifiers, and comments so embedded
+     * keywords or parens inside literals/comments cannot fool classification.
+     *
      * Default to READ since most CTEs are used with SELECT.
      */
     private function classifyCTE(string $query): Type
@@ -239,6 +402,13 @@ abstract class SQL implements Parser
         $seenParen = false;
 
         while ($pos < $len) {
+            $skipped = $this->skipLiteralOrComment($query, $pos, $len);
+            if ($skipped !== $pos) {
+                $pos = $skipped;
+
+                continue;
+            }
+
             $c = $query[$pos];
 
             if ($c === '(') {
@@ -257,7 +427,7 @@ abstract class SQL implements Parser
             }
 
             // Only look for keywords at depth 0, after we've seen at least one CTE block
-            if ($depth === 0 && $seenParen && ($c >= 'A' && $c <= 'Z' || $c >= 'a' && $c <= 'z')) {
+            if ($depth === 0 && $seenParen && (($c >= 'A' && $c <= 'Z') || ($c >= 'a' && $c <= 'z'))) {
                 $wordStart = $pos;
                 while ($pos < $len) {
                     $ch = $query[$pos];
@@ -284,5 +454,48 @@ abstract class SQL implements Parser
         }
 
         return Type::Read;
+    }
+
+    /**
+     * If $pos starts a string literal, quoted identifier, or comment,
+     * advance past it and return the new position. Otherwise return $pos
+     * unchanged.
+     */
+    private function skipLiteralOrComment(string $query, int $pos, int $len): int
+    {
+        if ($pos >= $len) {
+            return $pos;
+        }
+
+        $c = $query[$pos];
+
+        if ($c === '-' && ($pos + 1) < $len && $query[$pos + 1] === '-') {
+            return $this->skipLineComment($query, $pos + 2, $len);
+        }
+
+        if ($c === '/' && ($pos + 1) < $len && $query[$pos + 1] === '*') {
+            return $this->skipBlockComment($query, $pos + 2, $len);
+        }
+
+        if ($c === "'") {
+            return $this->skipSingleQuoted($query, $pos + 1, $len);
+        }
+
+        if ($c === '"') {
+            return $this->skipDoubleQuoted($query, $pos + 1, $len);
+        }
+
+        if ($c === '`') {
+            return $this->skipBacktickQuoted($query, $pos + 1, $len);
+        }
+
+        if ($c === '$') {
+            $skipped = $this->tryskipDollarQuoted($query, $pos, $len);
+            if ($skipped !== null) {
+                return $skipped;
+            }
+        }
+
+        return $pos;
     }
 }

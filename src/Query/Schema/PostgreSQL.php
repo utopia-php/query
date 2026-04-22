@@ -155,10 +155,21 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
     }
 
     /**
+     * Create a PL/pgSQL function.
+     *
+     * $body is emitted verbatim inside a dollar-quoted ($$...$$) block and must
+     * come from trusted (developer-controlled) source — never from untrusted
+     * input. A literal `$$` inside the body would close the dollar-quoted
+     * string early and is rejected.
+     *
      * @param  list<array{0: ParameterDirection, 1: string, 2: string}>  $params
+     *
+     * @throws ValidationException if $body contains a `$$` sequence.
      */
     public function createProcedure(string $name, array $params, string $body): Plan
     {
+        $this->assertSafeDollarQuotedBody($body);
+
         $paramList = $this->compileProcedureParams($params);
 
         $sql = 'CREATE FUNCTION ' . $this->quote($name)
@@ -173,6 +184,16 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
         return new Plan('DROP FUNCTION ' . $this->quote($name), [], executor: $this->executor);
     }
 
+    /**
+     * Create a trigger backed by a PL/pgSQL function.
+     *
+     * $body is emitted verbatim inside a dollar-quoted ($$...$$) block and must
+     * come from trusted (developer-controlled) source — never from untrusted
+     * input. A literal `$$` inside the body would close the dollar-quoted
+     * string early and is rejected.
+     *
+     * @throws ValidationException if $body contains a `$$` sequence.
+     */
     public function createTrigger(
         string $name,
         string $table,
@@ -180,6 +201,8 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
         TriggerEvent $event,
         string $body,
     ): Plan {
+        $this->assertSafeDollarQuotedBody($body);
+
         $funcName = $name . '_func';
 
         $sql = 'CREATE FUNCTION ' . $this->quote($funcName)
@@ -190,6 +213,19 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             . ' FOR EACH ROW EXECUTE FUNCTION ' . $this->quote($funcName) . '()';
 
         return new Plan($sql, [], executor: $this->executor);
+    }
+
+    /**
+     * Reject bodies that would break out of the surrounding `$$ ... $$`
+     * dollar-quoted string.
+     *
+     * @throws ValidationException if $body contains `$$`.
+     */
+    private function assertSafeDollarQuotedBody(string $body): void
+    {
+        if (\str_contains($body, '$$')) {
+            throw new ValidationException('Procedure/trigger body must not contain the dollar-quote terminator "$$"');
+        }
     }
 
     /**
@@ -338,9 +374,19 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
 
     /**
      * Alter a column's type with an optional USING expression for type casting.
+     *
+     * @throws ValidationException if $type or $using contains disallowed characters.
      */
     public function alterColumnType(string $table, string $column, string $type, string $using = ''): Plan
     {
+        if (! \preg_match('/^[A-Za-z0-9_() ,]+$/', $type)) {
+            throw new ValidationException('Invalid column type: ' . $type);
+        }
+
+        if ($using !== '') {
+            $this->assertSafeExpression($using, 'USING expression');
+        }
+
         $sql = 'ALTER TABLE ' . $this->quote($table)
             . ' ALTER COLUMN ' . $this->quote($column)
             . ' TYPE ' . $type;
@@ -350,6 +396,29 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
         }
 
         return new Plan($sql, [], executor: $this->executor);
+    }
+
+    /**
+     * Reject expressions that could chain additional statements or comments.
+     *
+     * Partition expressions and USING casts may legitimately contain parens,
+     * function calls, and casts, so an allowlist is too restrictive. We reject
+     * statement terminators and comment markers instead.
+     *
+     * @throws ValidationException if $expression is too long or contains a disallowed sequence.
+     */
+    private function assertSafeExpression(string $expression, string $label): void
+    {
+        if (\strlen($expression) > 1024) {
+            throw new ValidationException($label . ' exceeds 1024 character limit');
+        }
+
+        if (\str_contains($expression, ';')
+            || \str_contains($expression, '--')
+            || \str_contains($expression, '/*')
+        ) {
+            throw new ValidationException('Invalid ' . $label . ': ' . $expression);
+        }
     }
 
     public function dropIndexConcurrently(string $name): Plan
@@ -414,8 +483,13 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
         );
     }
 
+    /**
+     * @throws ValidationException if $expression is too long or contains disallowed sequences.
+     */
     public function createPartition(string $parent, string $name, string $expression): Plan
     {
+        $this->assertSafeExpression($expression, 'partition expression');
+
         return new Plan(
             'CREATE TABLE ' . $this->quote($name) . ' PARTITION OF ' . $this->quote($parent) . ' FOR VALUES ' . $expression,
             [],

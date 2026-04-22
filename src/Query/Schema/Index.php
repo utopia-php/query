@@ -31,7 +31,7 @@ readonly class Index
             throw new ValidationException('Invalid operator class: ' . $operatorClass);
         }
         foreach ($collations as $collation) {
-            if (! \preg_match('/^[A-Za-z0-9_]+$/', $collation)) {
+            if (! \preg_match('/^[A-Za-z0-9_"]+$/', $collation)) {
                 throw new ValidationException('Invalid collation: ' . $collation);
             }
         }

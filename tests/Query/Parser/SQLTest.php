@@ -129,6 +129,48 @@ class SQLTest extends TestCase
         $this->assertSame(Type::Read, $this->parser->classifySQL($sql));
     }
 
+    public function testClassifyCteInsertKeywordInsideStringLiteralTreatedAsRead(): void
+    {
+        // The inner INSERT is inside a string literal and must not influence classification.
+        $sql = "WITH foo AS (SELECT 'INSERT INTO dangerous VALUES (1)' AS payload FROM t) SELECT * FROM foo";
+        $this->assertSame(Type::Read, $this->parser->classifySQL($sql));
+    }
+
+    public function testClassifyCteCloseParenInsideStringLiteralDoesNotBreakDepth(): void
+    {
+        // The ')' inside the string literal must not drop the depth counter.
+        // If literals were ignored, the parser would see depth go to 0 early and
+        // mis-classify on the trailing 'DELETE' token inside the literal.
+        $sql = "WITH foo AS (SELECT ') DELETE FROM users' AS payload FROM t) SELECT * FROM foo";
+        $this->assertSame(Type::Read, $this->parser->classifySQL($sql));
+    }
+
+    public function testClassifyCteDeleteKeywordInsideBlockCommentIsIgnored(): void
+    {
+        $sql = "WITH foo AS (SELECT 1 FROM t) /* DELETE FROM users */ SELECT * FROM foo";
+        $this->assertSame(Type::Read, $this->parser->classifySQL($sql));
+    }
+
+    public function testClassifyCteInsertKeywordInsideLineCommentIsIgnored(): void
+    {
+        $sql = "WITH foo AS (SELECT 1 FROM t)\n-- INSERT INTO dangerous\nSELECT * FROM foo";
+        $this->assertSame(Type::Read, $this->parser->classifySQL($sql));
+    }
+
+    public function testClassifyCteKeywordInsideDoubleQuotedIdentifierIsIgnored(): void
+    {
+        // A quoted identifier literally named "DELETE FROM x" is a valid identifier.
+        $sql = 'WITH foo AS (SELECT 1 FROM "DELETE FROM x") SELECT * FROM foo';
+        $this->assertSame(Type::Read, $this->parser->classifySQL($sql));
+    }
+
+    public function testClassifyCteKeywordInsideDollarQuotedStringIsIgnored(): void
+    {
+        // Dollar-quoted strings must be skipped end-to-end.
+        $sql = 'WITH foo AS (SELECT $body$INSERT INTO dangerous$body$ FROM t) SELECT * FROM foo';
+        $this->assertSame(Type::Read, $this->parser->classifySQL($sql));
+    }
+
     // -- extractKeyword --
 
     public function testExtractKeywordSimple(): void

@@ -277,7 +277,9 @@ class MongoDB implements Parser
         }
         $strLen = $this->readUint32($data, $pos);
 
-        if ($pos + 4 + $strLen > $limit) {
+        // On 32-bit PHP `V` yields a signed int; treat negative as invalid.
+        // Also reject lengths that would advance past the buffer.
+        if ($strLen < 0 || $strLen > ($limit - $pos - 4)) {
             return false;
         }
 
@@ -305,7 +307,9 @@ class MongoDB implements Parser
         }
         $binLen = $this->readUint32($data, $pos);
 
-        if ($pos + 4 + 1 + $binLen > $limit) {
+        // On 32-bit PHP `V` yields a signed int; treat negative as invalid.
+        // Also reject lengths that would advance past the buffer.
+        if ($binLen < 0 || $binLen > ($limit - $pos - 5)) {
             return false;
         }
 
