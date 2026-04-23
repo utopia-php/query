@@ -30,9 +30,29 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
     /** @var array<string, Condition> */
     protected array $jsonSets = [];
 
-    abstract protected function compileConflictClause(): string;
-
     abstract public function insertOrIgnore(): Statement;
+
+    abstract protected function compileConflictHeader(): string;
+
+    abstract protected function compileConflictAssignment(string $wrapped): string;
+
+    protected function compileConflictClause(): string
+    {
+        $updates = [];
+        foreach ($this->conflictUpdateColumns as $col) {
+            $wrapped = $this->resolveAndWrap($col);
+            if (isset($this->conflictRawSets[$col])) {
+                $updates[] = $wrapped . ' = ' . $this->conflictRawSets[$col];
+                foreach ($this->conflictRawSetBindings[$col] ?? [] as $binding) {
+                    $this->addBinding($binding);
+                }
+            } else {
+                $updates[] = $wrapped . ' = ' . $this->compileConflictAssignment($wrapped);
+            }
+        }
+
+        return $this->compileConflictHeader() . ' ' . \implode(', ', $updates);
+    }
 
     #[\Override]
     public function compileFilter(Query $query): string

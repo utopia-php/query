@@ -88,22 +88,15 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     }
 
     #[\Override]
-    protected function compileConflictClause(): string
+    protected function compileConflictHeader(): string
     {
-        $updates = [];
-        foreach ($this->conflictUpdateColumns as $col) {
-            $wrapped = $this->resolveAndWrap($col);
-            if (isset($this->conflictRawSets[$col])) {
-                $updates[] = $wrapped . ' = ' . $this->conflictRawSets[$col];
-                foreach ($this->conflictRawSetBindings[$col] ?? [] as $binding) {
-                    $this->addBinding($binding);
-                }
-            } else {
-                $updates[] = $wrapped . ' = VALUES(' . $wrapped . ')';
-            }
-        }
+        return 'ON DUPLICATE KEY UPDATE';
+    }
 
-        return 'ON DUPLICATE KEY UPDATE ' . \implode(', ', $updates);
+    #[\Override]
+    protected function compileConflictAssignment(string $wrapped): string
+    {
+        return 'VALUES(' . $wrapped . ')';
     }
 
     #[\Override]

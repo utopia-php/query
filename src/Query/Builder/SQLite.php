@@ -49,27 +49,20 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
     }
 
     #[\Override]
-    protected function compileConflictClause(): string
+    protected function compileConflictHeader(): string
     {
         $wrappedKeys = \array_map(
             fn (string $key): string => $this->resolveAndWrap($key),
             $this->conflictKeys
         );
 
-        $updates = [];
-        foreach ($this->conflictUpdateColumns as $col) {
-            $wrapped = $this->resolveAndWrap($col);
-            if (isset($this->conflictRawSets[$col])) {
-                $updates[] = $wrapped . ' = ' . $this->conflictRawSets[$col];
-                foreach ($this->conflictRawSetBindings[$col] ?? [] as $binding) {
-                    $this->addBinding($binding);
-                }
-            } else {
-                $updates[] = $wrapped . ' = excluded.' . $wrapped;
-            }
-        }
+        return 'ON CONFLICT (' . \implode(', ', $wrappedKeys) . ') DO UPDATE SET';
+    }
 
-        return 'ON CONFLICT (' . \implode(', ', $wrappedKeys) . ') DO UPDATE SET ' . \implode(', ', $updates);
+    #[\Override]
+    protected function compileConflictAssignment(string $wrapped): string
+    {
+        return 'excluded.' . $wrapped;
     }
 
     #[\Override]

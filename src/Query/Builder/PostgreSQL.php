@@ -138,27 +138,20 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     }
 
     #[\Override]
-    protected function compileConflictClause(): string
+    protected function compileConflictHeader(): string
     {
         $wrappedKeys = \array_map(
             fn (string $key): string => $this->resolveAndWrap($key),
             $this->conflictKeys
         );
 
-        $updates = [];
-        foreach ($this->conflictUpdateColumns as $col) {
-            $wrapped = $this->resolveAndWrap($col);
-            if (isset($this->conflictRawSets[$col])) {
-                $updates[] = $wrapped . ' = ' . $this->conflictRawSets[$col];
-                foreach ($this->conflictRawSetBindings[$col] ?? [] as $binding) {
-                    $this->addBinding($binding);
-                }
-            } else {
-                $updates[] = $wrapped . ' = EXCLUDED.' . $wrapped;
-            }
-        }
+        return 'ON CONFLICT (' . \implode(', ', $wrappedKeys) . ') DO UPDATE SET';
+    }
 
-        return 'ON CONFLICT (' . \implode(', ', $wrappedKeys) . ') DO UPDATE SET ' . \implode(', ', $updates);
+    #[\Override]
+    protected function compileConflictAssignment(string $wrapped): string
+    {
+        return 'EXCLUDED.' . $wrapped;
     }
 
     #[\Override]
@@ -603,56 +596,47 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     #[\Override]
     public function countWhen(string $condition, string $alias = '', mixed ...$bindings): static
     {
-        $expr = 'COUNT(*) FILTER (WHERE ' . $condition . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, \array_values($bindings));
+        return $this->aggregateFilter('COUNT', null, $condition, $alias, \array_values($bindings));
     }
 
     #[\Override]
     public function sumWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
-        $expr = 'SUM(' . $this->resolveAndWrap($column) . ') FILTER (WHERE ' . $condition . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, \array_values($bindings));
+        return $this->aggregateFilter('SUM', $column, $condition, $alias, \array_values($bindings));
     }
 
     #[\Override]
     public function avgWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
-        $expr = 'AVG(' . $this->resolveAndWrap($column) . ') FILTER (WHERE ' . $condition . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, \array_values($bindings));
+        return $this->aggregateFilter('AVG', $column, $condition, $alias, \array_values($bindings));
     }
 
     #[\Override]
     public function minWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
-        $expr = 'MIN(' . $this->resolveAndWrap($column) . ') FILTER (WHERE ' . $condition . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, \array_values($bindings));
+        return $this->aggregateFilter('MIN', $column, $condition, $alias, \array_values($bindings));
     }
 
     #[\Override]
     public function maxWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
-        $expr = 'MAX(' . $this->resolveAndWrap($column) . ') FILTER (WHERE ' . $condition . ')';
+        return $this->aggregateFilter('MAX', $column, $condition, $alias, \array_values($bindings));
+    }
+
+    /**
+     * Emit a conditional aggregate using PostgreSQL's FILTER (WHERE ...) clause.
+     *
+     * @param  list<mixed>  $bindings
+     */
+    private function aggregateFilter(string $aggregate, ?string $column, string $condition, string $alias, array $bindings): static
+    {
+        $argument = $column === null ? '*' : $this->resolveAndWrap($column);
+        $expr = $aggregate . '(' . $argument . ') FILTER (WHERE ' . $condition . ')';
         if ($alias !== '') {
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->select($expr, \array_values($bindings));
+        return $this->select($expr, $bindings);
     }
 
     #[\Override]
