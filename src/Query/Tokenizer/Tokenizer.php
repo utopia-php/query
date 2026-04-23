@@ -58,139 +58,110 @@ class Tokenizer
         $this->pos = 0;
 
         $tokens = [];
+        $quoteChar = $this->getIdentifierQuoteChar();
 
         while ($this->pos < $this->length) {
             $start = $this->pos;
             $char = $this->sql[$this->pos];
 
-            if ($char === ' ' || $char === "\t" || $char === "\n" || $char === "\r") {
-                $tokens[] = $this->readWhitespace($start);
-                continue;
-            }
-
-            if ($char === '-' && $this->peek(1) === '-') {
-                $tokens[] = $this->readLineComment($start);
-                continue;
-            }
-
-            if ($char === '/' && $this->peek(1) === '*') {
-                $tokens[] = $this->readBlockComment($start);
-                continue;
-            }
-
-            if ($char === '\'') {
-                $tokens[] = $this->readString($start);
-                continue;
-            }
-
-            $quoteChar = $this->getIdentifierQuoteChar();
-            if ($char === $quoteChar) {
-                $tokens[] = $this->readQuotedIdentifier($start, $quoteChar);
-                continue;
-            }
-
-            if ($char === '"' && $quoteChar !== '"') {
-                $tokens[] = $this->readQuotedIdentifier($start, '"');
-                continue;
-            }
-
-            if ($this->isDigit($char)) {
-                $tokens[] = $this->readNumber($start);
-                continue;
-            }
-
-            if ($this->isIdentStart($char)) {
-                $tokens[] = $this->readIdentifierOrKeyword($start);
-                continue;
-            }
-
-            if ($char === '(') {
-                $this->pos++;
-                $tokens[] = new Token(TokenType::LeftParen, '(', $start);
-                continue;
-            }
-
-            if ($char === ')') {
-                $this->pos++;
-                $tokens[] = new Token(TokenType::RightParen, ')', $start);
-                continue;
-            }
-
-            if ($char === ',') {
-                $this->pos++;
-                $tokens[] = new Token(TokenType::Comma, ',', $start);
-                continue;
-            }
-
-            if ($char === ';') {
-                $this->pos++;
-                $tokens[] = new Token(TokenType::Semicolon, ';', $start);
-                continue;
-            }
-
-            if ($char === '.') {
-                if ($this->peek(1) !== null && $this->isDigit($this->peek(1))) {
-                    $tokens[] = $this->readNumber($start);
-                    continue;
-                }
-                $this->pos++;
-                $tokens[] = new Token(TokenType::Dot, '.', $start);
-                continue;
-            }
-
-            if ($char === '*') {
-                $this->pos++;
-                $tokens[] = new Token(TokenType::Star, '*', $start);
-                continue;
-            }
-
-            if ($char === '?') {
-                $this->pos++;
-                $tokens[] = new Token(TokenType::Placeholder, '?', $start);
-                continue;
-            }
-
-            if ($char === ':') {
-                $next = $this->peek(1);
-                if ($next === ':') {
-                    $this->pos += 2;
-                    $tokens[] = new Token(TokenType::Operator, '::', $start);
-                    continue;
-                }
-                if ($next !== null && $this->isIdentStart($next)) {
-                    $tokens[] = $this->readNamedPlaceholder($start);
-                    continue;
-                }
-                $this->pos++;
-                $tokens[] = new Token(TokenType::Operator, ':', $start);
-                continue;
-            }
-
-            if ($char === '$') {
-                $next = $this->peek(1);
-                if ($next !== null && $this->isDigit($next)) {
-                    $tokens[] = $this->readNumberedPlaceholder($start);
-                    continue;
-                }
-                $this->pos++;
-                $tokens[] = new Token(TokenType::Operator, '$', $start);
-                continue;
-            }
-
-            $op = $this->tryReadOperator($start);
-            if ($op !== null) {
-                $tokens[] = $op;
-                continue;
-            }
-
-            // Emit unknown characters as single-char operator tokens
-            $this->pos++;
-            $tokens[] = new Token(TokenType::Operator, $char, $start);
+            $tokens[] = match (true) {
+                $char === ' ' || $char === "\t" || $char === "\n" || $char === "\r" => $this->readWhitespace($start),
+                $char === '-' => $this->readDashPrefix($start),
+                $char === '/' => $this->readSlashPrefix($start),
+                $char === '\'' => $this->readString($start),
+                $char === $quoteChar => $this->readQuotedIdentifier($start, $quoteChar),
+                $char === '"' => $this->readQuotedIdentifier($start, '"'),
+                $char >= '0' && $char <= '9' => $this->readNumber($start),
+                ($char >= 'a' && $char <= 'z') || ($char >= 'A' && $char <= 'Z') || $char === '_' => $this->readIdentifierOrKeyword($start),
+                $char === '(' => $this->consumeSingleChar(TokenType::LeftParen, '(', $start),
+                $char === ')' => $this->consumeSingleChar(TokenType::RightParen, ')', $start),
+                $char === ',' => $this->consumeSingleChar(TokenType::Comma, ',', $start),
+                $char === ';' => $this->consumeSingleChar(TokenType::Semicolon, ';', $start),
+                $char === '.' => $this->readDot($start),
+                $char === '*' => $this->consumeSingleChar(TokenType::Star, '*', $start),
+                $char === '?' => $this->consumeSingleChar(TokenType::Placeholder, '?', $start),
+                $char === ':' => $this->readColonPrefix($start),
+                $char === '$' => $this->readDollarPrefix($start),
+                default => $this->readOperatorOrUnknown($start, $char),
+            };
         }
 
         $tokens[] = new Token(TokenType::Eof, '', $this->pos);
 
         return $tokens;
+    }
+
+    private function consumeSingleChar(TokenType $type, string $value, int $start): Token
+    {
+        $this->pos++;
+        return new Token($type, $value, $start);
+    }
+
+    private function readDashPrefix(int $start): Token
+    {
+        if ($this->peek(1) === '-') {
+            return $this->readLineComment($start);
+        }
+
+        return $this->readOperatorOrUnknown($start, '-');
+    }
+
+    private function readSlashPrefix(int $start): Token
+    {
+        if ($this->peek(1) === '*') {
+            return $this->readBlockComment($start);
+        }
+
+        return $this->readOperatorOrUnknown($start, '/');
+    }
+
+    private function readDot(int $start): Token
+    {
+        $next = $this->peek(1);
+        if ($next !== null && $this->isDigit($next)) {
+            return $this->readNumber($start);
+        }
+
+        $this->pos++;
+        return new Token(TokenType::Dot, '.', $start);
+    }
+
+    private function readColonPrefix(int $start): Token
+    {
+        $next = $this->peek(1);
+        if ($next === ':') {
+            $this->pos += 2;
+            return new Token(TokenType::Operator, '::', $start);
+        }
+        if ($next !== null && $this->isIdentStart($next)) {
+            return $this->readNamedPlaceholder($start);
+        }
+
+        $this->pos++;
+        return new Token(TokenType::Operator, ':', $start);
+    }
+
+    private function readDollarPrefix(int $start): Token
+    {
+        $next = $this->peek(1);
+        if ($next !== null && $this->isDigit($next)) {
+            return $this->readNumberedPlaceholder($start);
+        }
+
+        $this->pos++;
+        return new Token(TokenType::Operator, '$', $start);
+    }
+
+    private function readOperatorOrUnknown(int $start, string $char): Token
+    {
+        $op = $this->tryReadOperator($start);
+        if ($op !== null) {
+            return $op;
+        }
+
+        // Emit unknown characters as single-char operator tokens
+        $this->pos++;
+        return new Token(TokenType::Operator, $char, $start);
     }
 
     /**
