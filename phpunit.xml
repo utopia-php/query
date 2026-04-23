@@ -3,10 +3,14 @@
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          colors="true"
          beStrictAboutTestsThatDoNotTestAnything="true"
-         bootstrap="vendor/autoload.php">
+         bootstrap="vendor/autoload.php"
+         cacheDirectory=".phpunit.cache">
     <testsuites>
         <testsuite name="Query">
-            <directory>tests</directory>
+            <directory>tests/Query</directory>
+        </testsuite>
+        <testsuite name="Integration">
+            <directory>tests/Integration</directory>
         </testsuite>
     </testsuites>
     <source>

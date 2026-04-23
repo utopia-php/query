@@ -1,0 +1,471 @@
+<?php
+
+namespace Utopia\Query;
+
+use Closure;
+use Utopia\Query\Builder\Statement;
+use Utopia\Query\Exception\UnsupportedException;
+use Utopia\Query\Exception\ValidationException;
+use Utopia\Query\Schema\Column;
+use Utopia\Query\Schema\IndexType;
+use Utopia\Query\Schema\Table;
+
+abstract class Schema
+{
+    /** @var (Closure(Statement): (array<mixed>|int))|null */
+    protected ?Closure $executor = null;
+
+    /**
+     * @param  Closure(Statement): (array<mixed>|int)  $executor
+     */
+    public function setExecutor(Closure $executor): static
+    {
+        $this->executor = $executor;
+
+        return $this;
+    }
+
+    abstract protected function quote(string $identifier): string;
+
+    abstract protected function compileColumnType(Column $column): string;
+
+    abstract protected function compileAutoIncrement(): string;
+
+    /**
+     * @param  callable(Table): void  $definition
+     */
+    public function createIfNotExists(string $table, callable $definition): Statement
+    {
+        return $this->create($table, $definition, true);
+    }
+
+    /**
+     * @param  callable(Table): void  $definition
+     */
+    public function create(string $table, callable $definition, bool $ifNotExists = false): Statement
+    {
+        $blueprint = new Table();
+        $definition($blueprint);
+
+        if ($blueprint->ttl !== null) {
+            throw new UnsupportedException('TTL is only supported in ClickHouse.');
+        }
+
+        $columnDefs = [];
+        $primaryKeys = [];
+        $uniqueColumns = [];
+
+        foreach ($blueprint->columns as $column) {
+            $def = $this->compileColumnDefinition($column);
+            $columnDefs[] = $def;
+
+            if ($column->isPrimary) {
+                $primaryKeys[] = $this->quote($column->name);
+            }
+            if ($column->isUnique) {
+                $uniqueColumns[] = $column->name;
+            }
+        }
+
+        if (! empty($blueprint->compositePrimaryKey) && ! empty($primaryKeys)) {
+            throw new ValidationException('Cannot combine column-level primary() with Table::primary() composite key.');
+        }
+
+        // Raw column definitions (bypass typed Column objects)
+        foreach ($blueprint->rawColumnDefs as $rawDef) {
+            $columnDefs[] = $rawDef;
+        }
+
+        // Inline PRIMARY KEY constraint
+        if (! empty($primaryKeys)) {
+            $columnDefs[] = 'PRIMARY KEY (' . \implode(', ', $primaryKeys) . ')';
+        } elseif (! empty($blueprint->compositePrimaryKey)) {
+            $columnDefs[] = 'PRIMARY KEY ('
+                . \implode(', ', \array_map(fn (string $c): string => $this->quote($c), $blueprint->compositePrimaryKey))
+                . ')';
+        }
+
+        // Inline UNIQUE constraints for columns marked unique
+        foreach ($uniqueColumns as $col) {
+            $columnDefs[] = 'UNIQUE (' . $this->quote($col) . ')';
+        }
+
+        // Table-level CHECK constraints
+        foreach ($blueprint->checks as $check) {
+            $columnDefs[] = 'CONSTRAINT ' . $this->quote($check->name) . ' CHECK (' . $check->expression . ')';
+        }
+
+        // Indexes
+        foreach ($blueprint->indexes as $index) {
+            $keyword = match ($index->type) {
+                IndexType::Unique => 'UNIQUE INDEX',
+                IndexType::Fulltext => 'FULLTEXT INDEX',
+                IndexType::Spatial => 'SPATIAL INDEX',
+                default => 'INDEX',
+            };
+            $columnDefs[] = $keyword . ' ' . $this->quote($index->name)
+                . ' (' . $this->compileIndexColumns($index) . ')';
+        }
+
+        // Raw index definitions (bypass typed Index objects)
+        foreach ($blueprint->rawIndexDefs as $rawIdx) {
+            $columnDefs[] = $rawIdx;
+        }
+
+        // Foreign keys
+        foreach ($blueprint->foreignKeys as $fk) {
+            $def = 'FOREIGN KEY (' . $this->quote($fk->column) . ')'
+                . ' REFERENCES ' . $this->quote($fk->refTable)
+                . ' (' . $this->quote($fk->refColumn) . ')';
+            if ($fk->onDelete !== null) {
+                $def .= ' ON DELETE ' . $fk->onDelete->toSql();
+            }
+            if ($fk->onUpdate !== null) {
+                $def .= ' ON UPDATE ' . $fk->onUpdate->toSql();
+            }
+            $columnDefs[] = $def;
+        }
+
+        $sql = 'CREATE TABLE ' . ($ifNotExists ? 'IF NOT EXISTS ' : '') . $this->quote($table)
+            . ' (' . \implode(', ', $columnDefs) . ')';
+
+        if ($blueprint->partitionType !== null) {
+            $sql .= ' PARTITION BY ' . $blueprint->partitionType->value . '(' . $blueprint->partitionExpression . ')';
+            if ($blueprint->partitionCount !== null) {
+                $sql .= ' PARTITIONS ' . $blueprint->partitionCount;
+            }
+        }
+
+        return new Statement($sql, [], executor: $this->executor);
+    }
+
+    /**
+     * @param  callable(Table): void  $definition
+     */
+    public function alter(string $table, callable $definition): Statement
+    {
+        $blueprint = new Table();
+        $definition($blueprint);
+
+        $alterations = [];
+
+        foreach ($blueprint->columns as $column) {
+            $keyword = $column->isModify ? 'MODIFY COLUMN' : 'ADD COLUMN';
+            $def = $keyword . ' ' . $this->compileColumnDefinition($column);
+            if ($column->after !== null) {
+                $def .= ' AFTER ' . $this->quote($column->after);
+            }
+            $alterations[] = $def;
+        }
+
+        foreach ($blueprint->renameColumns as $rename) {
+            $alterations[] = 'RENAME COLUMN ' . $this->quote($rename->from)
+                . ' TO ' . $this->quote($rename->to);
+        }
+
+        foreach ($blueprint->dropColumns as $col) {
+            $alterations[] = 'DROP COLUMN ' . $this->quote($col);
+        }
+
+        foreach ($blueprint->indexes as $index) {
+            $keyword = match ($index->type) {
+                IndexType::Unique => 'ADD UNIQUE INDEX',
+                IndexType::Fulltext => 'ADD FULLTEXT INDEX',
+                IndexType::Spatial => 'ADD SPATIAL INDEX',
+                default => 'ADD INDEX',
+            };
+            $alterations[] = $keyword . ' ' . $this->quote($index->name)
+                . ' (' . $this->compileIndexColumns($index) . ')';
+        }
+
+        foreach ($blueprint->dropIndexes as $name) {
+            $alterations[] = 'DROP INDEX ' . $this->quote($name);
+        }
+
+        foreach ($blueprint->foreignKeys as $fk) {
+            $def = 'ADD FOREIGN KEY (' . $this->quote($fk->column) . ')'
+                . ' REFERENCES ' . $this->quote($fk->refTable)
+                . ' (' . $this->quote($fk->refColumn) . ')';
+            if ($fk->onDelete !== null) {
+                $def .= ' ON DELETE ' . $fk->onDelete->toSql();
+            }
+            if ($fk->onUpdate !== null) {
+                $def .= ' ON UPDATE ' . $fk->onUpdate->toSql();
+            }
+            $alterations[] = $def;
+        }
+
+        foreach ($blueprint->dropForeignKeys as $name) {
+            $alterations[] = 'DROP FOREIGN KEY ' . $this->quote($name);
+        }
+
+        $sql = 'ALTER TABLE ' . $this->quote($table)
+            . ' ' . \implode(', ', $alterations);
+
+        return new Statement($sql, [], executor: $this->executor);
+    }
+
+    public function drop(string $table): Statement
+    {
+        return new Statement('DROP TABLE ' . $this->quote($table), [], executor: $this->executor);
+    }
+
+    public function dropIfExists(string $table): Statement
+    {
+        return new Statement('DROP TABLE IF EXISTS ' . $this->quote($table), [], executor: $this->executor);
+    }
+
+    public function rename(string $from, string $to): Statement
+    {
+        return new Statement(
+            'RENAME TABLE ' . $this->quote($from) . ' TO ' . $this->quote($to),
+            [],
+            executor: $this->executor,
+        );
+    }
+
+    public function truncate(string $table): Statement
+    {
+        return new Statement('TRUNCATE TABLE ' . $this->quote($table), [], executor: $this->executor);
+    }
+
+    /**
+     * @param  string[]  $columns
+     * @param  array<string, int>  $lengths
+     * @param  array<string, string>  $orders
+     * @param  array<string, string>  $collations
+     * @param  list<string>  $rawColumns  Raw SQL expressions appended to column list (bypass quoting)
+     */
+    public function createIndex(
+        string $table,
+        string $name,
+        array $columns,
+        bool $unique = false,
+        string $type = '',
+        string $method = '',
+        string $operatorClass = '',
+        array $lengths = [],
+        array $orders = [],
+        array $collations = [],
+        array $rawColumns = [],
+    ): Statement {
+        $keyword = match (true) {
+            $unique => 'CREATE UNIQUE INDEX',
+            $type === 'fulltext' => 'CREATE FULLTEXT INDEX',
+            $type === 'spatial' => 'CREATE SPATIAL INDEX',
+            default => 'CREATE INDEX',
+        };
+
+        $indexType = $unique ? IndexType::Unique : ($type !== '' ? IndexType::from($type) : IndexType::Index);
+        $index = new Schema\Index($name, $columns, $indexType, $lengths, $orders, $method, $operatorClass, $collations, $rawColumns);
+
+        $sql = $keyword . ' ' . $this->quote($name)
+            . ' ON ' . $this->quote($table);
+
+        if ($method !== '') {
+            $sql .= ' USING ' . \strtoupper($method);
+        }
+
+        $sql .= ' (' . $this->compileIndexColumns($index) . ')';
+
+        return new Statement($sql, [], executor: $this->executor);
+    }
+
+    public function dropIndex(string $table, string $name): Statement
+    {
+        return new Statement(
+            'DROP INDEX ' . $this->quote($name) . ' ON ' . $this->quote($table),
+            [],
+            executor: $this->executor,
+        );
+    }
+
+    public function createView(string $name, Builder $query): Statement
+    {
+        $result = $query->build();
+        $sql = 'CREATE VIEW ' . $this->quote($name) . ' AS ' . $result->query;
+
+        return new Statement($sql, $result->bindings, executor: $this->executor);
+    }
+
+    public function createOrReplaceView(string $name, Builder $query): Statement
+    {
+        $result = $query->build();
+        $sql = 'CREATE OR REPLACE VIEW ' . $this->quote($name) . ' AS ' . $result->query;
+
+        return new Statement($sql, $result->bindings, executor: $this->executor);
+    }
+
+    public function dropView(string $name): Statement
+    {
+        return new Statement('DROP VIEW ' . $this->quote($name), [], executor: $this->executor);
+    }
+
+    protected function compileColumnDefinition(Column $column): string
+    {
+        if ($column->ttl !== null) {
+            throw new UnsupportedException('TTL is only supported in ClickHouse.');
+        }
+
+        $parts = [
+            $this->quote($column->name),
+            $this->compileColumnType($column),
+        ];
+
+        if ($column->isUnsigned) {
+            $unsigned = $this->compileUnsigned();
+            if ($unsigned !== '') {
+                $parts[] = $unsigned;
+            }
+        }
+
+        if ($column->generatedExpression !== null) {
+            $parts[] = $this->compileGeneratedClause($column);
+
+            if (! $column->isNullable) {
+                $parts[] = 'NOT NULL';
+            } else {
+                $parts[] = 'NULL';
+            }
+
+            if ($column->checkExpression !== null) {
+                $parts[] = 'CHECK (' . $column->checkExpression . ')';
+            }
+
+            if ($column->comment !== null) {
+                $parts[] = "COMMENT '" . \str_replace(['\\', "'"], ['\\\\', "''"], $column->comment) . "'";
+            }
+
+            return \implode(' ', $parts);
+        }
+
+        if ($column->isAutoIncrement) {
+            $parts[] = $this->compileAutoIncrement();
+        }
+
+        if (! $column->isNullable) {
+            $parts[] = 'NOT NULL';
+        } else {
+            $parts[] = 'NULL';
+        }
+
+        if ($column->hasDefault) {
+            $parts[] = 'DEFAULT ' . $this->compileDefaultValue($column->default);
+        }
+
+        if ($column->checkExpression !== null) {
+            $parts[] = 'CHECK (' . $column->checkExpression . ')';
+        }
+
+        if ($column->comment !== null) {
+            $parts[] = "COMMENT '" . \str_replace(['\\', "'"], ['\\\\', "''"], $column->comment) . "'";
+        }
+
+        return \implode(' ', $parts);
+    }
+
+    /**
+     * Compile the `GENERATED ALWAYS AS (...) [STORED|VIRTUAL]` clause.
+     *
+     * Default storage is VIRTUAL when unspecified, per SQL standard.
+     */
+    protected function compileGeneratedClause(Column $column): string
+    {
+        $clause = 'GENERATED ALWAYS AS (' . $column->generatedExpression . ')';
+        $stored = $column->generatedStored ?? false;
+
+        return $clause . ' ' . ($stored ? 'STORED' : 'VIRTUAL');
+    }
+
+    protected function compileDefaultValue(mixed $value): string
+    {
+        if ($value === null) {
+            return 'NULL';
+        }
+        if (\is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+        if (\is_int($value) || \is_float($value)) {
+            return (string) $value;
+        }
+
+        /** @var string|int|float $value */
+        return "'" . \str_replace(['\\', "'"], ['\\\\', "''"], (string) $value) . "'";
+    }
+
+    protected function compileUnsigned(): string
+    {
+        return 'UNSIGNED';
+    }
+
+    /**
+     * Compile index column list with lengths, orders, collations, and operator classes.
+     *
+     * @throws ValidationException if a collation or order value is not safe to emit inline.
+     */
+    protected function compileIndexColumns(Schema\Index $index): string
+    {
+        $parts = [];
+
+        foreach ($index->columns as $col) {
+            $part = $this->quote($col);
+
+            if (isset($index->collations[$col])) {
+                $collation = $index->collations[$col];
+                if (! \preg_match('/^[A-Za-z0-9_]+$/', $collation)) {
+                    throw new ValidationException('Invalid collation: ' . $collation);
+                }
+                $part .= ' COLLATE ' . $collation;
+            }
+
+            if (isset($index->lengths[$col])) {
+                $part .= '(' . $index->lengths[$col] . ')';
+            }
+
+            if ($index->operatorClass !== '') {
+                $part .= ' ' . $index->operatorClass;
+            }
+
+            if (isset($index->orders[$col])) {
+                $order = \strtoupper($index->orders[$col]);
+                if ($order !== OrderDirection::Asc->value && $order !== OrderDirection::Desc->value) {
+                    throw new ValidationException('Invalid index order: ' . $index->orders[$col]);
+                }
+                $part .= ' ' . $order;
+            }
+
+            $parts[] = $part;
+        }
+
+        // Append raw expressions (bypass quoting) — for CAST ARRAY, JSONB paths, etc.
+        foreach ($index->rawColumns as $raw) {
+            $parts[] = $raw;
+        }
+
+        return \implode(', ', $parts);
+    }
+
+    public function renameIndex(string $table, string $from, string $to): Statement
+    {
+        return new Statement(
+            'ALTER TABLE ' . $this->quote($table) . ' RENAME INDEX ' . $this->quote($from) . ' TO ' . $this->quote($to),
+            [],
+            executor: $this->executor,
+        );
+    }
+
+    public function createDatabase(string $name): Statement
+    {
+        return new Statement('CREATE DATABASE ' . $this->quote($name), [], executor: $this->executor);
+    }
+
+    public function dropDatabase(string $name): Statement
+    {
+        return new Statement('DROP DATABASE ' . $this->quote($name), [], executor: $this->executor);
+    }
+
+    public function analyzeTable(string $table): Statement
+    {
+        return new Statement('ANALYZE TABLE ' . $this->quote($table), [], executor: $this->executor);
+    }
+}

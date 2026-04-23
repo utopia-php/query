@@ -1,3 +1,10 @@
 .phpunit.result.cache
 composer.phar
 /vendor/
+.idea
+coverage
+coverage.xml
+.DS_Store
+.claude/worktrees/
+.phpunit.cache/
+coverage/
