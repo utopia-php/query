@@ -11765,11 +11765,11 @@ class MySQLTest extends TestCase
             ->update();
     }
 
-    public function testDeleteUsing(): void
+    public function testDeleteJoin(): void
     {
         $result = (new Builder())
             ->from('orders')
-            ->deleteUsing('o', 'users', 'o.user_id', 'users.id')
+            ->deleteJoin('o', 'users', 'o.user_id', 'users.id')
             ->filter([Query::equal('users.active', [false])])
             ->delete();
         $this->assertBindingCount($result);
@@ -11848,13 +11848,13 @@ class MySQLTest extends TestCase
             ->build();
     }
 
-    public function testResetClearsUpdateJoinAndDeleteUsing(): void
+    public function testResetClearsUpdateJoinAndDeleteJoin(): void
     {
         $builder = (new Builder())
             ->from('orders')
             ->set(['status' => 'cancelled'])
             ->updateJoin('users', 'orders.user_id', 'users.id')
-            ->deleteUsing('o', 'users', 'o.user_id', 'users.id');
+            ->deleteJoin('o', 'users', 'o.user_id', 'users.id');
 
         $builder->reset();
 
@@ -14210,11 +14210,11 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('GROUP BY `status`, YEAR(created_at)', $result->query);
     }
 
-    public function testDeleteUsingWithFilter(): void
+    public function testDeleteJoinWithFilter(): void
     {
         $result = (new Builder())
             ->from('orders')
-            ->deleteUsing('o', 'blacklist', 'o.user_id', 'blacklist.user_id')
+            ->deleteJoin('o', 'blacklist', 'o.user_id', 'blacklist.user_id')
             ->filter([Query::equal('blacklist.reason', ['fraud'])])
             ->delete();
         $this->assertBindingCount($result);
@@ -14752,11 +14752,11 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('NOT EXISTS (', $result->query);
     }
 
-    public function testCteWithDeleteUsing(): void
+    public function testCteWithDeleteJoin(): void
     {
         $result = (new Builder())
             ->from('orders')
-            ->deleteUsing('o', 'expired_users', 'o.user_id', 'expired_users.id')
+            ->deleteJoin('o', 'expired_users', 'o.user_id', 'expired_users.id')
             ->filter([Query::lessThan('o.created_at', '2023-01-01')])
             ->delete();
         $this->assertBindingCount($result);

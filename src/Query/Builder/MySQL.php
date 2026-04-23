@@ -30,11 +30,11 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
 
     protected string $deleteAlias = '';
 
-    protected string $deleteUsingTable = '';
+    protected string $deleteJoinTable = '';
 
-    protected string $deleteUsingLeft = '';
+    protected string $deleteJoinLeft = '';
 
-    protected string $deleteUsingRight = '';
+    protected string $deleteJoinRight = '';
 
     #[\Override]
     protected function compileRandom(): string
@@ -307,12 +307,12 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         return new Statement(\implode(' ', $parts), $this->bindings, executor: $this->executor);
     }
 
-    public function deleteUsing(string $alias, string $table, string $left, string $right): static
+    public function deleteJoin(string $alias, string $table, string $left, string $right): static
     {
         $this->deleteAlias = $alias;
-        $this->deleteUsingTable = $table;
-        $this->deleteUsingLeft = $left;
-        $this->deleteUsingRight = $right;
+        $this->deleteJoinTable = $table;
+        $this->deleteJoinLeft = $left;
+        $this->deleteJoinRight = $right;
 
         return $this;
     }
@@ -321,21 +321,21 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     public function delete(): Statement
     {
         if ($this->deleteAlias !== '') {
-            return $this->buildDeleteUsing();
+            return $this->buildDeleteJoin();
         }
 
         return parent::delete();
     }
 
-    private function buildDeleteUsing(): Statement
+    private function buildDeleteJoin(): Statement
     {
         $this->bindings = [];
         $this->validateTable();
 
         $sql = 'DELETE ' . $this->quote($this->deleteAlias)
             . ' FROM ' . $this->quote($this->table) . ' AS ' . $this->quote($this->deleteAlias)
-            . ' JOIN ' . $this->quote($this->deleteUsingTable)
-            . ' ON ' . $this->resolveAndWrap($this->deleteUsingLeft) . ' = ' . $this->resolveAndWrap($this->deleteUsingRight);
+            . ' JOIN ' . $this->quote($this->deleteJoinTable)
+            . ' ON ' . $this->resolveAndWrap($this->deleteJoinLeft) . ' = ' . $this->resolveAndWrap($this->deleteJoinRight);
 
         $parts = [$sql];
         $this->compileWhereClauses($parts);
@@ -430,9 +430,9 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
         $this->updateJoinRight = '';
         $this->updateJoinAlias = '';
         $this->deleteAlias = '';
-        $this->deleteUsingTable = '';
-        $this->deleteUsingLeft = '';
-        $this->deleteUsingRight = '';
+        $this->deleteJoinTable = '';
+        $this->deleteJoinLeft = '';
+        $this->deleteJoinRight = '';
 
         return $this;
     }
