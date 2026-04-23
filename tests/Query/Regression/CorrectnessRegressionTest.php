@@ -2,7 +2,6 @@
 
 namespace Tests\Query\Regression;
 
-use BadMethodCallException;
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder;
@@ -433,19 +432,25 @@ class CorrectnessRegressionTest extends TestCase
 
     public function testMysqlJsonContainsRejectsInvalidUtf8(): void
     {
+        $query = Query::containsAll('tags', ["\xB1\x31"]);
+        $query->setOnArray(true);
+
         $this->expectException(ValidationException::class);
         (new MySQLBuilder())
             ->from('t')
-            ->queries([Query::containsAll('tags', ["\xB1\x31"])])
+            ->queries([$query])
             ->build();
     }
 
     public function testMysqlJsonOverlapsRejectsInvalidUtf8(): void
     {
+        $query = Query::containsAny('tags', ["\xB1\x31"]);
+        $query->setOnArray(true);
+
         $this->expectException(ValidationException::class);
         (new MySQLBuilder())
             ->from('t')
-            ->queries([Query::containsAny('tags', ["\xB1\x31"])])
+            ->queries([$query])
             ->build();
     }
 

@@ -509,7 +509,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     #[\Override]
     protected function compileJsonContainsExpr(string $attribute, array $values, bool $not): string
     {
-        $this->addBinding(\json_encode($values[0]));
+        $this->addBinding($this->encodeJsonPayload($values[0]));
         $expr = 'JSON_CONTAINS(' . $attribute . ', ?)';
 
         return $not ? 'NOT ' . $expr : $expr;
@@ -523,9 +523,18 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     {
         /** @var array<mixed> $arr */
         $arr = $values[0];
-        $this->addBinding(\json_encode($arr));
+        $this->addBinding($this->encodeJsonPayload($arr));
 
         return 'JSON_OVERLAPS(' . $attribute . ', ?)';
+    }
+
+    private function encodeJsonPayload(mixed $payload): string
+    {
+        try {
+            return \json_encode($payload, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $exception) {
+            throw new ValidationException('Invalid JSON payload: ' . $exception->getMessage());
+        }
     }
 
     /**
