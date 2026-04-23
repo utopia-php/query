@@ -11642,6 +11642,84 @@ class MySQLTest extends TestCase
             ->hint('DROP TABLE users; --');
     }
 
+    public function testHintAcceptsBacktickedIndex(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->hint('INDEX(`users` `idx_users_age`)')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'SELECT /*+ INDEX(`users` `idx_users_age`) */ * FROM `users`',
+            $result->query
+        );
+    }
+
+    public function testHintAcceptsForceIndex(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->hint('FORCE INDEX (`idx_age`)')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'SELECT /*+ FORCE INDEX (`idx_age`) */ * FROM `users`',
+            $result->query
+        );
+    }
+
+    public function testHintRejectsSemicolonInjection(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid hint');
+
+        (new Builder())
+            ->from('users')
+            ->hint('; DROP TABLE users;');
+    }
+
+    public function testHintRejectsNullByteInjection(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid hint');
+
+        (new Builder())
+            ->from('users')
+            ->hint("INDEX(`idx`)\x00");
+    }
+
+    public function testHintRejectsNewlineInjection(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid hint');
+
+        (new Builder())
+            ->from('users')
+            ->hint("INDEX(`idx`)\nDROP TABLE users");
+    }
+
+    public function testHintRejectsBlockCommentInjection(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid hint');
+
+        (new Builder())
+            ->from('users')
+            ->hint('INDEX(`idx`) */ DROP TABLE users /*');
+    }
+
+    public function testHintRejectsQuoteInjection(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid hint');
+
+        (new Builder())
+            ->from('users')
+            ->hint("INDEX('idx')");
+    }
+
     public function testMaxExecutionTimeExactQuery(): void
     {
         $result = (new Builder())
