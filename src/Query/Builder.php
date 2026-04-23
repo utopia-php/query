@@ -73,7 +73,7 @@ abstract class Builder implements
     use Builder\Trait\Windows;
 
     /** @var list<string> */
-    private const COLUMN_PREDICATE_OPERATORS = ['=', '!=', '<>', '<', '>', '<=', '>='];
+    protected const COLUMN_PREDICATE_OPERATORS = ['=', '!=', '<>', '<', '>', '<=', '>='];
 
     protected string $table = '';
 
@@ -402,20 +402,13 @@ abstract class Builder implements
         }
     }
 
-    public function forUpdate(): static
-    {
-        $this->lockMode = LockMode::ForUpdate;
-
-        return $this;
-    }
-
     /**
      * Build an INSERT ... ON CONFLICT/DUPLICATE KEY UPDATE statement.
      * Requires onConflict() to be called first to configure conflict keys and update columns.
      */
     public function upsert(): Statement
     {
-        return $this->insert();
+        throw new UnsupportedException('UPSERT is not supported by this dialect.');
     }
 
     #[\Override]
@@ -717,7 +710,7 @@ abstract class Builder implements
                     Method::CrossJoin => JoinType::Cross,
                     Method::FullOuterJoin => JoinType::FullOuter,
                     Method::NaturalJoin => JoinType::Natural,
-                    default => JoinType::Inner,
+                    default => throw new UnsupportedException('Unsupported join method: ' . $joinQuery->getMethod()->value),
                 };
                 $isCrossJoin = $joinType === JoinType::Cross || $joinType === JoinType::Natural;
 
@@ -1240,7 +1233,17 @@ abstract class Builder implements
 
     protected function shouldEmitOffset(?int $offset, ?int $limit): bool
     {
-        return $offset !== null && $limit !== null;
+        if ($offset === null) {
+            return false;
+        }
+
+        if ($limit === null) {
+            throw new ValidationException(
+                'OFFSET requires LIMIT on this engine. Set a limit or use the dialect\'s native no-limit form.',
+            );
+        }
+
+        return true;
     }
 
     /**
