@@ -10,27 +10,27 @@ class ConditionTest extends TestCase
     public function testGetExpression(): void
     {
         $condition = new Condition('status = ?', ['active']);
-        $this->assertEquals('status = ?', $condition->expression);
+        $this->assertSame('status = ?', $condition->expression);
     }
 
     public function testGetBindings(): void
     {
         $condition = new Condition('status = ?', ['active']);
-        $this->assertEquals(['active'], $condition->bindings);
+        $this->assertSame(['active'], $condition->bindings);
     }
 
     public function testEmptyBindings(): void
     {
         $condition = new Condition('1 = 1');
-        $this->assertEquals('1 = 1', $condition->expression);
-        $this->assertEquals([], $condition->bindings);
+        $this->assertSame('1 = 1', $condition->expression);
+        $this->assertSame([], $condition->bindings);
     }
 
     public function testMultipleBindings(): void
     {
         $condition = new Condition('age BETWEEN ? AND ?', [18, 65]);
-        $this->assertEquals('age BETWEEN ? AND ?', $condition->expression);
-        $this->assertEquals([18, 65], $condition->bindings);
+        $this->assertSame('age BETWEEN ? AND ?', $condition->expression);
+        $this->assertSame([18, 65], $condition->bindings);
     }
 
     public function testPropertiesAreReadonly(): void

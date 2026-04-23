@@ -167,7 +167,7 @@ class PostgreSQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropIndex('users', 'idx_email');
 
-        $this->assertEquals('DROP INDEX "idx_email"', $result->query);
+        $this->assertSame('DROP INDEX "idx_email"', $result->query);
     }
     // CREATE INDEX — USING method + operator class
 
@@ -176,7 +176,7 @@ class PostgreSQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->createIndex('documents', 'idx_content_gin', ['content'], method: 'gin', operatorClass: 'gin_trgm_ops');
 
-        $this->assertEquals(
+        $this->assertSame(
             'CREATE INDEX "idx_content_gin" ON "documents" USING GIN ("content" gin_trgm_ops)',
             $result->query
         );
@@ -187,7 +187,7 @@ class PostgreSQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->createIndex('embeddings', 'idx_embedding_hnsw', ['embedding'], method: 'hnsw', operatorClass: 'vector_cosine_ops');
 
-        $this->assertEquals(
+        $this->assertSame(
             'CREATE INDEX "idx_embedding_hnsw" ON "embeddings" USING HNSW ("embedding" vector_cosine_ops)',
             $result->query
         );
@@ -198,7 +198,7 @@ class PostgreSQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->createIndex('locations', 'idx_coords_gist', ['coords'], method: 'gist');
 
-        $this->assertEquals(
+        $this->assertSame(
             'CREATE INDEX "idx_coords_gist" ON "locations" USING GIST ("coords")',
             $result->query
         );
@@ -224,7 +224,7 @@ class PostgreSQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropProcedure('update_stats');
 
-        $this->assertEquals('DROP FUNCTION "update_stats"', $result->query);
+        $this->assertSame('DROP FUNCTION "update_stats"', $result->query);
     }
     // TRIGGERS — EXECUTE FUNCTION
 
@@ -250,7 +250,7 @@ class PostgreSQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropForeignKey('orders', 'fk_user');
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE "orders" DROP CONSTRAINT "fk_user"',
             $result->query
         );
@@ -288,7 +288,7 @@ class PostgreSQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertEquals('DROP INDEX "idx_email"', $result->query);
+        $this->assertSame('DROP INDEX "idx_email"', $result->query);
     }
 
     public function testAlterColumnAndIndexSeparateStatements(): void
@@ -321,7 +321,7 @@ class PostgreSQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->createExtension('vector');
 
-        $this->assertEquals('CREATE EXTENSION IF NOT EXISTS "vector"', $result->query);
+        $this->assertSame('CREATE EXTENSION IF NOT EXISTS "vector"', $result->query);
     }
 
     public function testDropExtension(): void
@@ -329,7 +329,7 @@ class PostgreSQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropExtension('vector');
 
-        $this->assertEquals('DROP EXTENSION IF EXISTS "vector"', $result->query);
+        $this->assertSame('DROP EXTENSION IF EXISTS "vector"', $result->query);
     }
     // Views — double-quote wrapping
 
@@ -339,7 +339,7 @@ class PostgreSQLTest extends TestCase
         $builder = (new PgBuilder())->from('users')->filter([Query::equal('active', [true])]);
         $result = $schema->createView('active_users', $builder);
 
-        $this->assertEquals(
+        $this->assertSame(
             'CREATE VIEW "active_users" AS SELECT * FROM "users" WHERE "active" IN (?)',
             $result->query
         );
@@ -350,7 +350,7 @@ class PostgreSQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropView('active_users');
 
-        $this->assertEquals('DROP VIEW "active_users"', $result->query);
+        $this->assertSame('DROP VIEW "active_users"', $result->query);
     }
     // Shared operations — still work with double quotes
 
@@ -360,7 +360,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->drop('users');
         $this->assertBindingCount($result);
 
-        $this->assertEquals('DROP TABLE "users"', $result->query);
+        $this->assertSame('DROP TABLE "users"', $result->query);
     }
 
     public function testTruncateTable(): void
@@ -369,7 +369,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->truncate('users');
         $this->assertBindingCount($result);
 
-        $this->assertEquals('TRUNCATE TABLE "users"', $result->query);
+        $this->assertSame('TRUNCATE TABLE "users"', $result->query);
     }
 
     public function testRenameTableUsesAlterTable(): void
@@ -378,7 +378,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->rename('users', 'members');
         $this->assertBindingCount($result);
 
-        $this->assertEquals('ALTER TABLE "users" RENAME TO "members"', $result->query);
+        $this->assertSame('ALTER TABLE "users" RENAME TO "members"', $result->query);
     }
 
     // Edge cases
@@ -388,7 +388,7 @@ class PostgreSQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropIfExists('users');
 
-        $this->assertEquals('DROP TABLE IF EXISTS "users"', $result->query);
+        $this->assertSame('DROP TABLE IF EXISTS "users"', $result->query);
     }
 
     public function testCreateOrReplaceView(): void
@@ -481,7 +481,7 @@ class PostgreSQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->createIndex('users', 'idx_email', ['email']);
 
-        $this->assertEquals('CREATE INDEX "idx_email" ON "users" ("email")', $result->query);
+        $this->assertSame('CREATE INDEX "idx_email" ON "users" ("email")', $result->query);
     }
 
     public function testCreateUniqueIndex(): void
@@ -489,7 +489,7 @@ class PostgreSQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->createIndex('users', 'idx_email', ['email'], unique: true);
 
-        $this->assertEquals('CREATE UNIQUE INDEX "idx_email" ON "users" ("email")', $result->query);
+        $this->assertSame('CREATE UNIQUE INDEX "idx_email" ON "users" ("email")', $result->query);
     }
 
     public function testCreateIndexMultiColumn(): void
@@ -497,7 +497,7 @@ class PostgreSQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->createIndex('users', 'idx_name', ['first_name', 'last_name']);
 
-        $this->assertEquals('CREATE INDEX "idx_name" ON "users" ("first_name", "last_name")', $result->query);
+        $this->assertSame('CREATE INDEX "idx_name" ON "users" ("first_name", "last_name")', $result->query);
     }
 
     public function testAlterRenameColumn(): void
@@ -543,7 +543,7 @@ class PostgreSQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->addForeignKey('orders', 'fk_user', 'user_id', 'users', 'id', ForeignKeyAction::Cascade, ForeignKeyAction::SetNull);
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE "orders" ADD CONSTRAINT "fk_user" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE SET NULL',
             $result->query
         );
@@ -556,7 +556,7 @@ class PostgreSQLTest extends TestCase
         // dropTrigger should use base SQL dropTrigger
         $result = $schema->dropTrigger('trg_old');
 
-        $this->assertEquals('DROP TRIGGER "trg_old"', $result->query);
+        $this->assertSame('DROP TRIGGER "trg_old"', $result->query);
     }
 
     public function testAlterWithUniqueIndex(): void
@@ -587,7 +587,7 @@ class PostgreSQLTest extends TestCase
             'CREATE TABLE "accounts" ("id" BIGINT GENERATED BY DEFAULT AS IDENTITY NOT NULL, "username" VARCHAR(50) NOT NULL, "verified" BOOLEAN NOT NULL, "metadata" JSONB NOT NULL, PRIMARY KEY ("id"))',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
         $this->assertBindingCount($result);
     }
 
@@ -602,7 +602,7 @@ class PostgreSQLTest extends TestCase
             'ALTER TABLE "accounts" ADD COLUMN "bio" TEXT NULL',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
         $this->assertBindingCount($result);
     }
 
@@ -612,7 +612,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->drop('sessions');
 
         $this->assertSame('DROP TABLE "sessions"', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
         $this->assertBindingCount($result);
     }
 
@@ -655,7 +655,7 @@ class PostgreSQLTest extends TestCase
             "CREATE COLLATION IF NOT EXISTS \"ci_collation\" (provider = 'icu', locale = 'und-u-ks-level1', deterministic = true)",
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCreateCollationNonDeterministic(): void
@@ -689,7 +689,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->renameIndex('users', 'idx_old', 'idx_new');
 
         $this->assertSame('ALTER INDEX "idx_old" RENAME TO "idx_new"', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCreateDatabase(): void
@@ -698,7 +698,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->createDatabase('my_schema');
 
         $this->assertSame('CREATE SCHEMA "my_schema"', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testDropDatabase(): void
@@ -707,7 +707,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->dropDatabase('my_schema');
 
         $this->assertSame('DROP SCHEMA IF EXISTS "my_schema" CASCADE', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testAnalyzeTable(): void
@@ -716,7 +716,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->analyzeTable('users');
 
         $this->assertSame('ANALYZE "users"', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testAlterColumnType(): void
@@ -725,7 +725,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->alterColumnType('users', 'age', 'BIGINT');
 
         $this->assertSame('ALTER TABLE "users" ALTER COLUMN "age" TYPE BIGINT', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testAlterColumnTypeWithUsing(): void
@@ -734,7 +734,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->alterColumnType('users', 'age', 'INTEGER', '"age"::integer');
 
         $this->assertSame('ALTER TABLE "users" ALTER COLUMN "age" TYPE INTEGER USING "age"::integer', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testAlterColumnTypeRejectsInjectionInType(): void
@@ -819,7 +819,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->dropIndexConcurrently('idx_email');
 
         $this->assertSame('DROP INDEX CONCURRENTLY "idx_email"', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCreateType(): void
@@ -828,7 +828,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->createType('mood', ['happy', 'sad', 'neutral']);
 
         $this->assertSame("CREATE TYPE \"mood\" AS ENUM ('happy', 'sad', 'neutral')", $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testDropType(): void
@@ -837,7 +837,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->dropType('mood');
 
         $this->assertSame('DROP TYPE "mood"', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCreateSequence(): void
@@ -846,7 +846,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->createSequence('order_seq', 100, 5);
 
         $this->assertSame('CREATE SEQUENCE "order_seq" START 100 INCREMENT BY 5', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCreateSequenceDefaults(): void
@@ -863,7 +863,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->dropSequence('order_seq');
 
         $this->assertSame('DROP SEQUENCE "order_seq"', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testNextVal(): void
@@ -872,7 +872,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->nextVal('order_seq');
 
         $this->assertSame("SELECT nextval('order_seq')", $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCommentOnTable(): void
@@ -881,7 +881,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->commentOnTable('users', 'Main users table');
 
         $this->assertSame("COMMENT ON TABLE \"users\" IS 'Main users table'", $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCommentOnColumn(): void
@@ -890,7 +890,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->commentOnColumn('users', 'email', 'Primary email address');
 
         $this->assertSame("COMMENT ON COLUMN \"users\".\"email\" IS 'Primary email address'", $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCreatePartition(): void
@@ -899,7 +899,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->createPartition('orders', 'orders_2024', "IN ('2024')");
 
         $this->assertSame("CREATE TABLE \"orders_2024\" PARTITION OF \"orders\" FOR VALUES IN ('2024')", $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testDropPartition(): void
@@ -908,7 +908,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->dropPartition('orders', 'orders_2024');
 
         $this->assertSame('DROP TABLE "orders_2024"', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCreateIndexConcurrently(): void
@@ -917,7 +917,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->createIndex('users', 'idx_email', ['email'], concurrently: true);
 
         $this->assertSame('CREATE INDEX CONCURRENTLY "idx_email" ON "users" ("email")', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCreateUniqueIndexConcurrently(): void

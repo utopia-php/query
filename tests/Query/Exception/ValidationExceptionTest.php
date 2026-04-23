@@ -23,6 +23,6 @@ class ValidationExceptionTest extends TestCase
     public function testMessagePreserved(): void
     {
         $e = new ValidationException('Missing table');
-        $this->assertEquals('Missing table', $e->getMessage());
+        $this->assertSame('Missing table', $e->getMessage());
     }
 }

@@ -39,7 +39,7 @@ class FilterTest extends TestCase
 
         $this->assertStringContainsString('LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id` AND active = ?', $result->query);
         $this->assertStringNotContainsString('WHERE', $result->query);
-        $this->assertEquals([1], $result->bindings);
+        $this->assertSame([1], $result->bindings);
     }
 
     public function testWherePlacementForInnerJoin(): void
@@ -64,7 +64,7 @@ class FilterTest extends TestCase
         $this->assertStringContainsString('JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $result->query);
         $this->assertStringNotContainsString('ON `users`.`id` = `orders`.`user_id` AND', $result->query);
         $this->assertStringContainsString('WHERE active = ?', $result->query);
-        $this->assertEquals([1], $result->bindings);
+        $this->assertSame([1], $result->bindings);
     }
 
     public function testReturnsNullSkipsJoin(): void
@@ -83,8 +83,8 @@ class FilterTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `users` LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('SELECT * FROM `users` LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCrossJoinForcesOnToWhere(): void
@@ -109,7 +109,7 @@ class FilterTest extends TestCase
         $this->assertStringContainsString('CROSS JOIN `settings`', $result->query);
         $this->assertStringNotContainsString('CROSS JOIN `settings` AND', $result->query);
         $this->assertStringContainsString('WHERE active = ?', $result->query);
-        $this->assertEquals([1], $result->bindings);
+        $this->assertSame([1], $result->bindings);
     }
 
     public function testMultipleHooksOnSameJoin(): void
@@ -146,7 +146,7 @@ class FilterTest extends TestCase
             'LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id` AND active = ? AND visible = ?',
             $result->query
         );
-        $this->assertEquals([1, true], $result->bindings);
+        $this->assertSame([1, true], $result->bindings);
     }
 
     public function testBindingOrderCorrectness(): void
@@ -181,7 +181,7 @@ class FilterTest extends TestCase
         $this->assertBindingCount($result);
 
         // ON bindings come first (during join compilation), then filter bindings, then WHERE join filter bindings
-        $this->assertEquals(['on_val', 'active', 'where_val'], $result->bindings);
+        $this->assertSame(['on_val', 'active', 'where_val'], $result->bindings);
     }
 
     public function testFilterOnlyBackwardCompat(): void
@@ -204,7 +204,7 @@ class FilterTest extends TestCase
         $this->assertStringContainsString('LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $result->query);
         $this->assertStringNotContainsString('ON `users`.`id` = `orders`.`user_id` AND', $result->query);
         $this->assertStringContainsString('WHERE deleted = ?', $result->query);
-        $this->assertEquals([0], $result->bindings);
+        $this->assertSame([0], $result->bindings);
     }
 
     public function testDualInterfaceHook(): void
@@ -236,7 +236,7 @@ class FilterTest extends TestCase
         // JoinFilter applies to ON for join
         $this->assertStringContainsString('ON `users`.`id` = `orders`.`user_id` AND join_active = ?', $result->query);
         // ON binding first, then WHERE binding
-        $this->assertEquals([1, 1], $result->bindings);
+        $this->assertSame([1, 1], $result->bindings);
     }
 
     public function testPermissionLeftJoinOnPlacement(): void
@@ -248,7 +248,7 @@ class FilterTest extends TestCase
         $condition = $hook->filterJoin('orders', JoinType::Left);
 
         $this->assertNotNull($condition);
-        $this->assertEquals(Placement::On, $condition->placement);
+        $this->assertSame(Placement::On, $condition->placement);
         $this->assertStringContainsString('id IN', $condition->condition->expression);
     }
 
@@ -261,7 +261,7 @@ class FilterTest extends TestCase
         $condition = $hook->filterJoin('orders', JoinType::Inner);
 
         $this->assertNotNull($condition);
-        $this->assertEquals(Placement::Where, $condition->placement);
+        $this->assertSame(Placement::Where, $condition->placement);
     }
 
     public function testTenantLeftJoinOnPlacement(): void
@@ -270,7 +270,7 @@ class FilterTest extends TestCase
         $condition = $hook->filterJoin('orders', JoinType::Left);
 
         $this->assertNotNull($condition);
-        $this->assertEquals(Placement::On, $condition->placement);
+        $this->assertSame(Placement::On, $condition->placement);
         $this->assertStringContainsString('tenant_id IN', $condition->condition->expression);
     }
 
@@ -280,7 +280,7 @@ class FilterTest extends TestCase
         $condition = $hook->filterJoin('orders', JoinType::Inner);
 
         $this->assertNotNull($condition);
-        $this->assertEquals(Placement::Where, $condition->placement);
+        $this->assertSame(Placement::Where, $condition->placement);
     }
 
     public function testHookReceivesCorrectTableAndJoinType(): void
@@ -290,12 +290,12 @@ class FilterTest extends TestCase
 
         $rightJoinResult = $hook->filterJoin('orders', JoinType::Right);
         $this->assertNotNull($rightJoinResult);
-        $this->assertEquals(Placement::On, $rightJoinResult->placement);
+        $this->assertSame(Placement::On, $rightJoinResult->placement);
 
         // Same hook returns Where for JOIN — verifying joinType discrimination
         $innerJoinResult = $hook->filterJoin('orders', JoinType::Inner);
         $this->assertNotNull($innerJoinResult);
-        $this->assertEquals(Placement::Where, $innerJoinResult->placement);
+        $this->assertSame(Placement::Where, $innerJoinResult->placement);
 
         // Verify table name is used in the condition expression
         $permHook = new Permission(

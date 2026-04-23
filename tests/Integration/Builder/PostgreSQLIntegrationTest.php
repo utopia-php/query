@@ -104,8 +104,8 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnPostgres($result);
 
         $this->assertCount(2, $rows);
-        $this->assertEquals('Alice', $rows[0]['name']);
-        $this->assertEquals('Charlie', $rows[1]['name']);
+        $this->assertSame('Alice', $rows[0]['name']);
+        $this->assertSame('Charlie', $rows[1]['name']);
     }
 
     public function testSelectWithOrderByLimitOffset(): void
@@ -121,8 +121,8 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnPostgres($result);
 
         $this->assertCount(2, $rows);
-        $this->assertEquals('Bob', $rows[0]['name']);
-        $this->assertEquals('Charlie', $rows[1]['name']);
+        $this->assertSame('Bob', $rows[0]['name']);
+        $this->assertSame('Charlie', $rows[1]['name']);
     }
 
     public function testSelectWithJoin(): void
@@ -138,8 +138,8 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnPostgres($result);
 
         $this->assertCount(4, $rows);
-        $this->assertEquals('Alice', $rows[0]['name']);
-        $this->assertEquals('Widget', $rows[0]['product']);
+        $this->assertSame('Alice', $rows[0]['name']);
+        $this->assertSame('Widget', $rows[0]['product']);
     }
 
     public function testSelectWithLeftJoin(): void
@@ -155,7 +155,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnPostgres($result);
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('Diana', $rows[0]['name']);
+        $this->assertSame('Diana', $rows[0]['name']);
     }
 
     public function testInsertSingleRow(): void
@@ -176,8 +176,8 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnPostgres($check);
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('Frank', $rows[0]['name']);
-        $this->assertEquals('Berlin', $rows[0]['city']);
+        $this->assertSame('Frank', $rows[0]['name']);
+        $this->assertSame('Berlin', $rows[0]['city']);
     }
 
     public function testInsertMultipleRows(): void
@@ -200,8 +200,8 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnPostgres($check);
 
         $this->assertCount(2, $rows);
-        $this->assertEquals('Grace', $rows[0]['name']);
-        $this->assertEquals('Hank', $rows[1]['name']);
+        $this->assertSame('Grace', $rows[0]['name']);
+        $this->assertSame('Hank', $rows[1]['name']);
     }
 
     public function testInsertWithReturning(): void
@@ -215,8 +215,8 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnPostgres($result);
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('Ivy', $rows[0]['name']);
-        $this->assertEquals('ivy@example.com', $rows[0]['email']);
+        $this->assertSame('Ivy', $rows[0]['name']);
+        $this->assertSame('ivy@example.com', $rows[0]['email']);
         $this->assertArrayHasKey('id', $rows[0]);
         $this->assertGreaterThan(0, (int) $rows[0]['id']); // @phpstan-ignore cast.int
     }
@@ -240,7 +240,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnPostgres($check);
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('San Francisco', $rows[0]['city']);
+        $this->assertSame('San Francisco', $rows[0]['city']);
     }
 
     public function testUpdateWithReturning(): void
@@ -255,8 +255,8 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnPostgres($result);
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('Alice', $rows[0]['name']);
-        $this->assertEquals(31, (int) $rows[0]['age']); // @phpstan-ignore cast.int
+        $this->assertSame('Alice', $rows[0]['name']);
+        $this->assertSame(31, (int) $rows[0]['age']); // @phpstan-ignore cast.int
     }
 
     public function testDeleteWithWhere(): void
@@ -293,7 +293,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnPostgres($result);
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('Charlie', $rows[0]['name']);
+        $this->assertSame('Charlie', $rows[0]['name']);
     }
 
     public function testSelectWithGroupByAndHaving(): void
@@ -310,10 +310,10 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnPostgres($result);
 
         $this->assertCount(2, $rows);
-        $this->assertEquals(1, (int) $rows[0]['user_id']); // @phpstan-ignore cast.int
-        $this->assertEquals(2, (int) $rows[0]['order_count']); // @phpstan-ignore cast.int
-        $this->assertEquals(4, (int) $rows[1]['user_id']); // @phpstan-ignore cast.int
-        $this->assertEquals(2, (int) $rows[1]['order_count']); // @phpstan-ignore cast.int
+        $this->assertSame(1, (int) $rows[0]['user_id']); // @phpstan-ignore cast.int
+        $this->assertSame(2, (int) $rows[0]['order_count']); // @phpstan-ignore cast.int
+        $this->assertSame(4, (int) $rows[1]['user_id']); // @phpstan-ignore cast.int
+        $this->assertSame(2, (int) $rows[1]['order_count']); // @phpstan-ignore cast.int
     }
 
     public function testSelectWithUnion(): void
@@ -336,7 +336,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         sort($names);
 
         $this->assertCount(4, $rows);
-        $this->assertEquals(['Alice', 'Bob', 'Charlie', 'Eve'], $names);
+        $this->assertSame(['Alice', 'Bob', 'Charlie', 'Eve'], $names);
     }
 
     public function testUpsertOnConflictDoUpdate(): void
@@ -358,9 +358,9 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnPostgres($check);
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('Alice Updated', $rows[0]['name']);
-        $this->assertEquals(31, (int) $rows[0]['age']); // @phpstan-ignore cast.int
-        $this->assertEquals('Boston', $rows[0]['city']);
+        $this->assertSame('Alice Updated', $rows[0]['name']);
+        $this->assertSame(31, (int) $rows[0]['age']); // @phpstan-ignore cast.int
+        $this->assertSame('Boston', $rows[0]['city']);
     }
 
     public function testInsertOrIgnoreOnConflictDoNothing(): void
@@ -381,8 +381,8 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnPostgres($check);
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('Alice', $rows[0]['name']);
-        $this->assertEquals(30, (int) $rows[0]['age']); // @phpstan-ignore cast.int
+        $this->assertSame('Alice', $rows[0]['name']);
+        $this->assertSame(30, (int) $rows[0]['age']); // @phpstan-ignore cast.int
     }
 
     public function testSelectWithCte(): void
@@ -402,10 +402,10 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnPostgres($result);
 
         $this->assertCount(4, $rows);
-        $this->assertEquals('Alice', $rows[0]['name']);
-        $this->assertEquals('Bob', $rows[1]['name']);
-        $this->assertEquals('Diana', $rows[2]['name']);
-        $this->assertEquals('Eve', $rows[3]['name']);
+        $this->assertSame('Alice', $rows[0]['name']);
+        $this->assertSame('Bob', $rows[1]['name']);
+        $this->assertSame('Diana', $rows[2]['name']);
+        $this->assertSame('Eve', $rows[3]['name']);
     }
 
     public function testSelectWithWindowFunction(): void
@@ -425,8 +425,8 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
 
         $user1Rows = array_filter($rows, fn ($r) => (int) $r['user_id'] === 1); // @phpstan-ignore cast.int
         $user1Rows = array_values($user1Rows);
-        $this->assertEquals(1, (int) $user1Rows[0]['rn']); // @phpstan-ignore cast.int
-        $this->assertEquals(2, (int) $user1Rows[1]['rn']); // @phpstan-ignore cast.int
+        $this->assertSame(1, (int) $user1Rows[0]['rn']); // @phpstan-ignore cast.int
+        $this->assertSame(2, (int) $user1Rows[1]['rn']); // @phpstan-ignore cast.int
     }
 
     public function testSelectWithDistinct(): void
@@ -442,7 +442,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
 
         $this->assertCount(3, $rows);
         $products = array_column($rows, 'product');
-        $this->assertEquals(['Gadget', 'Gizmo', 'Widget'], $products);
+        $this->assertSame(['Gadget', 'Gizmo', 'Widget'], $products);
     }
 
     public function testSelectWithSubqueryInWhere(): void
@@ -464,7 +464,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $names = array_column($rows, 'name');
 
         $this->assertCount(3, $rows);
-        $this->assertEquals(['Alice', 'Charlie', 'Eve'], $names);
+        $this->assertSame(['Alice', 'Charlie', 'Eve'], $names);
     }
 
     public function testSelectForUpdate(): void
@@ -483,7 +483,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
             $rows = $this->executeOnPostgres($result);
 
             $this->assertCount(1, $rows);
-            $this->assertEquals('Alice', $rows[0]['name']);
+            $this->assertSame('Alice', $rows[0]['name']);
         } finally {
             $pdo->rollBack();
         }

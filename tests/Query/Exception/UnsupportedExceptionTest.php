@@ -23,6 +23,6 @@ class UnsupportedExceptionTest extends TestCase
     public function testMessagePreserved(): void
     {
         $e = new UnsupportedException('Not supported');
-        $this->assertEquals('Not supported', $e->getMessage());
+        $this->assertSame('Not supported', $e->getMessage());
     }
 }

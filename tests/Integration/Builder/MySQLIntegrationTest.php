@@ -117,9 +117,9 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnMysql($result);
 
         $this->assertCount(3, $rows);
-        $this->assertEquals('Charlie', $rows[0]['name']);
-        $this->assertEquals('Alice', $rows[1]['name']);
-        $this->assertEquals('Diana', $rows[2]['name']);
+        $this->assertSame('Charlie', $rows[0]['name']);
+        $this->assertSame('Alice', $rows[1]['name']);
+        $this->assertSame('Diana', $rows[2]['name']);
     }
 
     public function testSelectWithJoin(): void
@@ -173,7 +173,7 @@ class MySQLIntegrationTest extends IntegrationTestCase
         );
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('Frank', $rows[0]['name']);
+        $this->assertSame('Frank', $rows[0]['name']);
     }
 
     public function testInsertMultipleRows(): void
@@ -216,7 +216,7 @@ class MySQLIntegrationTest extends IntegrationTestCase
         );
 
         $this->assertCount(1, $rows);
-        $this->assertEquals(0, $rows[0]['active']);
+        $this->assertSame(0, (int) $rows[0]['active']); // @phpstan-ignore cast.int
     }
 
     public function testDeleteWithWhere(): void
@@ -302,11 +302,11 @@ class MySQLIntegrationTest extends IntegrationTestCase
 
         $this->assertCount(5, $rows);
         $map = array_column($rows, 'age_group', 'name');
-        $this->assertEquals('mid', $map['Alice']);
-        $this->assertEquals('mid', $map['Bob']);
-        $this->assertEquals('senior', $map['Charlie']);
-        $this->assertEquals('mid', $map['Diana']);
-        $this->assertEquals('young', $map['Eve']);
+        $this->assertSame('mid', $map['Alice']);
+        $this->assertSame('mid', $map['Bob']);
+        $this->assertSame('senior', $map['Charlie']);
+        $this->assertSame('mid', $map['Diana']);
+        $this->assertSame('young', $map['Eve']);
     }
 
     public function testSelectWithWhereInSubquery(): void
@@ -406,7 +406,7 @@ class MySQLIntegrationTest extends IntegrationTestCase
         );
 
         $this->assertCount(1, $rows);
-        $this->assertEquals(31, (int) $rows[0]['age']); // @phpstan-ignore cast.int
+        $this->assertSame(31, (int) $rows[0]['age']); // @phpstan-ignore cast.int
     }
 
     public function testSelectWithWindowFunction(): void
@@ -439,7 +439,7 @@ class MySQLIntegrationTest extends IntegrationTestCase
 
         $this->assertCount(3, $rows);
         $products = array_column($rows, 'product');
-        $this->assertEquals(['Gadget', 'Gizmo', 'Widget'], $products);
+        $this->assertSame(['Gadget', 'Gizmo', 'Widget'], $products);
     }
 
     public function testSelectWithBetween(): void
@@ -471,7 +471,7 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnMysql($result);
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('Alice', $rows[0]['name']);
+        $this->assertSame('Alice', $rows[0]['name']);
     }
 
     public function testSelectForUpdate(): void
@@ -490,7 +490,7 @@ class MySQLIntegrationTest extends IntegrationTestCase
             $rows = $this->executeOnMysql($result);
 
             $this->assertCount(1, $rows);
-            $this->assertEquals('Alice', $rows[0]['name']);
+            $this->assertSame('Alice', $rows[0]['name']);
 
             $pdo->commit();
         } catch (\Throwable $e) {

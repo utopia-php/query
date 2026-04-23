@@ -14,22 +14,22 @@ class AttributeTest extends TestCase
             '$createdAt' => '_createdAt',
         ]);
 
-        $this->assertEquals('_uid', $hook->resolve('$id'));
-        $this->assertEquals('_createdAt', $hook->resolve('$createdAt'));
+        $this->assertSame('_uid', $hook->resolve('$id'));
+        $this->assertSame('_createdAt', $hook->resolve('$createdAt'));
     }
 
     public function testUnmappedPassthrough(): void
     {
         $hook = new Map(['$id' => '_uid']);
 
-        $this->assertEquals('name', $hook->resolve('name'));
-        $this->assertEquals('status', $hook->resolve('status'));
+        $this->assertSame('name', $hook->resolve('name'));
+        $this->assertSame('status', $hook->resolve('status'));
     }
 
     public function testEmptyMap(): void
     {
         $hook = new Map([]);
 
-        $this->assertEquals('anything', $hook->resolve('anything'));
+        $this->assertSame('anything', $hook->resolve('anything'));
     }
 }

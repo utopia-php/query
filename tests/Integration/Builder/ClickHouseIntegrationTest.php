@@ -96,9 +96,9 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnClickhouse($result);
 
         $this->assertCount(3, $rows);
-        $this->assertEquals('Charlie', $rows[0]['name']);
-        $this->assertEquals('Alice', $rows[1]['name']);
-        $this->assertEquals('Diana', $rows[2]['name']);
+        $this->assertSame('Charlie', $rows[0]['name']);
+        $this->assertSame('Alice', $rows[1]['name']);
+        $this->assertSame('Diana', $rows[2]['name']);
     }
 
     public function testSelectWithJoin(): void
@@ -114,9 +114,9 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnClickhouse($result);
 
         $this->assertCount(3, $rows);
-        $this->assertEquals('Alice', $rows[0]['name']);
-        $this->assertEquals('Charlie', $rows[1]['name']);
-        $this->assertEquals('Eve', $rows[2]['name']);
+        $this->assertSame('Alice', $rows[0]['name']);
+        $this->assertSame('Charlie', $rows[1]['name']);
+        $this->assertSame('Eve', $rows[2]['name']);
     }
 
     public function testSelectWithPrewhere(): void
@@ -132,7 +132,7 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
 
         $this->assertCount(4, $rows);
         foreach ($rows as $row) {
-            $this->assertEquals('click', $row['action']);
+            $this->assertSame('click', $row['action']);
         }
     }
 
@@ -148,7 +148,7 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnClickhouse($result);
 
         $this->assertCount(5, $rows);
-        $this->assertEquals('Alice', $rows[0]['name']);
+        $this->assertSame('Alice', $rows[0]['name']);
     }
 
     public function testInsertSingleRow(): void
@@ -175,7 +175,7 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnClickhouse($select);
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('signup', $rows[0]['action']);
+        $this->assertSame('signup', $rows[0]['action']);
     }
 
     public function testInsertMultipleRows(): void
@@ -198,8 +198,8 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnClickhouse($select);
 
         $this->assertCount(2, $rows);
-        $this->assertEquals('Frank', $rows[0]['name']);
-        $this->assertEquals('Grace', $rows[1]['name']);
+        $this->assertSame('Frank', $rows[0]['name']);
+        $this->assertSame('Grace', $rows[1]['name']);
     }
 
     public function testSelectWithGroupByAndHaving(): void
@@ -263,8 +263,8 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnClickhouse($result);
 
         $this->assertCount(2, $rows);
-        $this->assertEquals('Alice', $rows[0]['name']);
-        $this->assertEquals('Charlie', $rows[1]['name']);
+        $this->assertSame('Alice', $rows[0]['name']);
+        $this->assertSame('Charlie', $rows[1]['name']);
     }
 
     public function testSelectWithWindowFunction(): void
@@ -280,10 +280,10 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnClickhouse($result);
 
         $this->assertCount(4, $rows);
-        $this->assertEquals(1, (int) $rows[0]['rn']); // @phpstan-ignore cast.int
-        $this->assertEquals(2, (int) $rows[1]['rn']); // @phpstan-ignore cast.int
-        $this->assertEquals(3, (int) $rows[2]['rn']); // @phpstan-ignore cast.int
-        $this->assertEquals(4, (int) $rows[3]['rn']); // @phpstan-ignore cast.int
+        $this->assertSame(1, (int) $rows[0]['rn']); // @phpstan-ignore cast.int
+        $this->assertSame(2, (int) $rows[1]['rn']); // @phpstan-ignore cast.int
+        $this->assertSame(3, (int) $rows[2]['rn']); // @phpstan-ignore cast.int
+        $this->assertSame(4, (int) $rows[3]['rn']); // @phpstan-ignore cast.int
     }
 
     public function testSelectWithDistinct(): void
@@ -299,7 +299,7 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
 
         $this->assertCount(3, $rows);
         $countries = array_column($rows, 'country');
-        $this->assertEquals(['DE', 'UK', 'US'], $countries);
+        $this->assertSame(['DE', 'UK', 'US'], $countries);
     }
 
     public function testSelectWithSubqueryInWhere(): void
@@ -366,7 +366,7 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnClickhouse($result);
 
         $this->assertCount(8, $rows);
-        $this->assertEquals('click', $rows[0]['action']);
+        $this->assertSame('click', $rows[0]['action']);
     }
 
     public function testSelectWithBetween(): void
@@ -402,7 +402,7 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnClickhouse($result);
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('Alice', $rows[0]['name']);
+        $this->assertSame('Alice', $rows[0]['name']);
     }
 
     public function testSelectWithCaseExpression(): void
@@ -459,8 +459,8 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnClickhouse($result);
 
         $this->assertCount(2, $rows);
-        $this->assertEquals('Post A', $rows[0]['name']);
-        $this->assertEquals('Post C', $rows[1]['name']);
+        $this->assertSame('Post A', $rows[0]['name']);
+        $this->assertSame('Post C', $rows[1]['name']);
     }
 
     public function testSelectWithExistsSubquery(): void

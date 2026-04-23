@@ -116,8 +116,8 @@ class MySQLTest extends TestCase
 
         $filter = Query::greaterThan('age', 18);
         $sql = $filter->compile($builder);
-        $this->assertEquals('`age` > ?', $sql);
-        $this->assertEquals([18], $builder->getBindings());
+        $this->assertSame('`age` > ?', $sql);
+        $this->assertSame([18], $builder->getBindings());
     }
 
     public function testFluentSelectFromFilterSortLimitOffset(): void
@@ -135,11 +135,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT `name`, `email` FROM `users` WHERE `status` IN (?) AND `age` > ? ORDER BY `name` ASC LIMIT ? OFFSET ?',
             $result->query
         );
-        $this->assertEquals(['active', 18, 25, 0], $result->bindings);
+        $this->assertSame(['active', 18, 25, 0], $result->bindings);
     }
 
     public function testBatchModeProducesSameOutput(): void
@@ -157,11 +157,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT `name`, `email` FROM `users` WHERE `status` IN (?) AND `age` > ? ORDER BY `name` ASC LIMIT ? OFFSET ?',
             $result->query
         );
-        $this->assertEquals(['active', 18, 25, 0], $result->bindings);
+        $this->assertSame(['active', 18, 25, 0], $result->bindings);
     }
 
     public function testEqual(): void
@@ -172,8 +172,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `status` IN (?, ?)', $result->query);
-        $this->assertEquals(['active', 'pending'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `status` IN (?, ?)', $result->query);
+        $this->assertSame(['active', 'pending'], $result->bindings);
     }
 
     public function testNotEqualSingle(): void
@@ -184,8 +184,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `role` != ?', $result->query);
-        $this->assertEquals(['guest'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `role` != ?', $result->query);
+        $this->assertSame(['guest'], $result->bindings);
     }
 
     public function testNotEqualMultiple(): void
@@ -196,8 +196,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `role` NOT IN (?, ?)', $result->query);
-        $this->assertEquals(['guest', 'banned'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `role` NOT IN (?, ?)', $result->query);
+        $this->assertSame(['guest', 'banned'], $result->bindings);
     }
 
     public function testLessThan(): void
@@ -208,8 +208,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `price` < ?', $result->query);
-        $this->assertEquals([100], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `price` < ?', $result->query);
+        $this->assertSame([100], $result->bindings);
     }
 
     public function testLessThanEqual(): void
@@ -220,8 +220,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `price` <= ?', $result->query);
-        $this->assertEquals([100], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `price` <= ?', $result->query);
+        $this->assertSame([100], $result->bindings);
     }
 
     public function testGreaterThan(): void
@@ -232,8 +232,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `age` > ?', $result->query);
-        $this->assertEquals([18], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `age` > ?', $result->query);
+        $this->assertSame([18], $result->bindings);
     }
 
     public function testGreaterThanEqual(): void
@@ -244,8 +244,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `score` >= ?', $result->query);
-        $this->assertEquals([90], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `score` >= ?', $result->query);
+        $this->assertSame([90], $result->bindings);
     }
 
     public function testBetween(): void
@@ -256,8 +256,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `age` BETWEEN ? AND ?', $result->query);
-        $this->assertEquals([18, 65], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `age` BETWEEN ? AND ?', $result->query);
+        $this->assertSame([18, 65], $result->bindings);
     }
 
     public function testNotBetween(): void
@@ -268,8 +268,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `age` NOT BETWEEN ? AND ?', $result->query);
-        $this->assertEquals([18, 65], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `age` NOT BETWEEN ? AND ?', $result->query);
+        $this->assertSame([18, 65], $result->bindings);
     }
 
     public function testStartsWith(): void
@@ -280,8 +280,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `name` LIKE ?', $result->query);
-        $this->assertEquals(['Jo%'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `name` LIKE ?', $result->query);
+        $this->assertSame(['Jo%'], $result->bindings);
     }
 
     public function testNotStartsWith(): void
@@ -292,8 +292,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `name` NOT LIKE ?', $result->query);
-        $this->assertEquals(['Jo%'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `name` NOT LIKE ?', $result->query);
+        $this->assertSame(['Jo%'], $result->bindings);
     }
 
     public function testEndsWith(): void
@@ -304,8 +304,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `email` LIKE ?', $result->query);
-        $this->assertEquals(['%.com'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `email` LIKE ?', $result->query);
+        $this->assertSame(['%.com'], $result->bindings);
     }
 
     public function testNotEndsWith(): void
@@ -316,8 +316,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `email` NOT LIKE ?', $result->query);
-        $this->assertEquals(['%.com'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `email` NOT LIKE ?', $result->query);
+        $this->assertSame(['%.com'], $result->bindings);
     }
 
     public function testContainsSingle(): void
@@ -328,8 +328,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `bio` LIKE ?', $result->query);
-        $this->assertEquals(['%php%'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `bio` LIKE ?', $result->query);
+        $this->assertSame(['%php%'], $result->bindings);
     }
 
     public function testContainsMultiple(): void
@@ -340,8 +340,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`bio` LIKE ? OR `bio` LIKE ?)', $result->query);
-        $this->assertEquals(['%php%', '%js%'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE (`bio` LIKE ? OR `bio` LIKE ?)', $result->query);
+        $this->assertSame(['%php%', '%js%'], $result->bindings);
     }
 
     public function testContainsAny(): void
@@ -352,8 +352,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`tags` LIKE ? OR `tags` LIKE ?)', $result->query);
-        $this->assertEquals(['%a%', '%b%'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE (`tags` LIKE ? OR `tags` LIKE ?)', $result->query);
+        $this->assertSame(['%a%', '%b%'], $result->bindings);
     }
 
     public function testContainsAll(): void
@@ -364,8 +364,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`perms` LIKE ? AND `perms` LIKE ?)', $result->query);
-        $this->assertEquals(['%read%', '%write%'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE (`perms` LIKE ? AND `perms` LIKE ?)', $result->query);
+        $this->assertSame(['%read%', '%write%'], $result->bindings);
     }
 
     public function testNotContainsSingle(): void
@@ -376,8 +376,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `bio` NOT LIKE ?', $result->query);
-        $this->assertEquals(['%php%'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `bio` NOT LIKE ?', $result->query);
+        $this->assertSame(['%php%'], $result->bindings);
     }
 
     public function testNotContainsMultiple(): void
@@ -388,8 +388,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`bio` NOT LIKE ? AND `bio` NOT LIKE ?)', $result->query);
-        $this->assertEquals(['%php%', '%js%'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE (`bio` NOT LIKE ? AND `bio` NOT LIKE ?)', $result->query);
+        $this->assertSame(['%php%', '%js%'], $result->bindings);
     }
 
     public function testSearch(): void
@@ -400,8 +400,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(? IN BOOLEAN MODE)', $result->query);
-        $this->assertEquals(['hello*'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(? IN BOOLEAN MODE)', $result->query);
+        $this->assertSame(['hello*'], $result->bindings);
     }
 
     public function testNotSearch(): void
@@ -412,8 +412,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE NOT (MATCH(`content`) AGAINST(? IN BOOLEAN MODE))', $result->query);
-        $this->assertEquals(['hello*'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE NOT (MATCH(`content`) AGAINST(? IN BOOLEAN MODE))', $result->query);
+        $this->assertSame(['hello*'], $result->bindings);
     }
 
     public function testRegex(): void
@@ -424,8 +424,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `slug` REGEXP ?', $result->query);
-        $this->assertEquals(['^[a-z]+$'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `slug` REGEXP ?', $result->query);
+        $this->assertSame(['^[a-z]+$'], $result->bindings);
     }
 
     public function testIsNull(): void
@@ -436,8 +436,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `deleted` IS NULL', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `deleted` IS NULL', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testIsNotNull(): void
@@ -448,8 +448,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `verified` IS NOT NULL', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `verified` IS NOT NULL', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExists(): void
@@ -460,8 +460,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`name` IS NOT NULL AND `email` IS NOT NULL)', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE (`name` IS NOT NULL AND `email` IS NOT NULL)', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testNotExists(): void
@@ -472,8 +472,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`legacy` IS NULL)', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE (`legacy` IS NULL)', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testAndLogical(): void
@@ -489,8 +489,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`age` > ? AND `status` IN (?))', $result->query);
-        $this->assertEquals([18, 'active'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE (`age` > ? AND `status` IN (?))', $result->query);
+        $this->assertSame([18, 'active'], $result->bindings);
     }
 
     public function testOrLogical(): void
@@ -506,8 +506,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`role` IN (?) OR `role` IN (?))', $result->query);
-        $this->assertEquals(['admin', 'mod'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE (`role` IN (?) OR `role` IN (?))', $result->query);
+        $this->assertSame(['admin', 'mod'], $result->bindings);
     }
 
     public function testDeeplyNested(): void
@@ -526,11 +526,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE (`age` > ? AND (`role` IN (?) OR `role` IN (?)))',
             $result->query
         );
-        $this->assertEquals([18, 'admin', 'mod'], $result->bindings);
+        $this->assertSame([18, 'admin', 'mod'], $result->bindings);
     }
 
     public function testSortAsc(): void
@@ -541,7 +541,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY `name` ASC', $result->query);
+        $this->assertSame('SELECT * FROM `t` ORDER BY `name` ASC', $result->query);
     }
 
     public function testSortDesc(): void
@@ -552,7 +552,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY `score` DESC', $result->query);
+        $this->assertSame('SELECT * FROM `t` ORDER BY `score` DESC', $result->query);
     }
 
     public function testSortRandom(): void
@@ -563,7 +563,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY RAND()', $result->query);
+        $this->assertSame('SELECT * FROM `t` ORDER BY RAND()', $result->query);
     }
 
     public function testMultipleSorts(): void
@@ -575,7 +575,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY `name` ASC, `age` DESC', $result->query);
+        $this->assertSame('SELECT * FROM `t` ORDER BY `name` ASC, `age` DESC', $result->query);
     }
 
     public function testLimitOnly(): void
@@ -586,8 +586,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result->query);
-        $this->assertEquals([10], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` LIMIT ?', $result->query);
+        $this->assertSame([10], $result->bindings);
     }
 
     public function testOffsetOnly(): void
@@ -609,8 +609,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `_cursor` > ?', $result->query);
-        $this->assertEquals(['abc123'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `_cursor` > ?', $result->query);
+        $this->assertSame(['abc123'], $result->bindings);
     }
 
     public function testCursorBefore(): void
@@ -621,8 +621,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `_cursor` < ?', $result->query);
-        $this->assertEquals(['xyz789'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `_cursor` < ?', $result->query);
+        $this->assertSame(['xyz789'], $result->bindings);
     }
 
     public function testFullCombinedQuery(): void
@@ -641,11 +641,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT `id`, `name` FROM `users` WHERE `status` IN (?) AND `age` > ? ORDER BY `name` ASC, `age` DESC LIMIT ? OFFSET ?',
             $result->query
         );
-        $this->assertEquals(['active', 18, 25, 10], $result->bindings);
+        $this->assertSame(['active', 18, 25, 10], $result->bindings);
     }
 
     public function testMultipleFilterCalls(): void
@@ -657,8 +657,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?) AND `b` IN (?)', $result->query);
-        $this->assertEquals([1, 2], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `a` IN (?) AND `b` IN (?)', $result->query);
+        $this->assertSame([1, 2], $result->bindings);
     }
 
     public function testResetClearsState(): void
@@ -679,8 +679,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `orders` WHERE `total` > ?', $result->query);
-        $this->assertEquals([100], $result->bindings);
+        $this->assertSame('SELECT * FROM `orders` WHERE `total` > ?', $result->query);
+        $this->assertSame([100], $result->bindings);
     }
 
     public function testAttributeResolver(): void
@@ -696,11 +696,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `users` WHERE `_uid` IN (?) ORDER BY `_createdAt` ASC',
             $result->query
         );
-        $this->assertEquals(['abc'], $result->bindings);
+        $this->assertSame(['abc'], $result->bindings);
     }
 
     public function testMultipleAttributeHooksChain(): void
@@ -721,7 +721,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // First hook maps name→full_name, second prepends col_
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE `col_full_name` IN (?)',
             $result->query
         );
@@ -751,11 +751,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `users` WHERE `_uid` IN (?) AND _tenant = ?',
             $result->query
         );
-        $this->assertEquals(['abc', 't1'], $result->bindings);
+        $this->assertSame(['abc', 't1'], $result->bindings);
     }
 
     public function testConditionProvider(): void
@@ -776,11 +776,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             "SELECT * FROM `users` WHERE `status` IN (?) AND _uid IN (SELECT _document FROM users_perms WHERE _type = 'read')",
             $result->query
         );
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testConditionProviderWithBindings(): void
@@ -799,12 +799,12 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `docs` WHERE `status` IN (?) AND _tenant = ?',
             $result->query
         );
         // filter bindings first, then hook bindings
-        $this->assertEquals(['active', 'tenant_abc'], $result->bindings);
+        $this->assertSame(['active', 'tenant_abc'], $result->bindings);
     }
 
     public function testBindingOrderingWithProviderAndCursor(): void
@@ -827,7 +827,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // binding order: filter, hook, cursor, limit, offset
-        $this->assertEquals(['active', 't1', 'cursor_val', 10, 5], $result->bindings);
+        $this->assertSame(['active', 't1', 'cursor_val', 10, 5], $result->bindings);
     }
 
     public function testDefaultSelectStar(): void
@@ -837,7 +837,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertSame('SELECT * FROM `t`', $result->query);
     }
 
     public function testCountStar(): void
@@ -848,8 +848,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT COUNT(*) FROM `t`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('SELECT COUNT(*) FROM `t`', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCountWithAlias(): void
@@ -860,7 +860,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT COUNT(*) AS `total` FROM `t`', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `total` FROM `t`', $result->query);
     }
 
     public function testSumColumn(): void
@@ -871,7 +871,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT SUM(`price`) AS `total_price` FROM `orders`', $result->query);
+        $this->assertSame('SELECT SUM(`price`) AS `total_price` FROM `orders`', $result->query);
     }
 
     public function testAvgColumn(): void
@@ -882,7 +882,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT AVG(`score`) FROM `t`', $result->query);
+        $this->assertSame('SELECT AVG(`score`) FROM `t`', $result->query);
     }
 
     public function testMinColumn(): void
@@ -893,7 +893,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT MIN(`price`) FROM `t`', $result->query);
+        $this->assertSame('SELECT MIN(`price`) FROM `t`', $result->query);
     }
 
     public function testMaxColumn(): void
@@ -904,7 +904,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT MAX(`price`) FROM `t`', $result->query);
+        $this->assertSame('SELECT MAX(`price`) FROM `t`', $result->query);
     }
 
     public function testAggregationWithSelection(): void
@@ -917,7 +917,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT COUNT(*) AS `total`, `status` FROM `orders` GROUP BY `status`',
             $result->query
         );
@@ -932,7 +932,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT COUNT(*) AS `total` FROM `orders` GROUP BY `status`',
             $result->query
         );
@@ -947,7 +947,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT COUNT(*) AS `total` FROM `orders` GROUP BY `status`, `country`',
             $result->query
         );
@@ -963,11 +963,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT COUNT(*) AS `total` FROM `orders` GROUP BY `status` HAVING COUNT(*) > ?',
             $result->query
         );
-        $this->assertEquals([5], $result->bindings);
+        $this->assertSame([5], $result->bindings);
     }
 
     public function testDistinct(): void
@@ -979,7 +979,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT DISTINCT `status` FROM `t`', $result->query);
+        $this->assertSame('SELECT DISTINCT `status` FROM `t`', $result->query);
     }
 
     public function testDistinctStar(): void
@@ -990,7 +990,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT DISTINCT * FROM `t`', $result->query);
+        $this->assertSame('SELECT DISTINCT * FROM `t`', $result->query);
     }
 
     public function testJoin(): void
@@ -1001,7 +1001,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id`',
             $result->query
         );
@@ -1015,7 +1015,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `users` LEFT JOIN `profiles` ON `users`.`id` = `profiles`.`user_id`',
             $result->query
         );
@@ -1029,7 +1029,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `users` RIGHT JOIN `orders` ON `users`.`id` = `orders`.`user_id`',
             $result->query
         );
@@ -1043,7 +1043,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `sizes` CROSS JOIN `colors`',
             $result->query
         );
@@ -1058,11 +1058,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` WHERE `orders`.`total` > ?',
             $result->query
         );
-        $this->assertEquals([100], $result->bindings);
+        $this->assertSame([100], $result->bindings);
     }
 
     public function testRawFilter(): void
@@ -1073,8 +1073,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE score > ? AND score < ?', $result->query);
-        $this->assertEquals([10, 100], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE score > ? AND score < ?', $result->query);
+        $this->assertSame([10, 100], $result->bindings);
     }
 
     public function testRawFilterNoBindings(): void
@@ -1085,8 +1085,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE 1 = 1', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE 1 = 1', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testUnion(): void
@@ -1099,11 +1099,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             '(SELECT * FROM `users` WHERE `status` IN (?)) UNION (SELECT * FROM `admins` WHERE `role` IN (?))',
             $result->query
         );
-        $this->assertEquals(['active', 'admin'], $result->bindings);
+        $this->assertSame(['active', 'admin'], $result->bindings);
     }
 
     public function testUnionAll(): void
@@ -1115,7 +1115,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             '(SELECT * FROM `current`) UNION ALL (SELECT * FROM `archive`)',
             $result->query
         );
@@ -1129,8 +1129,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `status` IN (?)', $result->query);
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `status` IN (?)', $result->query);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testWhenFalse(): void
@@ -1141,8 +1141,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('SELECT * FROM `t`', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testPage(): void
@@ -1153,8 +1153,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
-        $this->assertEquals([10, 20], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
+        $this->assertSame([10, 20], $result->bindings);
     }
 
     public function testPageDefaultPerPage(): void
@@ -1165,8 +1165,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
-        $this->assertEquals([25, 0], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
+        $this->assertSame([25, 0], $result->bindings);
     }
 
     public function testToRawSql(): void
@@ -1177,7 +1177,7 @@ class MySQLTest extends TestCase
             ->limit(10)
             ->toRawSql();
 
-        $this->assertEquals(
+        $this->assertSame(
             "SELECT * FROM `users` WHERE `status` IN ('active') LIMIT 10",
             $sql
         );
@@ -1190,7 +1190,7 @@ class MySQLTest extends TestCase
             ->filter([Query::greaterThan('age', 18)])
             ->toRawSql();
 
-        $this->assertEquals("SELECT * FROM `t` WHERE `age` > 18", $sql);
+        $this->assertSame("SELECT * FROM `t` WHERE `age` > 18", $sql);
     }
 
     public function testCombinedAggregationJoinGroupByHaving(): void
@@ -1208,11 +1208,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT COUNT(*) AS `order_count`, SUM(`total`) AS `total_amount`, `users`.`name` FROM `orders` JOIN `users` ON `orders`.`user_id` = `users`.`id` GROUP BY `users`.`name` HAVING COUNT(*) > ? ORDER BY `total_amount` DESC LIMIT ?',
             $result->query
         );
-        $this->assertEquals([5, 10], $result->bindings);
+        $this->assertSame([5, 10], $result->bindings);
     }
 
     public function testResetClearsUnions(): void
@@ -1228,7 +1228,7 @@ class MySQLTest extends TestCase
         $result = $builder->from('fresh')->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `fresh`', $result->query);
+        $this->assertSame('SELECT * FROM `fresh`', $result->query);
     }
     //  EDGE CASES & COMBINATIONS
 
@@ -1241,7 +1241,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT COUNT(`id`) FROM `t`', $result->query);
+        $this->assertSame('SELECT COUNT(`id`) FROM `t`', $result->query);
     }
 
     public function testCountWithEmptyStringAttribute(): void
@@ -1252,7 +1252,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT COUNT(*) FROM `t`', $result->query);
+        $this->assertSame('SELECT COUNT(*) FROM `t`', $result->query);
     }
 
     public function testMultipleAggregations(): void
@@ -1267,11 +1267,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT COUNT(*) AS `cnt`, SUM(`price`) AS `total`, AVG(`score`) AS `avg_score`, MIN(`age`) AS `youngest`, MAX(`age`) AS `oldest` FROM `t`',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testAggregationWithoutGroupBy(): void
@@ -1282,7 +1282,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT SUM(`total`) AS `grand_total` FROM `orders`', $result->query);
+        $this->assertSame('SELECT SUM(`total`) AS `grand_total` FROM `orders`', $result->query);
     }
 
     public function testAggregationWithFilter(): void
@@ -1294,11 +1294,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT COUNT(*) AS `total` FROM `orders` WHERE `status` IN (?)',
             $result->query
         );
-        $this->assertEquals(['completed'], $result->bindings);
+        $this->assertSame(['completed'], $result->bindings);
     }
 
     public function testAggregationWithoutAlias(): void
@@ -1310,7 +1310,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT COUNT(*), SUM(`price`) FROM `t`', $result->query);
+        $this->assertSame('SELECT COUNT(*), SUM(`price`) FROM `t`', $result->query);
     }
 
     public function testGroupByEmptyArray(): void
@@ -1321,7 +1321,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertSame('SELECT * FROM `t`', $result->query);
     }
 
     public function testMultipleGroupByCalls(): void
@@ -1367,11 +1367,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT COUNT(*) AS `total`, SUM(`price`) AS `sum_price` FROM `t` GROUP BY `status` HAVING COUNT(*) > ? AND SUM(`price`) < ?',
             $result->query
         );
-        $this->assertEquals([5, 1000], $result->bindings);
+        $this->assertSame([5, 1000], $result->bindings);
     }
 
     public function testHavingWithLogicalOr(): void
@@ -1390,7 +1390,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('HAVING (`total` > ? OR `total` < ?)', $result->query);
-        $this->assertEquals([10, 2], $result->bindings);
+        $this->assertSame([10, 2], $result->bindings);
     }
 
     public function testHavingWithoutGroupBy(): void
@@ -1419,7 +1419,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('HAVING COUNT(*) > ? AND COUNT(*) < ?', $result->query);
-        $this->assertEquals([1, 100], $result->bindings);
+        $this->assertSame([1, 100], $result->bindings);
     }
 
     public function testDistinctWithAggregation(): void
@@ -1431,7 +1431,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT DISTINCT COUNT(*) AS `total` FROM `t`', $result->query);
+        $this->assertSame('SELECT DISTINCT COUNT(*) AS `total` FROM `t`', $result->query);
     }
 
     public function testDistinctMultipleCalls(): void
@@ -1444,7 +1444,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT DISTINCT * FROM `t`', $result->query);
+        $this->assertSame('SELECT DISTINCT * FROM `t`', $result->query);
     }
 
     public function testDistinctWithJoin(): void
@@ -1457,7 +1457,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT DISTINCT `users`.`name` FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id`',
             $result->query
         );
@@ -1474,7 +1474,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT DISTINCT `status` FROM `t` WHERE `status` IS NOT NULL ORDER BY `status` ASC',
             $result->query
         );
@@ -1490,7 +1490,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` LEFT JOIN `profiles` ON `users`.`id` = `profiles`.`user_id` RIGHT JOIN `departments` ON `users`.`dept_id` = `departments`.`id`',
             $result->query
         );
@@ -1506,7 +1506,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT COUNT(*) AS `order_count` FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` GROUP BY `users`.`name`',
             $result->query
         );
@@ -1524,11 +1524,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` WHERE `orders`.`total` > ? ORDER BY `orders`.`total` DESC LIMIT ? OFFSET ?',
             $result->query
         );
-        $this->assertEquals([50, 10, 20], $result->bindings);
+        $this->assertSame([50, 10, 20], $result->bindings);
     }
 
     public function testJoinWithCustomOperator(): void
@@ -1539,7 +1539,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `a` JOIN `b` ON `a`.`val` != `b`.`val`',
             $result->query
         );
@@ -1554,7 +1554,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `sizes` CROSS JOIN `colors` LEFT JOIN `inventory` ON `sizes`.`id` = `inventory`.`size_id`',
             $result->query
         );
@@ -1568,8 +1568,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE a = ? AND b = ? AND c = ?', $result->query);
-        $this->assertEquals(['str', 42, 3.14], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE a = ? AND b = ? AND c = ?', $result->query);
+        $this->assertSame(['str', 42, 3.14], $result->bindings);
     }
 
     public function testRawCombinedWithRegularFilters(): void
@@ -1583,11 +1583,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE `status` IN (?) AND custom_func(col) > ?',
             $result->query
         );
-        $this->assertEquals(['active', 10], $result->bindings);
+        $this->assertSame(['active', 10], $result->bindings);
     }
 
     public function testRawWithEmptySql(): void
@@ -1614,7 +1614,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             '(SELECT * FROM `users`) UNION (SELECT * FROM `admins`) UNION (SELECT * FROM `mods`)',
             $result->query
         );
@@ -1632,7 +1632,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             '(SELECT * FROM `users`) UNION (SELECT * FROM `admins`) UNION ALL (SELECT * FROM `mods`)',
             $result->query
         );
@@ -1651,11 +1651,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             '(SELECT * FROM `users` WHERE `status` IN (?)) UNION (SELECT * FROM `admins` WHERE `level` IN (?)) UNION ALL (SELECT * FROM `mods` WHERE `score` > ?)',
             $result->query
         );
-        $this->assertEquals(['active', 1, 50], $result->bindings);
+        $this->assertSame(['active', 1, 50], $result->bindings);
     }
 
     public function testUnionWithAggregation(): void
@@ -1669,7 +1669,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             '(SELECT COUNT(*) AS `total` FROM `orders_2024`) UNION ALL (SELECT COUNT(*) AS `total` FROM `orders_2023`)',
             $result->query
         );
@@ -1685,7 +1685,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `a` IN (?)', $result->query);
     }
 
     public function testWhenMultipleCalls(): void
@@ -1698,8 +1698,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?) AND `c` IN (?)', $result->query);
-        $this->assertEquals([1, 3], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `a` IN (?) AND `c` IN (?)', $result->query);
+        $this->assertSame([1, 3], $result->bindings);
     }
 
     public function testPageZero(): void
@@ -1719,8 +1719,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
-        $this->assertEquals([1, 4], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
+        $this->assertSame([1, 4], $result->bindings);
     }
 
     public function testPageLargeValues(): void
@@ -1731,7 +1731,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals([100, 99900], $result->bindings);
+        $this->assertSame([100, 99900], $result->bindings);
     }
 
     public function testToRawSqlWithBooleanBindings(): void
@@ -1742,7 +1742,7 @@ class MySQLTest extends TestCase
             ->filter([Query::raw('active = ?', [true])]);
 
         $sql = $builder->toRawSql();
-        $this->assertEquals("SELECT * FROM `t` WHERE active = 1", $sql);
+        $this->assertSame("SELECT * FROM `t` WHERE active = 1", $sql);
     }
 
     public function testToRawSqlWithNullBinding(): void
@@ -1752,7 +1752,7 @@ class MySQLTest extends TestCase
             ->filter([Query::raw('deleted_at = ?', [null])]);
 
         $sql = $builder->toRawSql();
-        $this->assertEquals("SELECT * FROM `t` WHERE deleted_at = NULL", $sql);
+        $this->assertSame("SELECT * FROM `t` WHERE deleted_at = NULL", $sql);
     }
 
     public function testToRawSqlWithFloatBinding(): void
@@ -1762,7 +1762,7 @@ class MySQLTest extends TestCase
             ->filter([Query::raw('price > ?', [9.99])]);
 
         $sql = $builder->toRawSql();
-        $this->assertEquals("SELECT * FROM `t` WHERE price > 9.99", $sql);
+        $this->assertSame("SELECT * FROM `t` WHERE price > 9.99", $sql);
     }
 
     public function testToRawSqlComplexQuery(): void
@@ -1779,7 +1779,7 @@ class MySQLTest extends TestCase
             ->offset(10)
             ->toRawSql();
 
-        $this->assertEquals(
+        $this->assertSame(
             "SELECT `name` FROM `users` WHERE `status` IN ('active') AND `age` > 18 ORDER BY `name` ASC LIMIT 25 OFFSET 10",
             $sql
         );
@@ -1834,7 +1834,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // Order: filter bindings, hook bindings, cursor, limit, offset
-        $this->assertEquals(['x', 5, 'tenant1', 'cursor_abc', 10, 20], $result->bindings);
+        $this->assertSame(['x', 5, 'tenant1', 'cursor_abc', 10, 20], $result->bindings);
     }
 
     public function testBindingOrderMultipleProviders(): void
@@ -1860,7 +1860,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['x', 'v1', 'v2'], $result->bindings);
+        $this->assertSame(['x', 'v1', 'v2'], $result->bindings);
     }
 
     public function testBindingOrderHavingAfterFilters(): void
@@ -1876,7 +1876,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // Filter bindings, then having bindings, then limit
-        $this->assertEquals(['active', 5, 10], $result->bindings);
+        $this->assertSame(['active', 5, 10], $result->bindings);
     }
 
     public function testBindingOrderUnionAppendedLast(): void
@@ -1892,7 +1892,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // Main filter, main limit, then union bindings
-        $this->assertEquals(['b', 5, 'y'], $result->bindings);
+        $this->assertSame(['b', 5, 'y'], $result->bindings);
     }
 
     public function testBindingOrderComplexMixed(): void
@@ -1921,7 +1921,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // filter, hook, cursor, having, limit, offset, union
-        $this->assertEquals(['paid', 'org1', 'cur1', 1, 10, 5, 2023], $result->bindings);
+        $this->assertSame(['paid', 'org1', 'cur1', 1, 10, 5, 2023], $result->bindings);
     }
 
     public function testAttributeResolverWithAggregation(): void
@@ -1933,7 +1933,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT SUM(`_price`) AS `total` FROM `t`', $result->query);
+        $this->assertSame('SELECT SUM(`_price`) AS `total` FROM `t`', $result->query);
     }
 
     public function testAttributeResolverWithGroupBy(): void
@@ -1946,7 +1946,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT COUNT(*) AS `total` FROM `t` GROUP BY `_status`',
             $result->query
         );
@@ -1964,7 +1964,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` JOIN `other` ON `_uid` = `_ref`',
             $result->query
         );
@@ -2001,11 +2001,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` WHERE `orders`.`total` > ? AND users.org_id = ?',
             $result->query
         );
-        $this->assertEquals([100, 'org1'], $result->bindings);
+        $this->assertSame([100, 'org1'], $result->bindings);
     }
 
     public function testConditionProviderWithAggregation(): void
@@ -2026,7 +2026,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('WHERE org_id = ?', $result->query);
-        $this->assertEquals(['org1'], $result->bindings);
+        $this->assertSame(['org1'], $result->bindings);
     }
 
     public function testMultipleBuildsConsistentOutput(): void
@@ -2039,8 +2039,8 @@ class MySQLTest extends TestCase
         $result1 = $builder->build();
         $result2 = $builder->build();
 
-        $this->assertEquals($result1->query, $result2->query);
-        $this->assertEquals($result1->bindings, $result2->bindings);
+        $this->assertSame($result1->query, $result2->query);
+        $this->assertSame($result1->bindings, $result2->bindings);
     }
 
 
@@ -2061,11 +2061,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE `_cursor` > ? LIMIT ? OFFSET ?',
             $result->query
         );
-        $this->assertEquals(['abc', 10, 5], $result->bindings);
+        $this->assertSame(['abc', 10, 5], $result->bindings);
     }
 
     public function testCursorWithPage(): void
@@ -2150,7 +2150,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertSame('SELECT * FROM `t`', $result->query);
     }
 
     public function testSelectEmptyArray(): void
@@ -2162,7 +2162,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // Empty select produces empty column list
-        $this->assertEquals('SELECT  FROM `t`', $result->query);
+        $this->assertSame('SELECT  FROM `t`', $result->query);
     }
 
     public function testLimitZero(): void
@@ -2173,8 +2173,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result->query);
-        $this->assertEquals([0], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` LIMIT ?', $result->query);
+        $this->assertSame([0], $result->bindings);
     }
 
     public function testOffsetZero(): void
@@ -2240,8 +2240,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `slug` REGEXP ?', $result->query);
-        $this->assertEquals([''], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `slug` REGEXP ?', $result->query);
+        $this->assertSame([''], $result->bindings);
     }
 
     public function testRegexWithDotChar(): void
@@ -2252,8 +2252,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `name` REGEXP ?', $result->query);
-        $this->assertEquals(['a.b'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `name` REGEXP ?', $result->query);
+        $this->assertSame(['a.b'], $result->bindings);
     }
 
     public function testRegexWithStarChar(): void
@@ -2264,7 +2264,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['a*b'], $result->bindings);
+        $this->assertSame(['a*b'], $result->bindings);
     }
 
     public function testRegexWithPlusChar(): void
@@ -2275,7 +2275,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['a+'], $result->bindings);
+        $this->assertSame(['a+'], $result->bindings);
     }
 
     public function testRegexWithQuestionMarkChar(): void
@@ -2286,7 +2286,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['colou?r'], $result->bindings);
+        $this->assertSame(['colou?r'], $result->bindings);
     }
 
     public function testRegexWithCaretAndDollar(): void
@@ -2297,7 +2297,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['^[A-Z]+$'], $result->bindings);
+        $this->assertSame(['^[A-Z]+$'], $result->bindings);
     }
 
     public function testRegexWithPipeChar(): void
@@ -2308,7 +2308,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['red|blue|green'], $result->bindings);
+        $this->assertSame(['red|blue|green'], $result->bindings);
     }
 
     public function testRegexWithBackslash(): void
@@ -2319,7 +2319,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['\\\\server\\\\share'], $result->bindings);
+        $this->assertSame(['\\\\server\\\\share'], $result->bindings);
     }
 
     public function testRegexWithBracketsAndBraces(): void
@@ -2330,7 +2330,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('[0-9]{5}', $result->bindings[0]);
+        $this->assertSame('[0-9]{5}', $result->bindings[0]);
     }
 
     public function testRegexWithParentheses(): void
@@ -2341,7 +2341,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['(\\+1)?[0-9]{10}'], $result->bindings);
+        $this->assertSame(['(\\+1)?[0-9]{10}'], $result->bindings);
     }
 
     public function testRegexCombinedWithOtherFilters(): void
@@ -2356,11 +2356,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE `status` IN (?) AND `slug` REGEXP ? AND `age` > ?',
             $result->query
         );
-        $this->assertEquals(['active', '^[a-z-]+$', 18], $result->bindings);
+        $this->assertSame(['active', '^[a-z-]+$', 18], $result->bindings);
     }
 
     public function testRegexWithAttributeResolver(): void
@@ -2374,8 +2374,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `_slug` REGEXP ?', $result->query);
-        $this->assertEquals(['^test'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `_slug` REGEXP ?', $result->query);
+        $this->assertSame(['^test'], $result->bindings);
     }
 
     public function testRegexStandaloneCompileFilter(): void
@@ -2384,8 +2384,8 @@ class MySQLTest extends TestCase
         $query = Query::regex('col', '^abc');
         $sql = $builder->compileFilter($query);
 
-        $this->assertEquals('`col` REGEXP ?', $sql);
-        $this->assertEquals(['^abc'], $builder->getBindings());
+        $this->assertSame('`col` REGEXP ?', $sql);
+        $this->assertSame(['^abc'], $builder->getBindings());
     }
 
     public function testRegexBindingPreservedExactly(): void
@@ -2409,7 +2409,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals($pattern, $result->bindings[0]);
+        $this->assertSame($pattern, $result->bindings[0]);
         $this->assertStringContainsString('REGEXP ?', $result->query);
     }
 
@@ -2424,11 +2424,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE `name` REGEXP ? AND `email` REGEXP ?',
             $result->query
         );
-        $this->assertEquals(['^A', '@test\\.com$'], $result->bindings);
+        $this->assertSame(['^A', '@test\\.com$'], $result->bindings);
     }
 
     public function testRegexInAndLogicalGroup(): void
@@ -2444,11 +2444,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE (`slug` REGEXP ? AND `status` IN (?))',
             $result->query
         );
-        $this->assertEquals(['^[a-z]+$', 'active'], $result->bindings);
+        $this->assertSame(['^[a-z]+$', 'active'], $result->bindings);
     }
 
     public function testRegexInOrLogicalGroup(): void
@@ -2464,11 +2464,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE (`name` REGEXP ? OR `name` REGEXP ?)',
             $result->query
         );
-        $this->assertEquals(['^Admin', '^Mod'], $result->bindings);
+        $this->assertSame(['^Admin', '^Mod'], $result->bindings);
     }
     //  2. SQL-Specific: MATCH AGAINST / Search
 
@@ -2480,8 +2480,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE 1 = 0', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE 1 = 0', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testSearchWithSpecialCharacters(): void
@@ -2492,7 +2492,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['hello world required excluded*'], $result->bindings);
+        $this->assertSame(['hello world required excluded*'], $result->bindings);
     }
 
     public function testSearchCombinedWithOtherFilters(): void
@@ -2507,11 +2507,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(? IN BOOLEAN MODE) AND `status` IN (?) AND `views` > ?',
             $result->query
         );
-        $this->assertEquals(['hello*', 'published', 100], $result->bindings);
+        $this->assertSame(['hello*', 'published', 100], $result->bindings);
     }
 
     public function testNotSearchCombinedWithOtherFilters(): void
@@ -2525,11 +2525,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE NOT (MATCH(`content`) AGAINST(? IN BOOLEAN MODE)) AND `status` IN (?)',
             $result->query
         );
-        $this->assertEquals(['spam*', 'published'], $result->bindings);
+        $this->assertSame(['spam*', 'published'], $result->bindings);
     }
 
     public function testSearchWithAttributeResolver(): void
@@ -2543,7 +2543,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE MATCH(`_body`) AGAINST(? IN BOOLEAN MODE)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE MATCH(`_body`) AGAINST(? IN BOOLEAN MODE)', $result->query);
     }
 
     public function testSearchStandaloneCompileFilter(): void
@@ -2552,8 +2552,8 @@ class MySQLTest extends TestCase
         $query = Query::search('body', 'test');
         $sql = $builder->compileFilter($query);
 
-        $this->assertEquals('MATCH(`body`) AGAINST(? IN BOOLEAN MODE)', $sql);
-        $this->assertEquals(['test*'], $builder->getBindings());
+        $this->assertSame('MATCH(`body`) AGAINST(? IN BOOLEAN MODE)', $sql);
+        $this->assertSame(['test*'], $builder->getBindings());
     }
 
     public function testNotSearchStandaloneCompileFilter(): void
@@ -2562,8 +2562,8 @@ class MySQLTest extends TestCase
         $query = Query::notSearch('body', 'spam');
         $sql = $builder->compileFilter($query);
 
-        $this->assertEquals('NOT (MATCH(`body`) AGAINST(? IN BOOLEAN MODE))', $sql);
-        $this->assertEquals(['spam*'], $builder->getBindings());
+        $this->assertSame('NOT (MATCH(`body`) AGAINST(? IN BOOLEAN MODE))', $sql);
+        $this->assertSame(['spam*'], $builder->getBindings());
     }
 
     public function testSearchBindingPreservedExactly(): void
@@ -2587,7 +2587,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(trim($longText) . '*', $result->bindings[0]);
+        $this->assertSame(trim($longText) . '*', $result->bindings[0]);
     }
 
     public function testMultipleSearchFilters(): void
@@ -2601,11 +2601,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE MATCH(`title`) AGAINST(? IN BOOLEAN MODE) AND MATCH(`body`) AGAINST(? IN BOOLEAN MODE)',
             $result->query
         );
-        $this->assertEquals(['hello*', 'world*'], $result->bindings);
+        $this->assertSame(['hello*', 'world*'], $result->bindings);
     }
 
     public function testSearchInAndLogicalGroup(): void
@@ -2621,7 +2621,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE (MATCH(`content`) AGAINST(? IN BOOLEAN MODE) AND `status` IN (?))',
             $result->query
         );
@@ -2640,11 +2640,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE (MATCH(`title`) AGAINST(? IN BOOLEAN MODE) OR MATCH(`body`) AGAINST(? IN BOOLEAN MODE))',
             $result->query
         );
-        $this->assertEquals(['hello*', 'hello*'], $result->bindings);
+        $this->assertSame(['hello*', 'hello*'], $result->bindings);
     }
 
     public function testSearchAndRegexCombined(): void
@@ -2658,11 +2658,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(? IN BOOLEAN MODE) AND `slug` REGEXP ?',
             $result->query
         );
-        $this->assertEquals(['hello world*', '^[a-z-]+$'], $result->bindings);
+        $this->assertSame(['hello world*', '^[a-z-]+$'], $result->bindings);
     }
 
     public function testNotSearchStandalone(): void
@@ -2673,8 +2673,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE NOT (MATCH(`content`) AGAINST(? IN BOOLEAN MODE))', $result->query);
-        $this->assertEquals(['spam*'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE NOT (MATCH(`content`) AGAINST(? IN BOOLEAN MODE))', $result->query);
+        $this->assertSame(['spam*'], $result->bindings);
     }
     //  3. SQL-Specific: RAND()
 
@@ -2684,7 +2684,7 @@ class MySQLTest extends TestCase
         $query = Query::orderRandom();
         $sql = $builder->compileOrder($query);
 
-        $this->assertEquals('RAND()', $sql);
+        $this->assertSame('RAND()', $sql);
     }
 
     public function testRandomSortCombinedWithAscDesc(): void
@@ -2697,7 +2697,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` ORDER BY `name` ASC, RAND(), `age` DESC',
             $result->query
         );
@@ -2712,11 +2712,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE `status` IN (?) ORDER BY RAND()',
             $result->query
         );
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testRandomSortWithLimit(): void
@@ -2728,8 +2728,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY RAND() LIMIT ?', $result->query);
-        $this->assertEquals([5], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` ORDER BY RAND() LIMIT ?', $result->query);
+        $this->assertSame([5], $result->bindings);
     }
 
     public function testRandomSortWithAggregation(): void
@@ -2769,7 +2769,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT DISTINCT `status` FROM `t` ORDER BY RAND()',
             $result->query
         );
@@ -2786,8 +2786,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY RAND() LIMIT ?', $result->query);
-        $this->assertEquals([10], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` ORDER BY RAND() LIMIT ?', $result->query);
+        $this->assertSame([10], $result->bindings);
     }
 
     public function testRandomSortWithAttributeResolver(): void
@@ -2816,7 +2816,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY RAND(), RAND()', $result->query);
+        $this->assertSame('SELECT * FROM `t` ORDER BY RAND(), RAND()', $result->query);
     }
 
     public function testRandomSortWithOffset(): void
@@ -2829,8 +2829,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY RAND() LIMIT ? OFFSET ?', $result->query);
-        $this->assertEquals([10, 5], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` ORDER BY RAND() LIMIT ? OFFSET ?', $result->query);
+        $this->assertSame([10, 5], $result->bindings);
     }
     //  5. Standalone Compiler method calls
 
@@ -2838,160 +2838,160 @@ class MySQLTest extends TestCase
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::equal('col', ['a', 'b']));
-        $this->assertEquals('`col` IN (?, ?)', $sql);
-        $this->assertEquals(['a', 'b'], $builder->getBindings());
+        $this->assertSame('`col` IN (?, ?)', $sql);
+        $this->assertSame(['a', 'b'], $builder->getBindings());
     }
 
     public function testCompileFilterNotEqual(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::notEqual('col', 'a'));
-        $this->assertEquals('`col` != ?', $sql);
-        $this->assertEquals(['a'], $builder->getBindings());
+        $this->assertSame('`col` != ?', $sql);
+        $this->assertSame(['a'], $builder->getBindings());
     }
 
     public function testCompileFilterLessThan(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::lessThan('col', 10));
-        $this->assertEquals('`col` < ?', $sql);
-        $this->assertEquals([10], $builder->getBindings());
+        $this->assertSame('`col` < ?', $sql);
+        $this->assertSame([10], $builder->getBindings());
     }
 
     public function testCompileFilterLessThanEqual(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::lessThanEqual('col', 10));
-        $this->assertEquals('`col` <= ?', $sql);
-        $this->assertEquals([10], $builder->getBindings());
+        $this->assertSame('`col` <= ?', $sql);
+        $this->assertSame([10], $builder->getBindings());
     }
 
     public function testCompileFilterGreaterThan(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::greaterThan('col', 10));
-        $this->assertEquals('`col` > ?', $sql);
-        $this->assertEquals([10], $builder->getBindings());
+        $this->assertSame('`col` > ?', $sql);
+        $this->assertSame([10], $builder->getBindings());
     }
 
     public function testCompileFilterGreaterThanEqual(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::greaterThanEqual('col', 10));
-        $this->assertEquals('`col` >= ?', $sql);
-        $this->assertEquals([10], $builder->getBindings());
+        $this->assertSame('`col` >= ?', $sql);
+        $this->assertSame([10], $builder->getBindings());
     }
 
     public function testCompileFilterBetween(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::between('col', 1, 100));
-        $this->assertEquals('`col` BETWEEN ? AND ?', $sql);
-        $this->assertEquals([1, 100], $builder->getBindings());
+        $this->assertSame('`col` BETWEEN ? AND ?', $sql);
+        $this->assertSame([1, 100], $builder->getBindings());
     }
 
     public function testCompileFilterNotBetween(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::notBetween('col', 1, 100));
-        $this->assertEquals('`col` NOT BETWEEN ? AND ?', $sql);
-        $this->assertEquals([1, 100], $builder->getBindings());
+        $this->assertSame('`col` NOT BETWEEN ? AND ?', $sql);
+        $this->assertSame([1, 100], $builder->getBindings());
     }
 
     public function testCompileFilterStartsWith(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::startsWith('col', 'abc'));
-        $this->assertEquals('`col` LIKE ?', $sql);
-        $this->assertEquals(['abc%'], $builder->getBindings());
+        $this->assertSame('`col` LIKE ?', $sql);
+        $this->assertSame(['abc%'], $builder->getBindings());
     }
 
     public function testCompileFilterNotStartsWith(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::notStartsWith('col', 'abc'));
-        $this->assertEquals('`col` NOT LIKE ?', $sql);
-        $this->assertEquals(['abc%'], $builder->getBindings());
+        $this->assertSame('`col` NOT LIKE ?', $sql);
+        $this->assertSame(['abc%'], $builder->getBindings());
     }
 
     public function testCompileFilterEndsWith(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::endsWith('col', 'xyz'));
-        $this->assertEquals('`col` LIKE ?', $sql);
-        $this->assertEquals(['%xyz'], $builder->getBindings());
+        $this->assertSame('`col` LIKE ?', $sql);
+        $this->assertSame(['%xyz'], $builder->getBindings());
     }
 
     public function testCompileFilterNotEndsWith(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::notEndsWith('col', 'xyz'));
-        $this->assertEquals('`col` NOT LIKE ?', $sql);
-        $this->assertEquals(['%xyz'], $builder->getBindings());
+        $this->assertSame('`col` NOT LIKE ?', $sql);
+        $this->assertSame(['%xyz'], $builder->getBindings());
     }
 
     public function testCompileFilterContainsSingle(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::contains('col', ['val']));
-        $this->assertEquals('`col` LIKE ?', $sql);
-        $this->assertEquals(['%val%'], $builder->getBindings());
+        $this->assertSame('`col` LIKE ?', $sql);
+        $this->assertSame(['%val%'], $builder->getBindings());
     }
 
     public function testCompileFilterContainsMultiple(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::contains('col', ['a', 'b']));
-        $this->assertEquals('(`col` LIKE ? OR `col` LIKE ?)', $sql);
-        $this->assertEquals(['%a%', '%b%'], $builder->getBindings());
+        $this->assertSame('(`col` LIKE ? OR `col` LIKE ?)', $sql);
+        $this->assertSame(['%a%', '%b%'], $builder->getBindings());
     }
 
     public function testCompileFilterContainsAny(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::containsAny('col', ['a', 'b']));
-        $this->assertEquals('(`col` LIKE ? OR `col` LIKE ?)', $sql);
-        $this->assertEquals(['%a%', '%b%'], $builder->getBindings());
+        $this->assertSame('(`col` LIKE ? OR `col` LIKE ?)', $sql);
+        $this->assertSame(['%a%', '%b%'], $builder->getBindings());
     }
 
     public function testCompileFilterContainsAll(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::containsAll('col', ['a', 'b']));
-        $this->assertEquals('(`col` LIKE ? AND `col` LIKE ?)', $sql);
-        $this->assertEquals(['%a%', '%b%'], $builder->getBindings());
+        $this->assertSame('(`col` LIKE ? AND `col` LIKE ?)', $sql);
+        $this->assertSame(['%a%', '%b%'], $builder->getBindings());
     }
 
     public function testCompileFilterNotContainsSingle(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::notContains('col', ['val']));
-        $this->assertEquals('`col` NOT LIKE ?', $sql);
-        $this->assertEquals(['%val%'], $builder->getBindings());
+        $this->assertSame('`col` NOT LIKE ?', $sql);
+        $this->assertSame(['%val%'], $builder->getBindings());
     }
 
     public function testCompileFilterNotContainsMultiple(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::notContains('col', ['a', 'b']));
-        $this->assertEquals('(`col` NOT LIKE ? AND `col` NOT LIKE ?)', $sql);
-        $this->assertEquals(['%a%', '%b%'], $builder->getBindings());
+        $this->assertSame('(`col` NOT LIKE ? AND `col` NOT LIKE ?)', $sql);
+        $this->assertSame(['%a%', '%b%'], $builder->getBindings());
     }
 
     public function testCompileFilterIsNull(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::isNull('col'));
-        $this->assertEquals('`col` IS NULL', $sql);
-        $this->assertEquals([], $builder->getBindings());
+        $this->assertSame('`col` IS NULL', $sql);
+        $this->assertSame([], $builder->getBindings());
     }
 
     public function testCompileFilterIsNotNull(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::isNotNull('col'));
-        $this->assertEquals('`col` IS NOT NULL', $sql);
-        $this->assertEquals([], $builder->getBindings());
+        $this->assertSame('`col` IS NOT NULL', $sql);
+        $this->assertSame([], $builder->getBindings());
     }
 
     public function testCompileFilterAnd(): void
@@ -3001,8 +3001,8 @@ class MySQLTest extends TestCase
             Query::equal('a', [1]),
             Query::greaterThan('b', 2),
         ]));
-        $this->assertEquals('(`a` IN (?) AND `b` > ?)', $sql);
-        $this->assertEquals([1, 2], $builder->getBindings());
+        $this->assertSame('(`a` IN (?) AND `b` > ?)', $sql);
+        $this->assertSame([1, 2], $builder->getBindings());
     }
 
     public function testCompileFilterOr(): void
@@ -3012,191 +3012,191 @@ class MySQLTest extends TestCase
             Query::equal('a', [1]),
             Query::equal('b', [2]),
         ]));
-        $this->assertEquals('(`a` IN (?) OR `b` IN (?))', $sql);
-        $this->assertEquals([1, 2], $builder->getBindings());
+        $this->assertSame('(`a` IN (?) OR `b` IN (?))', $sql);
+        $this->assertSame([1, 2], $builder->getBindings());
     }
 
     public function testCompileFilterExists(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::exists(['a', 'b']));
-        $this->assertEquals('(`a` IS NOT NULL AND `b` IS NOT NULL)', $sql);
+        $this->assertSame('(`a` IS NOT NULL AND `b` IS NOT NULL)', $sql);
     }
 
     public function testCompileFilterNotExists(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::notExists(['a', 'b']));
-        $this->assertEquals('(`a` IS NULL AND `b` IS NULL)', $sql);
+        $this->assertSame('(`a` IS NULL AND `b` IS NULL)', $sql);
     }
 
     public function testCompileFilterRaw(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::raw('x > ? AND y < ?', [1, 2]));
-        $this->assertEquals('x > ? AND y < ?', $sql);
-        $this->assertEquals([1, 2], $builder->getBindings());
+        $this->assertSame('x > ? AND y < ?', $sql);
+        $this->assertSame([1, 2], $builder->getBindings());
     }
 
     public function testCompileFilterSearch(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::search('body', 'hello'));
-        $this->assertEquals('MATCH(`body`) AGAINST(? IN BOOLEAN MODE)', $sql);
-        $this->assertEquals(['hello*'], $builder->getBindings());
+        $this->assertSame('MATCH(`body`) AGAINST(? IN BOOLEAN MODE)', $sql);
+        $this->assertSame(['hello*'], $builder->getBindings());
     }
 
     public function testCompileFilterNotSearch(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::notSearch('body', 'spam'));
-        $this->assertEquals('NOT (MATCH(`body`) AGAINST(? IN BOOLEAN MODE))', $sql);
-        $this->assertEquals(['spam*'], $builder->getBindings());
+        $this->assertSame('NOT (MATCH(`body`) AGAINST(? IN BOOLEAN MODE))', $sql);
+        $this->assertSame(['spam*'], $builder->getBindings());
     }
 
     public function testCompileFilterRegex(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::regex('col', '^abc'));
-        $this->assertEquals('`col` REGEXP ?', $sql);
-        $this->assertEquals(['^abc'], $builder->getBindings());
+        $this->assertSame('`col` REGEXP ?', $sql);
+        $this->assertSame(['^abc'], $builder->getBindings());
     }
 
     public function testCompileOrderAsc(): void
     {
         $builder = new Builder();
         $sql = $builder->compileOrder(Query::orderAsc('name'));
-        $this->assertEquals('`name` ASC', $sql);
+        $this->assertSame('`name` ASC', $sql);
     }
 
     public function testCompileOrderDesc(): void
     {
         $builder = new Builder();
         $sql = $builder->compileOrder(Query::orderDesc('name'));
-        $this->assertEquals('`name` DESC', $sql);
+        $this->assertSame('`name` DESC', $sql);
     }
 
     public function testCompileOrderRandom(): void
     {
         $builder = new Builder();
         $sql = $builder->compileOrder(Query::orderRandom());
-        $this->assertEquals('RAND()', $sql);
+        $this->assertSame('RAND()', $sql);
     }
 
     public function testCompileLimitStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileLimit(Query::limit(25));
-        $this->assertEquals('LIMIT ?', $sql);
-        $this->assertEquals([25], $builder->getBindings());
+        $this->assertSame('LIMIT ?', $sql);
+        $this->assertSame([25], $builder->getBindings());
     }
 
     public function testCompileOffsetStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileOffset(Query::offset(50));
-        $this->assertEquals('OFFSET ?', $sql);
-        $this->assertEquals([50], $builder->getBindings());
+        $this->assertSame('OFFSET ?', $sql);
+        $this->assertSame([50], $builder->getBindings());
     }
 
     public function testCompileSelectStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileSelect(Query::select(['a', 'b', 'c']));
-        $this->assertEquals('`a`, `b`, `c`', $sql);
+        $this->assertSame('`a`, `b`, `c`', $sql);
     }
 
     public function testCompileCursorAfterStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileCursor(Query::cursorAfter('abc'));
-        $this->assertEquals('`_cursor` > ?', $sql);
-        $this->assertEquals(['abc'], $builder->getBindings());
+        $this->assertSame('`_cursor` > ?', $sql);
+        $this->assertSame(['abc'], $builder->getBindings());
     }
 
     public function testCompileCursorBeforeStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileCursor(Query::cursorBefore('xyz'));
-        $this->assertEquals('`_cursor` < ?', $sql);
-        $this->assertEquals(['xyz'], $builder->getBindings());
+        $this->assertSame('`_cursor` < ?', $sql);
+        $this->assertSame(['xyz'], $builder->getBindings());
     }
 
     public function testCompileAggregateCountStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileAggregate(Query::count('*', 'total'));
-        $this->assertEquals('COUNT(*) AS `total`', $sql);
+        $this->assertSame('COUNT(*) AS `total`', $sql);
     }
 
     public function testCompileAggregateCountWithoutAlias(): void
     {
         $builder = new Builder();
         $sql = $builder->compileAggregate(Query::count());
-        $this->assertEquals('COUNT(*)', $sql);
+        $this->assertSame('COUNT(*)', $sql);
     }
 
     public function testCompileAggregateSumStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileAggregate(Query::sum('price', 'total'));
-        $this->assertEquals('SUM(`price`) AS `total`', $sql);
+        $this->assertSame('SUM(`price`) AS `total`', $sql);
     }
 
     public function testCompileAggregateAvgStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileAggregate(Query::avg('score', 'avg_score'));
-        $this->assertEquals('AVG(`score`) AS `avg_score`', $sql);
+        $this->assertSame('AVG(`score`) AS `avg_score`', $sql);
     }
 
     public function testCompileAggregateMinStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileAggregate(Query::min('price', 'lowest'));
-        $this->assertEquals('MIN(`price`) AS `lowest`', $sql);
+        $this->assertSame('MIN(`price`) AS `lowest`', $sql);
     }
 
     public function testCompileAggregateMaxStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileAggregate(Query::max('price', 'highest'));
-        $this->assertEquals('MAX(`price`) AS `highest`', $sql);
+        $this->assertSame('MAX(`price`) AS `highest`', $sql);
     }
 
     public function testCompileGroupByStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileGroupBy(Query::groupBy(['status', 'country']));
-        $this->assertEquals('`status`, `country`', $sql);
+        $this->assertSame('`status`, `country`', $sql);
     }
 
     public function testCompileJoinStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileJoin(Query::join('orders', 'users.id', 'orders.uid'));
-        $this->assertEquals('JOIN `orders` ON `users`.`id` = `orders`.`uid`', $sql);
+        $this->assertSame('JOIN `orders` ON `users`.`id` = `orders`.`uid`', $sql);
     }
 
     public function testCompileLeftJoinStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileJoin(Query::leftJoin('profiles', 'users.id', 'profiles.uid'));
-        $this->assertEquals('LEFT JOIN `profiles` ON `users`.`id` = `profiles`.`uid`', $sql);
+        $this->assertSame('LEFT JOIN `profiles` ON `users`.`id` = `profiles`.`uid`', $sql);
     }
 
     public function testCompileRightJoinStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileJoin(Query::rightJoin('orders', 'users.id', 'orders.uid'));
-        $this->assertEquals('RIGHT JOIN `orders` ON `users`.`id` = `orders`.`uid`', $sql);
+        $this->assertSame('RIGHT JOIN `orders` ON `users`.`id` = `orders`.`uid`', $sql);
     }
 
     public function testCompileCrossJoinStandalone(): void
     {
         $builder = new Builder();
         $sql = $builder->compileJoin(Query::crossJoin('colors'));
-        $this->assertEquals('CROSS JOIN `colors`', $sql);
+        $this->assertSame('CROSS JOIN `colors`', $sql);
     }
     //  6. Filter edge cases
 
@@ -3208,8 +3208,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `status` IN (?)', $result->query);
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `status` IN (?)', $result->query);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testEqualWithManyValues(): void
@@ -3222,8 +3222,8 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $placeholders = implode(', ', array_fill(0, 10, '?'));
-        $this->assertEquals("SELECT * FROM `t` WHERE `id` IN ({$placeholders})", $result->query);
-        $this->assertEquals($values, $result->bindings);
+        $this->assertSame("SELECT * FROM `t` WHERE `id` IN ({$placeholders})", $result->query);
+        $this->assertSame($values, $result->bindings);
     }
 
     public function testEqualWithEmptyArray(): void
@@ -3234,8 +3234,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE 1 = 0', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE 1 = 0', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testNotEqualWithExactlyTwoValues(): void
@@ -3246,8 +3246,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `role` NOT IN (?, ?)', $result->query);
-        $this->assertEquals(['guest', 'banned'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `role` NOT IN (?, ?)', $result->query);
+        $this->assertSame(['guest', 'banned'], $result->bindings);
     }
 
     public function testBetweenWithSameMinAndMax(): void
@@ -3258,8 +3258,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `age` BETWEEN ? AND ?', $result->query);
-        $this->assertEquals([25, 25], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `age` BETWEEN ? AND ?', $result->query);
+        $this->assertSame([25, 25], $result->bindings);
     }
 
     public function testStartsWithEmptyString(): void
@@ -3270,8 +3270,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `name` LIKE ?', $result->query);
-        $this->assertEquals(['%'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `name` LIKE ?', $result->query);
+        $this->assertSame(['%'], $result->bindings);
     }
 
     public function testEndsWithEmptyString(): void
@@ -3282,8 +3282,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `name` LIKE ?', $result->query);
-        $this->assertEquals(['%'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `name` LIKE ?', $result->query);
+        $this->assertSame(['%'], $result->bindings);
     }
 
     public function testContainsWithSingleEmptyString(): void
@@ -3294,8 +3294,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `bio` LIKE ?', $result->query);
-        $this->assertEquals(['%%'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `bio` LIKE ?', $result->query);
+        $this->assertSame(['%%'], $result->bindings);
     }
 
     public function testContainsWithManyValues(): void
@@ -3307,7 +3307,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('(`bio` LIKE ? OR `bio` LIKE ? OR `bio` LIKE ? OR `bio` LIKE ? OR `bio` LIKE ?)', $result->query);
-        $this->assertEquals(['%a%', '%b%', '%c%', '%d%', '%e%'], $result->bindings);
+        $this->assertSame(['%a%', '%b%', '%c%', '%d%', '%e%'], $result->bindings);
     }
 
     public function testContainsAllWithSingleValue(): void
@@ -3318,8 +3318,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`perms` LIKE ?)', $result->query);
-        $this->assertEquals(['%read%'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE (`perms` LIKE ?)', $result->query);
+        $this->assertSame(['%read%'], $result->bindings);
     }
 
     public function testNotContainsWithEmptyStringValue(): void
@@ -3330,8 +3330,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `bio` NOT LIKE ?', $result->query);
-        $this->assertEquals(['%%'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `bio` NOT LIKE ?', $result->query);
+        $this->assertSame(['%%'], $result->bindings);
     }
 
     public function testComparisonWithFloatValues(): void
@@ -3342,8 +3342,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `price` > ?', $result->query);
-        $this->assertEquals([9.99], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `price` > ?', $result->query);
+        $this->assertSame([9.99], $result->bindings);
     }
 
     public function testComparisonWithNegativeValues(): void
@@ -3354,8 +3354,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `balance` < ?', $result->query);
-        $this->assertEquals([-100], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `balance` < ?', $result->query);
+        $this->assertSame([-100], $result->bindings);
     }
 
     public function testComparisonWithZero(): void
@@ -3366,8 +3366,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `score` >= ?', $result->query);
-        $this->assertEquals([0], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `score` >= ?', $result->query);
+        $this->assertSame([0], $result->bindings);
     }
 
     public function testComparisonWithVeryLargeInteger(): void
@@ -3378,7 +3378,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals([9999999999999], $result->bindings);
+        $this->assertSame([9999999999999], $result->bindings);
     }
 
     public function testComparisonWithStringValues(): void
@@ -3389,8 +3389,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `name` > ?', $result->query);
-        $this->assertEquals(['M'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `name` > ?', $result->query);
+        $this->assertSame(['M'], $result->bindings);
     }
 
     public function testBetweenWithStringValues(): void
@@ -3401,8 +3401,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `created_at` BETWEEN ? AND ?', $result->query);
-        $this->assertEquals(['2024-01-01', '2024-12-31'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `created_at` BETWEEN ? AND ?', $result->query);
+        $this->assertSame(['2024-01-01', '2024-12-31'], $result->bindings);
     }
 
     public function testIsNullCombinedWithIsNotNullOnDifferentColumns(): void
@@ -3416,11 +3416,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE `deleted_at` IS NULL AND `verified_at` IS NOT NULL',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testMultipleIsNullFilters(): void
@@ -3435,7 +3435,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE `a` IS NULL AND `b` IS NULL AND `c` IS NULL',
             $result->query
         );
@@ -3449,7 +3449,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`name` IS NOT NULL)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE (`name` IS NOT NULL)', $result->query);
     }
 
     public function testExistsWithManyAttributes(): void
@@ -3460,7 +3460,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE (`a` IS NOT NULL AND `b` IS NOT NULL AND `c` IS NOT NULL AND `d` IS NOT NULL)',
             $result->query
         );
@@ -3474,7 +3474,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE (`a` IS NULL AND `b` IS NULL AND `c` IS NULL)',
             $result->query
         );
@@ -3492,8 +3492,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?))', $result->query);
-        $this->assertEquals([1], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE (`a` IN (?))', $result->query);
+        $this->assertSame([1], $result->bindings);
     }
 
     public function testOrWithSingleSubQuery(): void
@@ -3508,8 +3508,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?))', $result->query);
-        $this->assertEquals([1], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE (`a` IN (?))', $result->query);
+        $this->assertSame([1], $result->bindings);
     }
 
     public function testAndWithManySubQueries(): void
@@ -3528,11 +3528,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE (`a` IN (?) AND `b` IN (?) AND `c` IN (?) AND `d` IN (?) AND `e` IN (?))',
             $result->query
         );
-        $this->assertEquals([1, 2, 3, 4, 5], $result->bindings);
+        $this->assertSame([1, 2, 3, 4, 5], $result->bindings);
     }
 
     public function testOrWithManySubQueries(): void
@@ -3551,7 +3551,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE (`a` IN (?) OR `b` IN (?) OR `c` IN (?) OR `d` IN (?) OR `e` IN (?))',
             $result->query
         );
@@ -3576,11 +3576,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE (((`a` IN (?) AND `b` IN (?)) OR `c` IN (?)) AND `d` IN (?))',
             $result->query
         );
-        $this->assertEquals([1, 2, 3, 4], $result->bindings);
+        $this->assertSame([1, 2, 3, 4], $result->bindings);
     }
 
     public function testRawWithManyBindings(): void
@@ -3593,8 +3593,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals("SELECT * FROM `t` WHERE {$placeholders}", $result->query);
-        $this->assertEquals($bindings, $result->bindings);
+        $this->assertSame("SELECT * FROM `t` WHERE {$placeholders}", $result->query);
+        $this->assertSame($bindings, $result->bindings);
     }
 
     public function testFilterWithDotsInAttributeName(): void
@@ -3605,7 +3605,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `table`.`column` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `table`.`column` IN (?)', $result->query);
     }
 
     public function testFilterWithUnderscoresInAttributeName(): void
@@ -3616,7 +3616,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `my_column_name` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `my_column_name` IN (?)', $result->query);
     }
 
     public function testFilterWithNumericAttributeName(): void
@@ -3627,7 +3627,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `123` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `123` IN (?)', $result->query);
     }
     //  7. Aggregation edge cases
 
@@ -3635,7 +3635,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())->from('t')->count()->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT COUNT(*) FROM `t`', $result->query);
+        $this->assertSame('SELECT COUNT(*) FROM `t`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -3643,7 +3643,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())->from('t')->sum('price')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT SUM(`price`) FROM `t`', $result->query);
+        $this->assertSame('SELECT SUM(`price`) FROM `t`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -3651,7 +3651,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())->from('t')->avg('score')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT AVG(`score`) FROM `t`', $result->query);
+        $this->assertSame('SELECT AVG(`score`) FROM `t`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -3659,7 +3659,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())->from('t')->min('price')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT MIN(`price`) FROM `t`', $result->query);
+        $this->assertSame('SELECT MIN(`price`) FROM `t`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -3667,7 +3667,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())->from('t')->max('price')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT MAX(`price`) FROM `t`', $result->query);
+        $this->assertSame('SELECT MAX(`price`) FROM `t`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -3715,7 +3715,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT COUNT(`id`) AS `count_id`, COUNT(*) AS `count_all` FROM `t`',
             $result->query
         );
@@ -3753,7 +3753,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('GROUP BY `category`', $result->query);
         $this->assertStringContainsString('ORDER BY `cnt` DESC', $result->query);
         $this->assertStringContainsString('LIMIT ?', $result->query);
-        $this->assertEquals(['paid', 5], $result->bindings);
+        $this->assertSame(['paid', 5], $result->bindings);
     }
 
     public function testAggregationJoinGroupByHavingSortLimitFullPipeline(): void
@@ -3782,7 +3782,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('ORDER BY `revenue` DESC', $result->query);
         $this->assertStringContainsString('LIMIT ?', $result->query);
         $this->assertStringContainsString('OFFSET ?', $result->query);
-        $this->assertEquals([0, 2, 20, 10], $result->bindings);
+        $this->assertSame([0, 2, 20, 10], $result->bindings);
     }
 
     public function testAggregationWithAttributeResolver(): void
@@ -3796,7 +3796,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT SUM(`_amount`) AS `total` FROM `t`', $result->query);
+        $this->assertSame('SELECT SUM(`_amount`) AS `total` FROM `t`', $result->query);
     }
 
     public function testMinMaxWithStringColumns(): void
@@ -3808,7 +3808,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT MIN(`name`) AS `first_name`, MAX(`name`) AS `last_name` FROM `t`',
             $result->query
         );
@@ -3823,7 +3823,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `employees` JOIN `employees` ON `employees`.`manager_id` = `employees`.`id`',
             $result->query
         );
@@ -3864,7 +3864,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('ORDER BY `orders`.`total` DESC', $result->query);
         $this->assertStringContainsString('LIMIT ?', $result->query);
         $this->assertStringContainsString('OFFSET ?', $result->query);
-        $this->assertEquals(['paid', 100, 25, 50], $result->bindings);
+        $this->assertSame(['paid', 100, 25, 50], $result->bindings);
     }
 
     public function testJoinAggregationGroupByHavingCombined(): void
@@ -3882,7 +3882,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('JOIN `users`', $result->query);
         $this->assertStringContainsString('GROUP BY `users`.`name`', $result->query);
         $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
-        $this->assertEquals([3], $result->bindings);
+        $this->assertSame([3], $result->bindings);
     }
 
     public function testJoinWithDistinct(): void
@@ -3946,7 +3946,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` JOIN `other` ON `_uid` = `_ref_id`',
             $result->query
         );
@@ -3974,7 +3974,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `a` CROSS JOIN `b` JOIN `c` ON `a`.`id` = `c`.`a_id`',
             $result->query
         );
@@ -4007,7 +4007,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `a` JOIN `b` ON `a`.`start` < `b`.`end`',
             $result->query
         );
@@ -4026,7 +4026,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $query = $result->query;
-        $this->assertEquals(5, substr_count($query, 'JOIN'));
+        $this->assertSame(5, substr_count($query, 'JOIN'));
     }
     //  9. Union edge cases
 
@@ -4044,7 +4044,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             '(SELECT * FROM `main`) UNION (SELECT * FROM `a`) UNION (SELECT * FROM `b`) UNION (SELECT * FROM `c`)',
             $result->query
         );
@@ -4064,7 +4064,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             '(SELECT * FROM `main`) UNION ALL (SELECT * FROM `a`) UNION ALL (SELECT * FROM `b`) UNION ALL (SELECT * FROM `c`)',
             $result->query
         );
@@ -4084,7 +4084,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             '(SELECT * FROM `main`) UNION (SELECT * FROM `a`) UNION ALL (SELECT * FROM `b`) UNION (SELECT * FROM `c`)',
             $result->query
         );
@@ -4167,7 +4167,7 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('WHERE org = ?', $result->query);
         $this->assertStringContainsString('UNION (SELECT * FROM `other` WHERE org = ?)', $result->query);
-        $this->assertEquals(['org1', 'org2'], $result->bindings);
+        $this->assertSame(['org1', 'org2'], $result->bindings);
     }
 
     public function testUnionBindingOrderWithComplexSubQueries(): void
@@ -4185,7 +4185,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['active', 10, 2023, 5], $result->bindings);
+        $this->assertSame(['active', 10, 2023, 5], $result->bindings);
     }
 
     public function testUnionWithDistinct(): void
@@ -4217,7 +4217,7 @@ class MySQLTest extends TestCase
         $result = $builder->from('fresh')->union($sub)->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             '(SELECT * FROM `fresh`) UNION (SELECT * FROM `other`)',
             $result->query
         );
@@ -4240,7 +4240,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['active', 1, 2, 10, 20], $result->bindings);
+        $this->assertSame(['active', 1, 2, 10, 20], $result->bindings);
     }
 
     public function testUnionWithFourSubQueries(): void
@@ -4259,7 +4259,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(4, substr_count($result->query, 'UNION'));
+        $this->assertSame(4, substr_count($result->query, 'UNION'));
     }
 
     public function testUnionAllWithFilteredSubQueries(): void
@@ -4277,8 +4277,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['paid', 'paid', 'paid', 'paid'], $result->bindings);
-        $this->assertEquals(3, substr_count($result->query, 'UNION ALL'));
+        $this->assertSame(['paid', 'paid', 'paid', 'paid'], $result->bindings);
+        $this->assertSame(3, substr_count($result->query, 'UNION ALL'));
     }
     //  10. toRawSql edge cases
 
@@ -4374,7 +4374,7 @@ class MySQLTest extends TestCase
             ->filter([Query::raw('a = ? AND b = ?', [null, null])])
             ->toRawSql();
 
-        $this->assertEquals("SELECT * FROM `t` WHERE a = NULL AND b = NULL", $sql);
+        $this->assertSame("SELECT * FROM `t` WHERE a = NULL AND b = NULL", $sql);
     }
 
     public function testToRawSqlWithAggregationQuery(): void
@@ -4445,7 +4445,7 @@ class MySQLTest extends TestCase
         $sql1 = $builder->toRawSql();
         $sql2 = $builder->toRawSql();
 
-        $this->assertEquals($sql1, $sql2);
+        $this->assertSame($sql1, $sql2);
     }
     //  11. when() edge cases
 
@@ -4464,7 +4464,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
         $this->assertStringContainsString('ORDER BY `name` ASC', $result->query);
         $this->assertStringContainsString('LIMIT ?', $result->query);
-        $this->assertEquals(['active', 10], $result->bindings);
+        $this->assertSame(['active', 10], $result->bindings);
     }
 
     public function testWhenChainedFiveTimes(): void
@@ -4479,11 +4479,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE `a` IN (?) AND `b` IN (?) AND `d` IN (?) AND `e` IN (?)',
             $result->query
         );
-        $this->assertEquals([1, 2, 4, 5], $result->bindings);
+        $this->assertSame([1, 2, 4, 5], $result->bindings);
     }
 
     public function testWhenInsideWhenThreeLevelsDeep(): void
@@ -4498,8 +4498,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `deep` IN (?)', $result->query);
-        $this->assertEquals([1], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `deep` IN (?)', $result->query);
+        $this->assertSame([1], $result->bindings);
     }
 
     public function testWhenThatAddsJoins(): void
@@ -4546,8 +4546,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('SELECT * FROM `t`', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testWhenFalseDoesNotAffectJoins(): void
@@ -4569,7 +4569,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertSame('SELECT * FROM `t`', $result->query);
     }
 
     public function testWhenFalseDoesNotAffectSort(): void
@@ -4609,11 +4609,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE p1 = ? AND p2 = ? AND p3 = ?',
             $result->query
         );
-        $this->assertEquals(['v1', 'v2', 'v3'], $result->bindings);
+        $this->assertSame(['v1', 'v2', 'v3'], $result->bindings);
     }
 
     public function testProviderReturningEmptyConditionString(): void
@@ -4646,11 +4646,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE a IN (?, ?, ?, ?, ?)',
             $result->query
         );
-        $this->assertEquals([1, 2, 3, 4, 5], $result->bindings);
+        $this->assertSame([1, 2, 3, 4, 5], $result->bindings);
     }
 
     public function testProviderCombinedWithCursorFilterHaving(): void
@@ -4674,7 +4674,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('WHERE', $result->query);
         $this->assertStringContainsString('HAVING', $result->query);
         // filter, provider, cursor, having
-        $this->assertEquals(['active', 'org1', 'cur1', 5], $result->bindings);
+        $this->assertSame(['active', 'org1', 'cur1', 5], $result->bindings);
     }
 
     public function testProviderCombinedWithJoins(): void
@@ -4693,7 +4693,7 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('JOIN `orders`', $result->query);
         $this->assertStringContainsString('WHERE tenant = ?', $result->query);
-        $this->assertEquals(['t1'], $result->bindings);
+        $this->assertSame(['t1'], $result->bindings);
     }
 
     public function testProviderCombinedWithUnions(): void
@@ -4714,7 +4714,7 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('WHERE org = ?', $result->query);
         $this->assertStringContainsString('UNION', $result->query);
-        $this->assertEquals(['org1'], $result->bindings);
+        $this->assertSame(['org1'], $result->bindings);
     }
 
     public function testProviderCombinedWithAggregations(): void
@@ -4750,7 +4750,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('users_perms', $result->query);
-        $this->assertEquals(['read'], $result->bindings);
+        $this->assertSame(['read'], $result->bindings);
     }
 
     public function testProviderBindingOrderWithComplexQuery(): void
@@ -4780,7 +4780,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // filter, provider1, provider2, cursor, limit, offset
-        $this->assertEquals(['va', 10, 'pv1', 'pv2', 'cur', 5, 10], $result->bindings);
+        $this->assertSame(['va', 10, 'pv1', 'pv2', 'cur', 5, 10], $result->bindings);
     }
 
     public function testProviderPreservedAcrossReset(): void
@@ -4800,7 +4800,7 @@ class MySQLTest extends TestCase
         $result = $builder->from('t2')->build();
         $this->assertBindingCount($result);
         $this->assertStringContainsString('WHERE org = ?', $result->query);
-        $this->assertEquals(['org1'], $result->bindings);
+        $this->assertSame(['org1'], $result->bindings);
     }
 
     public function testFourConditionProviders(): void
@@ -4834,11 +4834,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE a = ? AND b = ? AND c = ? AND d = ?',
             $result->query
         );
-        $this->assertEquals([1, 2, 3, 4], $result->bindings);
+        $this->assertSame([1, 2, 3, 4], $result->bindings);
     }
 
     public function testProviderWithNoBindings(): void
@@ -4854,8 +4854,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE 1 = 1', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE 1 = 1', $result->query);
+        $this->assertSame([], $result->bindings);
     }
     //  13. Reset edge cases
 
@@ -4896,7 +4896,7 @@ class MySQLTest extends TestCase
         $result = $builder->from('t2')->build();
         $this->assertBindingCount($result);
         $this->assertStringContainsString('org = ?', $result->query);
-        $this->assertEquals(['org1'], $result->bindings);
+        $this->assertSame(['org1'], $result->bindings);
     }
 
     public function testResetClearsPendingQueries(): void
@@ -4912,8 +4912,8 @@ class MySQLTest extends TestCase
 
         $result = $builder->from('t2')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t2`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('SELECT * FROM `t2`', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testResetClearsBindings(): void
@@ -4928,7 +4928,7 @@ class MySQLTest extends TestCase
         $builder->reset();
         $result = $builder->from('t2')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testResetClearsTable(): void
@@ -4970,7 +4970,7 @@ class MySQLTest extends TestCase
 
         $result = $builder->from('t')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertSame('SELECT * FROM `t`', $result->query);
     }
 
     public function testMultipleResetCalls(): void
@@ -4983,7 +4983,7 @@ class MySQLTest extends TestCase
 
         $result = $builder->from('t2')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t2`', $result->query);
+        $this->assertSame('SELECT * FROM `t2`', $result->query);
     }
 
     public function testResetBetweenDifferentQueryTypes(): void
@@ -5013,8 +5013,8 @@ class MySQLTest extends TestCase
 
         $result = $builder->from('new')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `new`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('SELECT * FROM `new`', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testResetAfterComplexQueryWithAllFeatures(): void
@@ -5040,8 +5040,8 @@ class MySQLTest extends TestCase
 
         $result = $builder->from('simple')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `simple`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('SELECT * FROM `simple`', $result->query);
+        $this->assertSame([], $result->bindings);
     }
     //  14. Multiple build() calls
 
@@ -5070,8 +5070,8 @@ class MySQLTest extends TestCase
         $result1 = $builder->build();
         $result2 = $builder->build();
 
-        $this->assertEquals($result1->query, $result2->query);
-        $this->assertEquals($result1->bindings, $result2->bindings);
+        $this->assertSame($result1->query, $result2->query);
+        $this->assertSame($result1->bindings, $result2->bindings);
     }
 
     public function testBuildResetsBindingsEachTime(): void
@@ -5086,7 +5086,7 @@ class MySQLTest extends TestCase
         $builder->build();
         $bindings2 = $builder->getBindings();
 
-        $this->assertEquals($bindings1, $bindings2);
+        $this->assertSame($bindings1, $bindings2);
         $this->assertCount(1, $bindings2);
     }
 
@@ -5106,8 +5106,8 @@ class MySQLTest extends TestCase
         $result2 = $builder->build();
         $result3 = $builder->build();
 
-        $this->assertEquals($result1->bindings, $result2->bindings);
-        $this->assertEquals($result2->bindings, $result3->bindings);
+        $this->assertSame($result1->bindings, $result2->bindings);
+        $this->assertSame($result2->bindings, $result3->bindings);
     }
 
     public function testBuildAfterAddingMoreQueries(): void
@@ -5115,7 +5115,7 @@ class MySQLTest extends TestCase
         $builder = (new Builder())->from('t');
 
         $result1 = $builder->build();
-        $this->assertEquals('SELECT * FROM `t`', $result1->query);
+        $this->assertSame('SELECT * FROM `t`', $result1->query);
 
         $builder->filter([Query::equal('a', [1])]);
         $result2 = $builder->build();
@@ -5134,8 +5134,8 @@ class MySQLTest extends TestCase
         $result1 = $builder->build();
         $result2 = $builder->build();
 
-        $this->assertEquals($result1->query, $result2->query);
-        $this->assertEquals($result1->bindings, $result2->bindings);
+        $this->assertSame($result1->query, $result2->query);
+        $this->assertSame($result1->bindings, $result2->bindings);
     }
 
     public function testBuildThreeTimesWithIncreasingComplexity(): void
@@ -5143,11 +5143,11 @@ class MySQLTest extends TestCase
         $builder = (new Builder())->from('t');
 
         $r1 = $builder->build();
-        $this->assertEquals('SELECT * FROM `t`', $r1->query);
+        $this->assertSame('SELECT * FROM `t`', $r1->query);
 
         $builder->filter([Query::equal('a', [1])]);
         $r2 = $builder->build();
-        $this->assertEquals('SELECT * FROM `t` WHERE `a` IN (?)', $r2->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `a` IN (?)', $r2->query);
 
         $builder->limit(10)->offset(5);
         $r3 = $builder->build();
@@ -5180,8 +5180,8 @@ class MySQLTest extends TestCase
         $r1 = $builder->build();
         $r2 = $builder->build();
 
-        $this->assertEquals([5], $r1->bindings);
-        $this->assertEquals([5], $r2->bindings);
+        $this->assertSame([5], $r1->bindings);
+        $this->assertSame([5], $r2->bindings);
     }
     //  15. Binding ordering comprehensive
 
@@ -5197,7 +5197,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['v1', 10, 1, 100], $result->bindings);
+        $this->assertSame(['v1', 10, 1, 100], $result->bindings);
     }
 
     public function testBindingOrderThreeProviders(): void
@@ -5225,7 +5225,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['pv1', 'pv2', 'pv3'], $result->bindings);
+        $this->assertSame(['pv1', 'pv2', 'pv3'], $result->bindings);
     }
 
     public function testBindingOrderMultipleUnions(): void
@@ -5243,7 +5243,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // main filter, main limit, union1 bindings, union2 bindings
-        $this->assertEquals([3, 5, 1, 2], $result->bindings);
+        $this->assertSame([3, 5, 1, 2], $result->bindings);
     }
 
     public function testBindingOrderLogicalAndWithMultipleSubFilters(): void
@@ -5260,7 +5260,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals([1, 2, 3], $result->bindings);
+        $this->assertSame([1, 2, 3], $result->bindings);
     }
 
     public function testBindingOrderLogicalOrWithMultipleSubFilters(): void
@@ -5277,7 +5277,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals([1, 2, 3], $result->bindings);
+        $this->assertSame([1, 2, 3], $result->bindings);
     }
 
     public function testBindingOrderNestedAndOr(): void
@@ -5296,7 +5296,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals([1, 2, 3], $result->bindings);
+        $this->assertSame([1, 2, 3], $result->bindings);
     }
 
     public function testBindingOrderRawMixedWithRegularFilters(): void
@@ -5311,7 +5311,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['v1', 10, 20], $result->bindings);
+        $this->assertSame(['v1', 10, 20], $result->bindings);
     }
 
     public function testBindingOrderAggregationHavingComplexConditions(): void
@@ -5331,7 +5331,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // filter, having1, having2, limit
-        $this->assertEquals(['active', 5, 10000, 10], $result->bindings);
+        $this->assertSame(['active', 5, 10000, 10], $result->bindings);
     }
 
     public function testBindingOrderFullPipelineWithEverything(): void
@@ -5361,7 +5361,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // filter(paid, 0), provider(t1), cursor(cursor_val), having(1), limit(25), offset(50), union(true)
-        $this->assertEquals(['paid', 0, 't1', 'cursor_val', 1, 25, 50, true], $result->bindings);
+        $this->assertSame(['paid', 0, 't1', 'cursor_val', 1, 25, 50, true], $result->bindings);
     }
 
     public function testBindingOrderContainsMultipleValues(): void
@@ -5376,7 +5376,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // contains produces three LIKE bindings, then equal
-        $this->assertEquals(['%php%', '%js%', '%go%', 'active'], $result->bindings);
+        $this->assertSame(['%php%', '%js%', '%go%', 'active'], $result->bindings);
     }
 
     public function testBindingOrderBetweenAndComparisons(): void
@@ -5391,7 +5391,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals([18, 65, 50, 100], $result->bindings);
+        $this->assertSame([18, 65, 50, 100], $result->bindings);
     }
 
     public function testBindingOrderStartsWithEndsWith(): void
@@ -5405,7 +5405,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['A%', '%.com'], $result->bindings);
+        $this->assertSame(['A%', '%.com'], $result->bindings);
     }
 
     public function testBindingOrderSearchAndRegex(): void
@@ -5419,7 +5419,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['hello*', '^test'], $result->bindings);
+        $this->assertSame(['hello*', '^test'], $result->bindings);
     }
 
     public function testBindingOrderWithCursorBeforeFilterAndLimit(): void
@@ -5440,7 +5440,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // filter, provider, cursor, limit, offset
-        $this->assertEquals(['x', 'org1', 'my_cursor', 10, 0], $result->bindings);
+        $this->assertSame(['x', 'org1', 'my_cursor', 10, 0], $result->bindings);
     }
     //  16. Empty/minimal queries
 
@@ -5504,7 +5504,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertSame('SELECT * FROM `t`', $result->query);
     }
 
     public function testBuildWithEmptySelectArray(): void
@@ -5515,7 +5515,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT  FROM `t`', $result->query);
+        $this->assertSame('SELECT  FROM `t`', $result->query);
     }
 
     public function testBuildWithOnlyHavingNoGroupBy(): void
@@ -5539,7 +5539,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT DISTINCT * FROM `t`', $result->query);
+        $this->assertSame('SELECT DISTINCT * FROM `t`', $result->query);
     }
     //  Spatial/Vector/ElemMatch Exception Tests
 
@@ -5615,7 +5615,7 @@ class MySQLTest extends TestCase
     public function testToRawSqlWithBoolFalse(): void
     {
         $sql = (new Builder())->from('t')->filter([Query::equal('active', [false])])->toRawSql();
-        $this->assertEquals("SELECT * FROM `t` WHERE `active` IN (0)", $sql);
+        $this->assertSame("SELECT * FROM `t` WHERE `active` IN (0)", $sql);
     }
 
     public function testToRawSqlMixedBindingTypes(): void
@@ -5688,11 +5688,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             '(SELECT DISTINCT COUNT(*) AS `total`, `status` FROM `orders` JOIN `users` ON `orders`.`uid` = `users`.`id` WHERE `amount` > ? GROUP BY `status` HAVING COUNT(*) > ? ORDER BY `status` ASC LIMIT ? OFFSET ?) UNION (SELECT * FROM `archive` WHERE `status` IN (?))',
             $result->query
         );
-        $this->assertEquals([100, 5, 10, 20, 'closed'], $result->bindings);
+        $this->assertSame([100, 5, 10, 20, 'closed'], $result->bindings);
     }
     //  Feature Combination Tests
 
@@ -5701,8 +5701,8 @@ class MySQLTest extends TestCase
         $other = (new Builder())->from('b');
         $result = (new Builder())->from('a')->distinct()->union($other)->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('(SELECT DISTINCT * FROM `a`) UNION (SELECT * FROM `b`)', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('(SELECT DISTINCT * FROM `a`) UNION (SELECT * FROM `b`)', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testRawInsideLogicalAnd(): void
@@ -5714,8 +5714,8 @@ class MySQLTest extends TestCase
             ])])
             ->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t` WHERE (`x` > ? AND custom_func(y) > ?)', $result->query);
-        $this->assertEquals([1, 5], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE (`x` > ? AND custom_func(y) > ?)', $result->query);
+        $this->assertSame([1, 5], $result->bindings);
     }
 
     public function testRawInsideLogicalOr(): void
@@ -5727,8 +5727,8 @@ class MySQLTest extends TestCase
             ])])
             ->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t` WHERE (`a` IN (?) OR b IS NOT NULL)', $result->query);
-        $this->assertEquals([1], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE (`a` IN (?) OR b IS NOT NULL)', $result->query);
+        $this->assertSame([1], $result->bindings);
     }
 
     public function testAggregationWithCursor(): void
@@ -5771,8 +5771,8 @@ class MySQLTest extends TestCase
             })
             ->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t` WHERE _tenant = ?', $result->query);
-        $this->assertEquals(['t1'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE _tenant = ?', $result->query);
+        $this->assertSame(['t1'], $result->bindings);
     }
 
     public function testConditionProviderWithCursorNoFilters(): void
@@ -5791,7 +5791,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('_tenant = ?', $result->query);
         $this->assertStringContainsString('`_cursor` > ?', $result->query);
         // Provider bindings come before cursor bindings
-        $this->assertEquals(['t1', 'abc'], $result->bindings);
+        $this->assertSame(['t1', 'abc'], $result->bindings);
     }
 
     public function testConditionProviderWithDistinct(): void
@@ -5807,8 +5807,8 @@ class MySQLTest extends TestCase
             })
             ->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT DISTINCT * FROM `t` WHERE _tenant = ?', $result->query);
-        $this->assertEquals(['t1'], $result->bindings);
+        $this->assertSame('SELECT DISTINCT * FROM `t` WHERE _tenant = ?', $result->query);
+        $this->assertSame(['t1'], $result->bindings);
     }
 
     public function testConditionProviderPersistsAfterReset(): void
@@ -5827,7 +5827,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
         $this->assertStringContainsString('FROM `other`', $result->query);
         $this->assertStringContainsString('_tenant = ?', $result->query);
-        $this->assertEquals(['t1'], $result->bindings);
+        $this->assertSame(['t1'], $result->bindings);
     }
 
     public function testConditionProviderWithHaving(): void
@@ -5849,7 +5849,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('WHERE _tenant = ?', $result->query);
         $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
         // Provider bindings before having bindings
-        $this->assertEquals(['t1', 5], $result->bindings);
+        $this->assertSame(['t1', 5], $result->bindings);
     }
 
     public function testUnionWithConditionProvider(): void
@@ -5869,7 +5869,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
         // Sub-query should include the condition provider
         $this->assertStringContainsString('UNION (SELECT * FROM `b` WHERE _deleted = ?)', $result->query);
-        $this->assertEquals([0], $result->bindings);
+        $this->assertSame([0], $result->bindings);
     }
     //  Boundary Value Tests
 
@@ -5877,8 +5877,8 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())->from('t')->limit(-1)->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result->query);
-        $this->assertEquals([-1], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` LIMIT ?', $result->query);
+        $this->assertSame([-1], $result->bindings);
     }
 
     public function testNegativeOffset(): void
@@ -5892,7 +5892,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())->from('t')->filter([Query::equal('col', [null])])->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t` WHERE `col` IS NULL', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `col` IS NULL', $result->query);
         $this->assertSame([], $result->bindings);
     }
 
@@ -5900,7 +5900,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())->from('t')->filter([Query::equal('col', ['a', null])])->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t` WHERE (`col` IN (?) OR `col` IS NULL)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE (`col` IN (?) OR `col` IS NULL)', $result->query);
         $this->assertSame(['a'], $result->bindings);
     }
 
@@ -5908,7 +5908,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())->from('t')->filter([Query::notEqual('col', [null])])->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t` WHERE `col` IS NOT NULL', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `col` IS NOT NULL', $result->query);
         $this->assertSame([], $result->bindings);
     }
 
@@ -5916,7 +5916,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())->from('t')->filter([Query::notEqual('col', ['a', null])])->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t` WHERE (`col` != ? AND `col` IS NOT NULL)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE (`col` != ? AND `col` IS NOT NULL)', $result->query);
         $this->assertSame(['a'], $result->bindings);
     }
 
@@ -5924,7 +5924,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())->from('t')->filter([Query::notEqual('col', ['a', 'b', null])])->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t` WHERE (`col` NOT IN (?, ?) AND `col` IS NOT NULL)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE (`col` NOT IN (?, ?) AND `col` IS NOT NULL)', $result->query);
         $this->assertSame(['a', 'b'], $result->bindings);
     }
 
@@ -5932,24 +5932,24 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())->from('t')->filter([Query::between('age', 65, 18)])->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t` WHERE `age` BETWEEN ? AND ?', $result->query);
-        $this->assertEquals([65, 18], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `age` BETWEEN ? AND ?', $result->query);
+        $this->assertSame([65, 18], $result->bindings);
     }
 
     public function testContainsWithSqlWildcard(): void
     {
         $result = (new Builder())->from('t')->filter([Query::contains('bio', ['100%'])])->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t` WHERE `bio` LIKE ?', $result->query);
-        $this->assertEquals(['%100\%%'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `bio` LIKE ?', $result->query);
+        $this->assertSame(['%100\%%'], $result->bindings);
     }
 
     public function testStartsWithWithWildcard(): void
     {
         $result = (new Builder())->from('t')->filter([Query::startsWith('name', '%admin')])->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t` WHERE `name` LIKE ?', $result->query);
-        $this->assertEquals(['\%admin%'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `name` LIKE ?', $result->query);
+        $this->assertSame(['\%admin%'], $result->bindings);
     }
 
     public function testCursorWithNullValue(): void
@@ -5958,7 +5958,7 @@ class MySQLTest extends TestCase
         $result = (new Builder())->from('t')->cursorAfter(null)->build();
         $this->assertBindingCount($result);
         $this->assertStringNotContainsString('_cursor', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCursorWithIntegerValue(): void
@@ -5981,8 +5981,8 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())->from('t')->limit(10)->limit(20)->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t` LIMIT ?', $result->query);
-        $this->assertEquals([10], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` LIMIT ?', $result->query);
+        $this->assertSame([10], $result->bindings);
     }
 
     public function testMultipleOffsetsFirstWins(): void
@@ -6019,56 +6019,56 @@ class MySQLTest extends TestCase
     {
         $builder = new Builder();
         $result = $builder->compileSelect(Query::select([]));
-        $this->assertEquals('', $result);
+        $this->assertSame('', $result);
     }
 
     public function testCompileGroupByEmpty(): void
     {
         $builder = new Builder();
         $result = $builder->compileGroupBy(Query::groupBy([]));
-        $this->assertEquals('', $result);
+        $this->assertSame('', $result);
     }
 
     public function testCompileGroupBySingleColumn(): void
     {
         $builder = new Builder();
         $result = $builder->compileGroupBy(Query::groupBy(['status']));
-        $this->assertEquals('`status`', $result);
+        $this->assertSame('`status`', $result);
     }
 
     public function testCompileSumWithoutAlias(): void
     {
         $builder = new Builder();
         $sql = $builder->compileAggregate(Query::sum('price'));
-        $this->assertEquals('SUM(`price`)', $sql);
+        $this->assertSame('SUM(`price`)', $sql);
     }
 
     public function testCompileAvgWithoutAlias(): void
     {
         $builder = new Builder();
         $sql = $builder->compileAggregate(Query::avg('score'));
-        $this->assertEquals('AVG(`score`)', $sql);
+        $this->assertSame('AVG(`score`)', $sql);
     }
 
     public function testCompileMinWithoutAlias(): void
     {
         $builder = new Builder();
         $sql = $builder->compileAggregate(Query::min('price'));
-        $this->assertEquals('MIN(`price`)', $sql);
+        $this->assertSame('MIN(`price`)', $sql);
     }
 
     public function testCompileMaxWithoutAlias(): void
     {
         $builder = new Builder();
         $sql = $builder->compileAggregate(Query::max('price'));
-        $this->assertEquals('MAX(`price`)', $sql);
+        $this->assertSame('MAX(`price`)', $sql);
     }
 
     public function testCompileLimitZero(): void
     {
         $builder = new Builder();
         $sql = $builder->compileLimit(Query::limit(0));
-        $this->assertEquals('LIMIT ?', $sql);
+        $this->assertSame('LIMIT ?', $sql);
         $this->assertSame([0], $builder->getBindings());
     }
 
@@ -6076,7 +6076,7 @@ class MySQLTest extends TestCase
     {
         $builder = new Builder();
         $sql = $builder->compileOffset(Query::offset(0));
-        $this->assertEquals('OFFSET ?', $sql);
+        $this->assertSame('OFFSET ?', $sql);
         $this->assertSame([0], $builder->getBindings());
     }
 
@@ -6098,59 +6098,59 @@ class MySQLTest extends TestCase
     public function testQueryCompileOrderAsc(): void
     {
         $builder = new Builder();
-        $this->assertEquals('`name` ASC', Query::orderAsc('name')->compile($builder));
+        $this->assertSame('`name` ASC', Query::orderAsc('name')->compile($builder));
     }
 
     public function testQueryCompileOrderDesc(): void
     {
         $builder = new Builder();
-        $this->assertEquals('`name` DESC', Query::orderDesc('name')->compile($builder));
+        $this->assertSame('`name` DESC', Query::orderDesc('name')->compile($builder));
     }
 
     public function testQueryCompileOrderRandom(): void
     {
         $builder = new Builder();
-        $this->assertEquals('RAND()', Query::orderRandom()->compile($builder));
+        $this->assertSame('RAND()', Query::orderRandom()->compile($builder));
     }
 
     public function testQueryCompileLimit(): void
     {
         $builder = new Builder();
-        $this->assertEquals('LIMIT ?', Query::limit(10)->compile($builder));
-        $this->assertEquals([10], $builder->getBindings());
+        $this->assertSame('LIMIT ?', Query::limit(10)->compile($builder));
+        $this->assertSame([10], $builder->getBindings());
     }
 
     public function testQueryCompileOffset(): void
     {
         $builder = new Builder();
-        $this->assertEquals('OFFSET ?', Query::offset(5)->compile($builder));
-        $this->assertEquals([5], $builder->getBindings());
+        $this->assertSame('OFFSET ?', Query::offset(5)->compile($builder));
+        $this->assertSame([5], $builder->getBindings());
     }
 
     public function testQueryCompileCursorAfter(): void
     {
         $builder = new Builder();
-        $this->assertEquals('`_cursor` > ?', Query::cursorAfter('x')->compile($builder));
-        $this->assertEquals(['x'], $builder->getBindings());
+        $this->assertSame('`_cursor` > ?', Query::cursorAfter('x')->compile($builder));
+        $this->assertSame(['x'], $builder->getBindings());
     }
 
     public function testQueryCompileCursorBefore(): void
     {
         $builder = new Builder();
-        $this->assertEquals('`_cursor` < ?', Query::cursorBefore('x')->compile($builder));
-        $this->assertEquals(['x'], $builder->getBindings());
+        $this->assertSame('`_cursor` < ?', Query::cursorBefore('x')->compile($builder));
+        $this->assertSame(['x'], $builder->getBindings());
     }
 
     public function testQueryCompileSelect(): void
     {
         $builder = new Builder();
-        $this->assertEquals('`a`, `b`', Query::select(['a', 'b'])->compile($builder));
+        $this->assertSame('`a`, `b`', Query::select(['a', 'b'])->compile($builder));
     }
 
     public function testQueryCompileGroupBy(): void
     {
         $builder = new Builder();
-        $this->assertEquals('`status`', Query::groupBy(['status'])->compile($builder));
+        $this->assertSame('`status`', Query::groupBy(['status'])->compile($builder));
     }
     //  Reset Behavior
 
@@ -6162,7 +6162,7 @@ class MySQLTest extends TestCase
         $builder->reset()->from('b');
         $result = $builder->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `b`', $result->query);
+        $this->assertSame('SELECT * FROM `b`', $result->query);
         $this->assertStringNotContainsString('UNION', $result->query);
     }
 
@@ -6174,7 +6174,7 @@ class MySQLTest extends TestCase
         $builder->reset()->from('t');
         $result = $builder->build();
         $this->assertBindingCount($result);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
     //  Missing Binding Assertions
 
@@ -6182,56 +6182,56 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())->from('t')->sortAsc('name')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testSortDescBindingsEmpty(): void
     {
         $result = (new Builder())->from('t')->sortDesc('name')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testSortRandomBindingsEmpty(): void
     {
         $result = (new Builder())->from('t')->sortRandom()->build();
         $this->assertBindingCount($result);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testDistinctBindingsEmpty(): void
     {
         $result = (new Builder())->from('t')->distinct()->build();
         $this->assertBindingCount($result);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testJoinBindingsEmpty(): void
     {
         $result = (new Builder())->from('t')->join('other', 'a', 'b')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCrossJoinBindingsEmpty(): void
     {
         $result = (new Builder())->from('t')->crossJoin('other')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testGroupByBindingsEmpty(): void
     {
         $result = (new Builder())->from('t')->groupBy(['status'])->build();
         $this->assertBindingCount($result);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCountWithAliasBindingsEmpty(): void
     {
         $result = (new Builder())->from('t')->count('*', 'total')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
     // DML: INSERT
 
@@ -6243,11 +6243,11 @@ class MySQLTest extends TestCase
             ->insert();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT INTO `users` (`name`, `email`) VALUES (?, ?)',
             $result->query
         );
-        $this->assertEquals(['Alice', 'a@b.com'], $result->bindings);
+        $this->assertSame(['Alice', 'a@b.com'], $result->bindings);
     }
 
     public function testInsertBatch(): void
@@ -6259,11 +6259,11 @@ class MySQLTest extends TestCase
             ->insert();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT INTO `users` (`name`, `email`) VALUES (?, ?), (?, ?)',
             $result->query
         );
-        $this->assertEquals(['Alice', 'a@b.com', 'Bob', 'b@b.com'], $result->bindings);
+        $this->assertSame(['Alice', 'a@b.com', 'Bob', 'b@b.com'], $result->bindings);
     }
 
     public function testInsertNoRowsThrows(): void
@@ -6292,11 +6292,11 @@ class MySQLTest extends TestCase
             ->upsert();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT INTO `users` (`id`, `name`, `email`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `email` = VALUES(`email`)',
             $result->query
         );
-        $this->assertEquals([1, 'Alice', 'a@b.com'], $result->bindings);
+        $this->assertSame([1, 'Alice', 'a@b.com'], $result->bindings);
     }
 
     public function testUpsertMultipleConflictColumns(): void
@@ -6308,11 +6308,11 @@ class MySQLTest extends TestCase
             ->upsert();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT INTO `user_roles` (`user_id`, `role_id`, `granted_at`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE `granted_at` = VALUES(`granted_at`)',
             $result->query
         );
-        $this->assertEquals([1, 2, '2024-01-01'], $result->bindings);
+        $this->assertSame([1, 2, '2024-01-01'], $result->bindings);
     }
     // DML: UPDATE
 
@@ -6325,11 +6325,11 @@ class MySQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'UPDATE `users` SET `status` = ? WHERE `status` IN (?)',
             $result->query
         );
-        $this->assertEquals(['archived', 'inactive'], $result->bindings);
+        $this->assertSame(['archived', 'inactive'], $result->bindings);
     }
 
     public function testUpdateWithSetRaw(): void
@@ -6342,11 +6342,11 @@ class MySQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'UPDATE `users` SET `name` = ?, `login_count` = login_count + 1 WHERE `id` IN (?)',
             $result->query
         );
-        $this->assertEquals(['Alice', 1], $result->bindings);
+        $this->assertSame(['Alice', 1], $result->bindings);
     }
 
     public function testUpdateWithFilterHook(): void
@@ -6366,11 +6366,11 @@ class MySQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'UPDATE `users` SET `status` = ? WHERE `id` IN (?) AND `_tenant` = ?',
             $result->query
         );
-        $this->assertEquals(['active', 1, 'tenant_123'], $result->bindings);
+        $this->assertSame(['active', 1, 'tenant_123'], $result->bindings);
     }
 
     public function testUpdateWithoutWhere(): void
@@ -6381,8 +6381,8 @@ class MySQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('UPDATE `users` SET `status` = ?', $result->query);
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame('UPDATE `users` SET `status` = ?', $result->query);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testUpdateWithOrderByAndLimit(): void
@@ -6396,11 +6396,11 @@ class MySQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'UPDATE `users` SET `status` = ? WHERE `active` IN (?) ORDER BY `created_at` ASC LIMIT ?',
             $result->query
         );
-        $this->assertEquals(['archived', false, 100], $result->bindings);
+        $this->assertSame(['archived', false, 100], $result->bindings);
     }
 
     public function testUpdateNoAssignmentsThrows(): void
@@ -6421,11 +6421,11 @@ class MySQLTest extends TestCase
             ->delete();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'DELETE FROM `users` WHERE `last_login` < ?',
             $result->query
         );
-        $this->assertEquals(['2024-01-01'], $result->bindings);
+        $this->assertSame(['2024-01-01'], $result->bindings);
     }
 
     public function testDeleteWithFilterHook(): void
@@ -6444,11 +6444,11 @@ class MySQLTest extends TestCase
             ->delete();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'DELETE FROM `users` WHERE `status` IN (?) AND `_tenant` = ?',
             $result->query
         );
-        $this->assertEquals(['deleted', 'tenant_123'], $result->bindings);
+        $this->assertSame(['deleted', 'tenant_123'], $result->bindings);
     }
 
     public function testDeleteWithoutWhere(): void
@@ -6458,8 +6458,8 @@ class MySQLTest extends TestCase
             ->delete();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('DELETE FROM `users`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('DELETE FROM `users`', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testDeleteWithOrderByAndLimit(): void
@@ -6472,11 +6472,11 @@ class MySQLTest extends TestCase
             ->delete();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'DELETE FROM `logs` WHERE `created_at` < ? ORDER BY `created_at` ASC LIMIT ?',
             $result->query
         );
-        $this->assertEquals(['2023-01-01', 1000], $result->bindings);
+        $this->assertSame(['2023-01-01', 1000], $result->bindings);
     }
     // DML: Reset clears new state
 
@@ -6595,7 +6595,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             '(SELECT * FROM `users`) INTERSECT (SELECT * FROM `admins`)',
             $result->query
         );
@@ -6610,7 +6610,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             '(SELECT * FROM `users`) INTERSECT ALL (SELECT * FROM `admins`)',
             $result->query
         );
@@ -6625,7 +6625,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             '(SELECT * FROM `users`) EXCEPT (SELECT * FROM `banned`)',
             $result->query
         );
@@ -6640,7 +6640,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             '(SELECT * FROM `users`) EXCEPT ALL (SELECT * FROM `banned`)',
             $result->query
         );
@@ -6656,11 +6656,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             '(SELECT * FROM `users` WHERE `status` IN (?)) INTERSECT (SELECT * FROM `admins` WHERE `role` IN (?))',
             $result->query
         );
-        $this->assertEquals(['active', 'admin'], $result->bindings);
+        $this->assertSame(['active', 'admin'], $result->bindings);
     }
 
     public function testExceptWithBindings(): void
@@ -6673,7 +6673,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['active', 'spam'], $result->bindings);
+        $this->assertSame(['active', 'spam'], $result->bindings);
     }
 
     public function testMixedSetOperations(): void
@@ -6719,11 +6719,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `accounts` WHERE `id` IN (?) FOR UPDATE',
             $result->query
         );
-        $this->assertEquals([1], $result->bindings);
+        $this->assertSame([1], $result->bindings);
     }
 
     public function testForShare(): void
@@ -6735,7 +6735,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `accounts` WHERE `id` IN (?) FOR SHARE',
             $result->query
         );
@@ -6751,11 +6751,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `accounts` LIMIT ? OFFSET ? FOR UPDATE',
             $result->query
         );
-        $this->assertEquals([10, 5], $result->bindings);
+        $this->assertSame([10, 5], $result->bindings);
     }
 
     public function testLockModeResetClears(): void
@@ -6766,50 +6766,50 @@ class MySQLTest extends TestCase
 
         $result = $builder->from('t')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertSame('SELECT * FROM `t`', $result->query);
     }
     //  Transaction Statements
 
     public function testBegin(): void
     {
         $result = (new Builder())->begin();
-        $this->assertEquals('BEGIN', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('BEGIN', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCommit(): void
     {
         $result = (new Builder())->commit();
-        $this->assertEquals('COMMIT', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('COMMIT', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testRollback(): void
     {
         $result = (new Builder())->rollback();
-        $this->assertEquals('ROLLBACK', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('ROLLBACK', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testSavepoint(): void
     {
         $result = (new Builder())->savepoint('sp1');
-        $this->assertEquals('SAVEPOINT `sp1`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('SAVEPOINT `sp1`', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testReleaseSavepoint(): void
     {
         $result = (new Builder())->releaseSavepoint('sp1');
-        $this->assertEquals('RELEASE SAVEPOINT `sp1`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('RELEASE SAVEPOINT `sp1`', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testRollbackToSavepoint(): void
     {
         $result = (new Builder())->rollbackToSavepoint('sp1');
-        $this->assertEquals('ROLLBACK TO SAVEPOINT `sp1`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('ROLLBACK TO SAVEPOINT `sp1`', $result->query);
+        $this->assertSame([], $result->bindings);
     }
     //  INSERT...SELECT
 
@@ -6825,11 +6825,11 @@ class MySQLTest extends TestCase
             ->fromSelect(['name', 'email'], $source)
             ->insertSelect();
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT INTO `archive` (`name`, `email`) SELECT `name`, `email` FROM `users` WHERE `status` IN (?)',
             $result->query
         );
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testInsertSelectWithoutSourceThrows(): void
@@ -6897,11 +6897,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'WITH `paid_orders` AS (SELECT * FROM `orders` WHERE `status` IN (?)) SELECT `customer_id` FROM `paid_orders`',
             $result->query
         );
-        $this->assertEquals(['paid'], $result->bindings);
+        $this->assertSame(['paid'], $result->bindings);
     }
 
     public function testCteWithRecursive(): void
@@ -6914,7 +6914,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'WITH RECURSIVE `tree` AS (SELECT * FROM `categories`) SELECT * FROM `tree`',
             $result->query
         );
@@ -6934,7 +6934,7 @@ class MySQLTest extends TestCase
 
         $this->assertStringStartsWith('WITH `paid` AS', $result->query);
         $this->assertStringContainsString('`approved_returns` AS', $result->query);
-        $this->assertEquals(['paid', 'approved'], $result->bindings);
+        $this->assertSame(['paid', 'approved'], $result->bindings);
     }
 
     public function testCteBindingsComeBefore(): void
@@ -6948,7 +6948,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals([2024, 100], $result->bindings);
+        $this->assertSame([2024, 100], $result->bindings);
     }
 
     public function testCteResetClears(): void
@@ -6960,7 +6960,7 @@ class MySQLTest extends TestCase
 
         $result = $builder->from('t')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertSame('SELECT * FROM `t`', $result->query);
     }
 
     public function testMixedRecursiveAndNonRecursiveCte(): void
@@ -7064,7 +7064,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT SUM(amount) AS total FROM `orders`', $result->query);
+        $this->assertSame('SELECT SUM(amount) AS total FROM `orders`', $result->query);
     }
 
     public function testSelectRawWithBindings(): void
@@ -7075,8 +7075,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT IF(amount > ?, 1, 0) AS big_order FROM `orders`', $result->query);
-        $this->assertEquals([1000], $result->bindings);
+        $this->assertSame('SELECT IF(amount > ?, 1, 0) AS big_order FROM `orders`', $result->query);
+        $this->assertSame([1000], $result->bindings);
     }
 
     public function testSelectRawCombinedWithSelect(): void
@@ -7088,7 +7088,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT `id`, `customer_id`, SUM(amount) AS total FROM `orders`', $result->query);
+        $this->assertSame('SELECT `id`, `customer_id`, SUM(amount) AS total FROM `orders`', $result->query);
     }
 
     public function testSelectRawWithCaseExpression(): void
@@ -7117,7 +7117,7 @@ class MySQLTest extends TestCase
 
         $result = $builder->from('t')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertSame('SELECT * FROM `t`', $result->query);
     }
 
     public function testSetRawWithBindings(): void
@@ -7130,11 +7130,11 @@ class MySQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'UPDATE `accounts` SET `name` = ?, `balance` = balance + ? WHERE `id` IN (?)',
             $result->query
         );
-        $this->assertEquals(['Alice', 100, 1], $result->bindings);
+        $this->assertSame(['Alice', 100, 1], $result->bindings);
     }
 
     public function testSetRawWithBindingsResetClears(): void
@@ -7155,7 +7155,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT COUNT(*) AS cnt, MAX(price) AS max_price FROM `t`', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS cnt, MAX(price) AS max_price FROM `t`', $result->query);
     }
 
     public function testForUpdateNotInUnion(): void
@@ -7202,8 +7202,8 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString("ST_Distance(ST_SRID(`coords`, 4326), ST_GeomFromText(?, 4326, 'axis-order=long-lat'), 'metre') < ?", $result->query);
-        $this->assertEquals('POINT(40.7128 -74.006)', $result->bindings[0]);
-        $this->assertEquals(5000.0, $result->bindings[1]);
+        $this->assertSame('POINT(40.7128 -74.006)', $result->bindings[0]);
+        $this->assertSame(5000.0, $result->bindings[1]);
     }
 
     public function testFilterDistanceNoMeters(): void
@@ -7226,7 +7226,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString("ST_Intersects(`area`, ST_GeomFromText(?, 4326, 'axis-order=long-lat'))", $result->query);
-        $this->assertEquals('POINT(1 2)', $result->bindings[0]);
+        $this->assertSame('POINT(1 2)', $result->bindings[0]);
     }
 
     public function testFilterNotIntersects(): void
@@ -7270,7 +7270,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('LINESTRING(0 0, 1 1, 2 2)', $result->bindings[0]);
+        $this->assertSame('LINESTRING(0 0, 1 1, 2 2)', $result->bindings[0]);
     }
 
     public function testSpatialWithPolygon(): void
@@ -7301,7 +7301,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('JSON_CONTAINS(`tags`, ?)', $result->query);
-        $this->assertEquals('"php"', $result->bindings[0]);
+        $this->assertSame('"php"', $result->bindings[0]);
     }
 
     public function testFilterJsonNotContains(): void
@@ -7324,7 +7324,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('JSON_OVERLAPS(`tags`, ?)', $result->query);
-        $this->assertEquals('["php","go"]', $result->bindings[0]);
+        $this->assertSame('["php","go"]', $result->bindings[0]);
     }
 
     public function testFilterJsonPath(): void
@@ -7336,7 +7336,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString("JSON_EXTRACT(`metadata`, '$.level') > ?", $result->query);
-        $this->assertEquals(5, $result->bindings[0]);
+        $this->assertSame(5, $result->bindings[0]);
     }
 
     public function testSetJsonAppend(): void
@@ -7544,21 +7544,21 @@ class MySQLTest extends TestCase
     public function testQueryJsonContainsFactory(): void
     {
         $q = Query::jsonContains('tags', 'php');
-        $this->assertEquals(Method::JsonContains, $q->getMethod());
-        $this->assertEquals('tags', $q->getAttribute());
+        $this->assertSame(Method::JsonContains, $q->getMethod());
+        $this->assertSame('tags', $q->getAttribute());
     }
 
     public function testQueryJsonOverlapsFactory(): void
     {
         $q = Query::jsonOverlaps('tags', ['php', 'go']);
-        $this->assertEquals(Method::JsonOverlaps, $q->getMethod());
+        $this->assertSame(Method::JsonOverlaps, $q->getMethod());
     }
 
     public function testQueryJsonPathFactory(): void
     {
         $q = Query::jsonPath('meta', 'level', '>', 5);
-        $this->assertEquals(Method::JsonPath, $q->getMethod());
-        $this->assertEquals(['level', '>', 5], $q->getValues());
+        $this->assertSame(Method::JsonPath, $q->getMethod());
+        $this->assertSame(['level', '>', 5], $q->getValues());
     }
     //  Does NOT implement VectorSearch
 
@@ -7592,7 +7592,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('NOT ST_Intersects', $result->query);
-        $this->assertEquals('POINT(1 2)', $result->bindings[0]);
+        $this->assertSame('POINT(1 2)', $result->bindings[0]);
     }
 
     public function testFilterNotCrossesLinestring(): void
@@ -7688,8 +7688,8 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('ST_Distance', $result->query);
         $this->assertStringContainsString('> ?', $result->query);
-        $this->assertEquals('POINT(1 2)', $result->bindings[0]);
-        $this->assertEquals(500.0, $result->bindings[1]);
+        $this->assertSame('POINT(1 2)', $result->bindings[0]);
+        $this->assertSame(500.0, $result->bindings[1]);
     }
 
     public function testFilterDistanceEqual(): void
@@ -7702,8 +7702,8 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('ST_Distance', $result->query);
         $this->assertStringContainsString('= ?', $result->query);
-        $this->assertEquals('POINT(1 2)', $result->bindings[0]);
-        $this->assertEquals(0.0, $result->bindings[1]);
+        $this->assertSame('POINT(1 2)', $result->bindings[0]);
+        $this->assertSame(0.0, $result->bindings[1]);
     }
 
     public function testFilterDistanceNotEqual(): void
@@ -7716,8 +7716,8 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('ST_Distance', $result->query);
         $this->assertStringContainsString('!= ?', $result->query);
-        $this->assertEquals('POINT(1 2)', $result->bindings[0]);
-        $this->assertEquals(100.0, $result->bindings[1]);
+        $this->assertSame('POINT(1 2)', $result->bindings[0]);
+        $this->assertSame(100.0, $result->bindings[1]);
     }
 
     public function testFilterDistanceWithoutMeters(): void
@@ -7729,8 +7729,8 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString("ST_Distance(ST_SRID(`loc`, 0), ST_GeomFromText(?, 0, 'axis-order=long-lat')) < ?", $result->query);
-        $this->assertEquals('POINT(1 2)', $result->bindings[0]);
-        $this->assertEquals(50.0, $result->bindings[1]);
+        $this->assertSame('POINT(1 2)', $result->bindings[0]);
+        $this->assertSame(50.0, $result->bindings[1]);
     }
 
     public function testFilterIntersectsLinestring(): void
@@ -7755,7 +7755,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('ST_Equals', $result->query);
-        $this->assertEquals('POINT(42.5 -73.2)', $result->bindings[0]);
+        $this->assertSame('POINT(42.5 -73.2)', $result->bindings[0]);
     }
 
     public function testSetJsonIntersect(): void
@@ -7855,7 +7855,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString("JSON_EXTRACT(`data`, '$.age') >= ?", $result->query);
-        $this->assertEquals(21, $result->bindings[0]);
+        $this->assertSame(21, $result->bindings[0]);
     }
 
     public function testMultipleHintsNoIcpAndBka(): void
@@ -7891,7 +7891,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testMaxExecutionTimeValue(): void
@@ -8061,8 +8061,8 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // CTE bindings come BEFORE main query bindings
-        $this->assertEquals('paid', $result->bindings[0]);
-        $this->assertEquals(100, $result->bindings[1]);
+        $this->assertSame('paid', $result->bindings[0]);
+        $this->assertSame(100, $result->bindings[1]);
     }
 
     public function testCTEWithRecursiveMixed(): void
@@ -8109,7 +8109,7 @@ class MySQLTest extends TestCase
             ->insertSelect();
 
         $this->assertStringContainsString('INSERT INTO `archive`', $result->query);
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testInsertSelectThrowsWithoutSource(): void
@@ -8219,7 +8219,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['active', 'admin'], $result->bindings);
+        $this->assertSame(['active', 'admin'], $result->bindings);
     }
 
     public function testPageThreeWithTen(): void
@@ -8231,7 +8231,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('LIMIT ? OFFSET ?', $result->query);
-        $this->assertEquals([10, 20], $result->bindings);
+        $this->assertSame([10, 20], $result->bindings);
     }
 
     public function testPageFirstPage(): void
@@ -8243,7 +8243,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('LIMIT ? OFFSET ?', $result->query);
-        $this->assertEquals([25, 0], $result->bindings);
+        $this->assertSame([25, 0], $result->bindings);
     }
 
     public function testCursorAfterWithSort(): void
@@ -8393,7 +8393,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('VALUES (?, ?), (?, ?)', $result->query);
-        $this->assertEquals([1, 2, 3, 4], $result->bindings);
+        $this->assertSame([1, 2, 3, 4], $result->bindings);
     }
 
     public function testBatchInsertMismatchedColumnsThrows(): void
@@ -8489,25 +8489,25 @@ class MySQLTest extends TestCase
     public function testBeginTransaction(): void
     {
         $result = (new Builder())->begin();
-        $this->assertEquals('BEGIN', $result->query);
+        $this->assertSame('BEGIN', $result->query);
     }
 
     public function testCommitTransaction(): void
     {
         $result = (new Builder())->commit();
-        $this->assertEquals('COMMIT', $result->query);
+        $this->assertSame('COMMIT', $result->query);
     }
 
     public function testRollbackTransaction(): void
     {
         $result = (new Builder())->rollback();
-        $this->assertEquals('ROLLBACK', $result->query);
+        $this->assertSame('ROLLBACK', $result->query);
     }
 
     public function testReleaseSavepointCompiles(): void
     {
         $result = (new Builder())->releaseSavepoint('sp1');
-        $this->assertEquals('RELEASE SAVEPOINT `sp1`', $result->query);
+        $this->assertSame('RELEASE SAVEPOINT `sp1`', $result->query);
     }
 
     public function testResetClearsCTEs(): void
@@ -8584,7 +8584,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`x` IS NULL', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testEqualWithNullAndValues(): void
@@ -8596,7 +8596,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('(`x` IN (?) OR `x` IS NULL)', $result->query);
-        $this->assertEquals([1], $result->bindings);
+        $this->assertSame([1], $result->bindings);
     }
 
     public function testEqualMultipleValues(): void
@@ -8608,7 +8608,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`x` IN (?, ?, ?)', $result->query);
-        $this->assertEquals([1, 2, 3], $result->bindings);
+        $this->assertSame([1, 2, 3], $result->bindings);
     }
 
     public function testNotEqualEmptyArrayReturnsTrue(): void
@@ -8631,7 +8631,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`x` != ?', $result->query);
-        $this->assertEquals([5], $result->bindings);
+        $this->assertSame([5], $result->bindings);
     }
 
     public function testNotEqualWithNullOnlyCompileNotIn(): void
@@ -8643,7 +8643,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`x` IS NOT NULL', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testNotEqualWithNullAndValues(): void
@@ -8655,7 +8655,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('(`x` != ? AND `x` IS NOT NULL)', $result->query);
-        $this->assertEquals([1], $result->bindings);
+        $this->assertSame([1], $result->bindings);
     }
 
     public function testNotEqualMultipleValues(): void
@@ -8667,7 +8667,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`x` NOT IN (?, ?, ?)', $result->query);
-        $this->assertEquals([1, 2, 3], $result->bindings);
+        $this->assertSame([1, 2, 3], $result->bindings);
     }
 
     public function testNotEqualSingleNonNull(): void
@@ -8679,7 +8679,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`x` != ?', $result->query);
-        $this->assertEquals([42], $result->bindings);
+        $this->assertSame([42], $result->bindings);
     }
 
     public function testBetweenFilter(): void
@@ -8691,7 +8691,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`age` BETWEEN ? AND ?', $result->query);
-        $this->assertEquals([18, 65], $result->bindings);
+        $this->assertSame([18, 65], $result->bindings);
     }
 
     public function testNotBetweenFilter(): void
@@ -8703,7 +8703,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`score` NOT BETWEEN ? AND ?', $result->query);
-        $this->assertEquals([0, 50], $result->bindings);
+        $this->assertSame([0, 50], $result->bindings);
     }
 
     public function testBetweenWithStrings(): void
@@ -8715,7 +8715,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`date` BETWEEN ? AND ?', $result->query);
-        $this->assertEquals(['2024-01-01', '2024-12-31'], $result->bindings);
+        $this->assertSame(['2024-01-01', '2024-12-31'], $result->bindings);
     }
 
     public function testAndWithTwoFilters(): void
@@ -8727,7 +8727,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('(`age` > ? AND `age` < ?)', $result->query);
-        $this->assertEquals([18, 65], $result->bindings);
+        $this->assertSame([18, 65], $result->bindings);
     }
 
     public function testOrWithTwoFilters(): void
@@ -8739,7 +8739,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('(`role` IN (?) OR `role` IN (?))', $result->query);
-        $this->assertEquals(['admin', 'mod'], $result->bindings);
+        $this->assertSame(['admin', 'mod'], $result->bindings);
     }
 
     public function testNestedAndInsideOr(): void
@@ -8756,7 +8756,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('((`a` > ? AND `b` < ?) OR `c` IN (?))', $result->query);
-        $this->assertEquals([1, 2, 3], $result->bindings);
+        $this->assertSame([1, 2, 3], $result->bindings);
     }
 
     public function testEmptyAndReturnsTrue(): void
@@ -8790,7 +8790,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('(`name` IS NOT NULL)', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExistsMultipleAttributes(): void
@@ -8802,7 +8802,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('(`name` IS NOT NULL AND `email` IS NOT NULL)', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testNotExistsSingleAttribute(): void
@@ -8814,7 +8814,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('(`name` IS NULL)', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testNotExistsMultipleAttributes(): void
@@ -8826,7 +8826,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('(`a` IS NULL AND `b` IS NULL)', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testRawFilterWithSql(): void
@@ -8850,7 +8850,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('active = 1', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testRawFilterEmpty(): void
@@ -8872,7 +8872,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['100\\%%'], $result->bindings);
+        $this->assertSame(['100\\%%'], $result->bindings);
     }
 
     public function testStartsWithEscapesUnderscore(): void
@@ -8883,7 +8883,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['a\\_b%'], $result->bindings);
+        $this->assertSame(['a\\_b%'], $result->bindings);
     }
 
     public function testStartsWithEscapesBackslash(): void
@@ -8907,7 +8907,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['%\\%test\\_'], $result->bindings);
+        $this->assertSame(['%\\%test\\_'], $result->bindings);
     }
 
     public function testContainsMultipleValuesUsesOr(): void
@@ -8919,7 +8919,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('(`bio` LIKE ? OR `bio` LIKE ?)', $result->query);
-        $this->assertEquals(['%php%', '%js%'], $result->bindings);
+        $this->assertSame(['%php%', '%js%'], $result->bindings);
     }
 
     public function testContainsAllUsesAnd(): void
@@ -8931,7 +8931,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('(`bio` LIKE ? AND `bio` LIKE ?)', $result->query);
-        $this->assertEquals(['%php%', '%js%'], $result->bindings);
+        $this->assertSame(['%php%', '%js%'], $result->bindings);
     }
 
     public function testNotContainsMultipleValues(): void
@@ -8943,7 +8943,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('(`bio` NOT LIKE ? AND `bio` NOT LIKE ?)', $result->query);
-        $this->assertEquals(['%x%', '%y%'], $result->bindings);
+        $this->assertSame(['%x%', '%y%'], $result->bindings);
     }
 
     public function testContainsSingleValueNoParentheses(): void
@@ -9015,7 +9015,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT DISTINCT `name` FROM `t`', $result->query);
+        $this->assertSame('SELECT DISTINCT `name` FROM `t`', $result->query);
     }
 
     public function testDistinctWithAggregate(): void
@@ -9027,7 +9027,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT DISTINCT COUNT(*) FROM `t`', $result->query);
+        $this->assertSame('SELECT DISTINCT COUNT(*) FROM `t`', $result->query);
     }
 
     public function testSumWithAlias2(): void
@@ -9038,7 +9038,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT SUM(`amount`) AS `total` FROM `t`', $result->query);
+        $this->assertSame('SELECT SUM(`amount`) AS `total` FROM `t`', $result->query);
     }
 
     public function testAvgWithAlias2(): void
@@ -9049,7 +9049,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT AVG(`score`) AS `avg_score` FROM `t`', $result->query);
+        $this->assertSame('SELECT AVG(`score`) AS `avg_score` FROM `t`', $result->query);
     }
 
     public function testMinWithAlias2(): void
@@ -9060,7 +9060,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT MIN(`price`) AS `cheapest` FROM `t`', $result->query);
+        $this->assertSame('SELECT MIN(`price`) AS `cheapest` FROM `t`', $result->query);
     }
 
     public function testMaxWithAlias2(): void
@@ -9071,7 +9071,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT MAX(`price`) AS `priciest` FROM `t`', $result->query);
+        $this->assertSame('SELECT MAX(`price`) AS `priciest` FROM `t`', $result->query);
     }
 
     public function testCountWithoutAlias(): void
@@ -9082,7 +9082,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT COUNT(*) FROM `t`', $result->query);
+        $this->assertSame('SELECT COUNT(*) FROM `t`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -9095,7 +9095,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT COUNT(*) AS `cnt`, SUM(`amount`) AS `total` FROM `t`', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt`, SUM(`amount`) AS `total` FROM `t`', $result->query);
     }
 
     public function testSelectRawWithRegularSelect(): void
@@ -9107,7 +9107,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT `id`, NOW() as current_time FROM `t`', $result->query);
+        $this->assertSame('SELECT `id`, NOW() as current_time FROM `t`', $result->query);
     }
 
     public function testSelectRawWithBindings2(): void
@@ -9118,7 +9118,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['a', 'b'], $result->bindings);
+        $this->assertSame(['a', 'b'], $result->bindings);
     }
 
     public function testRightJoin2(): void
@@ -9178,7 +9178,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('WHERE `a` IN (?) AND `b` > ? AND `c` < ?', $result->query);
-        $this->assertEquals([1, 2, 3], $result->bindings);
+        $this->assertSame([1, 2, 3], $result->bindings);
     }
 
     public function testFilterWithRawCombined(): void
@@ -9205,7 +9205,7 @@ class MySQLTest extends TestCase
 
         $result = $builder->from('t')->build();
         $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertSame('SELECT * FROM `t`', $result->query);
         $this->assertStringNotContainsString('one', $result->query);
     }
 
@@ -9318,7 +9318,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`deleted_at` IS NULL', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testIsNotNullFilter(): void
@@ -9330,7 +9330,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`name` IS NOT NULL', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testLessThanFilter(): void
@@ -9342,7 +9342,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`age` < ?', $result->query);
-        $this->assertEquals([30], $result->bindings);
+        $this->assertSame([30], $result->bindings);
     }
 
     public function testLessThanEqualFilter(): void
@@ -9354,7 +9354,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`age` <= ?', $result->query);
-        $this->assertEquals([30], $result->bindings);
+        $this->assertSame([30], $result->bindings);
     }
 
     public function testGreaterThanFilter(): void
@@ -9366,7 +9366,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`age` > ?', $result->query);
-        $this->assertEquals([18], $result->bindings);
+        $this->assertSame([18], $result->bindings);
     }
 
     public function testGreaterThanEqualFilter(): void
@@ -9378,7 +9378,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`age` >= ?', $result->query);
-        $this->assertEquals([21], $result->bindings);
+        $this->assertSame([21], $result->bindings);
     }
 
     public function testNotStartsWithFilter(): void
@@ -9390,7 +9390,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`name` NOT LIKE ?', $result->query);
-        $this->assertEquals(['foo%'], $result->bindings);
+        $this->assertSame(['foo%'], $result->bindings);
     }
 
     public function testNotEndsWithFilter(): void
@@ -9402,7 +9402,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`name` NOT LIKE ?', $result->query);
-        $this->assertEquals(['%bar'], $result->bindings);
+        $this->assertSame(['%bar'], $result->bindings);
     }
 
     public function testDeleteWithOrderAndLimit(): void
@@ -9448,7 +9448,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT `u`.`name`, `u`.`email` FROM `users` AS `u`', $result->query);
+        $this->assertSame('SELECT `u`.`name`, `u`.`email` FROM `users` AS `u`', $result->query);
     }
 
     public function testJoinAlias(): void
@@ -9507,11 +9507,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `users` WHERE `id` IN (SELECT `user_id` FROM `orders` WHERE `total` > ?)',
             $result->query
         );
-        $this->assertEquals([100], $result->bindings);
+        $this->assertSame([100], $result->bindings);
     }
 
     public function testFilterWhereNotIn(): void
@@ -9550,7 +9550,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT `user_id` FROM (SELECT `user_id` FROM `orders` GROUP BY `user_id`) AS `sub`',
             $result->query
         );
@@ -9567,7 +9567,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('ORDER BY FIELD(`status`, ?, ?, ?)', $result->query);
-        $this->assertEquals(['active', 'pending', 'inactive'], $result->bindings);
+        $this->assertSame(['active', 'pending', 'inactive'], $result->bindings);
     }
 
     public function testGroupByRaw(): void
@@ -9633,7 +9633,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT COUNT(DISTINCT `user_id`) AS `unique_users` FROM `orders`',
             $result->query
         );
@@ -9647,7 +9647,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT COUNT(DISTINCT `user_id`) FROM `orders`',
             $result->query
         );
@@ -9667,7 +9667,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('JOIN `orders` ON `users`.`id` = `orders`.`user_id` AND orders.status = ?', $result->query);
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testJoinWhereMultipleOns(): void
@@ -9754,11 +9754,11 @@ class MySQLTest extends TestCase
             ->set(['name' => 'John', 'email' => 'john@example.com'])
             ->insertOrIgnore();
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT IGNORE INTO `users` (`name`, `email`) VALUES (?, ?)',
             $result->query
         );
-        $this->assertEquals(['John', 'john@example.com'], $result->bindings);
+        $this->assertSame(['John', 'john@example.com'], $result->bindings);
     }
 
     // Feature 9: EXPLAIN
@@ -9921,9 +9921,9 @@ class MySQLTest extends TestCase
 
         $ons = $jb->ons;
         $this->assertCount(2, $ons);
-        $this->assertEquals('a.id', $ons[0]->left);
-        $this->assertEquals('b.a_id', $ons[0]->right);
-        $this->assertEquals('=', $ons[0]->operator);
+        $this->assertSame('a.id', $ons[0]->left);
+        $this->assertSame('b.a_id', $ons[0]->right);
+        $this->assertSame('=', $ons[0]->operator);
     }
 
     public function testJoinBuilderWhereAddsCondition(): void
@@ -9933,8 +9933,8 @@ class MySQLTest extends TestCase
 
         $wheres = $jb->wheres;
         $this->assertCount(1, $wheres);
-        $this->assertEquals('status = ?', $wheres[0]->expression);
-        $this->assertEquals(['active'], $wheres[0]->bindings);
+        $this->assertSame('status = ?', $wheres[0]->expression);
+        $this->assertSame(['active'], $wheres[0]->bindings);
     }
 
     public function testJoinBuilderOnRaw(): void
@@ -9944,7 +9944,7 @@ class MySQLTest extends TestCase
 
         $wheres = $jb->wheres;
         $this->assertCount(1, $wheres);
-        $this->assertEquals([30], $wheres[0]->bindings);
+        $this->assertSame([30], $wheres[0]->bindings);
     }
 
     public function testJoinBuilderWhereRaw(): void
@@ -9954,8 +9954,8 @@ class MySQLTest extends TestCase
 
         $wheres = $jb->wheres;
         $this->assertCount(1, $wheres);
-        $this->assertEquals('`deleted_at` IS NULL', $wheres[0]->expression);
-        $this->assertEquals([], $wheres[0]->bindings);
+        $this->assertSame('`deleted_at` IS NULL', $wheres[0]->expression);
+        $this->assertSame([], $wheres[0]->bindings);
     }
 
     public function testJoinBuilderCombinedOnAndWhere(): void
@@ -9985,7 +9985,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // Main filter bindings come before subquery bindings
-        $this->assertEquals(['admin', 'completed'], $result->bindings);
+        $this->assertSame(['admin', 'completed'], $result->bindings);
     }
 
     public function testSelectSubBindingOrder(): void
@@ -10002,7 +10002,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // Sub-select bindings come before main WHERE bindings
-        $this->assertEquals(['matched', true], $result->bindings);
+        $this->assertSame(['matched', true], $result->bindings);
     }
 
     public function testFromSubBindingOrder(): void
@@ -10017,7 +10017,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // FROM sub bindings come before main WHERE bindings
-        $this->assertEquals([100, 'shipped'], $result->bindings);
+        $this->assertSame([100, 'shipped'], $result->bindings);
     }
 
     // EXISTS with bindings
@@ -10036,7 +10036,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('EXISTS (SELECT', $result->query);
-        $this->assertEquals([true, 'paid'], $result->bindings);
+        $this->assertSame([true, 'paid'], $result->bindings);
     }
 
     public function testFilterNotExistsQuery(): void
@@ -10062,7 +10062,7 @@ class MySQLTest extends TestCase
             ->explain();
 
         $this->assertStringStartsWith('EXPLAIN SELECT', $result->query);
-        $this->assertEquals([true], $result->bindings);
+        $this->assertSame([true], $result->bindings);
     }
 
     public function testExplainAnalyzeWithFilters(): void
@@ -10073,7 +10073,7 @@ class MySQLTest extends TestCase
             ->explain(true);
 
         $this->assertStringStartsWith('EXPLAIN ANALYZE SELECT', $result->query);
-        $this->assertEquals([true], $result->bindings);
+        $this->assertSame([true], $result->bindings);
     }
 
     public function testTableAliasClearsOnNewFrom(): void
@@ -10130,7 +10130,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('ORDER BY FIELD(`status`, ?, ?, ?)', $result->query);
-        $this->assertEquals(['active', 'pending', 'inactive'], $result->bindings);
+        $this->assertSame(['active', 'pending', 'inactive'], $result->bindings);
     }
 
     public function testGroupByRawWithBindings(): void
@@ -10143,7 +10143,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString("GROUP BY DATE_FORMAT(`created_at`, ?)", $result->query);
-        $this->assertEquals(['%Y-%m'], $result->bindings);
+        $this->assertSame(['%Y-%m'], $result->bindings);
     }
 
     public function testHavingRawWithBindings(): void
@@ -10157,7 +10157,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('HAVING SUM(`amount`) > ?', $result->query);
-        $this->assertEquals([1000], $result->bindings);
+        $this->assertSame([1000], $result->bindings);
     }
 
     public function testMultipleRawOrdersCombined(): void
@@ -10249,7 +10249,7 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('LEFT JOIN `orders` ON', $result->query);
         $this->assertStringContainsString('orders.status = ?', $result->query);
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testJoinWhereWithTableAlias(): void
@@ -10331,7 +10331,7 @@ class MySQLTest extends TestCase
             ->insertOrIgnore();
 
         $this->assertStringStartsWith('INSERT IGNORE INTO', $result->query);
-        $this->assertEquals(['John', 'john@example.com'], $result->bindings);
+        $this->assertSame(['John', 'john@example.com'], $result->bindings);
     }
 
     // toRawSql with various types
@@ -10434,7 +10434,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         // CTE bindings come first
-        $this->assertEquals(['paid', 100], $result->bindings);
+        $this->assertSame(['paid', 100], $result->bindings);
     }
 
     public function testExactSimpleSelect(): void
@@ -10452,7 +10452,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `name`, `email` FROM `users` WHERE `status` IN (?) ORDER BY `name` ASC LIMIT ?',
             $result->query
         );
-        $this->assertEquals(['active', 10], $result->bindings);
+        $this->assertSame(['active', 10], $result->bindings);
     }
 
     public function testExactSelectWithMultipleFilters(): void
@@ -10473,7 +10473,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `name`, `price` FROM `products` WHERE `price` > ? AND `price` <= ? AND `category` IN (?) AND `name` LIKE ?',
             $result->query
         );
-        $this->assertEquals([10, 500, 'electronics', 'Pro%'], $result->bindings);
+        $this->assertSame([10, 500, 'electronics', 'Pro%'], $result->bindings);
     }
 
     public function testExactMultipleJoins(): void
@@ -10491,7 +10491,7 @@ class MySQLTest extends TestCase
             'SELECT `orders`.`id`, `users`.`name`, `products`.`title` FROM `orders` JOIN `users` ON `orders`.`user_id` = `users`.`id` LEFT JOIN `products` ON `orders`.`product_id` = `products`.`id` RIGHT JOIN `categories` ON `products`.`category_id` = `categories`.`id`',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactCrossJoin(): void
@@ -10507,7 +10507,7 @@ class MySQLTest extends TestCase
             'SELECT `sizes`.`label`, `colors`.`name` FROM `sizes` CROSS JOIN `colors`',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactInsertMultipleRows(): void
@@ -10524,7 +10524,7 @@ class MySQLTest extends TestCase
             'INSERT INTO `users` (`name`, `email`) VALUES (?, ?), (?, ?), (?, ?)',
             $result->query
         );
-        $this->assertEquals(['Alice', 'alice@test.com', 'Bob', 'bob@test.com', 'Charlie', 'charlie@test.com'], $result->bindings);
+        $this->assertSame(['Alice', 'alice@test.com', 'Bob', 'bob@test.com', 'Charlie', 'charlie@test.com'], $result->bindings);
     }
 
     public function testExactUpdateWithOrderAndLimit(): void
@@ -10542,7 +10542,7 @@ class MySQLTest extends TestCase
             'UPDATE `users` SET `status` = ? WHERE `last_login` < ? ORDER BY `last_login` ASC LIMIT ?',
             $result->query
         );
-        $this->assertEquals(['archived', '2023-06-01', 50], $result->bindings);
+        $this->assertSame(['archived', '2023-06-01', 50], $result->bindings);
     }
 
     public function testExactDeleteWithOrderAndLimit(): void
@@ -10559,7 +10559,7 @@ class MySQLTest extends TestCase
             'DELETE FROM `logs` WHERE `created_at` < ? ORDER BY `created_at` ASC LIMIT ?',
             $result->query
         );
-        $this->assertEquals(['2023-01-01', 500], $result->bindings);
+        $this->assertSame(['2023-01-01', 500], $result->bindings);
     }
 
     public function testExactUpsertOnDuplicateKey(): void
@@ -10575,7 +10575,7 @@ class MySQLTest extends TestCase
             'INSERT INTO `users` (`id`, `name`, `email`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `email` = VALUES(`email`)',
             $result->query
         );
-        $this->assertEquals([1, 'Alice', 'alice@new.com'], $result->bindings);
+        $this->assertSame([1, 'Alice', 'alice@new.com'], $result->bindings);
     }
 
     public function testExactSubqueryWhereIn(): void
@@ -10596,7 +10596,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `name` FROM `users` WHERE `id` IN (SELECT `user_id` FROM `orders` WHERE `total` > ?)',
             $result->query
         );
-        $this->assertEquals([1000], $result->bindings);
+        $this->assertSame([1000], $result->bindings);
     }
 
     public function testExactExistsSubquery(): void
@@ -10617,7 +10617,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `name` FROM `users` WHERE EXISTS (SELECT `id` FROM `orders` WHERE `orders`.`user_id` = `users`.`id`)',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactCte(): void
@@ -10640,7 +10640,7 @@ class MySQLTest extends TestCase
             'WITH `paid_orders` AS (SELECT `user_id`, `total` FROM `orders` WHERE `status` IN (?)) SELECT SUM(`total`) AS `total_spent`, `user_id` FROM `paid_orders` GROUP BY `user_id`',
             $result->query
         );
-        $this->assertEquals(['paid'], $result->bindings);
+        $this->assertSame(['paid'], $result->bindings);
     }
 
     public function testExactCaseInSelect(): void
@@ -10681,7 +10681,7 @@ class MySQLTest extends TestCase
             'SELECT COUNT(*) AS `order_count`, SUM(`total`) AS `total_spent`, `user_id` FROM `orders` GROUP BY `user_id` HAVING COUNT(*) > ?',
             $result->query
         );
-        $this->assertEquals([5], $result->bindings);
+        $this->assertSame([5], $result->bindings);
     }
 
     public function testExactUnion(): void
@@ -10703,7 +10703,7 @@ class MySQLTest extends TestCase
             '(SELECT `id`, `name` FROM `users` WHERE `status` IN (?)) UNION (SELECT `id`, `name` FROM `admins` WHERE `role` IN (?))',
             $result->query
         );
-        $this->assertEquals(['active', 'admin'], $result->bindings);
+        $this->assertSame(['active', 'admin'], $result->bindings);
     }
 
     public function testExactUnionAll(): void
@@ -10723,7 +10723,7 @@ class MySQLTest extends TestCase
             '(SELECT `id`, `total`, `created_at` FROM `orders`) UNION ALL (SELECT `id`, `total`, `created_at` FROM `orders_archive`)',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactWindowFunction(): void
@@ -10739,7 +10739,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `customer_id`, `total`, ROW_NUMBER() OVER (PARTITION BY `customer_id` ORDER BY `total` ASC) AS `rn` FROM `orders`',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactForUpdate(): void
@@ -10756,7 +10756,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `balance` FROM `accounts` WHERE `id` IN (?) FOR UPDATE',
             $result->query
         );
-        $this->assertEquals([42], $result->bindings);
+        $this->assertSame([42], $result->bindings);
     }
 
     public function testExactForShareSkipLocked(): void
@@ -10774,7 +10774,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `quantity` FROM `inventory` WHERE `quantity` > ? LIMIT ? FOR SHARE SKIP LOCKED',
             $result->query
         );
-        $this->assertEquals([0, 5], $result->bindings);
+        $this->assertSame([0, 5], $result->bindings);
     }
 
     public function testExactHintMaxExecutionTime(): void
@@ -10790,7 +10790,7 @@ class MySQLTest extends TestCase
             'SELECT /*+ MAX_EXECUTION_TIME(5000) */ `id`, `name` FROM `users`',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactRawExpressions(): void
@@ -10808,7 +10808,7 @@ class MySQLTest extends TestCase
             'SELECT COUNT(*) AS `total`, MAX(`created_at`) AS `latest` FROM `users` WHERE `active` IN (?) ORDER BY FIELD(`role`, ?, ?, ?)',
             $result->query
         );
-        $this->assertEquals([true, 'admin', 'editor', 'viewer'], $result->bindings);
+        $this->assertSame([true, 'admin', 'editor', 'viewer'], $result->bindings);
     }
 
     public function testExactNestedWhereGroups(): void
@@ -10832,7 +10832,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `name` FROM `users` WHERE (`active` IN (?) AND (`role` IN (?) OR `karma` > ?))',
             $result->query
         );
-        $this->assertEquals([true, 'admin', 100], $result->bindings);
+        $this->assertSame([true, 'admin', 100], $result->bindings);
     }
 
     public function testExactDistinctWithOffset(): void
@@ -10850,7 +10850,7 @@ class MySQLTest extends TestCase
             'SELECT DISTINCT `name` FROM `tags` LIMIT ? OFFSET ?',
             $result->query
         );
-        $this->assertEquals([20, 10], $result->bindings);
+        $this->assertSame([20, 10], $result->bindings);
     }
 
     public function testExactInsertOrIgnore(): void
@@ -10866,7 +10866,7 @@ class MySQLTest extends TestCase
             'INSERT IGNORE INTO `tags` (`name`, `slug`) VALUES (?, ?), (?, ?)',
             $result->query
         );
-        $this->assertEquals(['php', 'php', 'mysql', 'mysql'], $result->bindings);
+        $this->assertSame(['php', 'php', 'mysql', 'mysql'], $result->bindings);
     }
 
     public function testExactFromSubquery(): void
@@ -10888,7 +10888,7 @@ class MySQLTest extends TestCase
             'SELECT `user_id`, `user_total` FROM (SELECT SUM(`total`) AS `user_total`, `user_id` FROM `orders` GROUP BY `user_id`) AS `sub` WHERE `user_total` > ?',
             $result->query
         );
-        $this->assertEquals([500], $result->bindings);
+        $this->assertSame([500], $result->bindings);
     }
 
     public function testExactSelectSubquery(): void
@@ -10909,7 +10909,7 @@ class MySQLTest extends TestCase
             'SELECT `name`, (SELECT COUNT(*) FROM `orders` WHERE `orders`.`user_id` = `users`.`id`) AS `order_count` FROM `users`',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactAdvancedWhenTrue(): void
@@ -10927,7 +10927,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `name` FROM `users` WHERE `status` IN (?)',
             $result->query
         );
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testExactAdvancedWhenFalse(): void
@@ -10945,7 +10945,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `name` FROM `users`',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactAdvancedWhenSequence(): void
@@ -10969,7 +10969,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `name` FROM `users` WHERE `status` IN (?) AND `age` > ?',
             $result->query
         );
-        $this->assertEquals(['active', 18], $result->bindings);
+        $this->assertSame(['active', 18], $result->bindings);
     }
 
     public function testExactAdvancedExplain(): void
@@ -10985,7 +10985,7 @@ class MySQLTest extends TestCase
             'EXPLAIN SELECT `id`, `name` FROM `users` WHERE `status` IN (?)',
             $result->query
         );
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testExactAdvancedExplainAnalyze(): void
@@ -11001,7 +11001,7 @@ class MySQLTest extends TestCase
             'EXPLAIN ANALYZE SELECT `id`, `name` FROM `users` WHERE `status` IN (?)',
             $result->query
         );
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testExactAdvancedCursorAfter(): void
@@ -11018,7 +11018,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `name` FROM `users` WHERE `_cursor` > ? ORDER BY `name` ASC',
             $result->query
         );
-        $this->assertEquals(['abc123'], $result->bindings);
+        $this->assertSame(['abc123'], $result->bindings);
     }
 
     public function testExactAdvancedCursorBefore(): void
@@ -11035,7 +11035,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `name` FROM `users` WHERE `_cursor` < ? ORDER BY `name` DESC',
             $result->query
         );
-        $this->assertEquals(['xyz789'], $result->bindings);
+        $this->assertSame(['xyz789'], $result->bindings);
     }
 
     public function testExactAdvancedTransactionBegin(): void
@@ -11044,7 +11044,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertSame('BEGIN', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactAdvancedTransactionCommit(): void
@@ -11053,7 +11053,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertSame('COMMIT', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactAdvancedTransactionRollback(): void
@@ -11062,7 +11062,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertSame('ROLLBACK', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactAdvancedSavepoint(): void
@@ -11071,7 +11071,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertSame('SAVEPOINT `sp1`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactAdvancedReleaseSavepoint(): void
@@ -11080,7 +11080,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertSame('RELEASE SAVEPOINT `sp1`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactAdvancedRollbackToSavepoint(): void
@@ -11089,7 +11089,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertSame('ROLLBACK TO SAVEPOINT `sp1`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactAdvancedMultipleCtes(): void
@@ -11118,7 +11118,7 @@ class MySQLTest extends TestCase
             'WITH `a` AS (SELECT `user_id`, `total` FROM `orders` WHERE `status` IN (?)), `b` AS (SELECT `user_id`, `amount` FROM `returns` WHERE `status` IN (?)) SELECT SUM(`total`) AS `total_paid`, `user_id` FROM `a` GROUP BY `user_id`',
             $result->query
         );
-        $this->assertEquals(['paid', 'approved'], $result->bindings);
+        $this->assertSame(['paid', 'approved'], $result->bindings);
     }
 
     public function testExactAdvancedMultipleWindowFunctions(): void
@@ -11135,7 +11135,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `department`, `salary`, ROW_NUMBER() OVER (PARTITION BY `department` ORDER BY `salary` ASC) AS `row_num`, RANK() OVER (PARTITION BY `department` ORDER BY `salary` DESC) AS `salary_rank` FROM `employees`',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactAdvancedUnionWithOrderAndLimit(): void
@@ -11157,7 +11157,7 @@ class MySQLTest extends TestCase
             '(SELECT `id`, `total`, `created_at` FROM `orders` ORDER BY `created_at` DESC LIMIT ?) UNION ALL (SELECT `id`, `total`, `created_at` FROM `orders_archive`)',
             $result->query
         );
-        $this->assertEquals([10], $result->bindings);
+        $this->assertSame([10], $result->bindings);
     }
 
     public function testExactAdvancedDeeplyNestedConditions(): void
@@ -11184,7 +11184,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `name` FROM `products` WHERE (`category` IN (?) AND (`price` > ? OR (`brand` IN (?) AND `stock` < ?)))',
             $result->query
         );
-        $this->assertEquals(['electronics', 100, 'acme', 50], $result->bindings);
+        $this->assertSame(['electronics', 100, 'acme', 50], $result->bindings);
     }
 
     public function testExactAdvancedForUpdateNoWait(): void
@@ -11201,7 +11201,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `balance` FROM `accounts` WHERE `id` IN (?) FOR UPDATE NOWAIT',
             $result->query
         );
-        $this->assertEquals([1], $result->bindings);
+        $this->assertSame([1], $result->bindings);
     }
 
     public function testExactAdvancedForShareNoWait(): void
@@ -11218,7 +11218,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `balance` FROM `accounts` WHERE `id` IN (?) FOR SHARE NOWAIT',
             $result->query
         );
-        $this->assertEquals([1], $result->bindings);
+        $this->assertSame([1], $result->bindings);
     }
 
     public function testExactAdvancedConflictSetRaw(): void
@@ -11235,7 +11235,7 @@ class MySQLTest extends TestCase
             'INSERT INTO `counters` (`id`, `count`, `updated_at`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE `count` = `count` + VALUES(`count`), `updated_at` = VALUES(`updated_at`)',
             $result->query
         );
-        $this->assertEquals([1, 1, '2024-01-01'], $result->bindings);
+        $this->assertSame([1, 1, '2024-01-01'], $result->bindings);
     }
 
     public function testExactAdvancedSetRawWithBindings(): void
@@ -11251,7 +11251,7 @@ class MySQLTest extends TestCase
             'UPDATE `products` SET `price` = `price` * ? WHERE `category` IN (?)',
             $result->query
         );
-        $this->assertEquals([1.1, 'electronics'], $result->bindings);
+        $this->assertSame([1.1, 'electronics'], $result->bindings);
     }
 
     public function testExactAdvancedSetCaseInUpdate(): void
@@ -11288,7 +11288,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `name` FROM `users`',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactAdvancedEmptyInClause(): void
@@ -11304,7 +11304,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `name` FROM `users` WHERE 1 = 0',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactAdvancedEmptyAndGroup(): void
@@ -11320,7 +11320,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `name` FROM `users` WHERE 1 = 1',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactAdvancedEmptyOrGroup(): void
@@ -11336,7 +11336,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `name` FROM `users` WHERE 1 = 0',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactAdvancedSelectRawWithGroupByRawAndHavingRaw(): void
@@ -11354,7 +11354,7 @@ class MySQLTest extends TestCase
             'SELECT DATE(`created_at`) AS `order_date`, SUM(`total`) AS `daily_total` FROM `orders` GROUP BY DATE(`created_at`) HAVING SUM(`total`) > ?',
             $result->query
         );
-        $this->assertEquals([1000], $result->bindings);
+        $this->assertSame([1000], $result->bindings);
     }
 
     public function testExactAdvancedMultipleHooks(): void
@@ -11375,7 +11375,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `title` FROM `documents` WHERE `status` IN (?) AND tenant_id IN (?, ?) AND id IN (SELECT DISTINCT document_id FROM documents_permissions WHERE role IN (?, ?) AND type = ?)',
             $result->query
         );
-        $this->assertEquals(['published', 'tenant_a', 'tenant_b', 'role:member', 'role:admin', 'read'], $result->bindings);
+        $this->assertSame(['published', 'tenant_a', 'tenant_b', 'role:member', 'role:admin', 'read'], $result->bindings);
     }
 
     public function testExactAdvancedAttributeMapHook(): void
@@ -11395,7 +11395,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `full_name`, `email` FROM `users` WHERE `full_name` IN (?)',
             $result->query
         );
-        $this->assertEquals(['Alice'], $result->bindings);
+        $this->assertSame(['Alice'], $result->bindings);
     }
 
     public function testExactAdvancedResetClearsState(): void
@@ -11420,7 +11420,7 @@ class MySQLTest extends TestCase
             'SELECT `id`, `total` FROM `orders` WHERE `total` > ?',
             $result->query
         );
-        $this->assertEquals([100], $result->bindings);
+        $this->assertSame([100], $result->bindings);
     }
 
     public function testCountWhenWithAlias(): void
@@ -11435,7 +11435,7 @@ class MySQLTest extends TestCase
             'SELECT COUNT(CASE WHEN status = ? THEN 1 END) AS `active_count` FROM `orders`',
             $result->query
         );
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testCountWhenWithoutAlias(): void
@@ -11450,7 +11450,7 @@ class MySQLTest extends TestCase
             'SELECT COUNT(CASE WHEN status = ? THEN 1 END) FROM `orders`',
             $result->query
         );
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testSumWhenWithAlias(): void
@@ -11465,7 +11465,7 @@ class MySQLTest extends TestCase
             'SELECT SUM(CASE WHEN status = ? THEN `amount` END) AS `active_total` FROM `orders`',
             $result->query
         );
-        $this->assertEquals(['completed'], $result->bindings);
+        $this->assertSame(['completed'], $result->bindings);
     }
 
     public function testSumWhenWithoutAlias(): void
@@ -11480,7 +11480,7 @@ class MySQLTest extends TestCase
             'SELECT SUM(CASE WHEN status = ? THEN `amount` END) FROM `orders`',
             $result->query
         );
-        $this->assertEquals(['completed'], $result->bindings);
+        $this->assertSame(['completed'], $result->bindings);
     }
 
     public function testAvgWhenWithAlias(): void
@@ -11495,7 +11495,7 @@ class MySQLTest extends TestCase
             'SELECT AVG(CASE WHEN status = ? THEN `amount` END) AS `avg_completed` FROM `orders`',
             $result->query
         );
-        $this->assertEquals(['completed'], $result->bindings);
+        $this->assertSame(['completed'], $result->bindings);
     }
 
     public function testAvgWhenWithoutAlias(): void
@@ -11510,7 +11510,7 @@ class MySQLTest extends TestCase
             'SELECT AVG(CASE WHEN status = ? THEN `amount` END) FROM `orders`',
             $result->query
         );
-        $this->assertEquals(['completed'], $result->bindings);
+        $this->assertSame(['completed'], $result->bindings);
     }
 
     public function testMinWhenWithAlias(): void
@@ -11525,7 +11525,7 @@ class MySQLTest extends TestCase
             'SELECT MIN(CASE WHEN status = ? THEN `amount` END) AS `min_completed` FROM `orders`',
             $result->query
         );
-        $this->assertEquals(['completed'], $result->bindings);
+        $this->assertSame(['completed'], $result->bindings);
     }
 
     public function testMinWhenWithoutAlias(): void
@@ -11540,7 +11540,7 @@ class MySQLTest extends TestCase
             'SELECT MIN(CASE WHEN status = ? THEN `amount` END) FROM `orders`',
             $result->query
         );
-        $this->assertEquals(['completed'], $result->bindings);
+        $this->assertSame(['completed'], $result->bindings);
     }
 
     public function testMaxWhenWithAlias(): void
@@ -11555,7 +11555,7 @@ class MySQLTest extends TestCase
             'SELECT MAX(CASE WHEN status = ? THEN `amount` END) AS `max_completed` FROM `orders`',
             $result->query
         );
-        $this->assertEquals(['completed'], $result->bindings);
+        $this->assertSame(['completed'], $result->bindings);
     }
 
     public function testMaxWhenWithoutAlias(): void
@@ -11570,7 +11570,7 @@ class MySQLTest extends TestCase
             'SELECT MAX(CASE WHEN status = ? THEN `amount` END) FROM `orders`',
             $result->query
         );
-        $this->assertEquals(['completed'], $result->bindings);
+        $this->assertSame(['completed'], $result->bindings);
     }
 
     public function testJoinLateral(): void
@@ -11809,7 +11809,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('MATCH(`title`) AGAINST(? IN BOOLEAN MODE)', $result->query);
-        $this->assertEquals(['"exact phrase"'], $result->bindings);
+        $this->assertSame(['"exact phrase"'], $result->bindings);
     }
 
     public function testConflictClauseWithRawSets(): void
@@ -11894,7 +11894,7 @@ class MySQLTest extends TestCase
             'SELECT `user_id` FROM (SELECT `user_id` FROM `orders` WHERE `total` > ?) AS `high_orders`',
             $result->query
         );
-        $this->assertEquals([100], $result->bindings);
+        $this->assertSame([100], $result->bindings);
     }
 
     public function testInsertAs(): void
@@ -12093,7 +12093,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('INSERT IGNORE INTO `users`', $result->query);
-        $this->assertEquals(['Alice', 'alice@test.com'], $result->bindings);
+        $this->assertSame(['Alice', 'alice@test.com'], $result->bindings);
     }
 
     public function testUpsertSelectFromBuilder(): void
@@ -12288,14 +12288,14 @@ class MySQLTest extends TestCase
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::exists([]));
-        $this->assertEquals('1 = 1', $sql);
+        $this->assertSame('1 = 1', $sql);
     }
 
     public function testCompileNotExistsEmptyValues(): void
     {
         $builder = new Builder();
         $sql = $builder->compileFilter(Query::notExists([]));
-        $this->assertEquals('1 = 1', $sql);
+        $this->assertSame('1 = 1', $sql);
     }
 
     public function testEscapeLikeValueWithArray(): void
@@ -12318,7 +12318,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('LIKE ?', $result->query);
-        $this->assertEquals(['%42%'], $result->bindings);
+        $this->assertSame(['%42%'], $result->bindings);
     }
 
     public function testEscapeLikeValueWithBoolean(): void
@@ -12330,7 +12330,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('LIKE ?', $result->query);
-        $this->assertEquals(['%1%'], $result->bindings);
+        $this->assertSame(['%1%'], $result->bindings);
     }
 
     public function testCloneWithSubqueries(): void
@@ -12349,7 +12349,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($originalResult);
         $this->assertBindingCount($clonedResult);
 
-        $this->assertEquals($originalResult->query, $clonedResult->query);
+        $this->assertSame($originalResult->query, $clonedResult->query);
     }
 
     public function testCloneWithFromSubquery(): void
@@ -13014,7 +13014,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('ORDER BY `ab`.`order_count` DESC', $result->query);
         $this->assertStringContainsString('LIMIT ?', $result->query);
         $this->assertStringContainsString('OFFSET ?', $result->query);
-        $this->assertEquals([3, 'active', 10, 5], $result->bindings);
+        $this->assertSame([3, 'active', 10, 5], $result->bindings);
     }
 
     public function testCteWithUnionCombiningComplexSubqueries(): void
@@ -13037,7 +13037,7 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('WITH `active_products` AS', $result->query);
         $this->assertStringContainsString('UNION', $result->query);
-        $this->assertEquals([true, 1000], $result->bindings);
+        $this->assertSame([true, 1000], $result->bindings);
     }
 
     public function testCteReferencedInJoin(): void
@@ -13056,7 +13056,7 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('WITH `active_depts` AS', $result->query);
         $this->assertStringContainsString('JOIN `active_depts` ON', $result->query);
-        $this->assertEquals([true, 50000], $result->bindings);
+        $this->assertSame([true, 50000], $result->bindings);
     }
 
     public function testRecursiveCteWithWhereFilter(): void
@@ -13080,7 +13080,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('WITH RECURSIVE `tree` AS', $result->query);
         $this->assertStringContainsString('UNION ALL', $result->query);
         $this->assertStringContainsString('WHERE `name` != ?', $result->query);
-        $this->assertEquals(['Excluded'], $result->bindings);
+        $this->assertSame(['Excluded'], $result->bindings);
     }
 
     public function testMultipleCtesWhereSecondReferencesFirst(): void
@@ -13102,7 +13102,7 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('WITH `completed_orders` AS', $result->query);
         $this->assertStringContainsString('`order_totals` AS', $result->query);
-        $this->assertEquals(['completed'], $result->bindings);
+        $this->assertSame(['completed'], $result->bindings);
     }
 
     public function testWindowFunctionWithJoinAndWhere(): void
@@ -13119,7 +13119,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('ROW_NUMBER() OVER (PARTITION BY `users`.`name` ORDER BY `orders`.`total` DESC) AS `rn`', $result->query);
         $this->assertStringContainsString('JOIN `users`', $result->query);
         $this->assertStringContainsString('WHERE `orders`.`total` > ?', $result->query);
-        $this->assertEquals([100], $result->bindings);
+        $this->assertSame([100], $result->bindings);
     }
 
     public function testWindowFunctionCombinedWithGroupBy(): void
@@ -13211,7 +13211,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('JOIN `users`', $result->query);
         $this->assertStringContainsString('WHERE `paid_orders`.`total` > ?', $result->query);
         $this->assertStringContainsString('ORDER BY `paid_orders`.`total` DESC', $result->query);
-        $this->assertEquals(['paid', 100], $result->bindings);
+        $this->assertSame(['paid', 100], $result->bindings);
     }
 
     public function testFilterWhereInWithSubqueryAndJoin(): void
@@ -13232,7 +13232,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('JOIN `products`', $result->query);
         $this->assertStringContainsString('`orders`.`user_id` IN (SELECT `id` FROM `vip_users` WHERE `tier` IN (?))', $result->query);
         $this->assertStringContainsString('`orders`.`total` > ?', $result->query);
-        $this->assertEquals([50, 'gold'], $result->bindings);
+        $this->assertSame([50, 'gold'], $result->bindings);
     }
 
     public function testExistsSubqueryWithOtherWhereFilters(): void
@@ -13255,7 +13255,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('`status` IN (?)', $result->query);
         $this->assertStringContainsString('`age` > ?', $result->query);
         $this->assertStringContainsString('EXISTS (SELECT `id` FROM `orders`', $result->query);
-        $this->assertEquals(['active', 18], $result->bindings);
+        $this->assertSame(['active', 18], $result->bindings);
     }
 
     public function testUnionWithOrderByAndLimit(): void
@@ -13276,7 +13276,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('ORDER BY `created_at` DESC', $result->query);
         $this->assertStringContainsString('LIMIT ?', $result->query);
         $this->assertStringContainsString('UNION', $result->query);
-        $this->assertEquals(['premium', 20, 'premium'], $result->bindings);
+        $this->assertSame(['premium', 20, 'premium'], $result->bindings);
     }
 
     public function testThreeUnionQueries(): void
@@ -13294,9 +13294,9 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(2, substr_count($result->query, ') UNION ('));
+        $this->assertSame(2, substr_count($result->query, ') UNION ('));
         $this->assertStringContainsString('UNION ALL', $result->query);
-        $this->assertEquals([0, 1, 2, 3], $result->bindings);
+        $this->assertSame([0, 1, 2, 3], $result->bindings);
     }
 
     public function testInsertSelectWithJoinedSource(): void
@@ -13315,7 +13315,7 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('INSERT INTO `employees` (`name`, `dept_code`)', $result->query);
         $this->assertStringContainsString('JOIN `departments`', $result->query);
-        $this->assertEquals([true], $result->bindings);
+        $this->assertSame([true], $result->bindings);
     }
 
     public function testUpdateJoinWithFilter(): void
@@ -13332,7 +13332,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('ON `orders`.`user_id` = `users`.`id`', $result->query);
         $this->assertStringContainsString('SET `orders`.`status` = ?', $result->query);
         $this->assertStringContainsString('WHERE `users`.`tier` IN (?)', $result->query);
-        $this->assertEquals(['upgraded', 'gold'], $result->bindings);
+        $this->assertSame(['upgraded', 'gold'], $result->bindings);
     }
 
     public function testDeleteWithSubqueryFilter(): void
@@ -13453,7 +13453,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('MATCH(`articles`.`content`) AGAINST(? IN BOOLEAN MODE)', $result->query);
         $this->assertStringContainsString('`articles`.`published` IN (?)', $result->query);
         $this->assertStringContainsString('JOIN `authors`', $result->query);
-        $this->assertEquals(['database optimization*', true], $result->bindings);
+        $this->assertSame(['database optimization*', true], $result->bindings);
     }
 
     public function testForUpdateWithJoinAndSubquery(): void
@@ -13498,7 +13498,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('AVG(`amount`) AS `avg_amount`', $result->query);
         $this->assertStringContainsString('GROUP BY `region`', $result->query);
         $this->assertStringContainsString('HAVING COUNT(*) > ? AND AVG(`amount`) > ?', $result->query);
-        $this->assertEquals([10, 50, 5], $result->bindings);
+        $this->assertSame([10, 50, 5], $result->bindings);
     }
 
     public function testCountDistinctColumn(): void
@@ -13509,7 +13509,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT COUNT(DISTINCT `user_id`) AS `unique_buyers` FROM `orders`', $result->query);
+        $this->assertSame('SELECT COUNT(DISTINCT `user_id`) AS `unique_buyers` FROM `orders`', $result->query);
     }
 
     public function testSelfJoinWithAlias(): void
@@ -13541,10 +13541,10 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(3, substr_count($result->query, ' JOIN '));
+        $this->assertSame(3, substr_count($result->query, ' JOIN '));
         $this->assertStringContainsString('`orders`.`total` > ?', $result->query);
         $this->assertStringContainsString('`products`.`category` IN (?)', $result->query);
-        $this->assertEquals([100, 'electronics'], $result->bindings);
+        $this->assertSame([100, 'electronics'], $result->bindings);
     }
 
     public function testCrossJoinWithLeftAndInnerJoinCombined(): void
@@ -13561,7 +13561,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('CROSS JOIN `colors`', $result->query);
         $this->assertStringContainsString('LEFT JOIN `inventory`', $result->query);
         $this->assertStringContainsString('JOIN `warehouses`', $result->query);
-        $this->assertEquals([true], $result->bindings);
+        $this->assertSame([true], $result->bindings);
     }
 
     public function testExplainWithComplexQuery(): void
@@ -13588,8 +13588,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `x` IN (?)', $result->query);
-        $this->assertEquals([1], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `x` IN (?)', $result->query);
+        $this->assertSame([1], $result->bindings);
     }
 
     public function testFilterMultiElementArray(): void
@@ -13600,8 +13600,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `x` IN (?, ?, ?)', $result->query);
-        $this->assertEquals([1, 2, 3], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `x` IN (?, ?, ?)', $result->query);
+        $this->assertSame([1, 2, 3], $result->bindings);
     }
 
     public function testIsNullCombinedWithEqual(): void
@@ -13615,11 +13615,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE `deleted_at` IS NULL AND `status` IN (?, ?)',
             $result->query
         );
-        $this->assertEquals(['active', 'pending'], $result->bindings);
+        $this->assertSame(['active', 'pending'], $result->bindings);
     }
 
     public function testIsNotNullWithGreaterThan(): void
@@ -13633,11 +13633,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE `verified_at` IS NOT NULL AND `login_count` > ?',
             $result->query
         );
-        $this->assertEquals([5], $result->bindings);
+        $this->assertSame([5], $result->bindings);
     }
 
     public function testBetweenCombinedWithNotEqual(): void
@@ -13651,11 +13651,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE `age` BETWEEN ? AND ? AND `status` != ?',
             $result->query
         );
-        $this->assertEquals([18, 65, 'banned'], $result->bindings);
+        $this->assertSame([18, 65, 'banned'], $result->bindings);
     }
 
     public function testOrWrappingMultipleDifferentOperatorTypes(): void
@@ -13673,11 +13673,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE (`role` IN (?) OR `score` > ? OR `suspended_at` IS NULL OR `email` LIKE ?)',
             $result->query
         );
-        $this->assertEquals(['admin', 95, 'vip%'], $result->bindings);
+        $this->assertSame(['admin', 95, 'vip%'], $result->bindings);
     }
 
     public function testNestedOrInsideAnd(): void
@@ -13696,11 +13696,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE (`active` IN (?) AND (`age` > ? OR `verified` IN (?)))',
             $result->query
         );
-        $this->assertEquals([true, 21, true], $result->bindings);
+        $this->assertSame([true, 21, true], $result->bindings);
     }
 
     public function testAndInsideOr(): void
@@ -13722,11 +13722,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE ((`role` IN (?) AND `level` > ?) OR (`role` IN (?) AND `level` > ?))',
             $result->query
         );
-        $this->assertEquals(['admin', 5, 'superuser', 1], $result->bindings);
+        $this->assertSame(['admin', 5, 'superuser', 1], $result->bindings);
     }
 
     public function testTripleNestedLogicalOrAndEqGtAndLtNe(): void
@@ -13748,11 +13748,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE ((`a` IN (?) AND `b` > ?) OR (`c` < ? AND `d` != ?))',
             $result->query
         );
-        $this->assertEquals([1, 2, 3, 4], $result->bindings);
+        $this->assertSame([1, 2, 3, 4], $result->bindings);
     }
 
     public function testEqualWithEmptyStringValue(): void
@@ -13763,8 +13763,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `name` IN (?)', $result->query);
-        $this->assertEquals([''], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `name` IN (?)', $result->query);
+        $this->assertSame([''], $result->bindings);
     }
 
     public function testContainsWithSqlWildcardPercentAndUnderscore(): void
@@ -13775,8 +13775,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `bio` LIKE ?', $result->query);
-        $this->assertEquals(['%100\%\_test%'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE `bio` LIKE ?', $result->query);
+        $this->assertSame(['%100\%\_test%'], $result->bindings);
     }
 
     public function testCompoundSortAscDesc(): void
@@ -13789,7 +13789,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` ORDER BY `last_name` ASC, `first_name` ASC, `created_at` DESC',
             $result->query
         );
@@ -13805,11 +13805,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE `status` IN (?) ORDER BY `score` DESC LIMIT ?',
             $result->query
         );
-        $this->assertEquals(['active', 1], $result->bindings);
+        $this->assertSame(['active', 1], $result->bindings);
     }
 
     public function testExplicitOffsetZeroWithLimit(): void
@@ -13821,8 +13821,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
-        $this->assertEquals([10, 0], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
+        $this->assertSame([10, 0], $result->bindings);
     }
 
     public function testLargeOffset(): void
@@ -13834,8 +13834,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
-        $this->assertEquals([25, 999999], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
+        $this->assertSame([25, 999999], $result->bindings);
     }
 
     public function testDistinctWithCountStar(): void
@@ -13874,7 +13874,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('SET `name` = ?, `email` = ?, `age` = ?', $result->query);
-        $this->assertEquals(['Alice', 'alice@example.com', 30, 1], $result->bindings);
+        $this->assertSame(['Alice', 'alice@example.com', 30, 1], $result->bindings);
     }
 
     public function testMultipleSetCallsForInsert(): void
@@ -13887,11 +13887,11 @@ class MySQLTest extends TestCase
             ->insert();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT INTO `users` (`name`, `email`) VALUES (?, ?), (?, ?), (?, ?)',
             $result->query
         );
-        $this->assertEquals(['Alice', 'a@b.com', 'Bob', 'b@b.com', 'Charlie', 'c@b.com'], $result->bindings);
+        $this->assertSame(['Alice', 'a@b.com', 'Bob', 'b@b.com', 'Charlie', 'c@b.com'], $result->bindings);
     }
 
     public function testGroupBySingleColumn(): void
@@ -13903,7 +13903,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT COUNT(*) AS `total` FROM `orders` GROUP BY `status`', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `total` FROM `orders` GROUP BY `status`', $result->query);
     }
 
     public function testGroupByMultipleColumnsList(): void
@@ -13915,7 +13915,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT COUNT(*) AS `total` FROM `orders` GROUP BY `status`, `region`, `year`',
             $result->query
         );
@@ -13949,7 +13949,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('LEFT JOIN `refunds`', $result->query);
         $this->assertStringContainsString('`refunds`.`id` IS NULL', $result->query);
         $this->assertStringContainsString('`orders`.`total` > ?', $result->query);
-        $this->assertEquals([50], $result->bindings);
+        $this->assertSame([50], $result->bindings);
     }
 
     public function testBindingOrderComplexFilterHavingSubquery(): void
@@ -13983,7 +13983,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('tenant_id = ?', $result->query);
         $this->assertStringContainsString('`user_id` NOT IN (SELECT', $result->query);
         $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
-        $this->assertEquals([0, 't1', 'fraud', 5, 10], $result->bindings);
+        $this->assertSame([0, 't1', 'fraud', 5, 10], $result->bindings);
     }
 
     public function testCloneThenModifyOriginalUnchanged(): void
@@ -14002,7 +14002,7 @@ class MySQLTest extends TestCase
 
         $this->assertStringNotContainsString('`age`', $originalResult->query);
         $this->assertStringContainsString('`age` > ?', $clonedResult->query);
-        $this->assertEquals(['active', 10], $originalResult->bindings);
+        $this->assertSame(['active', 10], $originalResult->bindings);
     }
 
     public function testResetThenRebuildEntirelyDifferentQueryType(): void
@@ -14040,7 +14040,7 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('`name`', $result->query);
         $this->assertStringContainsString('COALESCE(bio, ?) AS bio_display', $result->query);
-        $this->assertEquals(['N/A', true], $result->bindings);
+        $this->assertSame(['N/A', true], $result->bindings);
     }
 
     public function testWhereRawWithRegularFilter(): void
@@ -14054,11 +14054,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE `status` IN (?) AND YEAR(created_at) = ?',
             $result->query
         );
-        $this->assertEquals(['active', 2024], $result->bindings);
+        $this->assertSame(['active', 2024], $result->bindings);
     }
 
     public function testHavingWithMultipleConditionsAndLogicalOr(): void
@@ -14079,7 +14079,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('HAVING COUNT(*) > ? AND (`total` > ? OR `total` < ?)', $result->query);
-        $this->assertEquals([5, 10000, 100], $result->bindings);
+        $this->assertSame([5, 10000, 100], $result->bindings);
     }
 
     public function testCountStarVsCountColumnName(): void
@@ -14096,8 +14096,8 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($colResult);
 
-        $this->assertEquals('SELECT COUNT(*) AS `total` FROM `t`', $starResult->query);
-        $this->assertEquals('SELECT COUNT(`name`) AS `total` FROM `t`', $colResult->query);
+        $this->assertSame('SELECT COUNT(*) AS `total` FROM `t`', $starResult->query);
+        $this->assertSame('SELECT COUNT(`name`) AS `total` FROM `t`', $colResult->query);
     }
 
     public function testAggregatesOnlyNoGroupBy(): void
@@ -14112,7 +14112,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT COUNT(*) AS `total_orders`, SUM(`total`) AS `revenue`, AVG(`total`) AS `avg_order`, MIN(`total`) AS `smallest_order`, MAX(`total`) AS `largest_order` FROM `orders`',
             $result->query
         );
@@ -14131,7 +14131,7 @@ class MySQLTest extends TestCase
 
         $this->assertStringStartsWith('INSERT IGNORE INTO', $result->query);
         $this->assertStringContainsString('VALUES (?, ?), (?, ?), (?, ?)', $result->query);
-        $this->assertEquals([1, 'Alice', 2, 'Bob', 3, 'Charlie'], $result->bindings);
+        $this->assertSame([1, 'Alice', 2, 'Bob', 3, 'Charlie'], $result->bindings);
     }
 
     public function testSelectReadOnlyFlag(): void
@@ -14181,7 +14181,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('HAVING COUNT(*) > ? AND SUM(total) > ?', $result->query);
-        $this->assertEquals([5, 1000], $result->bindings);
+        $this->assertSame([5, 1000], $result->bindings);
     }
 
     public function testOrderByRawWithRegularSort(): void
@@ -14194,7 +14194,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('ORDER BY FIELD(status, ?, ?, ?), `name` ASC', $result->query);
-        $this->assertEquals(['active', 'pending', 'inactive'], $result->bindings);
+        $this->assertSame(['active', 'pending', 'inactive'], $result->bindings);
     }
 
     public function testGroupByRawWithRegularGroupBy(): void
@@ -14223,7 +14223,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('JOIN `blacklist`', $result->query);
         $this->assertStringContainsString('ON `o`.`user_id` = `blacklist`.`user_id`', $result->query);
         $this->assertStringContainsString('WHERE `blacklist`.`reason` IN (?)', $result->query);
-        $this->assertEquals(['fraud'], $result->bindings);
+        $this->assertSame(['fraud'], $result->bindings);
     }
 
     public function testMaxExecutionTimeHint(): void
@@ -14269,7 +14269,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('`users`.`id` = `orders`.`user_id`', $result->query);
         $this->assertStringContainsString('orders.status = ?', $result->query);
         $this->assertStringContainsString('orders.total > ?', $result->query);
-        $this->assertEquals(['completed', 100], $result->bindings);
+        $this->assertSame(['completed', 100], $result->bindings);
     }
 
     public function testFromNoneWithSelectRaw(): void
@@ -14280,7 +14280,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT 1 + 1 AS result', $result->query);
+        $this->assertSame('SELECT 1 + 1 AS result', $result->query);
     }
 
     public function testCteBindingOrderPrecedesMainQuery(): void
@@ -14297,7 +14297,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['premium', 80, 5], $result->bindings);
+        $this->assertSame(['premium', 80, 5], $result->bindings);
     }
 
     public function testWindowFunctionWithJoinFilterGroupBy(): void
@@ -14337,7 +14337,7 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('(SELECT COUNT(*)', $result->query);
         $this->assertStringContainsString(') AS `paid_order_count`', $result->query);
-        $this->assertEquals(['paid', true], $result->bindings);
+        $this->assertSame(['paid', true], $result->bindings);
     }
 
     public function testFilterWhereNotInSubqueryWithAdditionalFilter(): void
@@ -14373,7 +14373,7 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('`status` IN (?)', $result->query);
         $this->assertStringContainsString('NOT EXISTS (SELECT `id` FROM `refunds`', $result->query);
-        $this->assertEquals(['completed'], $result->bindings);
+        $this->assertSame(['completed'], $result->bindings);
     }
 
     public function testCountWhenWithFilterAndGroupBy(): void
@@ -14607,7 +14607,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $expectedBindings = ['A', 50, 'org1', 'banned', 2, 10, 2023];
-        $this->assertEquals($expectedBindings, $result->bindings);
+        $this->assertSame($expectedBindings, $result->bindings);
     }
 
     public function testSearchExactPhraseMatch(): void
@@ -14618,7 +14618,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('"exact phrase"', $result->bindings[0]);
+        $this->assertSame('"exact phrase"', $result->bindings[0]);
         /** @var string $firstBinding */
         $firstBinding = $result->bindings[0];
         $this->assertStringNotContainsString('*', $firstBinding);
@@ -14632,7 +14632,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE 1 = 1', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE 1 = 1', $result->query);
     }
 
     public function testSearchExactPhraseInExactMode(): void
@@ -14643,7 +14643,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['"hello world"'], $result->bindings);
+        $this->assertSame(['"hello world"'], $result->bindings);
     }
 
     public function testUpsertSelectWithFilteredSource(): void
@@ -14663,7 +14663,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('INSERT INTO `users`', $result->query);
         $this->assertStringContainsString('SELECT `id`, `name`, `email` FROM `staging`', $result->query);
         $this->assertStringContainsString('ON DUPLICATE KEY UPDATE', $result->query);
-        $this->assertEquals([true], $result->bindings);
+        $this->assertSame([true], $result->bindings);
     }
 
     public function testExplainAnalyzeWithFormatJson(): void
@@ -14691,7 +14691,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('NOW() AS current_time', $result->query);
         $this->assertStringContainsString('CONCAT(first_name, ?, last_name) AS full_name', $result->query);
         $this->assertStringContainsString('? AS constant_val', $result->query);
-        $this->assertEquals([' ', 42], $result->bindings);
+        $this->assertSame([' ', 42], $result->bindings);
     }
 
     public function testFromSubqueryWithAggregation(): void
@@ -14764,7 +14764,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('DELETE `o` FROM `orders` AS `o`', $result->query);
         $this->assertStringContainsString('JOIN `expired_users`', $result->query);
         $this->assertStringContainsString('WHERE `o`.`created_at` < ?', $result->query);
-        $this->assertEquals(['2023-01-01'], $result->bindings);
+        $this->assertSame(['2023-01-01'], $result->bindings);
     }
 
     public function testUpdateJoinWithAliasAndFilter(): void
@@ -14803,7 +14803,7 @@ class MySQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString("JSON_EXTRACT(`settings`, '$.theme.color') = ?", $result->query);
-        $this->assertEquals(['blue'], $result->bindings);
+        $this->assertSame(['blue'], $result->bindings);
     }
 
     public function testCloneIndependenceWithWhereInSubquery(): void
@@ -14850,7 +14850,7 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('WITH `recent_sales` AS', $result->query);
         $this->assertStringContainsString('JOIN `products`', $result->query);
         $this->assertStringContainsString('WHERE region = ?', $result->query);
-        $this->assertEquals([6, 'US'], $result->bindings);
+        $this->assertSame([6, 'US'], $result->bindings);
     }
 
     public function testEndsWithWithUnderscoreWildcard(): void
@@ -14861,7 +14861,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['%\_test'], $result->bindings);
+        $this->assertSame(['%\_test'], $result->bindings);
     }
 
     public function testStartsWithWithPercentWildcard(): void
@@ -14872,7 +14872,7 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['50\%%'], $result->bindings);
+        $this->assertSame(['50\%%'], $result->bindings);
     }
 
     public function testNotBetweenCombinedWithOrFilter(): void
@@ -14888,11 +14888,11 @@ class MySQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `t` WHERE (`age` NOT BETWEEN ? AND ? OR `status` IN (?))',
             $result->query
         );
-        $this->assertEquals([18, 65, 'exempt'], $result->bindings);
+        $this->assertSame([18, 65, 'exempt'], $result->bindings);
     }
 
     public function testUpdateWithMultipleRawSets(): void
@@ -14919,11 +14919,11 @@ class MySQLTest extends TestCase
             ->insert();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT INTO `users` (`name`, `bio`, `age`) VALUES (?, ?, ?)',
             $result->query
         );
-        $this->assertEquals(['Alice', null, null], $result->bindings);
+        $this->assertSame(['Alice', null, null], $result->bindings);
     }
 
     public function testResetClearsLateralJoins(): void
@@ -14939,7 +14939,7 @@ class MySQLTest extends TestCase
         $result = $builder->from('fresh')->build();
         $this->assertBindingCount($result);
         $this->assertStringNotContainsString('LATERAL', $result->query);
-        $this->assertEquals('SELECT * FROM `fresh`', $result->query);
+        $this->assertSame('SELECT * FROM `fresh`', $result->query);
     }
 
     public function testResetClearsWindowDefinitions(): void
@@ -15043,7 +15043,7 @@ class MySQLTest extends TestCase
 
         $this->assertStringContainsString('JOIN `orders` ON', $result->query);
         $this->assertStringContainsString('orders.created_at > NOW() - INTERVAL ? DAY', $result->query);
-        $this->assertEquals([30], $result->bindings);
+        $this->assertSame([30], $result->bindings);
     }
 
     public function testFromNoneEmitsNoFromClause(): void

@@ -117,9 +117,9 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('users', $op['collection']);
-        $this->assertEquals('find', $op['operation']);
-        $this->assertEquals(['name' => 1, 'email' => 1, '_id' => 0], $op['projection']);
+        $this->assertSame('users', $op['collection']);
+        $this->assertSame('find', $op['operation']);
+        $this->assertSame(['name' => 1, 'email' => 1, '_id' => 0], $op['projection']);
         $this->assertEmpty($result->bindings);
     }
 
@@ -131,7 +131,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('find', $op['operation']);
+        $this->assertSame('find', $op['operation']);
         $this->assertArrayNotHasKey('projection', $op);
     }
 
@@ -144,8 +144,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['status' => '?'], $op['filter']);
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['status' => '?'], $op['filter']);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testFilterEqualMultipleValues(): void
@@ -157,8 +157,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['status' => ['$in' => ['?', '?']]], $op['filter']);
-        $this->assertEquals(['active', 'pending'], $result->bindings);
+        $this->assertSame(['status' => ['$in' => ['?', '?']]], $op['filter']);
+        $this->assertSame(['active', 'pending'], $result->bindings);
     }
 
     public function testFilterNotEqual(): void
@@ -170,8 +170,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['status' => ['$ne' => '?']], $op['filter']);
-        $this->assertEquals(['deleted'], $result->bindings);
+        $this->assertSame(['status' => ['$ne' => '?']], $op['filter']);
+        $this->assertSame(['deleted'], $result->bindings);
     }
 
     public function testFilterNotEqualMultipleValues(): void
@@ -183,8 +183,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['status' => ['$nin' => ['?', '?']]], $op['filter']);
-        $this->assertEquals(['deleted', 'banned'], $result->bindings);
+        $this->assertSame(['status' => ['$nin' => ['?', '?']]], $op['filter']);
+        $this->assertSame(['deleted', 'banned'], $result->bindings);
     }
 
     public function testFilterGreaterThan(): void
@@ -196,8 +196,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['age' => ['$gt' => '?']], $op['filter']);
-        $this->assertEquals([25], $result->bindings);
+        $this->assertSame(['age' => ['$gt' => '?']], $op['filter']);
+        $this->assertSame([25], $result->bindings);
     }
 
     public function testFilterLessThan(): void
@@ -209,8 +209,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['age' => ['$lt' => '?']], $op['filter']);
-        $this->assertEquals([30], $result->bindings);
+        $this->assertSame(['age' => ['$lt' => '?']], $op['filter']);
+        $this->assertSame([30], $result->bindings);
     }
 
     public function testFilterGreaterThanEqual(): void
@@ -222,8 +222,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['age' => ['$gte' => '?']], $op['filter']);
-        $this->assertEquals([18], $result->bindings);
+        $this->assertSame(['age' => ['$gte' => '?']], $op['filter']);
+        $this->assertSame([18], $result->bindings);
     }
 
     public function testFilterLessThanEqual(): void
@@ -235,8 +235,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['age' => ['$lte' => '?']], $op['filter']);
-        $this->assertEquals([65], $result->bindings);
+        $this->assertSame(['age' => ['$lte' => '?']], $op['filter']);
+        $this->assertSame([65], $result->bindings);
     }
 
     public function testFilterBetween(): void
@@ -248,8 +248,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['age' => ['$gte' => '?', '$lte' => '?']], $op['filter']);
-        $this->assertEquals([18, 65], $result->bindings);
+        $this->assertSame(['age' => ['$gte' => '?', '$lte' => '?']], $op['filter']);
+        $this->assertSame([18, 65], $result->bindings);
     }
 
     public function testFilterNotBetween(): void
@@ -261,11 +261,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$or' => [
+        $this->assertSame(['$or' => [
             ['age' => ['$lt' => '?']],
             ['age' => ['$gt' => '?']],
         ]], $op['filter']);
-        $this->assertEquals([18, 65], $result->bindings);
+        $this->assertSame([18, 65], $result->bindings);
     }
 
     public function testFilterStartsWith(): void
@@ -277,8 +277,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['name' => ['$regex' => '?']], $op['filter']);
-        $this->assertEquals(['^Al'], $result->bindings);
+        $this->assertSame(['name' => ['$regex' => '?']], $op['filter']);
+        $this->assertSame(['^Al'], $result->bindings);
     }
 
     public function testFilterEndsWith(): void
@@ -290,8 +290,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['email' => ['$regex' => '?']], $op['filter']);
-        $this->assertEquals(['\.com$'], $result->bindings);
+        $this->assertSame(['email' => ['$regex' => '?']], $op['filter']);
+        $this->assertSame(['\.com$'], $result->bindings);
     }
 
     public function testFilterContains(): void
@@ -303,8 +303,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['name' => ['$regex' => '?']], $op['filter']);
-        $this->assertEquals(['test'], $result->bindings);
+        $this->assertSame(['name' => ['$regex' => '?']], $op['filter']);
+        $this->assertSame(['test'], $result->bindings);
     }
 
     public function testFilterNotContains(): void
@@ -316,8 +316,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['name' => ['$not' => ['$regex' => '?']]], $op['filter']);
-        $this->assertEquals(['test'], $result->bindings);
+        $this->assertSame(['name' => ['$not' => ['$regex' => '?']]], $op['filter']);
+        $this->assertSame(['test'], $result->bindings);
     }
 
     public function testFilterRegex(): void
@@ -329,8 +329,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['email' => ['$regex' => '?']], $op['filter']);
-        $this->assertEquals(['^[a-z]+@test\\.com$'], $result->bindings);
+        $this->assertSame(['email' => ['$regex' => '?']], $op['filter']);
+        $this->assertSame(['^[a-z]+@test\\.com$'], $result->bindings);
     }
 
     public function testFilterIsNull(): void
@@ -342,7 +342,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['deleted_at' => null], $op['filter']);
+        $this->assertSame(['deleted_at' => null], $op['filter']);
         $this->assertEmpty($result->bindings);
     }
 
@@ -355,7 +355,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['email' => ['$ne' => null]], $op['filter']);
+        $this->assertSame(['email' => ['$ne' => null]], $op['filter']);
         $this->assertEmpty($result->bindings);
     }
 
@@ -371,11 +371,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$or' => [
+        $this->assertSame(['$or' => [
             ['status' => '?'],
             ['age' => ['$gt' => '?']],
         ]], $op['filter']);
-        $this->assertEquals(['active', 18], $result->bindings);
+        $this->assertSame(['active', 18], $result->bindings);
     }
 
     public function testFilterAnd(): void
@@ -390,11 +390,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['status' => '?'],
             ['age' => ['$gt' => '?']],
         ]], $op['filter']);
-        $this->assertEquals(['active', 18], $result->bindings);
+        $this->assertSame(['active', 18], $result->bindings);
     }
 
     public function testMultipleFiltersProduceAnd(): void
@@ -409,11 +409,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['status' => '?'],
             ['age' => ['$gt' => '?']],
         ]], $op['filter']);
-        $this->assertEquals(['active', 25], $result->bindings);
+        $this->assertSame(['active', 25], $result->bindings);
     }
 
     public function testSortAscAndDesc(): void
@@ -426,7 +426,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['name' => 1, 'age' => -1], $op['sort']);
+        $this->assertSame(['name' => 1, 'age' => -1], $op['sort']);
     }
 
     public function testLimitAndOffset(): void
@@ -439,8 +439,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(10, $op['limit']);
-        $this->assertEquals(20, $op['skip']);
+        $this->assertSame(10, $op['limit']);
+        $this->assertSame(20, $op['skip']);
     }
 
     public function testInsertSingleRow(): void
@@ -452,13 +452,13 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('users', $op['collection']);
-        $this->assertEquals('insertMany', $op['operation']);
+        $this->assertSame('users', $op['collection']);
+        $this->assertSame('insertMany', $op['operation']);
         /** @var list<array<string, mixed>> $documents */
         $documents = $op['documents'];
         $this->assertCount(1, $documents);
-        $this->assertEquals(['name' => '?', 'email' => '?', 'age' => '?'], $documents[0]);
-        $this->assertEquals(['Alice', 'alice@test.com', 30], $result->bindings);
+        $this->assertSame(['name' => '?', 'email' => '?', 'age' => '?'], $documents[0]);
+        $this->assertSame(['Alice', 'alice@test.com', 30], $result->bindings);
     }
 
     public function testInsertMultipleRows(): void
@@ -474,7 +474,7 @@ class MongoDBTest extends TestCase
         /** @var list<array<string, mixed>> $documents */
         $documents = $op['documents'];
         $this->assertCount(2, $documents);
-        $this->assertEquals(['Alice', 30, 'Bob', 25], $result->bindings);
+        $this->assertSame(['Alice', 30, 'Bob', 25], $result->bindings);
     }
 
     public function testUpdateWithSet(): void
@@ -487,11 +487,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('users', $op['collection']);
-        $this->assertEquals('updateMany', $op['operation']);
-        $this->assertEquals(['$set' => ['city' => '?']], $op['update']);
-        $this->assertEquals(['name' => '?'], $op['filter']);
-        $this->assertEquals(['Alice', 'New York'], $result->bindings);
+        $this->assertSame('users', $op['collection']);
+        $this->assertSame('updateMany', $op['operation']);
+        $this->assertSame(['$set' => ['city' => '?']], $op['update']);
+        $this->assertSame(['name' => '?'], $op['filter']);
+        $this->assertSame(['Alice', 'New York'], $result->bindings);
     }
 
     public function testUpdateWithIncrement(): void
@@ -504,8 +504,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$inc' => ['login_count' => 1]], $op['update']);
-        $this->assertEquals(['Alice'], $result->bindings);
+        $this->assertSame(['$inc' => ['login_count' => 1]], $op['update']);
+        $this->assertSame(['Alice'], $result->bindings);
     }
 
     public function testUpdateWithPush(): void
@@ -518,8 +518,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$push' => ['tags' => '?']], $op['update']);
-        $this->assertEquals(['Alice', 'admin'], $result->bindings);
+        $this->assertSame(['$push' => ['tags' => '?']], $op['update']);
+        $this->assertSame(['Alice', 'admin'], $result->bindings);
     }
 
     public function testUpdateWithPull(): void
@@ -532,8 +532,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$pull' => ['tags' => '?']], $op['update']);
-        $this->assertEquals(['Alice', 'guest'], $result->bindings);
+        $this->assertSame(['$pull' => ['tags' => '?']], $op['update']);
+        $this->assertSame(['Alice', 'guest'], $result->bindings);
     }
 
     public function testUpdateWithAddToSet(): void
@@ -546,8 +546,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$addToSet' => ['roles' => '?']], $op['update']);
-        $this->assertEquals(['Alice', 'editor'], $result->bindings);
+        $this->assertSame(['$addToSet' => ['roles' => '?']], $op['update']);
+        $this->assertSame(['Alice', 'editor'], $result->bindings);
     }
 
     public function testUpdateWithUnset(): void
@@ -560,8 +560,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$unset' => ['deprecated_field' => '']], $op['update']);
-        $this->assertEquals(['Alice'], $result->bindings);
+        $this->assertSame(['$unset' => ['deprecated_field' => '']], $op['update']);
+        $this->assertSame(['Alice'], $result->bindings);
     }
 
     public function testDelete(): void
@@ -573,10 +573,10 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('users', $op['collection']);
-        $this->assertEquals('deleteMany', $op['operation']);
-        $this->assertEquals(['status' => '?'], $op['filter']);
-        $this->assertEquals(['deleted'], $result->bindings);
+        $this->assertSame('users', $op['collection']);
+        $this->assertSame('deleteMany', $op['operation']);
+        $this->assertSame(['status' => '?'], $op['filter']);
+        $this->assertSame(['deleted'], $result->bindings);
     }
 
     public function testDeleteWithoutFilter(): void
@@ -587,7 +587,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('deleteMany', $op['operation']);
+        $this->assertSame('deleteMany', $op['operation']);
         $this->assertEmpty((array) $op['filter']);
     }
 
@@ -602,7 +602,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -610,8 +610,8 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($groupStage);
         /** @var array<string, mixed> $groupBody */
         $groupBody = $groupStage['$group'];
-        $this->assertEquals('$country', $groupBody['_id']);
-        $this->assertEquals(['$sum' => 1], $groupBody['cnt']);
+        $this->assertSame('$country', $groupBody['_id']);
+        $this->assertSame(['$sum' => 1], $groupBody['cnt']);
     }
 
     public function testGroupByWithMultipleAggregates(): void
@@ -632,8 +632,8 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($groupStage);
         /** @var array<string, mixed> $groupBody */
         $groupBody = $groupStage['$group'];
-        $this->assertEquals(['$sum' => '$amount'], $groupBody['total']);
-        $this->assertEquals(['$avg' => '$amount'], $groupBody['average']);
+        $this->assertSame(['$sum' => '$amount'], $groupBody['total']);
+        $this->assertSame(['$avg' => '$amount'], $groupBody['average']);
     }
 
     public function testGroupByWithHaving(): void
@@ -673,7 +673,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -691,7 +691,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -699,10 +699,10 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($lookupStage);
         /** @var array<string, mixed> $lookupBody */
         $lookupBody = $lookupStage['$lookup'];
-        $this->assertEquals('users', $lookupBody['from']);
-        $this->assertEquals('user_id', $lookupBody['localField']);
-        $this->assertEquals('id', $lookupBody['foreignField']);
-        $this->assertEquals('u', $lookupBody['as']);
+        $this->assertSame('users', $lookupBody['from']);
+        $this->assertSame('user_id', $lookupBody['localField']);
+        $this->assertSame('id', $lookupBody['foreignField']);
+        $this->assertSame('u', $lookupBody['as']);
     }
 
     public function testLeftJoin(): void
@@ -740,7 +740,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -748,7 +748,7 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($unionStage);
         /** @var array<string, mixed> $unionBody */
         $unionBody = $unionStage['$unionWith'];
-        $this->assertEquals('users', $unionBody['coll']);
+        $this->assertSame('users', $unionBody['coll']);
     }
 
     public function testUpsert(): void
@@ -761,13 +761,13 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('updateOne', $op['operation']);
-        $this->assertEquals(['email' => '?'], $op['filter']);
-        $this->assertEquals(['$set' => ['name' => '?', 'age' => '?']], $op['update']);
+        $this->assertSame('updateOne', $op['operation']);
+        $this->assertSame(['email' => '?'], $op['filter']);
+        $this->assertSame(['$set' => ['name' => '?', 'age' => '?']], $op['update']);
         /** @var array<string, mixed> $options */
         $options = $op['options'];
         $this->assertTrue($options['upsert']);
-        $this->assertEquals(['alice@test.com', 'Alice Updated', 31], $result->bindings);
+        $this->assertSame(['alice@test.com', 'Alice Updated', 31], $result->bindings);
     }
 
     public function testInsertOrIgnore(): void
@@ -779,7 +779,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('insertMany', $op['operation']);
+        $this->assertSame('insertMany', $op['operation']);
         /** @var array<string, mixed> $options */
         $options = $op['options'];
         $this->assertFalse($options['ordered']);
@@ -795,7 +795,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -823,7 +823,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -831,7 +831,7 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($lookupStage);
         /** @var array<string, mixed> $lookupBody */
         $lookupBody = $lookupStage['$lookup'];
-        $this->assertEquals('orders', $lookupBody['from']);
+        $this->assertSame('orders', $lookupBody['from']);
     }
 
     public function testSortRandom(): void
@@ -843,7 +843,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -863,7 +863,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
         /** @var array<string, mixed> $matchStage */
@@ -873,8 +873,8 @@ class MongoDBTest extends TestCase
         $this->assertArrayHasKey('$text', $matchBody);
         /** @var array<string, mixed> $textBody */
         $textBody = $matchBody['$text'];
-        $this->assertEquals('?', $textBody['$search']);
-        $this->assertEquals(['mongodb tutorial'], $result->bindings);
+        $this->assertSame('?', $textBody['$search']);
+        $this->assertSame(['mongodb tutorial'], $result->bindings);
     }
 
     public function testNoTableThrowsException(): void
@@ -926,12 +926,12 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('find', $op['operation']);
-        $this->assertEquals(['name' => 1, '_id' => 0], $op['projection']);
-        $this->assertEquals(['country' => '?'], $op['filter']);
-        $this->assertEquals(['name' => 1], $op['sort']);
-        $this->assertEquals(10, $op['limit']);
-        $this->assertEquals(5, $op['skip']);
+        $this->assertSame('find', $op['operation']);
+        $this->assertSame(['name' => 1, '_id' => 0], $op['projection']);
+        $this->assertSame(['country' => '?'], $op['filter']);
+        $this->assertSame(['name' => 1], $op['sort']);
+        $this->assertSame(10, $op['limit']);
+        $this->assertSame(5, $op['skip']);
     }
 
     public function testAggregateOperationForGroupBy(): void
@@ -943,7 +943,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
     }
 
     public function testClone(): void
@@ -979,7 +979,7 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($groupStage);
         /** @var array<string, mixed> $groupBody */
         $groupBody = $groupStage['$group'];
-        $this->assertEquals([
+        $this->assertSame([
             'country' => '$country',
             'city' => '$city',
         ], $groupBody['_id']);
@@ -1001,8 +1001,8 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($groupStage);
         /** @var array<string, mixed> $groupBody */
         $groupBody = $groupStage['$group'];
-        $this->assertEquals(['$min' => '$amount'], $groupBody['min_amount']);
-        $this->assertEquals(['$max' => '$amount'], $groupBody['max_amount']);
+        $this->assertSame(['$min' => '$amount'], $groupBody['min_amount']);
+        $this->assertSame(['$max' => '$amount'], $groupBody['max_amount']);
     }
 
     public function testFilterEqualWithNull(): void
@@ -1014,7 +1014,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['deleted_at' => null], $op['filter']);
+        $this->assertSame(['deleted_at' => null], $op['filter']);
         $this->assertEmpty($result->bindings);
     }
 
@@ -1027,11 +1027,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$or' => [
+        $this->assertSame(['$or' => [
             ['bio' => ['$regex' => '?']],
             ['bio' => ['$regex' => '?']],
         ]], $op['filter']);
-        $this->assertEquals(['php', 'java'], $result->bindings);
+        $this->assertSame(['php', 'java'], $result->bindings);
     }
 
     public function testFilterContainsAll(): void
@@ -1043,11 +1043,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['bio' => ['$regex' => '?']],
             ['bio' => ['$regex' => '?']],
         ]], $op['filter']);
-        $this->assertEquals(['php', 'java'], $result->bindings);
+        $this->assertSame(['php', 'java'], $result->bindings);
     }
 
     public function testFilterNotStartsWith(): void
@@ -1059,8 +1059,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['name' => ['$not' => ['$regex' => '?']]], $op['filter']);
-        $this->assertEquals(['^Test'], $result->bindings);
+        $this->assertSame(['name' => ['$not' => ['$regex' => '?']]], $op['filter']);
+        $this->assertSame(['^Test'], $result->bindings);
     }
 
     public function testUpdateWithMultipleOperators(): void
@@ -1093,8 +1093,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(10, $op['limit']);
-        $this->assertEquals(20, $op['skip']);
+        $this->assertSame(10, $op['limit']);
+        $this->assertSame(20, $op['skip']);
     }
 
     public function testTableSampling(): void
@@ -1106,14 +1106,14 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
         $sampleStage = $this->findStage($pipeline, '$sample');
         $this->assertNotNull($sampleStage);
         /** @var array<string, mixed> $sampleBody */
         $sampleBody = $sampleStage['$sample'];
-        $this->assertEquals(100, $sampleBody['size']);
+        $this->assertSame(100, $sampleBody['size']);
     }
 
     public function testFilterNotSearchThrowsException(): void
@@ -1140,14 +1140,14 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
         $lookupStage = $this->findStage($pipeline, '$lookup');
         $this->assertNotNull($lookupStage);
         /** @var array<string, mixed> $lookupBody */
         $lookupBody = $lookupStage['$lookup'];
-        $this->assertEquals('orders', $lookupBody['from']);
+        $this->assertSame('orders', $lookupBody['from']);
         /** @var string $lookupAs */
         $lookupAs = $lookupBody['as'];
         $this->assertStringStartsWith('_exists_', $lookupAs);
@@ -1177,7 +1177,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
 
@@ -1189,7 +1189,7 @@ class MongoDBTest extends TestCase
                 foreach ($matchBody as $key => $val) {
                     if (\str_starts_with($key, '_exists_') && \is_array($val) && isset($val['$size'])) {
                         $hasExistsMatch = true;
-                        $this->assertEquals(0, $val['$size']);
+                        $this->assertSame(0, $val['$size']);
                     }
                 }
             }
@@ -1210,7 +1210,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
 
@@ -1236,7 +1236,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
         $windowStage = $this->findStage($pipeline, '$setWindowFields');
@@ -1248,7 +1248,7 @@ class MongoDBTest extends TestCase
         $this->assertArrayHasKey('running_total', $output);
         /** @var array<string, mixed> $runningTotal */
         $runningTotal = $output['running_total'];
-        $this->assertEquals('$amount', $runningTotal['$sum']);
+        $this->assertSame('$amount', $runningTotal['$sum']);
         $this->assertArrayHasKey('window', $runningTotal);
     }
 
@@ -1272,7 +1272,7 @@ class MongoDBTest extends TestCase
         $this->assertArrayHasKey('avg_price', $output);
         /** @var array<string, mixed> $avgPrice */
         $avgPrice = $output['avg_price'];
-        $this->assertEquals('$price', $avgPrice['$avg']);
+        $this->assertSame('$price', $avgPrice['$avg']);
     }
 
     public function testWindowFunctionWithMin(): void
@@ -1294,7 +1294,7 @@ class MongoDBTest extends TestCase
         $output = $windowBody['output'];
         /** @var array<string, mixed> $minAmount */
         $minAmount = $output['min_amount'];
-        $this->assertEquals('$amount', $minAmount['$min']);
+        $this->assertSame('$amount', $minAmount['$min']);
     }
 
     public function testWindowFunctionWithMax(): void
@@ -1316,7 +1316,7 @@ class MongoDBTest extends TestCase
         $output = $windowBody['output'];
         /** @var array<string, mixed> $maxAmount */
         $maxAmount = $output['max_amount'];
-        $this->assertEquals('$amount', $maxAmount['$max']);
+        $this->assertSame('$amount', $maxAmount['$max']);
     }
 
     public function testWindowFunctionWithCount(): void
@@ -1338,7 +1338,7 @@ class MongoDBTest extends TestCase
         $output = $windowBody['output'];
         /** @var array<string, mixed> $eventCount */
         $eventCount = $output['event_count'];
-        $this->assertEquals(1, $eventCount['$sum']);
+        $this->assertSame(1, $eventCount['$sum']);
     }
 
     public function testWindowFunctionUnsupportedThrows(): void
@@ -1377,7 +1377,7 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($windowStage);
         /** @var array<string, mixed> $windowBody */
         $windowBody = $windowStage['$setWindowFields'];
-        $this->assertEquals([
+        $this->assertSame([
             'country' => '$country',
             'city' => '$city',
         ], $windowBody['partitionBy']);
@@ -1437,7 +1437,7 @@ class MongoDBTest extends TestCase
         $windowBody = $windowStage['$setWindowFields'];
         /** @var array<string, int> $sortBy */
         $sortBy = $windowBody['sortBy'];
-        $this->assertEquals(1, $sortBy['created_at']);
+        $this->assertSame(1, $sortBy['created_at']);
     }
 
     public function testFilterEqualWithNullAndValues(): void
@@ -1449,11 +1449,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$or' => [
+        $this->assertSame(['$or' => [
             ['status' => ['$in' => ['?']]],
             ['status' => null],
         ]], $op['filter']);
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testFilterNotEqualWithNullOnly(): void
@@ -1465,7 +1465,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['status' => ['$ne' => null]], $op['filter']);
+        $this->assertSame(['status' => ['$ne' => null]], $op['filter']);
         $this->assertEmpty($result->bindings);
     }
 
@@ -1478,11 +1478,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['status' => ['$nin' => ['?']]],
             ['status' => ['$ne' => null]],
         ]], $op['filter']);
-        $this->assertEquals(['deleted'], $result->bindings);
+        $this->assertSame(['deleted'], $result->bindings);
     }
 
     public function testFilterNotContainsMultipleValues(): void
@@ -1494,11 +1494,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['bio' => ['$not' => ['$regex' => '?']]],
             ['bio' => ['$not' => ['$regex' => '?']]],
         ]], $op['filter']);
-        $this->assertEquals(['spam', 'junk'], $result->bindings);
+        $this->assertSame(['spam', 'junk'], $result->bindings);
     }
 
     public function testFilterFieldExists(): void
@@ -1510,7 +1510,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['email' => ['$exists' => true, '$ne' => null]], $op['filter']);
+        $this->assertSame(['email' => ['$exists' => true, '$ne' => null]], $op['filter']);
     }
 
     public function testFilterFieldNotExists(): void
@@ -1522,7 +1522,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['email' => ['$type' => 10]], $op['filter']);
+        $this->assertSame(['email' => ['$type' => 10]], $op['filter']);
     }
 
     public function testFilterFieldExistsMultiple(): void
@@ -1534,7 +1534,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['email' => ['$exists' => true, '$ne' => null]],
             ['phone' => ['$exists' => true, '$ne' => null]],
         ]], $op['filter']);
@@ -1549,7 +1549,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['email' => ['$type' => 10]],
             ['phone' => ['$type' => 10]],
         ]], $op['filter']);
@@ -1567,8 +1567,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['tags' => ['$in' => ['?', '?']]], $op['filter']);
-        $this->assertEquals(['php', 'js'], $result->bindings);
+        $this->assertSame(['tags' => ['$in' => ['?', '?']]], $op['filter']);
+        $this->assertSame(['php', 'js'], $result->bindings);
     }
 
     public function testContainsAnyOnString(): void
@@ -1580,11 +1580,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$or' => [
+        $this->assertSame(['$or' => [
             ['bio' => ['$regex' => '?']],
             ['bio' => ['$regex' => '?']],
         ]], $op['filter']);
-        $this->assertEquals(['php', 'js'], $result->bindings);
+        $this->assertSame(['php', 'js'], $result->bindings);
     }
 
     public function testUpsertSelectThrowsException(): void
@@ -1609,8 +1609,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('updateOne', $op['operation']);
-        $this->assertEquals(['email' => '?'], $op['filter']);
+        $this->assertSame('updateOne', $op['operation']);
+        $this->assertSame(['email' => '?'], $op['filter']);
         /** @var array<string, mixed> $update */
         $update = $op['update'];
         /** @var array<string, mixed> $setDoc */
@@ -1644,17 +1644,17 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
 
         $skipStage = $this->findStage($pipeline, '$skip');
         $this->assertNotNull($skipStage);
-        $this->assertEquals(20, $skipStage['$skip']);
+        $this->assertSame(20, $skipStage['$skip']);
 
         $limitStage = $this->findStage($pipeline, '$limit');
         $this->assertNotNull($limitStage);
-        $this->assertEquals(10, $limitStage['$limit']);
+        $this->assertSame(10, $limitStage['$limit']);
     }
 
     public function testAggregateDefaultSortDoesNotThrow(): void
@@ -1666,7 +1666,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
     }
 
     public function testAggregationWithNoAlias(): void
@@ -1709,8 +1709,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['injected' => '?'], $op['filter']);
-        $this->assertEquals(['yes'], $result->bindings);
+        $this->assertSame(['injected' => '?'], $op['filter']);
+        $this->assertSame(['yes'], $result->bindings);
     }
 
     public function testAfterBuildCallback(): void
@@ -1724,7 +1724,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('find', $op['operation']);
+        $this->assertSame('find', $op['operation']);
     }
 
     public function testFilterNotEndsWith(): void
@@ -1736,8 +1736,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['email' => ['$not' => ['$regex' => '?']]], $op['filter']);
-        $this->assertEquals(['\.com$'], $result->bindings);
+        $this->assertSame(['email' => ['$not' => ['$regex' => '?']]], $op['filter']);
+        $this->assertSame(['\.com$'], $result->bindings);
     }
 
     public function testEmptyHavingReturnsEmpty(): void
@@ -1751,7 +1751,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
     }
 
     public function testHavingWithMultipleConditions(): void
@@ -1802,7 +1802,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
         $unionStage = $this->findStage($pipeline, '$unionWith');
@@ -2070,7 +2070,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -2089,11 +2089,11 @@ class MongoDBTest extends TestCase
 
         $skipStage = $this->findStage($pipeline, '$skip');
         $this->assertNotNull($skipStage);
-        $this->assertEquals(5, $skipStage['$skip']);
+        $this->assertSame(5, $skipStage['$skip']);
 
         $limitStage = $this->findStage($pipeline, '$limit');
         $this->assertNotNull($limitStage);
-        $this->assertEquals(20, $limitStage['$limit']);
+        $this->assertSame(20, $limitStage['$limit']);
 
         $lookupIdx = $this->findStageIndex($pipeline, '$lookup');
         $matchIdx = $this->findStageIndex($pipeline, '$match');
@@ -2127,7 +2127,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -2137,15 +2137,15 @@ class MongoDBTest extends TestCase
 
         /** @var array<string, mixed> $lookup1 */
         $lookup1 = $lookupStages[0]['$lookup'];
-        $this->assertEquals('users', $lookup1['from']);
-        $this->assertEquals('u', $lookup1['as']);
+        $this->assertSame('users', $lookup1['from']);
+        $this->assertSame('u', $lookup1['as']);
 
         /** @var array<string, mixed> $lookup2 */
         $lookup2 = $lookupStages[1]['$lookup'];
-        $this->assertEquals('products', $lookup2['from']);
-        $this->assertEquals('p', $lookup2['as']);
+        $this->assertSame('products', $lookup2['from']);
+        $this->assertSame('p', $lookup2['as']);
 
-        $this->assertEquals([50], $result->bindings);
+        $this->assertSame([50], $result->bindings);
     }
 
     public function testLeftJoinAndInnerJoinCombined(): void
@@ -2171,7 +2171,7 @@ class MongoDBTest extends TestCase
 
         /** @var string $secondUnwind */
         $secondUnwind = $unwindStages[1]['$unwind'];
-        $this->assertEquals('$c', $secondUnwind);
+        $this->assertSame('$c', $secondUnwind);
     }
 
     public function testJoinWithAggregateGroupByHaving(): void
@@ -2197,8 +2197,8 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($groupStage);
         /** @var array<string, mixed> $groupBody */
         $groupBody = $groupStage['$group'];
-        $this->assertEquals(['$sum' => 1], $groupBody['order_count']);
-        $this->assertEquals(['$sum' => '$orders.amount'], $groupBody['total_amount']);
+        $this->assertSame(['$sum' => 1], $groupBody['order_count']);
+        $this->assertSame(['$sum' => '$orders.amount'], $groupBody['total_amount']);
 
         $groupIdx = $this->findStageIndex($pipeline, '$group');
         $this->assertNotNull($groupIdx);
@@ -2248,7 +2248,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -2281,7 +2281,7 @@ class MongoDBTest extends TestCase
         $lookupStages = $this->findAllStages($pipeline, '$lookup');
         $this->assertGreaterThanOrEqual(2, \count($lookupStages));
 
-        $this->assertEquals(['gold'], $result->bindings);
+        $this->assertSame(['gold'], $result->bindings);
     }
 
     public function testFilterWhereInSubqueryWithAggregate(): void
@@ -2299,7 +2299,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -2308,9 +2308,9 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($groupStage);
         /** @var array<string, mixed> $groupBody */
         $groupBody = $groupStage['$group'];
-        $this->assertEquals(['$sum' => 1], $groupBody['order_count']);
+        $this->assertSame(['$sum' => 1], $groupBody['order_count']);
 
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testExistsSubqueryWithRegularFilter(): void
@@ -2328,7 +2328,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -2339,7 +2339,7 @@ class MongoDBTest extends TestCase
         $matchStages = $this->findAllStages($pipeline, '$match');
         $this->assertGreaterThanOrEqual(2, \count($matchStages));
 
-        $this->assertEquals([100, 'active'], $result->bindings);
+        $this->assertSame([100, 'active'], $result->bindings);
     }
 
     public function testNotExistsSubqueryWithRegularFilter(): void
@@ -2367,7 +2367,7 @@ class MongoDBTest extends TestCase
                 foreach ($matchBody as $key => $val) {
                     if (\str_starts_with($key, '_exists_') && \is_array($val) && isset($val['$size'])) {
                         $hasExistsMatch = true;
-                        $this->assertEquals(0, $val['$size']);
+                        $this->assertSame(0, $val['$size']);
                     }
                 }
             }
@@ -2403,7 +2403,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -2412,7 +2412,7 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($unionStage);
         /** @var array<string, mixed> $unionBody */
         $unionBody = $unionStage['$unionWith'];
-        $this->assertEquals('archived_orders', $unionBody['coll']);
+        $this->assertSame('archived_orders', $unionBody['coll']);
         $this->assertArrayHasKey('pipeline', $unionBody);
     }
 
@@ -2446,13 +2446,13 @@ class MongoDBTest extends TestCase
 
         /** @var array<string, mixed> $union1Body */
         $union1Body = $unionStages[0]['$unionWith'];
-        $this->assertEquals('eu_users', $union1Body['coll']);
+        $this->assertSame('eu_users', $union1Body['coll']);
 
         /** @var array<string, mixed> $union2Body */
         $union2Body = $unionStages[1]['$unionWith'];
-        $this->assertEquals('asia_users', $union2Body['coll']);
+        $this->assertSame('asia_users', $union2Body['coll']);
 
-        $this->assertEquals(['US', 'EU', 'ASIA'], $result->bindings);
+        $this->assertSame(['US', 'EU', 'ASIA'], $result->bindings);
     }
 
     public function testUnionWithOrderByAndLimit(): void
@@ -2557,7 +2557,7 @@ class MongoDBTest extends TestCase
 
         /** @var array<string, mixed> $windowBody */
         $windowBody = $windowStage['$setWindowFields'];
-        $this->assertEquals([
+        $this->assertSame([
             'region' => '$region',
             'department' => '$department',
             'team' => '$team',
@@ -2565,8 +2565,8 @@ class MongoDBTest extends TestCase
 
         /** @var array<string, int> $sortBy */
         $sortBy = $windowBody['sortBy'];
-        $this->assertEquals(-1, $sortBy['revenue']);
-        $this->assertEquals(1, $sortBy['name']);
+        $this->assertSame(-1, $sortBy['revenue']);
+        $this->assertSame(1, $sortBy['name']);
     }
 
     public function testGroupByMultipleColumnsMultipleAggregates(): void
@@ -2589,27 +2589,27 @@ class MongoDBTest extends TestCase
         /** @var array<string, mixed> $groupBody */
         $groupBody = $groupStage['$group'];
 
-        $this->assertEquals([
+        $this->assertSame([
             'region' => '$region',
             'year' => '$year',
             'quarter' => '$quarter',
         ], $groupBody['_id']);
 
-        $this->assertEquals(['$sum' => 1], $groupBody['cnt']);
-        $this->assertEquals(['$sum' => '$amount'], $groupBody['total']);
-        $this->assertEquals(['$avg' => '$amount'], $groupBody['average']);
+        $this->assertSame(['$sum' => 1], $groupBody['cnt']);
+        $this->assertSame(['$sum' => '$amount'], $groupBody['total']);
+        $this->assertSame(['$avg' => '$amount'], $groupBody['average']);
 
         $projectStage = $this->findStage($pipeline, '$project');
         $this->assertNotNull($projectStage);
         /** @var array<string, mixed> $projectBody */
         $projectBody = $projectStage['$project'];
-        $this->assertEquals(0, $projectBody['_id']);
-        $this->assertEquals('$_id.region', $projectBody['region']);
-        $this->assertEquals('$_id.year', $projectBody['year']);
-        $this->assertEquals('$_id.quarter', $projectBody['quarter']);
-        $this->assertEquals(1, $projectBody['cnt']);
-        $this->assertEquals(1, $projectBody['total']);
-        $this->assertEquals(1, $projectBody['average']);
+        $this->assertSame(0, $projectBody['_id']);
+        $this->assertSame('$_id.region', $projectBody['region']);
+        $this->assertSame('$_id.year', $projectBody['year']);
+        $this->assertSame('$_id.quarter', $projectBody['quarter']);
+        $this->assertSame(1, $projectBody['cnt']);
+        $this->assertSame(1, $projectBody['total']);
+        $this->assertSame(1, $projectBody['average']);
     }
 
     public function testMultipleAggregatesWithoutGroupBy(): void
@@ -2634,11 +2634,11 @@ class MongoDBTest extends TestCase
         $groupBody = $groupStage['$group'];
 
         $this->assertNull($groupBody['_id']);
-        $this->assertEquals(['$sum' => 1], $groupBody['total_count']);
-        $this->assertEquals(['$sum' => '$amount'], $groupBody['total_amount']);
-        $this->assertEquals(['$avg' => '$amount'], $groupBody['avg_amount']);
-        $this->assertEquals(['$min' => '$amount'], $groupBody['min_amount']);
-        $this->assertEquals(['$max' => '$amount'], $groupBody['max_amount']);
+        $this->assertSame(['$sum' => 1], $groupBody['total_count']);
+        $this->assertSame(['$sum' => '$amount'], $groupBody['total_amount']);
+        $this->assertSame(['$avg' => '$amount'], $groupBody['avg_amount']);
+        $this->assertSame(['$min' => '$amount'], $groupBody['min_amount']);
+        $this->assertSame(['$max' => '$amount'], $groupBody['max_amount']);
     }
 
     public function testBeforeBuildCallbackAddingFiltersWithMainFilters(): void
@@ -2653,11 +2653,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['role' => '?'],
             ['active' => '?'],
         ]], $op['filter']);
-        $this->assertEquals(['admin', true], $result->bindings);
+        $this->assertSame(['admin', true], $result->bindings);
     }
 
     public function testAfterBuildCallbackModifyingResult(): void
@@ -2681,7 +2681,7 @@ class MongoDBTest extends TestCase
 
         $op = $this->decode($result->query);
         $this->assertTrue($op['custom_flag']);
-        $this->assertEquals('find', $op['operation']);
+        $this->assertSame('find', $op['operation']);
     }
 
     public function testInsertMultipleRowsDocumentStructure(): void
@@ -2700,10 +2700,10 @@ class MongoDBTest extends TestCase
         $this->assertCount(3, $documents);
 
         foreach ($documents as $doc) {
-            $this->assertEquals(['name' => '?', 'age' => '?', 'city' => '?'], $doc);
+            $this->assertSame(['name' => '?', 'age' => '?', 'city' => '?'], $doc);
         }
 
-        $this->assertEquals(['Alice', 30, 'NYC', 'Bob', 25, 'LA', 'Charlie', 35, 'SF'], $result->bindings);
+        $this->assertSame(['Alice', 30, 'NYC', 'Bob', 25, 'LA', 'Charlie', 35, 'SF'], $result->bindings);
     }
 
     public function testUpdateWithComplexMultiConditionFilter(): void
@@ -2725,8 +2725,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('updateMany', $op['operation']);
-        $this->assertEquals(['$set' => ['status' => '?']], $op['update']);
+        $this->assertSame('updateMany', $op['operation']);
+        $this->assertSame(['$set' => ['status' => '?']], $op['update']);
 
         /** @var array<string, mixed> $filter */
         $filter = $op['filter'];
@@ -2753,7 +2753,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('deleteMany', $op['operation']);
+        $this->assertSame('deleteMany', $op['operation']);
 
         /** @var array<string, mixed> $filter */
         $filter = $op['filter'];
@@ -2776,11 +2776,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$or' => [
+        $this->assertSame(['$or' => [
             ['a' => '?'],
             ['b' => ['$gt' => '?']],
         ]], $op['filter']);
-        $this->assertEquals([1, 5], $result->bindings);
+        $this->assertSame([1, 5], $result->bindings);
     }
 
     public function testFilterAndWithEqualAndLessThanStructure(): void
@@ -2795,11 +2795,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['a' => '?'],
             ['b' => ['$lt' => '?']],
         ]], $op['filter']);
-        $this->assertEquals([1, 10], $result->bindings);
+        $this->assertSame([1, 10], $result->bindings);
     }
 
     public function testNestedOrInsideAndInsideOr(): void
@@ -2832,14 +2832,14 @@ class MongoDBTest extends TestCase
         /** @var list<array<string, mixed>> $and1 */
         $and1 = $orConditions[0]['$and'];
         $this->assertCount(2, $and1);
-        $this->assertEquals(['status' => '?'], $and1[0]);
-        $this->assertEquals(['age' => ['$gt' => '?']], $and1[1]);
+        $this->assertSame(['status' => '?'], $and1[0]);
+        $this->assertSame(['age' => ['$gt' => '?']], $and1[1]);
 
         /** @var list<array<string, mixed>> $and2 */
         $and2 = $orConditions[1]['$and'];
         $this->assertCount(2, $and2);
-        $this->assertEquals(['score' => ['$lt' => '?']], $and2[0]);
-        $this->assertEquals(['role' => ['$ne' => '?']], $and2[1]);
+        $this->assertSame(['score' => ['$lt' => '?']], $and2[0]);
+        $this->assertSame(['role' => ['$ne' => '?']], $and2[1]);
     }
 
     public function testTripleNestingAndOfOrFilters(): void
@@ -2872,13 +2872,13 @@ class MongoDBTest extends TestCase
 
         /** @var list<array<string, mixed>> $or1 */
         $or1 = $andConditions[0]['$or'];
-        $this->assertEquals(['status' => '?'], $or1[0]);
-        $this->assertEquals(['score' => ['$gt' => '?']], $or1[1]);
+        $this->assertSame(['status' => '?'], $or1[0]);
+        $this->assertSame(['score' => ['$gt' => '?']], $or1[1]);
 
         /** @var list<array<string, mixed>> $or2 */
         $or2 = $andConditions[1]['$or'];
-        $this->assertEquals(['age' => ['$lt' => '?']], $or2[0]);
-        $this->assertEquals(['balance' => ['$gte' => '?', '$lte' => '?']], $or2[1]);
+        $this->assertSame(['age' => ['$lt' => '?']], $or2[0]);
+        $this->assertSame(['balance' => ['$gte' => '?', '$lte' => '?']], $or2[1]);
     }
 
     public function testIsNullWithEqualCombined(): void
@@ -2893,11 +2893,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['deleted_at' => null],
             ['status' => '?'],
         ]], $op['filter']);
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testIsNotNullWithGreaterThanCombined(): void
@@ -2912,11 +2912,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['email' => ['$ne' => null]],
             ['login_count' => ['$gt' => '?']],
         ]], $op['filter']);
-        $this->assertEquals([0], $result->bindings);
+        $this->assertSame([0], $result->bindings);
     }
 
     public function testBetweenWithNotEqualCombined(): void
@@ -2931,11 +2931,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['age' => ['$gte' => '?', '$lte' => '?']],
             ['status' => ['$ne' => '?']],
         ]], $op['filter']);
-        $this->assertEquals([18, 65, 'banned'], $result->bindings);
+        $this->assertSame([18, 65, 'banned'], $result->bindings);
     }
 
     public function testContainsWithStartsWithCombined(): void
@@ -2950,11 +2950,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['name' => ['$regex' => '?']],
             ['email' => ['$regex' => '?']],
         ]], $op['filter']);
-        $this->assertEquals(['test', '^admin'], $result->bindings);
+        $this->assertSame(['test', '^admin'], $result->bindings);
     }
 
     public function testNotContainsWithContainsCombined(): void
@@ -2969,11 +2969,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['body' => ['$not' => ['$regex' => '?']]],
             ['body' => ['$regex' => '?']],
         ]], $op['filter']);
-        $this->assertEquals(['spam', 'valuable'], $result->bindings);
+        $this->assertSame(['spam', 'valuable'], $result->bindings);
     }
 
     public function testMultipleEqualOnDifferentFields(): void
@@ -2989,12 +2989,12 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['name' => '?'],
             ['city' => '?'],
             ['role' => '?'],
         ]], $op['filter']);
-        $this->assertEquals(['Alice', 'NYC', 'admin'], $result->bindings);
+        $this->assertSame(['Alice', 'NYC', 'admin'], $result->bindings);
     }
 
     public function testEqualMultiValueInEquivalent(): void
@@ -3006,8 +3006,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['x' => ['$in' => ['?', '?', '?']]], $op['filter']);
-        $this->assertEquals([1, 2, 3], $result->bindings);
+        $this->assertSame(['x' => ['$in' => ['?', '?', '?']]], $op['filter']);
+        $this->assertSame([1, 2, 3], $result->bindings);
     }
 
     public function testNotEqualMultiValueNinEquivalent(): void
@@ -3019,8 +3019,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['x' => ['$nin' => ['?', '?', '?']]], $op['filter']);
-        $this->assertEquals([1, 2, 3], $result->bindings);
+        $this->assertSame(['x' => ['$nin' => ['?', '?', '?']]], $op['filter']);
+        $this->assertSame([1, 2, 3], $result->bindings);
     }
 
     public function testEqualBooleanValue(): void
@@ -3032,8 +3032,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['active' => '?'], $op['filter']);
-        $this->assertEquals([true], $result->bindings);
+        $this->assertSame(['active' => '?'], $op['filter']);
+        $this->assertSame([true], $result->bindings);
     }
 
     public function testEqualEmptyStringValue(): void
@@ -3045,8 +3045,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['name' => '?'], $op['filter']);
-        $this->assertEquals([''], $result->bindings);
+        $this->assertSame(['name' => '?'], $op['filter']);
+        $this->assertSame([''], $result->bindings);
     }
 
     public function testRegexWithOtherFilters(): void
@@ -3062,12 +3062,12 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['name' => ['$regex' => '?']],
             ['age' => ['$gt' => '?']],
             ['status' => '?'],
         ]], $op['filter']);
-        $this->assertEquals(['^[A-Z]', 18, 'active'], $result->bindings);
+        $this->assertSame(['^[A-Z]', 18, 'active'], $result->bindings);
     }
 
     public function testContainsAllWithMultipleValues(): void
@@ -3079,12 +3079,12 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$and' => [
+        $this->assertSame(['$and' => [
             ['tags' => ['$regex' => '?']],
             ['tags' => ['$regex' => '?']],
             ['tags' => ['$regex' => '?']],
         ]], $op['filter']);
-        $this->assertEquals(['php', 'mongodb', 'testing'], $result->bindings);
+        $this->assertSame(['php', 'mongodb', 'testing'], $result->bindings);
     }
 
     public function testFilterOnDottedNestedField(): void
@@ -3096,8 +3096,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['address.city' => '?'], $op['filter']);
-        $this->assertEquals(['NYC'], $result->bindings);
+        $this->assertSame(['address.city' => '?'], $op['filter']);
+        $this->assertSame(['NYC'], $result->bindings);
     }
 
     public function testComplexQueryBindingOrder(): void
@@ -3112,7 +3112,7 @@ class MongoDBTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals([
+        $this->assertSame([
             'active',
             100,
             '2024-01-01',
@@ -3132,7 +3132,7 @@ class MongoDBTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals([50, 10], $result->bindings);
+        $this->assertSame([50, 10], $result->bindings);
     }
 
     public function testUnionBindingsInBothBranches(): void
@@ -3150,7 +3150,7 @@ class MongoDBTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['active', 'cancelled'], $result->bindings);
+        $this->assertSame(['active', 'cancelled'], $result->bindings);
     }
 
     public function testSubqueryBindingsWithOuterQueryBindings(): void
@@ -3183,7 +3183,7 @@ class MongoDBTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(['user', -10, 'banned', 'violation'], $result->bindings);
+        $this->assertSame(['user', -10, 'banned', 'violation'], $result->bindings);
     }
 
     public function testInsertMultipleRowsBindingPositions(): void
@@ -3196,7 +3196,7 @@ class MongoDBTest extends TestCase
             ->insert();
         $this->assertBindingCount($result);
 
-        $this->assertEquals([1, 'x', 2, 'y', 3, 'z'], $result->bindings);
+        $this->assertSame([1, 'x', 2, 'y', 3, 'z'], $result->bindings);
     }
 
     public function testSelectEmptyArray(): void
@@ -3208,9 +3208,9 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('find', $op['operation']);
+        $this->assertSame('find', $op['operation']);
         // Empty select still creates a projection with only _id suppressed
-        $this->assertEquals(['_id' => 0], $op['projection']);
+        $this->assertSame(['_id' => 0], $op['projection']);
     }
 
     public function testSelectStar(): void
@@ -3222,11 +3222,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('find', $op['operation']);
+        $this->assertSame('find', $op['operation']);
         $this->assertArrayHasKey('projection', $op);
         /** @var array<string, int> $projection */
         $projection = $op['projection'];
-        $this->assertEquals(1, $projection['*']);
+        $this->assertSame(1, $projection['*']);
     }
 
     public function testSelectManyColumns(): void
@@ -3240,12 +3240,12 @@ class MongoDBTest extends TestCase
         $op = $this->decode($result->query);
         /** @var array<string, int> $projection */
         $projection = $op['projection'];
-        $this->assertEquals(1, $projection['a']);
-        $this->assertEquals(1, $projection['b']);
-        $this->assertEquals(1, $projection['c']);
-        $this->assertEquals(1, $projection['d']);
-        $this->assertEquals(1, $projection['e']);
-        $this->assertEquals(0, $projection['_id']);
+        $this->assertSame(1, $projection['a']);
+        $this->assertSame(1, $projection['b']);
+        $this->assertSame(1, $projection['c']);
+        $this->assertSame(1, $projection['d']);
+        $this->assertSame(1, $projection['e']);
+        $this->assertSame(0, $projection['_id']);
     }
 
     public function testCompoundSort(): void
@@ -3259,7 +3259,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['a' => 1, 'b' => -1, 'c' => 1], $op['sort']);
+        $this->assertSame(['a' => 1, 'b' => -1, 'c' => 1], $op['sort']);
     }
 
     public function testLimitOne(): void
@@ -3271,7 +3271,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(1, $op['limit']);
+        $this->assertSame(1, $op['limit']);
     }
 
     public function testOffsetZero(): void
@@ -3283,7 +3283,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(0, $op['skip']);
+        $this->assertSame(0, $op['skip']);
     }
 
     public function testLargeLimit(): void
@@ -3295,7 +3295,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(1000000, $op['limit']);
+        $this->assertSame(1000000, $op['limit']);
     }
 
     public function testGroupByThreeColumns(): void
@@ -3315,7 +3315,7 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($groupStage);
         /** @var array<string, mixed> $groupBody */
         $groupBody = $groupStage['$group'];
-        $this->assertEquals([
+        $this->assertSame([
             'a' => '$a',
             'b' => '$b',
             'c' => '$c',
@@ -3331,7 +3331,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
     }
 
     public function testDistinctWithSelectAndSort(): void
@@ -3345,7 +3345,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -3357,7 +3357,7 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($sortStage);
         /** @var array<string, int> $sortBody */
         $sortBody = $sortStage['$sort'];
-        $this->assertEquals(1, $sortBody['country']);
+        $this->assertSame(1, $sortBody['country']);
     }
 
     public function testCountStarWithoutGroupByWholeCollection(): void
@@ -3369,7 +3369,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -3378,7 +3378,7 @@ class MongoDBTest extends TestCase
         /** @var array<string, mixed> $groupBody */
         $groupBody = $groupStage['$group'];
         $this->assertNull($groupBody['_id']);
-        $this->assertEquals(['$sum' => 1], $groupBody['total']);
+        $this->assertSame(['$sum' => 1], $groupBody['total']);
     }
 
     public function testReadOnlyFlagOnBuild(): void
@@ -3439,7 +3439,7 @@ class MongoDBTest extends TestCase
         $this->assertCount(2, $clonedResult->bindings);
 
         $originalOp = $this->decode($originalResult->query);
-        $this->assertEquals('find', $originalOp['operation']);
+        $this->assertSame('find', $originalOp['operation']);
         $this->assertArrayNotHasKey('sort', $originalOp);
         $this->assertArrayNotHasKey('limit', $originalOp);
     }
@@ -3464,9 +3464,9 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('orders', $op['collection']);
-        $this->assertEquals(['total' => ['$gt' => '?']], $op['filter']);
-        $this->assertEquals([100], $result->bindings);
+        $this->assertSame('orders', $op['collection']);
+        $this->assertSame(['total' => ['$gt' => '?']], $op['filter']);
+        $this->assertSame([100], $result->bindings);
     }
 
     public function testMultipleSetCallsForUpdate(): void
@@ -3485,7 +3485,7 @@ class MongoDBTest extends TestCase
         $this->assertArrayHasKey('$set', $update);
         /** @var array<string, string> $setDoc */
         $setDoc = $update['$set'];
-        $this->assertEquals('?', $setDoc['name']);
+        $this->assertSame('?', $setDoc['name']);
     }
 
     public function testEmptyOrLogicalProducesExprFalse(): void
@@ -3538,7 +3538,7 @@ class MongoDBTest extends TestCase
         $matchBody = $firstStage['$match'];
         $this->assertArrayHasKey('$text', $matchBody);
 
-        $this->assertEquals(['mongodb', 'published'], $result->bindings);
+        $this->assertSame(['mongodb', 'published'], $result->bindings);
     }
 
     public function testTableSamplingBeforeFilters(): void
@@ -3573,7 +3573,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -3585,11 +3585,11 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($sortStage);
         /** @var array<string, int> $sortBody */
         $sortBody = $sortStage['$sort'];
-        $this->assertEquals(1, $sortBody['_rand']);
+        $this->assertSame(1, $sortBody['_rand']);
 
         $unsetStage = $this->findStage($pipeline, '$unset');
         $this->assertNotNull($unsetStage);
-        $this->assertEquals('_rand', $unsetStage['$unset']);
+        $this->assertSame('_rand', $unsetStage['$unset']);
     }
 
     public function testUpdateWithSetAndPushAndIncrement(): void
@@ -3632,10 +3632,10 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('updateOne', $op['operation']);
-        $this->assertEquals(['date' => '?', 'metric' => '?'], $op['filter']);
-        $this->assertEquals(['$set' => ['value' => '?']], $op['update']);
-        $this->assertEquals(['2024-06-15', 'pageviews', 1500], $result->bindings);
+        $this->assertSame('updateOne', $op['operation']);
+        $this->assertSame(['date' => '?', 'metric' => '?'], $op['filter']);
+        $this->assertSame(['$set' => ['value' => '?']], $op['update']);
+        $this->assertSame(['2024-06-15', 'pageviews', 1500], $result->bindings);
     }
 
     public function testDeleteWithMultipleFilters(): void
@@ -3651,7 +3651,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('deleteMany', $op['operation']);
+        $this->assertSame('deleteMany', $op['operation']);
 
         /** @var array<string, mixed> $filter */
         $filter = $op['filter'];
@@ -3660,11 +3660,11 @@ class MongoDBTest extends TestCase
         $andConditions = $filter['$and'];
         $this->assertCount(3, $andConditions);
 
-        $this->assertEquals(['expires_at' => ['$lt' => '?']], $andConditions[0]);
-        $this->assertEquals(['persistent' => ['$ne' => '?']], $andConditions[1]);
-        $this->assertEquals(['user_id' => null], $andConditions[2]);
+        $this->assertSame(['expires_at' => ['$lt' => '?']], $andConditions[0]);
+        $this->assertSame(['persistent' => ['$ne' => '?']], $andConditions[1]);
+        $this->assertSame(['user_id' => null], $andConditions[2]);
 
-        $this->assertEquals(['2024-01-01', true], $result->bindings);
+        $this->assertSame(['2024-01-01', true], $result->bindings);
     }
 
     public function testUpdateWithNoFilterProducesEmptyStdclass(): void
@@ -3676,7 +3676,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('updateMany', $op['operation']);
+        $this->assertSame('updateMany', $op['operation']);
         $this->assertEmpty((array) $op['filter']);
     }
 
@@ -3690,7 +3690,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('insertMany', $op['operation']);
+        $this->assertSame('insertMany', $op['operation']);
         /** @var array<string, mixed> $options */
         $options = $op['options'];
         $this->assertFalse($options['ordered']);
@@ -3726,7 +3726,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -3738,7 +3738,7 @@ class MongoDBTest extends TestCase
 
         $textMatchPos = \array_search('$match', $stageTypes);
         $this->assertNotFalse($textMatchPos);
-        $this->assertEquals(0, $textMatchPos);
+        $this->assertSame(0, $textMatchPos);
     }
 
     public function testWindowFunctionWithNullPartition(): void
@@ -3819,9 +3819,9 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($projectStage);
         /** @var array<string, mixed> $projectBody */
         $projectBody = $projectStage['$project'];
-        $this->assertEquals(0, $projectBody['_id']);
-        $this->assertEquals('$_id', $projectBody['region']);
-        $this->assertEquals(1, $projectBody['total_sales']);
+        $this->assertSame(0, $projectBody['_id']);
+        $this->assertSame('$_id', $projectBody['region']);
+        $this->assertSame(1, $projectBody['total_sales']);
     }
 
     public function testCrossJoinThrowsUnsupportedException(): void
@@ -3855,8 +3855,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['email' => ['$regex' => '?']], $op['filter']);
-        $this->assertEquals(['\.co\.uk$'], $result->bindings);
+        $this->assertSame(['email' => ['$regex' => '?']], $op['filter']);
+        $this->assertSame(['\.co\.uk$'], $result->bindings);
     }
 
     public function testFilterStartsWithSpecialChars(): void
@@ -3868,8 +3868,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['path' => ['$regex' => '?']], $op['filter']);
-        $this->assertEquals(['^\/var\/log\.'], $result->bindings);
+        $this->assertSame(['path' => ['$regex' => '?']], $op['filter']);
+        $this->assertSame(['^\/var\/log\.'], $result->bindings);
     }
 
     public function testFilterContainsWithSpecialCharsEscaped(): void
@@ -3881,8 +3881,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['message' => ['$regex' => '?']], $op['filter']);
-        $this->assertEquals(['file\.txt'], $result->bindings);
+        $this->assertSame(['message' => ['$regex' => '?']], $op['filter']);
+        $this->assertSame(['file\.txt'], $result->bindings);
     }
 
     public function testFilterGreaterThanEqualWithFloat(): void
@@ -3894,8 +3894,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['price' => ['$gte' => '?']], $op['filter']);
-        $this->assertEquals([9.99], $result->bindings);
+        $this->assertSame(['price' => ['$gte' => '?']], $op['filter']);
+        $this->assertSame([9.99], $result->bindings);
     }
 
     public function testFilterLessThanEqualWithZero(): void
@@ -3907,8 +3907,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['stock' => ['$lte' => '?']], $op['filter']);
-        $this->assertEquals([0], $result->bindings);
+        $this->assertSame(['stock' => ['$lte' => '?']], $op['filter']);
+        $this->assertSame([0], $result->bindings);
     }
 
     public function testInsertSingleRowBindingStructure(): void
@@ -3923,8 +3923,8 @@ class MongoDBTest extends TestCase
         /** @var list<array<string, mixed>> $documents */
         $documents = $op['documents'];
         $this->assertCount(1, $documents);
-        $this->assertEquals(['level' => '?', 'message' => '?', 'timestamp' => '?'], $documents[0]);
-        $this->assertEquals(['info', 'test', 12345], $result->bindings);
+        $this->assertSame(['level' => '?', 'message' => '?', 'timestamp' => '?'], $documents[0]);
+        $this->assertSame(['info', 'test', 12345], $result->bindings);
     }
 
     public function testFindOperationHasNoProjectionWhenNoneSelected(): void
@@ -3936,7 +3936,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('find', $op['operation']);
+        $this->assertSame('find', $op['operation']);
         $this->assertArrayNotHasKey('projection', $op);
     }
 
@@ -3987,8 +3987,8 @@ class MongoDBTest extends TestCase
         $op = $this->decode($result->query);
         /** @var array<string, int> $projection */
         $projection = $op['projection'];
-        $this->assertEquals(1, $projection['_id']);
-        $this->assertEquals(1, $projection['name']);
+        $this->assertSame(1, $projection['_id']);
+        $this->assertSame(1, $projection['name']);
     }
 
     public function testIncrementWithFloat(): void
@@ -4005,7 +4005,7 @@ class MongoDBTest extends TestCase
         $update = $op['update'];
         /** @var array<string, float> $incDoc */
         $incDoc = $update['$inc'];
-        $this->assertEquals(99.50, $incDoc['balance']);
+        $this->assertSame(99.50, $incDoc['balance']);
     }
 
     public function testIncrementWithNegativeValue(): void
@@ -4022,7 +4022,7 @@ class MongoDBTest extends TestCase
         $update = $op['update'];
         /** @var array<string, int> $incDoc */
         $incDoc = $update['$inc'];
-        $this->assertEquals(-5, $incDoc['value']);
+        $this->assertSame(-5, $incDoc['value']);
     }
 
     public function testUnsetMultipleFields(): void
@@ -4040,9 +4040,9 @@ class MongoDBTest extends TestCase
         /** @var array<string, string> $unsetDoc */
         $unsetDoc = $update['$unset'];
         $this->assertCount(3, $unsetDoc);
-        $this->assertEquals('', $unsetDoc['field_a']);
-        $this->assertEquals('', $unsetDoc['field_b']);
-        $this->assertEquals('', $unsetDoc['field_c']);
+        $this->assertSame('', $unsetDoc['field_a']);
+        $this->assertSame('', $unsetDoc['field_b']);
+        $this->assertSame('', $unsetDoc['field_c']);
     }
 
     public function testResetClearsMongoSpecificState(): void
@@ -4064,7 +4064,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('items', $op['collection']);
+        $this->assertSame('items', $op['collection']);
         /** @var array<string, mixed> $update */
         $update = $op['update'];
         $this->assertArrayHasKey('$set', $update);
@@ -4084,10 +4084,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['name' => '?'], $op['filter']);
-        /** @var array<string, mixed> $filter */
-        $filter = $op['filter'];
-        $this->assertArrayNotHasKey('$and', $filter);
+        $this->assertSame(['name' => '?'], $op['filter']);
+        $this->assertArrayNotHasKey('$and', $op['filter']);
     }
 
     public function testPageCalculation(): void
@@ -4099,8 +4097,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(20, $op['limit']);
-        $this->assertEquals(80, $op['skip']);
+        $this->assertSame(20, $op['limit']);
+        $this->assertSame(80, $op['skip']);
     }
 
     public function testTextSearchAndTableSamplingCombined(): void
@@ -4124,7 +4122,7 @@ class MongoDBTest extends TestCase
         $this->assertArrayHasKey('$sample', $pipeline[1]);
         /** @var array<string, mixed> $sampleBody */
         $sampleBody = $pipeline[1]['$sample'];
-        $this->assertEquals(200, $sampleBody['size']);
+        $this->assertSame(200, $sampleBody['size']);
     }
 
     public function testNotBetweenStructure(): void
@@ -4136,11 +4134,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['$or' => [
+        $this->assertSame(['$or' => [
             ['price' => ['$lt' => '?']],
             ['price' => ['$gt' => '?']],
         ]], $op['filter']);
-        $this->assertEquals([10.0, 50.0], $result->bindings);
+        $this->assertSame([10.0, 50.0], $result->bindings);
     }
 
     public function testContainsAnyOnArrayUsesIn(): void
@@ -4155,8 +4153,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals(['tags' => ['$in' => ['?', '?', '?']]], $op['filter']);
-        $this->assertEquals(['a', 'b', 'c'], $result->bindings);
+        $this->assertSame(['tags' => ['$in' => ['?', '?', '?']]], $op['filter']);
+        $this->assertSame(['a', 'b', 'c'], $result->bindings);
     }
 
     public function testFilterWhereNotInSubqueryStructure(): void
@@ -4179,8 +4177,8 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($lookupStage);
         /** @var array<string, mixed> $lookupBody */
         $lookupBody = $lookupStage['$lookup'];
-        $this->assertEquals('blacklist', $lookupBody['from']);
-        $this->assertEquals('_sub_0', $lookupBody['as']);
+        $this->assertSame('blacklist', $lookupBody['from']);
+        $this->assertSame('_sub_0', $lookupBody['as']);
 
         $unsetStage = $this->findStage($pipeline, '$unset');
         $this->assertNotNull($unsetStage);
@@ -4198,8 +4196,8 @@ class MongoDBTest extends TestCase
         $result1 = $builder->build();
         $result2 = $builder->build();
 
-        $this->assertEquals($result1->query, $result2->query);
-        $this->assertEquals($result1->bindings, $result2->bindings);
+        $this->assertSame($result1->query, $result2->query);
+        $this->assertSame($result1->bindings, $result2->bindings);
     }
 
     public function testExistsSubqueryAddsLimitOnePipeline(): void
@@ -4229,7 +4227,7 @@ class MongoDBTest extends TestCase
         foreach ($subPipeline as $stage) {
             if (isset($stage['$limit'])) {
                 $hasLimit = true;
-                $this->assertEquals(1, $stage['$limit']);
+                $this->assertSame(1, $stage['$limit']);
             }
         }
         $this->assertTrue($hasLimit);
@@ -4251,8 +4249,8 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($lookupStage);
         /** @var array<string, mixed> $lookupBody */
         $lookupBody = $lookupStage['$lookup'];
-        $this->assertEquals('user_id', $lookupBody['localField']);
-        $this->assertEquals('_id', $lookupBody['foreignField']);
+        $this->assertSame('user_id', $lookupBody['localField']);
+        $this->assertSame('_id', $lookupBody['foreignField']);
     }
 
     public function testJoinDefaultAliasUsesTableName(): void
@@ -4271,7 +4269,7 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($lookupStage);
         /** @var array<string, mixed> $lookupBody */
         $lookupBody = $lookupStage['$lookup'];
-        $this->assertEquals('users', $lookupBody['as']);
+        $this->assertSame('users', $lookupBody['as']);
     }
 
     public function testSortRandomWithSortAscCombined(): void
@@ -4284,7 +4282,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -4293,8 +4291,8 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($sortStage);
         /** @var array<string, int> $sortBody */
         $sortBody = $sortStage['$sort'];
-        $this->assertEquals(1, $sortBody['name']);
-        $this->assertEquals(1, $sortBody['_rand']);
+        $this->assertSame(1, $sortBody['name']);
+        $this->assertSame(1, $sortBody['_rand']);
     }
 
     public function testImplementsFieldUpdates(): void
@@ -4332,11 +4330,11 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('updateMany', $op['operation']);
+        $this->assertSame('updateMany', $op['operation']);
         /** @var array<string, mixed> $update */
         $update = $op['update'];
         $this->assertArrayHasKey('$rename', $update);
-        $this->assertEquals(['old_name' => 'new_name'], $update['$rename']);
+        $this->assertSame(['old_name' => 'new_name'], $update['$rename']);
     }
 
     public function testMultiply(): void
@@ -4352,7 +4350,7 @@ class MongoDBTest extends TestCase
         /** @var array<string, mixed> $update */
         $update = $op['update'];
         $this->assertArrayHasKey('$mul', $update);
-        $this->assertEquals(['price' => 1.1], $update['$mul']);
+        $this->assertSame(['price' => 1.1], $update['$mul']);
     }
 
     public function testPopFirst(): void
@@ -4368,7 +4366,7 @@ class MongoDBTest extends TestCase
         /** @var array<string, mixed> $update */
         $update = $op['update'];
         $this->assertArrayHasKey('$pop', $update);
-        $this->assertEquals(['tags' => -1], $update['$pop']);
+        $this->assertSame(['tags' => -1], $update['$pop']);
     }
 
     public function testPopLast(): void
@@ -4384,7 +4382,7 @@ class MongoDBTest extends TestCase
         /** @var array<string, mixed> $update */
         $update = $op['update'];
         $this->assertArrayHasKey('$pop', $update);
-        $this->assertEquals(['tags' => 1], $update['$pop']);
+        $this->assertSame(['tags' => 1], $update['$pop']);
     }
 
     public function testPullAll(): void
@@ -4402,7 +4400,7 @@ class MongoDBTest extends TestCase
         $this->assertArrayHasKey('$pullAll', $update);
         /** @var array<string, array<string>> $pullAll */
         $pullAll = $update['$pullAll'];
-        $this->assertEquals(['?', '?'], $pullAll['scores']);
+        $this->assertSame(['?', '?'], $pullAll['scores']);
         $this->assertContains(0, $result->bindings);
         $this->assertContains(5, $result->bindings);
     }
@@ -4420,7 +4418,7 @@ class MongoDBTest extends TestCase
         /** @var array<string, mixed> $update */
         $update = $op['update'];
         $this->assertArrayHasKey('$min', $update);
-        $this->assertEquals(['low_score' => '?'], $update['$min']);
+        $this->assertSame(['low_score' => '?'], $update['$min']);
         $this->assertContains(50, $result->bindings);
     }
 
@@ -4437,7 +4435,7 @@ class MongoDBTest extends TestCase
         /** @var array<string, mixed> $update */
         $update = $op['update'];
         $this->assertArrayHasKey('$max', $update);
-        $this->assertEquals(['high_score' => '?'], $update['$max']);
+        $this->assertSame(['high_score' => '?'], $update['$max']);
         $this->assertContains(100, $result->bindings);
     }
 
@@ -4454,7 +4452,7 @@ class MongoDBTest extends TestCase
         /** @var array<string, mixed> $update */
         $update = $op['update'];
         $this->assertArrayHasKey('$currentDate', $update);
-        $this->assertEquals(['lastModified' => ['$type' => 'date']], $update['$currentDate']);
+        $this->assertSame(['lastModified' => ['$type' => 'date']], $update['$currentDate']);
     }
 
     public function testCurrentDateTimestamp(): void
@@ -4469,7 +4467,7 @@ class MongoDBTest extends TestCase
         $op = $this->decode($result->query);
         /** @var array<string, mixed> $update */
         $update = $op['update'];
-        $this->assertEquals(['lastModified' => ['$type' => 'timestamp']], $update['$currentDate']);
+        $this->assertSame(['lastModified' => ['$type' => 'timestamp']], $update['$currentDate']);
     }
 
     public function testMultipleUpdateOperators(): void
@@ -4514,7 +4512,7 @@ class MongoDBTest extends TestCase
         $pushDoc = $update['$push'];
         /** @var array<string, mixed> $tagsModifier */
         $tagsModifier = $pushDoc['tags'];
-        $this->assertEquals(['?', '?', '?'], $tagsModifier['$each']);
+        $this->assertSame(['?', '?', '?'], $tagsModifier['$each']);
         $this->assertArrayNotHasKey('$position', $tagsModifier);
         $this->assertArrayNotHasKey('$slice', $tagsModifier);
         $this->assertArrayNotHasKey('$sort', $tagsModifier);
@@ -4536,10 +4534,10 @@ class MongoDBTest extends TestCase
         $pushDoc = $update['$push'];
         /** @var array<string, mixed> $scoresModifier */
         $scoresModifier = $pushDoc['scores'];
-        $this->assertEquals(['?', '?'], $scoresModifier['$each']);
-        $this->assertEquals(0, $scoresModifier['$position']);
-        $this->assertEquals(5, $scoresModifier['$slice']);
-        $this->assertEquals(['score' => -1], $scoresModifier['$sort']);
+        $this->assertSame(['?', '?'], $scoresModifier['$each']);
+        $this->assertSame(0, $scoresModifier['$position']);
+        $this->assertSame(5, $scoresModifier['$slice']);
+        $this->assertSame(['score' => -1], $scoresModifier['$sort']);
     }
 
     public function testPushEachWithPosition(): void
@@ -4558,7 +4556,7 @@ class MongoDBTest extends TestCase
         $pushDoc = $update['$push'];
         /** @var array<string, mixed> $itemsModifier */
         $itemsModifier = $pushDoc['items'];
-        $this->assertEquals(2, $itemsModifier['$position']);
+        $this->assertSame(2, $itemsModifier['$position']);
         $this->assertArrayNotHasKey('$slice', $itemsModifier);
     }
 
@@ -4578,7 +4576,7 @@ class MongoDBTest extends TestCase
         $pushDoc = $update['$push'];
         /** @var array<string, mixed> $itemsModifier */
         $itemsModifier = $pushDoc['items'];
-        $this->assertEquals(10, $itemsModifier['$slice']);
+        $this->assertSame(10, $itemsModifier['$slice']);
         $this->assertArrayNotHasKey('$position', $itemsModifier);
     }
 
@@ -4597,7 +4595,7 @@ class MongoDBTest extends TestCase
         $update = $op['update'];
         /** @var array<string, mixed> $pushDoc */
         $pushDoc = $update['$push'];
-        $this->assertEquals('?', $pushDoc['simple_field']);
+        $this->assertSame('?', $pushDoc['simple_field']);
         $this->assertIsArray($pushDoc['array_field']);
     }
 
@@ -4612,7 +4610,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('updateMany', $op['operation']);
+        $this->assertSame('updateMany', $op['operation']);
         $this->assertArrayHasKey('options', $op);
         /** @var array<string, mixed> $options */
         $options = $op['options'];
@@ -4654,7 +4652,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -4662,10 +4660,10 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($bucketStage);
         /** @var array<string, mixed> $bucketBody */
         $bucketBody = $bucketStage['$bucket'];
-        $this->assertEquals('$price', $bucketBody['groupBy']);
-        $this->assertEquals([0, 100, 200, 300], $bucketBody['boundaries']);
-        $this->assertEquals('Other', $bucketBody['default']);
-        $this->assertEquals(['count' => ['$sum' => 1]], $bucketBody['output']);
+        $this->assertSame('$price', $bucketBody['groupBy']);
+        $this->assertSame([0, 100, 200, 300], $bucketBody['boundaries']);
+        $this->assertSame('Other', $bucketBody['default']);
+        $this->assertSame(['count' => ['$sum' => 1]], $bucketBody['output']);
     }
 
     public function testBucketWithoutDefault(): void
@@ -4702,9 +4700,9 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($bucketAutoStage);
         /** @var array<string, mixed> $bucketAutoBody */
         $bucketAutoBody = $bucketAutoStage['$bucketAuto'];
-        $this->assertEquals('$price', $bucketAutoBody['groupBy']);
-        $this->assertEquals(5, $bucketAutoBody['buckets']);
-        $this->assertEquals(['count' => ['$sum' => 1]], $bucketAutoBody['output']);
+        $this->assertSame('$price', $bucketAutoBody['groupBy']);
+        $this->assertSame(5, $bucketAutoBody['buckets']);
+        $this->assertSame(['count' => ['$sum' => 1]], $bucketAutoBody['output']);
     }
 
     public function testBucketAutoWithoutOutput(): void
@@ -4746,7 +4744,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -4769,7 +4767,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -4777,13 +4775,13 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($graphLookupStage);
         /** @var array<string, mixed> $graphLookupBody */
         $graphLookupBody = $graphLookupStage['$graphLookup'];
-        $this->assertEquals('employees', $graphLookupBody['from']);
-        $this->assertEquals('$managerId', $graphLookupBody['startWith']);
-        $this->assertEquals('managerId', $graphLookupBody['connectFromField']);
-        $this->assertEquals('_id', $graphLookupBody['connectToField']);
-        $this->assertEquals('reportingHierarchy', $graphLookupBody['as']);
-        $this->assertEquals(5, $graphLookupBody['maxDepth']);
-        $this->assertEquals('depth', $graphLookupBody['depthField']);
+        $this->assertSame('employees', $graphLookupBody['from']);
+        $this->assertSame('$managerId', $graphLookupBody['startWith']);
+        $this->assertSame('managerId', $graphLookupBody['connectFromField']);
+        $this->assertSame('_id', $graphLookupBody['connectToField']);
+        $this->assertSame('reportingHierarchy', $graphLookupBody['as']);
+        $this->assertSame(5, $graphLookupBody['maxDepth']);
+        $this->assertSame('depth', $graphLookupBody['depthField']);
     }
 
     public function testGraphLookupWithoutOptionalFields(): void
@@ -4822,10 +4820,10 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($mergeStage);
         /** @var array<string, mixed> $mergeBody */
         $mergeBody = $mergeStage['$merge'];
-        $this->assertEquals('order_summary', $mergeBody['into']);
-        $this->assertEquals(['_id'], $mergeBody['on']);
-        $this->assertEquals(['replace'], $mergeBody['whenMatched']);
-        $this->assertEquals(['insert'], $mergeBody['whenNotMatched']);
+        $this->assertSame('order_summary', $mergeBody['into']);
+        $this->assertSame(['_id'], $mergeBody['on']);
+        $this->assertSame(['replace'], $mergeBody['whenMatched']);
+        $this->assertSame(['insert'], $mergeBody['whenNotMatched']);
     }
 
     public function testMergeIntoCollectionMinimal(): void
@@ -4844,7 +4842,7 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($mergeStage);
         /** @var array<string, mixed> $mergeBody */
         $mergeBody = $mergeStage['$merge'];
-        $this->assertEquals('summary', $mergeBody['into']);
+        $this->assertSame('summary', $mergeBody['into']);
         $this->assertArrayNotHasKey('on', $mergeBody);
         $this->assertArrayNotHasKey('whenMatched', $mergeBody);
     }
@@ -4881,7 +4879,7 @@ class MongoDBTest extends TestCase
         $pipeline = $op['pipeline'];
         $outStage = $this->findStage($pipeline, '$out');
         $this->assertNotNull($outStage);
-        $this->assertEquals('order_results', $outStage['$out']);
+        $this->assertSame('order_results', $outStage['$out']);
     }
 
     public function testOutputToCollectionWithDatabase(): void
@@ -4900,8 +4898,8 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($outStage);
         /** @var array<string, string> $outBody */
         $outBody = $outStage['$out'];
-        $this->assertEquals('analytics_db', $outBody['db']);
-        $this->assertEquals('results', $outBody['coll']);
+        $this->assertSame('analytics_db', $outBody['db']);
+        $this->assertSame('results', $outBody['coll']);
     }
 
     public function testOutputIsLastPipelineStage(): void
@@ -4949,7 +4947,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -4957,7 +4955,7 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($replaceRootStage);
         /** @var array<string, mixed> $replaceRootBody */
         $replaceRootBody = $replaceRootStage['$replaceRoot'];
-        $this->assertEquals('$profile', $replaceRootBody['newRoot']);
+        $this->assertSame('$profile', $replaceRootBody['newRoot']);
     }
 
     public function testAtlasSearch(): void
@@ -4969,15 +4967,15 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
         $this->assertArrayHasKey('$search', $pipeline[0]);
         /** @var array<string, mixed> $searchBody */
         $searchBody = $pipeline[0]['$search'];
-        $this->assertEquals('default', $searchBody['index']);
-        $this->assertEquals(['query' => 'mongodb', 'path' => 'content'], $searchBody['text']);
+        $this->assertSame('default', $searchBody['index']);
+        $this->assertSame(['query' => 'mongodb', 'path' => 'content'], $searchBody['text']);
     }
 
     public function testAtlasSearchWithoutIndex(): void
@@ -5021,7 +5019,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -5038,19 +5036,19 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
+        $this->assertSame('aggregate', $op['operation']);
 
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
         $this->assertArrayHasKey('$vectorSearch', $pipeline[0]);
         /** @var array<string, mixed> $vectorSearchBody */
         $vectorSearchBody = $pipeline[0]['$vectorSearch'];
-        $this->assertEquals('embedding', $vectorSearchBody['path']);
-        $this->assertEquals([0.1, 0.2, 0.3], $vectorSearchBody['queryVector']);
-        $this->assertEquals(100, $vectorSearchBody['numCandidates']);
-        $this->assertEquals(10, $vectorSearchBody['limit']);
-        $this->assertEquals('vector_index', $vectorSearchBody['index']);
-        $this->assertEquals(['category' => 'electronics'], $vectorSearchBody['filter']);
+        $this->assertSame('embedding', $vectorSearchBody['path']);
+        $this->assertSame([0.1, 0.2, 0.3], $vectorSearchBody['queryVector']);
+        $this->assertSame(100, $vectorSearchBody['numCandidates']);
+        $this->assertSame(10, $vectorSearchBody['limit']);
+        $this->assertSame('vector_index', $vectorSearchBody['index']);
+        $this->assertSame(['category' => 'electronics'], $vectorSearchBody['filter']);
     }
 
     public function testVectorSearchWithoutOptionalFields(): void
@@ -5094,8 +5092,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('find', $op['operation']);
-        $this->assertEquals('idx_name', $op['hint']);
+        $this->assertSame('find', $op['operation']);
+        $this->assertSame('idx_name', $op['hint']);
     }
 
     public function testHintArrayOnFind(): void
@@ -5107,8 +5105,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('find', $op['operation']);
-        $this->assertEquals(['name' => 1, 'age' => -1], $op['hint']);
+        $this->assertSame('find', $op['operation']);
+        $this->assertSame(['name' => 1, 'age' => -1], $op['hint']);
     }
 
     public function testHintOnAggregate(): void
@@ -5121,8 +5119,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
-        $this->assertEquals('idx_name', $op['hint']);
+        $this->assertSame('aggregate', $op['operation']);
+        $this->assertSame('idx_name', $op['hint']);
     }
 
     public function testResetClearsNewProperties(): void
@@ -5176,7 +5174,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('find', $op['operation']);
+        $this->assertSame('find', $op['operation']);
     }
 
     public function testResetClearsSearchStages(): void
@@ -5192,7 +5190,7 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('find', $op['operation']);
+        $this->assertSame('find', $op['operation']);
     }
 
     public function testBucketReplacesGroupBy(): void
@@ -5263,7 +5261,7 @@ class MongoDBTest extends TestCase
         $this->assertNotNull($sortIdx);
         $this->assertNotNull($limitIdx);
 
-        $this->assertEquals(0, $searchIdx);
+        $this->assertSame(0, $searchIdx);
         $this->assertLessThan($matchIdx, $searchIdx);
         $this->assertLessThan($sortIdx, $matchIdx);
         $this->assertLessThan($limitIdx, $sortIdx);
@@ -5345,8 +5343,8 @@ class MongoDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('aggregate', $op['operation']);
-        $this->assertEquals('search_idx', $op['hint']);
+        $this->assertSame('aggregate', $op['operation']);
+        $this->assertSame('search_idx', $op['hint']);
     }
 
     public function testReplaceRootAfterGroupBy(): void
@@ -5395,7 +5393,7 @@ class MongoDBTest extends TestCase
         $op = $this->decode($result->query);
         /** @var array<string, mixed> $update */
         $update = $op['update'];
-        $this->assertEquals(['quantity' => 2], $update['$mul']);
+        $this->assertSame(['quantity' => 2], $update['$mul']);
     }
 
     public function testBucketAutoWithFilter(): void

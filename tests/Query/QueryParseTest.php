@@ -15,8 +15,8 @@ class QueryParseTest extends TestCase
         $json = '{"method":"equal","attribute":"name","values":["John"]}';
         $query = Query::parse($json);
         $this->assertSame(Method::Equal, $query->getMethod());
-        $this->assertEquals('name', $query->getAttribute());
-        $this->assertEquals(['John'], $query->getValues());
+        $this->assertSame('name', $query->getAttribute());
+        $this->assertSame(['John'], $query->getValues());
     }
 
     public function testParseInvalidJson(): void
@@ -59,8 +59,8 @@ class QueryParseTest extends TestCase
         $json = '{"method":"isNull"}';
         $query = Query::parse($json);
         $this->assertSame(Method::IsNull, $query->getMethod());
-        $this->assertEquals('', $query->getAttribute());
-        $this->assertEquals([], $query->getValues());
+        $this->assertSame('', $query->getAttribute());
+        $this->assertSame([], $query->getValues());
     }
 
     public function testParseQueryFromArray(): void
@@ -88,7 +88,7 @@ class QueryParseTest extends TestCase
         $this->assertSame(Method::Or, $query->getMethod());
         $this->assertCount(2, $query->getValues());
         $this->assertInstanceOf(Query::class, $query->getValues()[0]);
-        $this->assertEquals('John', $query->getValues()[0]->getValue());
+        $this->assertSame('John', $query->getValues()[0]->getValue());
     }
 
     public function testParseQueries(): void
@@ -106,7 +106,7 @@ class QueryParseTest extends TestCase
     {
         $query = Query::equal('name', ['John']);
         $array = $query->toArray();
-        $this->assertEquals([
+        $this->assertSame([
             'method' => 'equal',
             'attribute' => 'name',
             'values' => ['John'],
@@ -118,7 +118,7 @@ class QueryParseTest extends TestCase
         $query = Query::limit(25);
         $array = $query->toArray();
         $this->assertArrayNotHasKey('attribute', $array);
-        $this->assertEquals(['method' => 'limit', 'values' => [25]], $array);
+        $this->assertSame(['method' => 'limit', 'values' => [25]], $array);
     }
 
     public function testToArrayNested(): void
@@ -128,15 +128,15 @@ class QueryParseTest extends TestCase
             Query::greaterThan('age', 18),
         ]);
         $array = $query->toArray();
-        $this->assertEquals('or', $array['method']);
+        $this->assertSame('or', $array['method']);
 
         $values = $array['values'] ?? [];
         $this->assertIsArray($values);
         $this->assertCount(2, $values);
         $this->assertIsArray($values[0]);
         $this->assertIsArray($values[1]);
-        $this->assertEquals('equal', $values[0]['method']);
-        $this->assertEquals('greaterThan', $values[1]['method']);
+        $this->assertSame('equal', $values[0]['method']);
+        $this->assertSame('greaterThan', $values[1]['method']);
     }
 
     public function testToString(): void
@@ -146,9 +146,9 @@ class QueryParseTest extends TestCase
 
         /** @var array<string, mixed> $decoded */
         $decoded = json_decode($string, true);
-        $this->assertEquals('equal', $decoded['method']);
-        $this->assertEquals('name', $decoded['attribute']);
-        $this->assertEquals(['John'], $decoded['values']);
+        $this->assertSame('equal', $decoded['method']);
+        $this->assertSame('name', $decoded['attribute']);
+        $this->assertSame(['John'], $decoded['values']);
     }
 
     public function testToStringNested(): void
@@ -160,7 +160,7 @@ class QueryParseTest extends TestCase
 
         /** @var array<string, mixed> $decoded */
         $decoded = json_decode($string, true);
-        $this->assertEquals('and', $decoded['method']);
+        $this->assertSame('and', $decoded['method']);
 
         $values = $decoded['values'] ?? [];
         $this->assertIsArray($values);
@@ -172,9 +172,9 @@ class QueryParseTest extends TestCase
         $original = Query::equal('name', ['John']);
         $json = $original->toString();
         $parsed = Query::parse($json);
-        $this->assertEquals($original->getMethod(), $parsed->getMethod());
-        $this->assertEquals($original->getAttribute(), $parsed->getAttribute());
-        $this->assertEquals($original->getValues(), $parsed->getValues());
+        $this->assertSame($original->getMethod(), $parsed->getMethod());
+        $this->assertSame($original->getAttribute(), $parsed->getAttribute());
+        $this->assertSame($original->getValues(), $parsed->getValues());
     }
 
     public function testRoundTripNestedParseSerialization(): void
@@ -185,7 +185,7 @@ class QueryParseTest extends TestCase
         ]);
         $json = $original->toString();
         $parsed = Query::parse($json);
-        $this->assertEquals($original->getMethod(), $parsed->getMethod());
+        $this->assertSame($original->getMethod(), $parsed->getMethod());
         $this->assertCount(2, $parsed->getValues());
         $this->assertInstanceOf(Query::class, $parsed->getValues()[0]);
     }
@@ -196,8 +196,8 @@ class QueryParseTest extends TestCase
         $json = $original->toString();
         $parsed = Query::parse($json);
         $this->assertSame(Method::Count, $parsed->getMethod());
-        $this->assertEquals('id', $parsed->getAttribute());
-        $this->assertEquals(['total'], $parsed->getValues());
+        $this->assertSame('id', $parsed->getAttribute());
+        $this->assertSame(['total'], $parsed->getValues());
     }
 
     public function testRoundTripSum(): void
@@ -206,7 +206,7 @@ class QueryParseTest extends TestCase
         $json = $original->toString();
         $parsed = Query::parse($json);
         $this->assertSame(Method::Sum, $parsed->getMethod());
-        $this->assertEquals('price', $parsed->getAttribute());
+        $this->assertSame('price', $parsed->getAttribute());
     }
 
     public function testRoundTripGroupBy(): void
@@ -215,7 +215,7 @@ class QueryParseTest extends TestCase
         $json = $original->toString();
         $parsed = Query::parse($json);
         $this->assertSame(Method::GroupBy, $parsed->getMethod());
-        $this->assertEquals(['status', 'country'], $parsed->getValues());
+        $this->assertSame(['status', 'country'], $parsed->getValues());
     }
 
     public function testRoundTripHaving(): void
@@ -242,8 +242,8 @@ class QueryParseTest extends TestCase
         $json = $original->toString();
         $parsed = Query::parse($json);
         $this->assertSame(Method::Join, $parsed->getMethod());
-        $this->assertEquals('orders', $parsed->getAttribute());
-        $this->assertEquals(['users.id', '=', 'orders.user_id'], $parsed->getValues());
+        $this->assertSame('orders', $parsed->getAttribute());
+        $this->assertSame(['users.id', '=', 'orders.user_id'], $parsed->getValues());
     }
 
     public function testRoundTripCrossJoin(): void
@@ -252,7 +252,7 @@ class QueryParseTest extends TestCase
         $json = $original->toString();
         $parsed = Query::parse($json);
         $this->assertSame(Method::CrossJoin, $parsed->getMethod());
-        $this->assertEquals('colors', $parsed->getAttribute());
+        $this->assertSame('colors', $parsed->getAttribute());
     }
 
     /**
@@ -266,8 +266,8 @@ class QueryParseTest extends TestCase
         $json = $original->toString();
         $parsed = Query::parse($json, allowRaw: true);
         $this->assertSame(Method::Raw, $parsed->getMethod());
-        $this->assertEquals('score > ?', $parsed->getAttribute());
-        $this->assertEquals([10], $parsed->getValues());
+        $this->assertSame('score > ?', $parsed->getAttribute());
+        $this->assertSame([10], $parsed->getValues());
     }
 
     public function testRoundTripUnion(): void
@@ -288,8 +288,8 @@ class QueryParseTest extends TestCase
         $json = $original->toString();
         $parsed = Query::parse($json);
         $this->assertSame(Method::Avg, $parsed->getMethod());
-        $this->assertEquals('score', $parsed->getAttribute());
-        $this->assertEquals(['avg_score'], $parsed->getValues());
+        $this->assertSame('score', $parsed->getAttribute());
+        $this->assertSame(['avg_score'], $parsed->getValues());
     }
 
     public function testRoundTripMin(): void
@@ -298,8 +298,8 @@ class QueryParseTest extends TestCase
         $json = $original->toString();
         $parsed = Query::parse($json);
         $this->assertSame(Method::Min, $parsed->getMethod());
-        $this->assertEquals('price', $parsed->getAttribute());
-        $this->assertEquals([], $parsed->getValues());
+        $this->assertSame('price', $parsed->getAttribute());
+        $this->assertSame([], $parsed->getValues());
     }
 
     public function testRoundTripMax(): void
@@ -308,7 +308,7 @@ class QueryParseTest extends TestCase
         $json = $original->toString();
         $parsed = Query::parse($json);
         $this->assertSame(Method::Max, $parsed->getMethod());
-        $this->assertEquals(['oldest'], $parsed->getValues());
+        $this->assertSame(['oldest'], $parsed->getValues());
     }
 
     public function testRoundTripCountWithoutAlias(): void
@@ -317,8 +317,8 @@ class QueryParseTest extends TestCase
         $json = $original->toString();
         $parsed = Query::parse($json);
         $this->assertSame(Method::Count, $parsed->getMethod());
-        $this->assertEquals('id', $parsed->getAttribute());
-        $this->assertEquals([], $parsed->getValues());
+        $this->assertSame('id', $parsed->getAttribute());
+        $this->assertSame([], $parsed->getValues());
     }
 
     public function testRoundTripGroupByEmpty(): void
@@ -327,7 +327,7 @@ class QueryParseTest extends TestCase
         $json = $original->toString();
         $parsed = Query::parse($json);
         $this->assertSame(Method::GroupBy, $parsed->getMethod());
-        $this->assertEquals([], $parsed->getValues());
+        $this->assertSame([], $parsed->getValues());
     }
 
     public function testRoundTripHavingMultiple(): void
@@ -349,8 +349,8 @@ class QueryParseTest extends TestCase
         $json = $original->toString();
         $parsed = Query::parse($json);
         $this->assertSame(Method::LeftJoin, $parsed->getMethod());
-        $this->assertEquals('profiles', $parsed->getAttribute());
-        $this->assertEquals(['u.id', '=', 'p.uid'], $parsed->getValues());
+        $this->assertSame('profiles', $parsed->getAttribute());
+        $this->assertSame(['u.id', '=', 'p.uid'], $parsed->getValues());
     }
 
     public function testRoundTripRightJoin(): void
@@ -366,7 +366,7 @@ class QueryParseTest extends TestCase
         $original = Query::join('t', 'a.val', 'b.val', '!=');
         $json = $original->toString();
         $parsed = Query::parse($json);
-        $this->assertEquals(['a.val', '!=', 'b.val'], $parsed->getValues());
+        $this->assertSame(['a.val', '!=', 'b.val'], $parsed->getValues());
     }
 
     public function testRoundTripUnionAll(): void
@@ -389,8 +389,8 @@ class QueryParseTest extends TestCase
         $json = $original->toString();
         $parsed = Query::parse($json, allowRaw: true);
         $this->assertSame(Method::Raw, $parsed->getMethod());
-        $this->assertEquals('1 = 1', $parsed->getAttribute());
-        $this->assertEquals([], $parsed->getValues());
+        $this->assertSame('1 = 1', $parsed->getAttribute());
+        $this->assertSame([], $parsed->getValues());
     }
 
     /**
@@ -402,7 +402,7 @@ class QueryParseTest extends TestCase
         $original = Query::raw('a > ? AND b < ?', [10, 20]);
         $json = $original->toString();
         $parsed = Query::parse($json, allowRaw: true);
-        $this->assertEquals([10, 20], $parsed->getValues());
+        $this->assertSame([10, 20], $parsed->getValues());
     }
 
     public function testParseQueryRejectsRawByDefault(): void
@@ -444,8 +444,8 @@ class QueryParseTest extends TestCase
         $json = '{"method":"raw","attribute":"score > ?","values":[10]}';
         $parsed = Query::parse($json, allowRaw: true);
         $this->assertSame(Method::Raw, $parsed->getMethod());
-        $this->assertEquals('score > ?', $parsed->getAttribute());
-        $this->assertEquals([10], $parsed->getValues());
+        $this->assertSame('score > ?', $parsed->getAttribute());
+        $this->assertSame([10], $parsed->getValues());
     }
 
     public function testParseQueryAcceptsRawInParseQueryWhenOptedIn(): void
@@ -547,20 +547,20 @@ class QueryParseTest extends TestCase
     public function testParseMissingAttributeDefaultsToEmpty(): void
     {
         $query = Query::parse('{"method":"isNull","values":[]}');
-        $this->assertEquals('', $query->getAttribute());
+        $this->assertSame('', $query->getAttribute());
     }
 
     public function testParseMissingValuesDefaultsToEmpty(): void
     {
         $query = Query::parse('{"method":"isNull"}');
-        $this->assertEquals([], $query->getValues());
+        $this->assertSame([], $query->getValues());
     }
 
     public function testParseExtraFieldsIgnored(): void
     {
         $query = Query::parse('{"method":"equal","attribute":"x","values":[1],"extra":"ignored"}');
         $this->assertSame(Method::Equal, $query->getMethod());
-        $this->assertEquals('x', $query->getAttribute());
+        $this->assertSame('x', $query->getAttribute());
     }
 
     public function testParseNonObjectJsonThrows(): void
@@ -579,62 +579,62 @@ class QueryParseTest extends TestCase
     {
         $query = Query::count('id', 'total');
         $array = $query->toArray();
-        $this->assertEquals('count', $array['method']);
-        $this->assertEquals('id', $array['attribute']);
-        $this->assertEquals(['total'], $array['values']);
+        $this->assertSame('count', $array['method']);
+        $this->assertSame('id', $array['attribute']);
+        $this->assertSame(['total'], $array['values']);
     }
 
     public function testToArrayCountWithoutAlias(): void
     {
         $query = Query::count();
         $array = $query->toArray();
-        $this->assertEquals('count', $array['method']);
-        $this->assertEquals('*', $array['attribute']);
-        $this->assertEquals([], $array['values']);
+        $this->assertSame('count', $array['method']);
+        $this->assertSame('*', $array['attribute']);
+        $this->assertSame([], $array['values']);
     }
 
     public function testToArrayDistinct(): void
     {
         $query = Query::distinct();
         $array = $query->toArray();
-        $this->assertEquals('distinct', $array['method']);
+        $this->assertSame('distinct', $array['method']);
         $this->assertArrayNotHasKey('attribute', $array);
-        $this->assertEquals([], $array['values']);
+        $this->assertSame([], $array['values']);
     }
 
     public function testToArrayJoinPreservesOperator(): void
     {
         $query = Query::join('t', 'a', 'b', '!=');
         $array = $query->toArray();
-        $this->assertEquals(['a', '!=', 'b'], $array['values']);
+        $this->assertSame(['a', '!=', 'b'], $array['values']);
     }
 
     public function testToArrayCrossJoin(): void
     {
         $query = Query::crossJoin('t');
         $array = $query->toArray();
-        $this->assertEquals('crossJoin', $array['method']);
-        $this->assertEquals('t', $array['attribute']);
-        $this->assertEquals([], $array['values']);
+        $this->assertSame('crossJoin', $array['method']);
+        $this->assertSame('t', $array['attribute']);
+        $this->assertSame([], $array['values']);
     }
 
     public function testToArrayHaving(): void
     {
         $query = Query::having([Query::greaterThan('x', 1), Query::lessThan('y', 10)]);
         $array = $query->toArray();
-        $this->assertEquals('having', $array['method']);
+        $this->assertSame('having', $array['method']);
 
         /** @var array<int, array<string, mixed>> $values */
         $values = $array['values'] ?? [];
         $this->assertCount(2, $values);
-        $this->assertEquals('greaterThan', $values[0]['method']);
+        $this->assertSame('greaterThan', $values[0]['method']);
     }
 
     public function testToArrayUnionAll(): void
     {
         $query = Query::unionAll([Query::equal('x', [1])]);
         $array = $query->toArray();
-        $this->assertEquals('unionAll', $array['method']);
+        $this->assertSame('unionAll', $array['method']);
 
         /** @var array<int, array<string, mixed>> $values */
         $values = $array['values'] ?? [];
@@ -645,9 +645,9 @@ class QueryParseTest extends TestCase
     {
         $query = Query::raw('a > ?', [10]);
         $array = $query->toArray();
-        $this->assertEquals('raw', $array['method']);
-        $this->assertEquals('a > ?', $array['attribute']);
-        $this->assertEquals([10], $array['values']);
+        $this->assertSame('raw', $array['method']);
+        $this->assertSame('a > ?', $array['attribute']);
+        $this->assertSame([10], $array['values']);
     }
 
     public function testParseQueriesEmpty(): void
@@ -677,8 +677,8 @@ class QueryParseTest extends TestCase
         $json = $query->toString();
         $decoded = json_decode($json, true);
         $this->assertIsArray($decoded);
-        $this->assertEquals('groupBy', $decoded['method']);
-        $this->assertEquals(['a', 'b'], $decoded['values']);
+        $this->assertSame('groupBy', $decoded['method']);
+        $this->assertSame(['a', 'b'], $decoded['values']);
     }
 
     public function testToStringRawProducesValidJson(): void
@@ -687,8 +687,8 @@ class QueryParseTest extends TestCase
         $json = $query->toString();
         $decoded = json_decode($json, true);
         $this->assertIsArray($decoded);
-        $this->assertEquals('raw', $decoded['method']);
-        $this->assertEquals('x > ? AND y < ?', $decoded['attribute']);
-        $this->assertEquals([1, 2], $decoded['values']);
+        $this->assertSame('raw', $decoded['method']);
+        $this->assertSame('x > ? AND y < ?', $decoded['attribute']);
+        $this->assertSame([1, 2], $decoded['values']);
     }
 }

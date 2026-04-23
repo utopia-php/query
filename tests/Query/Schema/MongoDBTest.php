@@ -23,15 +23,15 @@ class MongoDBTest extends TestCase
         });
 
         $op = $this->decode($result->query);
-        $this->assertEquals('createCollection', $op['command']);
-        $this->assertEquals('users', $op['collection']);
+        $this->assertSame('createCollection', $op['command']);
+        $this->assertSame('users', $op['collection']);
         $this->assertArrayHasKey('validator', $op);
         /** @var array<string, mixed> $validator */
         $validator = $op['validator'];
         $this->assertArrayHasKey('$jsonSchema', $validator);
         /** @var array<string, mixed> $jsonSchema */
         $jsonSchema = $validator['$jsonSchema'];
-        $this->assertEquals('object', $jsonSchema['bsonType']);
+        $this->assertSame('object', $jsonSchema['bsonType']);
         /** @var array<string, mixed> $properties */
         $properties = $jsonSchema['properties'];
         $this->assertArrayHasKey('id', $properties);
@@ -58,13 +58,13 @@ class MongoDBTest extends TestCase
         $jsonSchema = $validator['$jsonSchema'];
         /** @var array<string, array<string, mixed>> $props */
         $props = $jsonSchema['properties'];
-        $this->assertEquals('int', $props['id']['bsonType']);
-        $this->assertEquals('string', $props['title']['bsonType']);
-        $this->assertEquals('string', $props['body']['bsonType']);
-        $this->assertEquals('int', $props['views']['bsonType']);
-        $this->assertEquals('double', $props['rating']['bsonType']);
-        $this->assertEquals('bool', $props['published']['bsonType']);
-        $this->assertEquals('date', $props['created_at']['bsonType']);
+        $this->assertSame('int', $props['id']['bsonType']);
+        $this->assertSame('string', $props['title']['bsonType']);
+        $this->assertSame('string', $props['body']['bsonType']);
+        $this->assertSame('int', $props['views']['bsonType']);
+        $this->assertSame('double', $props['rating']['bsonType']);
+        $this->assertSame('bool', $props['published']['bsonType']);
+        $this->assertSame('date', $props['created_at']['bsonType']);
     }
 
     public function testCreateCollectionWithEnumValidation(): void
@@ -83,8 +83,8 @@ class MongoDBTest extends TestCase
         /** @var array<string, array<string, mixed>> $properties */
         $properties = $jsonSchema['properties'];
         $statusProp = $properties['status'];
-        $this->assertEquals('string', $statusProp['bsonType']);
-        $this->assertEquals(['pending', 'active', 'completed'], $statusProp['enum']);
+        $this->assertSame('string', $statusProp['bsonType']);
+        $this->assertSame(['pending', 'active', 'completed'], $statusProp['enum']);
     }
 
     public function testCreateCollectionWithRequired(): void
@@ -128,8 +128,8 @@ class MongoDBTest extends TestCase
         $result = $schema->drop('users');
 
         $op = $this->decode($result->query);
-        $this->assertEquals('drop', $op['command']);
-        $this->assertEquals('users', $op['collection']);
+        $this->assertSame('drop', $op['command']);
+        $this->assertSame('users', $op['collection']);
     }
 
     public function testDropIfExists(): void
@@ -138,8 +138,8 @@ class MongoDBTest extends TestCase
         $result = $schema->dropIfExists('users');
 
         $op = $this->decode($result->query);
-        $this->assertEquals('drop', $op['command']);
-        $this->assertEquals('users', $op['collection']);
+        $this->assertSame('drop', $op['command']);
+        $this->assertSame('users', $op['collection']);
     }
 
     public function testRename(): void
@@ -148,9 +148,9 @@ class MongoDBTest extends TestCase
         $result = $schema->rename('old_users', 'new_users');
 
         $op = $this->decode($result->query);
-        $this->assertEquals('renameCollection', $op['command']);
-        $this->assertEquals('old_users', $op['from']);
-        $this->assertEquals('new_users', $op['to']);
+        $this->assertSame('renameCollection', $op['command']);
+        $this->assertSame('old_users', $op['from']);
+        $this->assertSame('new_users', $op['to']);
     }
 
     public function testTruncate(): void
@@ -159,8 +159,8 @@ class MongoDBTest extends TestCase
         $result = $schema->truncate('users');
 
         $op = $this->decode($result->query);
-        $this->assertEquals('deleteMany', $op['command']);
-        $this->assertEquals('users', $op['collection']);
+        $this->assertSame('deleteMany', $op['command']);
+        $this->assertSame('users', $op['collection']);
     }
 
     public function testCreateIndex(): void
@@ -169,12 +169,12 @@ class MongoDBTest extends TestCase
         $result = $schema->createIndex('users', 'idx_email', ['email'], true);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('createIndex', $op['command']);
-        $this->assertEquals('users', $op['collection']);
+        $this->assertSame('createIndex', $op['command']);
+        $this->assertSame('users', $op['collection']);
         /** @var array<string, mixed> $index */
         $index = $op['index'];
-        $this->assertEquals(['email' => 1], $index['key']);
-        $this->assertEquals('idx_email', $index['name']);
+        $this->assertSame(['email' => 1], $index['key']);
+        $this->assertSame('idx_email', $index['name']);
         $this->assertTrue($index['unique']);
     }
 
@@ -191,7 +191,7 @@ class MongoDBTest extends TestCase
         $op = $this->decode($result->query);
         /** @var array<string, mixed> $index */
         $index = $op['index'];
-        $this->assertEquals(['user_id' => 1, 'action' => -1], $index['key']);
+        $this->assertSame(['user_id' => 1, 'action' => -1], $index['key']);
     }
 
     public function testDropIndex(): void
@@ -200,9 +200,9 @@ class MongoDBTest extends TestCase
         $result = $schema->dropIndex('users', 'idx_email');
 
         $op = $this->decode($result->query);
-        $this->assertEquals('dropIndex', $op['command']);
-        $this->assertEquals('users', $op['collection']);
-        $this->assertEquals('idx_email', $op['index']);
+        $this->assertSame('dropIndex', $op['command']);
+        $this->assertSame('users', $op['collection']);
+        $this->assertSame('idx_email', $op['index']);
     }
 
     public function testAnalyzeTable(): void
@@ -211,8 +211,8 @@ class MongoDBTest extends TestCase
         $result = $schema->analyzeTable('users');
 
         $op = $this->decode($result->query);
-        $this->assertEquals('collStats', $op['command']);
-        $this->assertEquals('users', $op['collection']);
+        $this->assertSame('collStats', $op['command']);
+        $this->assertSame('users', $op['collection']);
     }
 
     public function testCreateDatabase(): void
@@ -221,8 +221,8 @@ class MongoDBTest extends TestCase
         $result = $schema->createDatabase('mydb');
 
         $op = $this->decode($result->query);
-        $this->assertEquals('createDatabase', $op['command']);
-        $this->assertEquals('mydb', $op['database']);
+        $this->assertSame('createDatabase', $op['command']);
+        $this->assertSame('mydb', $op['database']);
     }
 
     public function testDropDatabase(): void
@@ -231,8 +231,8 @@ class MongoDBTest extends TestCase
         $result = $schema->dropDatabase('mydb');
 
         $op = $this->decode($result->query);
-        $this->assertEquals('dropDatabase', $op['command']);
-        $this->assertEquals('mydb', $op['database']);
+        $this->assertSame('dropDatabase', $op['command']);
+        $this->assertSame('mydb', $op['database']);
     }
 
     public function testAlter(): void
@@ -244,8 +244,8 @@ class MongoDBTest extends TestCase
         });
 
         $op = $this->decode($result->query);
-        $this->assertEquals('collMod', $op['command']);
-        $this->assertEquals('users', $op['collection']);
+        $this->assertSame('collMod', $op['command']);
+        $this->assertSame('users', $op['collection']);
         $this->assertArrayHasKey('validator', $op);
         /** @var array<string, mixed> $validator */
         $validator = $op['validator'];
@@ -272,7 +272,7 @@ class MongoDBTest extends TestCase
         /** @var array<string, array<string, mixed>> $properties */
         $properties = $jsonSchema['properties'];
         $nameProp = $properties['name'];
-        $this->assertEquals('The display name', $nameProp['description']);
+        $this->assertSame('The display name', $nameProp['description']);
     }
 
     public function testAlterWithMultipleColumns(): void
@@ -285,7 +285,7 @@ class MongoDBTest extends TestCase
         });
 
         $op = $this->decode($result->query);
-        $this->assertEquals('collMod', $op['command']);
+        $this->assertSame('collMod', $op['command']);
         /** @var array<string, mixed> $validator */
         $validator = $op['validator'];
         /** @var array<string, mixed> $jsonSchema */
@@ -316,7 +316,7 @@ class MongoDBTest extends TestCase
         $jsonSchema = $validator['$jsonSchema'];
         /** @var array<string, array<string, mixed>> $props */
         $props = $jsonSchema['properties'];
-        $this->assertEquals('User phone number', $props['phone']['description']);
+        $this->assertSame('User phone number', $props['phone']['description']);
     }
 
     public function testAlterDropColumnThrows(): void
@@ -352,11 +352,11 @@ class MongoDBTest extends TestCase
         $result = $schema->createView('active_users', $builder);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('createView', $op['command']);
-        $this->assertEquals('active_users', $op['view']);
-        $this->assertEquals('users', $op['source']);
+        $this->assertSame('createView', $op['command']);
+        $this->assertSame('active_users', $op['view']);
+        $this->assertSame('users', $op['source']);
         $this->assertArrayHasKey('pipeline', $op);
-        $this->assertEquals([true], $result->bindings);
+        $this->assertSame([true], $result->bindings);
     }
 
     public function testCreateViewFromAggregation(): void
@@ -370,9 +370,9 @@ class MongoDBTest extends TestCase
         $result = $schema->createView('order_counts', $builder);
 
         $op = $this->decode($result->query);
-        $this->assertEquals('createView', $op['command']);
-        $this->assertEquals('order_counts', $op['view']);
-        $this->assertEquals('orders', $op['source']);
+        $this->assertSame('createView', $op['command']);
+        $this->assertSame('order_counts', $op['view']);
+        $this->assertSame('orders', $op['source']);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
         $this->assertNotEmpty($pipeline);
@@ -398,13 +398,13 @@ class MongoDBTest extends TestCase
         $jsonSchema = $validator['$jsonSchema'];
         /** @var array<string, array<string, mixed>> $props */
         $props = $jsonSchema['properties'];
-        $this->assertEquals('object', $props['meta']['bsonType']);
-        $this->assertEquals('binData', $props['data']['bsonType']);
-        $this->assertEquals('object', $props['location']['bsonType']);
-        $this->assertEquals('object', $props['path']['bsonType']);
-        $this->assertEquals('object', $props['area']['bsonType']);
-        $this->assertEquals('string', $props['uid']['bsonType']);
-        $this->assertEquals('array', $props['embedding']['bsonType']);
+        $this->assertSame('object', $props['meta']['bsonType']);
+        $this->assertSame('binData', $props['data']['bsonType']);
+        $this->assertSame('object', $props['location']['bsonType']);
+        $this->assertSame('object', $props['path']['bsonType']);
+        $this->assertSame('object', $props['area']['bsonType']);
+        $this->assertSame('string', $props['uid']['bsonType']);
+        $this->assertSame('array', $props['embedding']['bsonType']);
     }
 
     /**

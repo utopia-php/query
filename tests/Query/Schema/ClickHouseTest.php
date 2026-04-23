@@ -149,7 +149,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertEquals('ALTER TABLE `events` ADD COLUMN `score` Float64', $result->query);
+        $this->assertSame('ALTER TABLE `events` ADD COLUMN `score` Float64', $result->query);
     }
 
     public function testAlterModifyColumn(): void
@@ -160,7 +160,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertEquals('ALTER TABLE `events` MODIFY COLUMN `name` String', $result->query);
+        $this->assertSame('ALTER TABLE `events` MODIFY COLUMN `name` String', $result->query);
     }
 
     public function testAlterRenameColumn(): void
@@ -171,7 +171,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertEquals('ALTER TABLE `events` RENAME COLUMN `old` TO `new`', $result->query);
+        $this->assertSame('ALTER TABLE `events` RENAME COLUMN `old` TO `new`', $result->query);
     }
 
     public function testAlterDropColumn(): void
@@ -182,7 +182,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertEquals('ALTER TABLE `events` DROP COLUMN `old_col`', $result->query);
+        $this->assertSame('ALTER TABLE `events` DROP COLUMN `old_col`', $result->query);
     }
 
     public function testAlterForeignKeyThrows(): void
@@ -203,7 +203,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->drop('events');
         $this->assertBindingCount($result);
 
-        $this->assertEquals('DROP TABLE `events`', $result->query);
+        $this->assertSame('DROP TABLE `events`', $result->query);
     }
 
     public function testTruncateTable(): void
@@ -212,7 +212,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->truncate('events');
         $this->assertBindingCount($result);
 
-        $this->assertEquals('TRUNCATE TABLE `events`', $result->query);
+        $this->assertSame('TRUNCATE TABLE `events`', $result->query);
     }
     // VIEW
 
@@ -222,11 +222,11 @@ class ClickHouseTest extends TestCase
         $builder = (new ClickHouseBuilder())->from('events')->filter([Query::equal('status', ['active'])]);
         $result = $schema->createView('active_events', $builder);
 
-        $this->assertEquals(
+        $this->assertSame(
             'CREATE VIEW `active_events` AS SELECT * FROM `events` WHERE `status` IN (?)',
             $result->query
         );
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testDropView(): void
@@ -234,7 +234,7 @@ class ClickHouseTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropView('active_events');
 
-        $this->assertEquals('DROP VIEW `active_events`', $result->query);
+        $this->assertSame('DROP VIEW `active_events`', $result->query);
     }
     // DROP INDEX (ClickHouse-specific)
 
@@ -243,7 +243,7 @@ class ClickHouseTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropIndex('events', 'idx_name');
 
-        $this->assertEquals('ALTER TABLE `events` DROP INDEX `idx_name`', $result->query);
+        $this->assertSame('ALTER TABLE `events` DROP INDEX `idx_name`', $result->query);
     }
     // Feature interface checks — ClickHouse does NOT implement these
 
@@ -269,7 +269,7 @@ class ClickHouseTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropIfExists('events');
 
-        $this->assertEquals('DROP TABLE IF EXISTS `events`', $result->query);
+        $this->assertSame('DROP TABLE IF EXISTS `events`', $result->query);
     }
 
     public function testCreateTableWithDefaultValue(): void
@@ -444,7 +444,7 @@ class ClickHouseTest extends TestCase
             'CREATE TABLE `metrics` (`id` Int64, `name` String, `value` Float64, `recorded_at` DateTime64(3)) ENGINE = MergeTree() ORDER BY (`id`)',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
         $this->assertBindingCount($result);
     }
 
@@ -459,7 +459,7 @@ class ClickHouseTest extends TestCase
             'ALTER TABLE `metrics` ADD COLUMN `description` Nullable(String)',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
         $this->assertBindingCount($result);
     }
 
@@ -469,7 +469,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->drop('metrics');
 
         $this->assertSame('DROP TABLE `metrics`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
         $this->assertBindingCount($result);
     }
 
@@ -494,7 +494,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->commentOnTable('events', 'Main events table');
 
         $this->assertSame("ALTER TABLE `events` MODIFY COMMENT 'Main events table'", $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCommentOnColumn(): void
@@ -503,7 +503,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->commentOnColumn('events', 'name', 'Event name');
 
         $this->assertSame("ALTER TABLE `events` COMMENT COLUMN `name` 'Event name'", $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testDropPartition(): void
@@ -512,7 +512,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->dropPartition('events', '202401');
 
         $this->assertSame("ALTER TABLE `events` DROP PARTITION '202401'", $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCreateTableWithPartition(): void

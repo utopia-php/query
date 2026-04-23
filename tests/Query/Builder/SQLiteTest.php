@@ -42,7 +42,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY RANDOM()', $result->query);
+        $this->assertSame('SELECT * FROM `t` ORDER BY RANDOM()', $result->query);
     }
 
     public function testRegexThrowsUnsupported(): void
@@ -86,11 +86,11 @@ class SQLiteTest extends TestCase
             ->upsert();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT INTO `users` (`id`, `name`, `email`) VALUES (?, ?, ?) ON CONFLICT (`id`) DO UPDATE SET `name` = excluded.`name`, `email` = excluded.`email`',
             $result->query
         );
-        $this->assertEquals([1, 'Alice', 'a@b.com'], $result->bindings);
+        $this->assertSame([1, 'Alice', 'a@b.com'], $result->bindings);
     }
 
     public function testUpsertMultipleConflictKeys(): void
@@ -102,11 +102,11 @@ class SQLiteTest extends TestCase
             ->upsert();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT INTO `user_roles` (`user_id`, `role_id`, `granted_at`) VALUES (?, ?, ?) ON CONFLICT (`user_id`, `role_id`) DO UPDATE SET `granted_at` = excluded.`granted_at`',
             $result->query
         );
-        $this->assertEquals([1, 2, '2024-01-01'], $result->bindings);
+        $this->assertSame([1, 2, '2024-01-01'], $result->bindings);
     }
 
     public function testUpsertWithSetRaw(): void
@@ -129,11 +129,11 @@ class SQLiteTest extends TestCase
             ->insertOrIgnore();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT OR IGNORE INTO `users` (`name`, `email`) VALUES (?, ?)',
             $result->query
         );
-        $this->assertEquals(['John', 'john@example.com'], $result->bindings);
+        $this->assertSame(['John', 'john@example.com'], $result->bindings);
     }
 
     public function testInsertOrIgnoreBatch(): void
@@ -145,11 +145,11 @@ class SQLiteTest extends TestCase
             ->insertOrIgnore();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT OR IGNORE INTO `users` (`name`, `email`) VALUES (?, ?), (?, ?)',
             $result->query
         );
-        $this->assertEquals(['Alice', 'a@b.com', 'Bob', 'b@b.com'], $result->bindings);
+        $this->assertSame(['Alice', 'a@b.com', 'Bob', 'b@b.com'], $result->bindings);
     }
 
     public function testSetJsonAppend(): void
@@ -294,7 +294,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('COUNT(CASE WHEN status = ? THEN 1 END) AS `active_count`', $result->query);
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testCountWhenWithoutAlias(): void
@@ -318,7 +318,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('SUM(CASE WHEN status = ? THEN `amount` END) AS `total_active`', $result->query);
-        $this->assertEquals(['active'], $result->bindings);
+        $this->assertSame(['active'], $result->bindings);
     }
 
     public function testSumWhenWithoutAlias(): void
@@ -342,7 +342,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('AVG(CASE WHEN region = ? THEN `amount` END) AS `avg_east`', $result->query);
-        $this->assertEquals(['east'], $result->bindings);
+        $this->assertSame(['east'], $result->bindings);
     }
 
     public function testAvgWhenWithoutAlias(): void
@@ -366,7 +366,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('MIN(CASE WHEN category = ? THEN `price` END) AS `min_electronics`', $result->query);
-        $this->assertEquals(['electronics'], $result->bindings);
+        $this->assertSame(['electronics'], $result->bindings);
     }
 
     public function testMinWhenWithoutAlias(): void
@@ -390,7 +390,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('MAX(CASE WHEN category = ? THEN `price` END) AS `max_electronics`', $result->query);
-        $this->assertEquals(['electronics'], $result->bindings);
+        $this->assertSame(['electronics'], $result->bindings);
     }
 
     public function testMaxWhenWithoutAlias(): void
@@ -492,7 +492,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString("json_extract(`data`, '$.age') >= ?", $result->query);
-        $this->assertEquals(21, $result->bindings[0]);
+        $this->assertSame(21, $result->bindings[0]);
     }
 
     public function testFilterJsonPathInvalidPathThrows(): void
@@ -551,7 +551,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $count = substr_count($result->query, 'EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?))');
-        $this->assertEquals(3, $count);
+        $this->assertSame(3, $count);
         $this->assertStringContainsString(' AND ', $result->query);
     }
 
@@ -564,7 +564,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $count = substr_count($result->query, 'EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?))');
-        $this->assertEquals(3, $count);
+        $this->assertSame(3, $count);
         $this->assertStringContainsString(' OR ', $result->query);
     }
 
@@ -582,7 +582,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringNotContainsString('json_group_array', $result->query);
-        $this->assertEquals('UPDATE `t` SET `name` = ? WHERE `id` IN (?)', $result->query);
+        $this->assertSame('UPDATE `t` SET `name` = ? WHERE `id` IN (?)', $result->query);
     }
 
     public function testBasicSelect(): void
@@ -592,7 +592,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertSame('SELECT * FROM `t`', $result->query);
     }
 
     public function testSelectWithColumns(): void
@@ -603,7 +603,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT `name`, `email` FROM `users`', $result->query);
+        $this->assertSame('SELECT `name`, `email` FROM `users`', $result->query);
     }
 
     public function testFilterAndSort(): void
@@ -621,11 +621,11 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT `name` FROM `users` WHERE `status` IN (?) AND `age` > ? ORDER BY `name` ASC LIMIT ? OFFSET ?',
             $result->query
         );
-        $this->assertEquals(['active', 18, 10, 5], $result->bindings);
+        $this->assertSame(['active', 18, 10, 5], $result->bindings);
     }
 
     public function testInsertSingleRow(): void
@@ -636,11 +636,11 @@ class SQLiteTest extends TestCase
             ->insert();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT INTO `users` (`name`, `email`) VALUES (?, ?)',
             $result->query
         );
-        $this->assertEquals(['Alice', 'a@b.com'], $result->bindings);
+        $this->assertSame(['Alice', 'a@b.com'], $result->bindings);
     }
 
     public function testInsertBatch(): void
@@ -652,11 +652,11 @@ class SQLiteTest extends TestCase
             ->insert();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT INTO `users` (`name`, `email`) VALUES (?, ?), (?, ?)',
             $result->query
         );
-        $this->assertEquals(['Alice', 'a@b.com', 'Bob', 'b@b.com'], $result->bindings);
+        $this->assertSame(['Alice', 'a@b.com', 'Bob', 'b@b.com'], $result->bindings);
     }
 
     public function testUpdateWithWhere(): void
@@ -668,11 +668,11 @@ class SQLiteTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'UPDATE `users` SET `status` = ? WHERE `status` IN (?)',
             $result->query
         );
-        $this->assertEquals(['archived', 'inactive'], $result->bindings);
+        $this->assertSame(['archived', 'inactive'], $result->bindings);
     }
 
     public function testDeleteWithWhere(): void
@@ -683,11 +683,11 @@ class SQLiteTest extends TestCase
             ->delete();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'DELETE FROM `users` WHERE `last_login` < ?',
             $result->query
         );
-        $this->assertEquals(['2024-01-01'], $result->bindings);
+        $this->assertSame(['2024-01-01'], $result->bindings);
     }
 
     public function testDeleteWithoutWhere(): void
@@ -697,25 +697,25 @@ class SQLiteTest extends TestCase
             ->delete();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('DELETE FROM `users`', $result->query);
+        $this->assertSame('DELETE FROM `users`', $result->query);
     }
 
     public function testTransactionStatements(): void
     {
         $builder = new Builder();
 
-        $this->assertEquals('BEGIN', $builder->begin()->query);
-        $this->assertEquals('COMMIT', $builder->commit()->query);
-        $this->assertEquals('ROLLBACK', $builder->rollback()->query);
+        $this->assertSame('BEGIN', $builder->begin()->query);
+        $this->assertSame('COMMIT', $builder->commit()->query);
+        $this->assertSame('ROLLBACK', $builder->rollback()->query);
     }
 
     public function testSavepoint(): void
     {
         $builder = new Builder();
 
-        $this->assertEquals('SAVEPOINT `sp1`', $builder->savepoint('sp1')->query);
-        $this->assertEquals('RELEASE SAVEPOINT `sp1`', $builder->releaseSavepoint('sp1')->query);
-        $this->assertEquals('ROLLBACK TO SAVEPOINT `sp1`', $builder->rollbackToSavepoint('sp1')->query);
+        $this->assertSame('SAVEPOINT `sp1`', $builder->savepoint('sp1')->query);
+        $this->assertSame('RELEASE SAVEPOINT `sp1`', $builder->releaseSavepoint('sp1')->query);
+        $this->assertSame('ROLLBACK TO SAVEPOINT `sp1`', $builder->rollbackToSavepoint('sp1')->query);
     }
 
     public function testForUpdate(): void
@@ -821,7 +821,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('COUNT(CASE WHEN status = ? AND region = ? THEN 1 END) AS `combo`', $result->query);
-        $this->assertEquals(['active', 'east'], $result->bindings);
+        $this->assertSame(['active', 'east'], $result->bindings);
     }
 
     public function testSpatialDistanceGreaterThanThrows(): void
@@ -887,7 +887,7 @@ class SQLiteTest extends TestCase
             'INSERT INTO `settings` (`key`, `value`) VALUES (?, ?) ON CONFLICT (`key`) DO UPDATE SET `value` = excluded.`value`',
             $result->query
         );
-        $this->assertEquals(['theme', 'dark'], $result->bindings);
+        $this->assertSame(['theme', 'dark'], $result->bindings);
     }
 
     public function testExactInsertOrIgnoreQuery(): void
@@ -902,7 +902,7 @@ class SQLiteTest extends TestCase
             'INSERT OR IGNORE INTO `t` (`id`, `name`) VALUES (?, ?)',
             $result->query
         );
-        $this->assertEquals([1, 'test'], $result->bindings);
+        $this->assertSame([1, 'test'], $result->bindings);
     }
 
     public function testExactCountWhenQuery(): void
@@ -917,7 +917,7 @@ class SQLiteTest extends TestCase
             'SELECT COUNT(CASE WHEN active = ? THEN 1 END) AS `active_count` FROM `t`',
             $result->query
         );
-        $this->assertEquals([1], $result->bindings);
+        $this->assertSame([1], $result->bindings);
     }
 
     public function testExactSumWhenQuery(): void
@@ -932,7 +932,7 @@ class SQLiteTest extends TestCase
             'SELECT SUM(CASE WHEN type = ? THEN `amount` END) AS `credit_total` FROM `t`',
             $result->query
         );
-        $this->assertEquals(['credit'], $result->bindings);
+        $this->assertSame(['credit'], $result->bindings);
     }
 
     public function testExactAvgWhenQuery(): void
@@ -947,7 +947,7 @@ class SQLiteTest extends TestCase
             'SELECT AVG(CASE WHEN grade = ? THEN `score` END) AS `avg_a` FROM `t`',
             $result->query
         );
-        $this->assertEquals(['A'], $result->bindings);
+        $this->assertSame(['A'], $result->bindings);
     }
 
     public function testExactMinWhenQuery(): void
@@ -962,7 +962,7 @@ class SQLiteTest extends TestCase
             'SELECT MIN(CASE WHEN in_stock = ? THEN `price` END) AS `min_available` FROM `t`',
             $result->query
         );
-        $this->assertEquals([1], $result->bindings);
+        $this->assertSame([1], $result->bindings);
     }
 
     public function testExactMaxWhenQuery(): void
@@ -977,7 +977,7 @@ class SQLiteTest extends TestCase
             'SELECT MAX(CASE WHEN in_stock = ? THEN `price` END) AS `max_available` FROM `t`',
             $result->query
         );
-        $this->assertEquals([1], $result->bindings);
+        $this->assertSame([1], $result->bindings);
     }
 
     public function testExactFilterJsonPathQuery(): void
@@ -992,7 +992,7 @@ class SQLiteTest extends TestCase
             "SELECT * FROM `users` WHERE json_extract(`profile`, '$.settings.theme') = ?",
             $result->query
         );
-        $this->assertEquals(['dark'], $result->bindings);
+        $this->assertSame(['dark'], $result->bindings);
     }
 
     public function testSetJsonAppendReturnsSelf(): void
@@ -1296,7 +1296,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(3, substr_count($result->query, 'UNION'));
+        $this->assertSame(3, substr_count($result->query, 'UNION'));
     }
 
     public function testSubSelectWithFilter(): void
@@ -1445,7 +1445,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('executed', $capturedQuery);
+        $this->assertSame('executed', $capturedQuery);
     }
 
     public function testUpdateWithComplexFilter(): void
@@ -1505,7 +1505,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals([1, 2, 3, 4], $result->bindings);
+        $this->assertSame([1, 2, 3, 4], $result->bindings);
     }
 
     public function testIsNullAndEqualCombined(): void
@@ -1536,7 +1536,7 @@ class SQLiteTest extends TestCase
 
         $this->assertStringContainsString('`price` BETWEEN ? AND ?', $result->query);
         $this->assertStringContainsString('`stock` > ?', $result->query);
-        $this->assertEquals([10, 100, 0], $result->bindings);
+        $this->assertSame([10, 100, 0], $result->bindings);
     }
 
     public function testStartsWithAndContainsCombined(): void
@@ -1576,7 +1576,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `users` ORDER BY `last_name` ASC, `first_name` ASC, `created_at` DESC',
             $result->query
         );
@@ -1589,7 +1589,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertSame('SELECT * FROM `t`', $result->query);
     }
 
     public function testBooleanValuesInFilters(): void
@@ -1603,7 +1603,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals([true, false], $result->bindings);
+        $this->assertSame([true, false], $result->bindings);
     }
 
     public function testBindingOrderVerification(): void
@@ -1623,10 +1623,10 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(0, $result->bindings[0]);
-        $this->assertEquals('active', $result->bindings[1]);
-        $this->assertEquals(5, $result->bindings[2]);
-        $this->assertEquals(10, $result->bindings[3]);
+        $this->assertSame(0, $result->bindings[0]);
+        $this->assertSame('active', $result->bindings[1]);
+        $this->assertSame(5, $result->bindings[2]);
+        $this->assertSame(10, $result->bindings[3]);
     }
 
     public function testCloneAndModify(): void
@@ -1664,8 +1664,8 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `orders` WHERE `total` > ?', $result->query);
-        $this->assertEquals([100], $result->bindings);
+        $this->assertSame('SELECT * FROM `orders` WHERE `total` > ?', $result->query);
+        $this->assertSame([100], $result->bindings);
     }
 
     public function testReadOnlyFlagOnSelect(): void
@@ -1775,8 +1775,8 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
-        $this->assertEquals([1, 0], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
+        $this->assertSame([1, 0], $result->bindings);
     }
 
     public function testSelectRawExpression(): void
@@ -1814,7 +1814,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('`price` NOT BETWEEN ? AND ?', $result->query);
-        $this->assertEquals([10, 50], $result->bindings);
+        $this->assertSame([10, 50], $result->bindings);
     }
 
     public function testMultipleFilterTypes(): void

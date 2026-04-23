@@ -12,13 +12,13 @@ class SpatialQueryTest extends TestCase
     {
         $query = Query::distanceEqual('location', [1.0, 2.0], 100);
         $this->assertSame(Method::DistanceEqual, $query->getMethod());
-        $this->assertEquals([[[1.0, 2.0], 100, false]], $query->getValues());
+        $this->assertSame([[[1.0, 2.0], 100, false]], $query->getValues());
     }
 
     public function testDistanceEqualWithMeters(): void
     {
         $query = Query::distanceEqual('location', [1.0, 2.0], 100, true);
-        $this->assertEquals([[[1.0, 2.0], 100, true]], $query->getValues());
+        $this->assertSame([[[1.0, 2.0], 100, true]], $query->getValues());
     }
 
     public function testDistanceNotEqual(): void
@@ -43,7 +43,7 @@ class SpatialQueryTest extends TestCase
     {
         $query = Query::intersects('geo', [[0, 0], [1, 1]]);
         $this->assertSame(Method::Intersects, $query->getMethod());
-        $this->assertEquals([[[0, 0], [1, 1]]], $query->getValues());
+        $this->assertSame([[[0, 0], [1, 1]]], $query->getValues());
     }
 
     public function testNotIntersects(): void
@@ -92,7 +92,7 @@ class SpatialQueryTest extends TestCase
     {
         $query = Query::covers('zone', [1.0, 2.0]);
         $this->assertSame(Method::Covers, $query->getMethod());
-        $this->assertEquals('zone', $query->getAttribute());
+        $this->assertSame('zone', $query->getAttribute());
     }
 
     public function testNotCoversFactory(): void
@@ -105,7 +105,7 @@ class SpatialQueryTest extends TestCase
     {
         $query = Query::spatialEquals('geom', [3.0, 4.0]);
         $this->assertSame(Method::SpatialEquals, $query->getMethod());
-        $this->assertEquals([[3.0, 4.0]], $query->getValues());
+        $this->assertSame([[3.0, 4.0]], $query->getValues());
     }
 
     public function testNotSpatialEqualsFactory(): void

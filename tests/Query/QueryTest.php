@@ -15,46 +15,46 @@ class QueryTest extends TestCase
     {
         $query = new Query('equal');
         $this->assertSame(Method::Equal, $query->getMethod());
-        $this->assertEquals('', $query->getAttribute());
-        $this->assertEquals([], $query->getValues());
+        $this->assertSame('', $query->getAttribute());
+        $this->assertSame([], $query->getValues());
     }
 
     public function testConstructorWithAllParams(): void
     {
         $query = new Query('equal', 'name', ['John']);
         $this->assertSame(Method::Equal, $query->getMethod());
-        $this->assertEquals('name', $query->getAttribute());
-        $this->assertEquals(['John'], $query->getValues());
+        $this->assertSame('name', $query->getAttribute());
+        $this->assertSame(['John'], $query->getValues());
     }
 
     public function testConstructorOrderAscDefaultAttribute(): void
     {
         $query = new Query(Method::OrderAsc);
-        $this->assertEquals('', $query->getAttribute());
+        $this->assertSame('', $query->getAttribute());
     }
 
     public function testConstructorOrderDescDefaultAttribute(): void
     {
         $query = new Query(Method::OrderDesc);
-        $this->assertEquals('', $query->getAttribute());
+        $this->assertSame('', $query->getAttribute());
     }
 
     public function testConstructorOrderAscWithAttribute(): void
     {
         $query = new Query(Method::OrderAsc, 'name');
-        $this->assertEquals('name', $query->getAttribute());
+        $this->assertSame('name', $query->getAttribute());
     }
 
     public function testGetValue(): void
     {
         $query = new Query('equal', 'name', ['John', 'Jane']);
-        $this->assertEquals('John', $query->getValue());
+        $this->assertSame('John', $query->getValue());
     }
 
     public function testGetValueDefault(): void
     {
         $query = new Query('equal', 'name');
-        $this->assertEquals('fallback', $query->getValue('fallback'));
+        $this->assertSame('fallback', $query->getValue('fallback'));
     }
 
     public function testGetValueDefaultNull(): void
@@ -75,7 +75,7 @@ class QueryTest extends TestCase
     {
         $query = new Query('equal', 'name', ['John']);
         $result = $query->setAttribute('age');
-        $this->assertEquals('age', $query->getAttribute());
+        $this->assertSame('age', $query->getAttribute());
         $this->assertSame($query, $result);
     }
 
@@ -83,7 +83,7 @@ class QueryTest extends TestCase
     {
         $query = new Query('equal', 'name', ['John']);
         $result = $query->setValues(['Jane', 'Doe']);
-        $this->assertEquals(['Jane', 'Doe'], $query->getValues());
+        $this->assertSame(['Jane', 'Doe'], $query->getValues());
         $this->assertSame($query, $result);
     }
 
@@ -91,7 +91,7 @@ class QueryTest extends TestCase
     {
         $query = new Query('equal', 'name', ['John', 'Jane']);
         $result = $query->setValue('Only');
-        $this->assertEquals(['Only'], $query->getValues());
+        $this->assertSame(['Only'], $query->getValues());
         $this->assertSame($query, $result);
     }
 
@@ -99,7 +99,7 @@ class QueryTest extends TestCase
     {
         $query = new Query('equal', 'name');
         $query->setAttributeType('string');
-        $this->assertEquals('string', $query->getAttributeType());
+        $this->assertSame('string', $query->getAttributeType());
     }
 
     public function testOnArray(): void
@@ -112,11 +112,11 @@ class QueryTest extends TestCase
 
     public function testMethodEnumValues(): void
     {
-        $this->assertEquals('ASC', OrderDirection::Asc->value);
-        $this->assertEquals('DESC', OrderDirection::Desc->value);
-        $this->assertEquals('RANDOM', OrderDirection::Random->value);
-        $this->assertEquals('after', CursorDirection::After->value);
-        $this->assertEquals('before', CursorDirection::Before->value);
+        $this->assertSame('ASC', OrderDirection::Asc->value);
+        $this->assertSame('DESC', OrderDirection::Desc->value);
+        $this->assertSame('RANDOM', OrderDirection::Random->value);
+        $this->assertSame('after', CursorDirection::After->value);
+        $this->assertSame('before', CursorDirection::Before->value);
     }
 
     public function testVectorMethodsAreVector(): void
@@ -141,7 +141,7 @@ class QueryTest extends TestCase
     public function testEmptyValues(): void
     {
         $query = Query::equal('name', []);
-        $this->assertEquals([], $query->getValues());
+        $this->assertSame([], $query->getValues());
     }
 
     public function testFingerprint(): void
@@ -293,16 +293,16 @@ class QueryTest extends TestCase
     {
         $query = Query::distinct();
         $this->assertSame(Method::Distinct, $query->getMethod());
-        $this->assertEquals('', $query->getAttribute());
-        $this->assertEquals([], $query->getValues());
+        $this->assertSame('', $query->getAttribute());
+        $this->assertSame([], $query->getValues());
     }
 
     public function testRawFactory(): void
     {
         $query = Query::raw('score > ?', [10]);
         $this->assertSame(Method::Raw, $query->getMethod());
-        $this->assertEquals('score > ?', $query->getAttribute());
-        $this->assertEquals([10], $query->getValues());
+        $this->assertSame('score > ?', $query->getAttribute());
+        $this->assertSame([10], $query->getValues());
     }
 
     public function testUnionFactory(): void
@@ -324,21 +324,21 @@ class QueryTest extends TestCase
     public function testMethodNoDuplicateValues(): void
     {
         $values = array_map(fn (Method $m) => $m->value, Method::cases());
-        $this->assertEquals(count($values), count(array_unique($values)));
+        $this->assertSame(count($values), count(array_unique($values)));
     }
 
     public function testAggregateMethodsNoDuplicates(): void
     {
         $aggMethods = array_filter(Method::cases(), fn (Method $m) => $m->isAggregate());
         $values = array_map(fn (Method $m) => $m->value, $aggMethods);
-        $this->assertEquals(count($values), count(array_unique($values)));
+        $this->assertSame(count($values), count(array_unique($values)));
     }
 
     public function testJoinMethodsNoDuplicates(): void
     {
         $joinMethods = array_filter(Method::cases(), fn (Method $m) => $m->isJoin());
         $values = array_map(fn (Method $m) => $m->value, $joinMethods);
-        $this->assertEquals(count($values), count(array_unique($values)));
+        $this->assertSame(count($values), count(array_unique($values)));
     }
 
     public function testAggregateMethodsAreValidMethods(): void
@@ -370,20 +370,20 @@ class QueryTest extends TestCase
     public function testRawFactoryEmptySql(): void
     {
         $query = Query::raw('');
-        $this->assertEquals('', $query->getAttribute());
-        $this->assertEquals([], $query->getValues());
+        $this->assertSame('', $query->getAttribute());
+        $this->assertSame([], $query->getValues());
     }
 
     public function testRawFactoryEmptyBindings(): void
     {
         $query = Query::raw('1 = 1', []);
-        $this->assertEquals([], $query->getValues());
+        $this->assertSame([], $query->getValues());
     }
 
     public function testRawFactoryMixedBindings(): void
     {
         $query = Query::raw('a = ? AND b = ? AND c = ?', ['str', 42, 3.14]);
-        $this->assertEquals(['str', 42, 3.14], $query->getValues());
+        $this->assertSame(['str', 42, 3.14], $query->getValues());
     }
 
     public function testUnionIsNested(): void
@@ -455,77 +455,77 @@ class QueryTest extends TestCase
 
     public function testCountEnumValue(): void
     {
-        $this->assertEquals('count', Method::Count->value);
+        $this->assertSame('count', Method::Count->value);
     }
 
     public function testSumEnumValue(): void
     {
-        $this->assertEquals('sum', Method::Sum->value);
+        $this->assertSame('sum', Method::Sum->value);
     }
 
     public function testAvgEnumValue(): void
     {
-        $this->assertEquals('avg', Method::Avg->value);
+        $this->assertSame('avg', Method::Avg->value);
     }
 
     public function testMinEnumValue(): void
     {
-        $this->assertEquals('min', Method::Min->value);
+        $this->assertSame('min', Method::Min->value);
     }
 
     public function testMaxEnumValue(): void
     {
-        $this->assertEquals('max', Method::Max->value);
+        $this->assertSame('max', Method::Max->value);
     }
 
     public function testGroupByEnumValue(): void
     {
-        $this->assertEquals('groupBy', Method::GroupBy->value);
+        $this->assertSame('groupBy', Method::GroupBy->value);
     }
 
     public function testHavingEnumValue(): void
     {
-        $this->assertEquals('having', Method::Having->value);
+        $this->assertSame('having', Method::Having->value);
     }
 
     public function testDistinctEnumValue(): void
     {
-        $this->assertEquals('distinct', Method::Distinct->value);
+        $this->assertSame('distinct', Method::Distinct->value);
     }
 
     public function testJoinEnumValue(): void
     {
-        $this->assertEquals('join', Method::Join->value);
+        $this->assertSame('join', Method::Join->value);
     }
 
     public function testLeftJoinEnumValue(): void
     {
-        $this->assertEquals('leftJoin', Method::LeftJoin->value);
+        $this->assertSame('leftJoin', Method::LeftJoin->value);
     }
 
     public function testRightJoinEnumValue(): void
     {
-        $this->assertEquals('rightJoin', Method::RightJoin->value);
+        $this->assertSame('rightJoin', Method::RightJoin->value);
     }
 
     public function testCrossJoinEnumValue(): void
     {
-        $this->assertEquals('crossJoin', Method::CrossJoin->value);
+        $this->assertSame('crossJoin', Method::CrossJoin->value);
     }
 
     public function testUnionEnumValue(): void
     {
-        $this->assertEquals('union', Method::Union->value);
+        $this->assertSame('union', Method::Union->value);
     }
 
     public function testUnionAllEnumValue(): void
     {
-        $this->assertEquals('unionAll', Method::UnionAll->value);
+        $this->assertSame('unionAll', Method::UnionAll->value);
     }
 
     public function testRawEnumValue(): void
     {
-        $this->assertEquals('raw', Method::Raw->value);
+        $this->assertSame('raw', Method::Raw->value);
     }
 
     public function testCountIsSpatialQueryFalse(): void
@@ -548,9 +548,9 @@ class QueryTest extends TestCase
         $json = Query::equal('name', ['John'])->toString();
         $decoded = \json_decode($json, true);
         $this->assertIsArray($decoded);
-        $this->assertEquals('equal', $decoded['method']);
-        $this->assertEquals('name', $decoded['attribute']);
-        $this->assertEquals(['John'], $decoded['values']);
+        $this->assertSame('equal', $decoded['method']);
+        $this->assertSame('name', $decoded['attribute']);
+        $this->assertSame(['John'], $decoded['values']);
     }
 
     public function testToStringWithNestedQuery(): void
@@ -559,12 +559,12 @@ class QueryTest extends TestCase
         $decoded = \json_decode($json, true);
         $this->assertIsArray($decoded);
         /** @var array<string, mixed> $decoded */
-        $this->assertEquals('and', $decoded['method']);
+        $this->assertSame('and', $decoded['method']);
         $this->assertIsArray($decoded['values']);
         $this->assertCount(1, $decoded['values']);
         /** @var array<string, mixed> $inner */
         $inner = $decoded['values'][0];
-        $this->assertEquals('equal', $inner['method']);
+        $this->assertSame('equal', $inner['method']);
     }
 
     public function testToStringThrowsOnInvalidJson(): void
@@ -591,9 +591,9 @@ class QueryTest extends TestCase
     public function testToArraySimpleFilter(): void
     {
         $array = Query::equal('age', [25])->toArray();
-        $this->assertEquals('equal', $array['method']);
-        $this->assertEquals('age', $array['attribute']);
-        $this->assertEquals([25], $array['values']);
+        $this->assertSame('equal', $array['method']);
+        $this->assertSame('age', $array['attribute']);
+        $this->assertSame([25], $array['values']);
     }
 
     public function testToArrayWithEmptyAttribute(): void
@@ -612,7 +612,7 @@ class QueryTest extends TestCase
         $this->assertArrayHasKey('method', $nested);
         $this->assertArrayHasKey('attribute', $nested);
         $this->assertArrayHasKey('values', $nested);
-        $this->assertEquals('equal', $nested['method']);
+        $this->assertSame('equal', $nested['method']);
     }
 
     public function testCompileOrderAsc(): void
@@ -665,8 +665,8 @@ class QueryTest extends TestCase
     {
         $query = Query::jsonContains('tags', 'php');
         $this->assertSame(Method::JsonContains, $query->getMethod());
-        $this->assertEquals('tags', $query->getAttribute());
-        $this->assertEquals(['php'], $query->getValues());
+        $this->assertSame('tags', $query->getAttribute());
+        $this->assertSame(['php'], $query->getValues());
     }
 
     public function testJsonNotContainsFactory(): void
@@ -679,14 +679,14 @@ class QueryTest extends TestCase
     {
         $query = Query::jsonOverlaps('tags', ['a', 'b']);
         $this->assertSame(Method::JsonOverlaps, $query->getMethod());
-        $this->assertEquals([['a', 'b']], $query->getValues());
+        $this->assertSame([['a', 'b']], $query->getValues());
     }
 
     public function testJsonPathFactory(): void
     {
         $query = Query::jsonPath('data', 'name', '=', 'test');
         $this->assertSame(Method::JsonPath, $query->getMethod());
-        $this->assertEquals(['name', '=', 'test'], $query->getValues());
+        $this->assertSame(['name', '=', 'test'], $query->getValues());
     }
 
     public function testCoversFactory(): void

@@ -30,7 +30,7 @@ class LogicalQueryTest extends TestCase
     {
         $query = Query::containsAll('tags', ['php', 'js']);
         $this->assertSame(Method::ContainsAll, $query->getMethod());
-        $this->assertEquals(['php', 'js'], $query->getValues());
+        $this->assertSame(['php', 'js'], $query->getValues());
     }
 
     public function testElemMatch(): void
@@ -38,7 +38,7 @@ class LogicalQueryTest extends TestCase
         $inner = [Query::equal('field', ['val'])];
         $query = Query::elemMatch('items', $inner);
         $this->assertSame(Method::ElemMatch, $query->getMethod());
-        $this->assertEquals('items', $query->getAttribute());
+        $this->assertSame('items', $query->getAttribute());
     }
 
     public function testOrIsNested(): void
@@ -62,13 +62,13 @@ class LogicalQueryTest extends TestCase
     public function testEmptyAnd(): void
     {
         $query = Query::and([]);
-        $this->assertEquals([], $query->getValues());
+        $this->assertSame([], $query->getValues());
     }
 
     public function testEmptyOr(): void
     {
         $query = Query::or([]);
-        $this->assertEquals([], $query->getValues());
+        $this->assertSame([], $query->getValues());
     }
 
     public function testNestedAndOr(): void

@@ -54,7 +54,7 @@ class MariaDBTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
+        $this->assertSame('SELECT * FROM `t`', $result->query);
     }
 
     public function testSelectWithFilters(): void
@@ -72,11 +72,11 @@ class MariaDBTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT `name`, `email` FROM `users` WHERE `status` IN (?) AND `age` > ? ORDER BY `name` ASC LIMIT ? OFFSET ?',
             $result->query
         );
-        $this->assertEquals(['active', 18, 25, 0], $result->bindings);
+        $this->assertSame(['active', 18, 25, 0], $result->bindings);
     }
 
     public function testGeomFromTextWithoutAxisOrder(): void
@@ -100,8 +100,8 @@ class MariaDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('ST_DISTANCE_SPHERE(`coords`, ST_GeomFromText(?, 4326)) < ?', $result->query);
-        $this->assertEquals('POINT(40.7128 -74.006)', $result->bindings[0]);
-        $this->assertEquals(5000.0, $result->bindings[1]);
+        $this->assertSame('POINT(40.7128 -74.006)', $result->bindings[0]);
+        $this->assertSame(5000.0, $result->bindings[1]);
     }
 
     public function testFilterDistanceNoMetersUsesStDistance(): void
@@ -241,7 +241,7 @@ class MariaDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('ST_Intersects(`area`, ST_GeomFromText(?, 4326))', $result->query);
-        $this->assertEquals('POINT(1 2)', $result->bindings[0]);
+        $this->assertSame('POINT(1 2)', $result->bindings[0]);
     }
 
     public function testFilterNotIntersects(): void
@@ -318,7 +318,7 @@ class MariaDBTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('LINESTRING(0 0, 1 1, 2 2)', $result->bindings[0]);
+        $this->assertSame('LINESTRING(0 0, 1 1, 2 2)', $result->bindings[0]);
     }
 
     public function testSpatialWithPolygon(): void
@@ -342,11 +342,11 @@ class MariaDBTest extends TestCase
             ->insert();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT INTO `users` (`name`, `email`) VALUES (?, ?)',
             $result->query
         );
-        $this->assertEquals(['Alice', 'a@b.com'], $result->bindings);
+        $this->assertSame(['Alice', 'a@b.com'], $result->bindings);
     }
 
     public function testInsertBatch(): void
@@ -358,7 +358,7 @@ class MariaDBTest extends TestCase
             ->insert();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT INTO `users` (`name`, `email`) VALUES (?, ?), (?, ?)',
             $result->query
         );
@@ -373,7 +373,7 @@ class MariaDBTest extends TestCase
             ->upsert();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT INTO `users` (`id`, `name`, `email`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `email` = VALUES(`email`)',
             $result->query
         );
@@ -400,7 +400,7 @@ class MariaDBTest extends TestCase
             ->insertOrIgnore();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'INSERT IGNORE INTO `users` (`name`, `email`) VALUES (?, ?)',
             $result->query
         );
@@ -415,7 +415,7 @@ class MariaDBTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'UPDATE `users` SET `status` = ? WHERE `status` IN (?)',
             $result->query
         );
@@ -429,7 +429,7 @@ class MariaDBTest extends TestCase
             ->delete();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'DELETE FROM `users` WHERE `last_login` < ?',
             $result->query
         );
@@ -443,7 +443,7 @@ class MariaDBTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` ORDER BY RAND()', $result->query);
+        $this->assertSame('SELECT * FROM `t` ORDER BY RAND()', $result->query);
     }
 
     public function testRegex(): void
@@ -454,7 +454,7 @@ class MariaDBTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE `slug` REGEXP ?', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `slug` REGEXP ?', $result->query);
     }
 
     public function testSearch(): void
@@ -465,8 +465,8 @@ class MariaDBTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(? IN BOOLEAN MODE)', $result->query);
-        $this->assertEquals(['hello*'], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` WHERE MATCH(`content`) AGAINST(? IN BOOLEAN MODE)', $result->query);
+        $this->assertSame(['hello*'], $result->bindings);
     }
 
     public function testExplain(): void
@@ -492,9 +492,9 @@ class MariaDBTest extends TestCase
     {
         $builder = new Builder();
 
-        $this->assertEquals('BEGIN', $builder->begin()->query);
-        $this->assertEquals('COMMIT', $builder->commit()->query);
-        $this->assertEquals('ROLLBACK', $builder->rollback()->query);
+        $this->assertSame('BEGIN', $builder->begin()->query);
+        $this->assertSame('COMMIT', $builder->commit()->query);
+        $this->assertSame('ROLLBACK', $builder->rollback()->query);
     }
 
     public function testForUpdate(): void
@@ -676,7 +676,7 @@ class MariaDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString("JSON_EXTRACT(`data`, '$.age') >= ?", $result->query);
-        $this->assertEquals(21, $result->bindings[0]);
+        $this->assertSame(21, $result->bindings[0]);
     }
 
     public function testCountWhenWithAlias(): void
@@ -713,7 +713,7 @@ class MariaDBTest extends TestCase
             'SELECT * FROM `locations` WHERE ST_DISTANCE_SPHERE(`coords`, ST_GeomFromText(?, 4326)) < ?',
             $result->query
         );
-        $this->assertEquals(['POINT(40.7128 -74.006)', 5000.0], $result->bindings);
+        $this->assertSame(['POINT(40.7128 -74.006)', 5000.0], $result->bindings);
     }
 
     public function testExactSpatialDistanceNoMetersQuery(): void
@@ -728,7 +728,7 @@ class MariaDBTest extends TestCase
             'SELECT * FROM `locations` WHERE ST_Distance(`coords`, ST_GeomFromText(?, 4326)) > ?',
             $result->query
         );
-        $this->assertEquals(['POINT(1 2)', 100.0], $result->bindings);
+        $this->assertSame(['POINT(1 2)', 100.0], $result->bindings);
     }
 
     public function testExactIntersectsQuery(): void
@@ -743,7 +743,7 @@ class MariaDBTest extends TestCase
             'SELECT * FROM `zones` WHERE ST_Intersects(`area`, ST_GeomFromText(?, 4326))',
             $result->query
         );
-        $this->assertEquals(['POINT(1 2)'], $result->bindings);
+        $this->assertSame(['POINT(1 2)'], $result->bindings);
     }
 
     public function testResetClearsState(): void
@@ -763,8 +763,8 @@ class MariaDBTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `orders` WHERE `total` > ?', $result->query);
-        $this->assertEquals([100], $result->bindings);
+        $this->assertSame('SELECT * FROM `orders` WHERE `total` > ?', $result->query);
+        $this->assertSame([100], $result->bindings);
     }
 
     public function testSpatialDistanceGreaterThanMeters(): void
@@ -1045,7 +1045,7 @@ class MariaDBTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('executed', $capturedQuery);
+        $this->assertSame('executed', $capturedQuery);
     }
 
     public function testNestedLogicalFilters(): void
@@ -1129,9 +1129,9 @@ class MariaDBTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(0, $result->bindings[0]);
-        $this->assertEquals('active', $result->bindings[1]);
-        $this->assertEquals(5, $result->bindings[2]);
+        $this->assertSame(0, $result->bindings[0]);
+        $this->assertSame('active', $result->bindings[1]);
+        $this->assertSame(5, $result->bindings[2]);
     }
 
     public function testCloneAndModify(): void
@@ -1184,7 +1184,7 @@ class MariaDBTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'SELECT * FROM `users` ORDER BY `last_name` ASC, `created_at` DESC, `first_name` ASC',
             $result->query
         );
@@ -1202,7 +1202,7 @@ class MariaDBTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals([true, false], $result->bindings);
+        $this->assertSame([true, false], $result->bindings);
         $this->assertStringContainsString('`suspended_at` IS NULL', $result->query);
     }
 
@@ -1243,7 +1243,7 @@ class MariaDBTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('VALUES (?, ?), (?, ?), (?, ?)', $result->query);
-        $this->assertEquals(['Alice', 'a@b.com', 'Bob', 'b@b.com', 'Charlie', 'c@b.com'], $result->bindings);
+        $this->assertSame(['Alice', 'a@b.com', 'Bob', 'b@b.com', 'Charlie', 'c@b.com'], $result->bindings);
     }
 
     public function testDeleteWithComplexFilter(): void
@@ -1322,8 +1322,8 @@ class MariaDBTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertEquals('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
-        $this->assertEquals([1, 0], $result->bindings);
+        $this->assertSame('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
+        $this->assertSame([1, 0], $result->bindings);
     }
 
     public function testBetweenWithNotEqual(): void

@@ -56,11 +56,11 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'CREATE TABLE `users` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `name` VARCHAR(255) NOT NULL, `email` VARCHAR(255) NOT NULL, PRIMARY KEY (`id`), UNIQUE (`email`))',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCreateTableAllColumnTypes(): void
@@ -214,7 +214,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE `users` ADD COLUMN `avatar_url` VARCHAR(255) NULL AFTER `email`',
             $result->query
         );
@@ -228,7 +228,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE `users` MODIFY COLUMN `name` VARCHAR(500) NOT NULL',
             $result->query
         );
@@ -242,7 +242,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE `users` RENAME COLUMN `bio` TO `biography`',
             $result->query
         );
@@ -256,7 +256,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE `users` DROP COLUMN `age`',
             $result->query
         );
@@ -270,7 +270,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE `users` ADD INDEX `idx_name` (`name`)',
             $result->query
         );
@@ -284,7 +284,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE `users` DROP INDEX `idx_old`',
             $result->query
         );
@@ -313,7 +313,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE `users` DROP FOREIGN KEY `fk_old`',
             $result->query
         );
@@ -341,8 +341,8 @@ class MySQLTest extends TestCase
         $result = $schema->drop('users');
         $this->assertBindingCount($result);
 
-        $this->assertEquals('DROP TABLE `users`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('DROP TABLE `users`', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testDropTableIfExists(): void
@@ -350,7 +350,7 @@ class MySQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropIfExists('users');
 
-        $this->assertEquals('DROP TABLE IF EXISTS `users`', $result->query);
+        $this->assertSame('DROP TABLE IF EXISTS `users`', $result->query);
     }
     // RENAME TABLE
 
@@ -360,7 +360,7 @@ class MySQLTest extends TestCase
         $result = $schema->rename('users', 'members');
         $this->assertBindingCount($result);
 
-        $this->assertEquals('RENAME TABLE `users` TO `members`', $result->query);
+        $this->assertSame('RENAME TABLE `users` TO `members`', $result->query);
     }
     // TRUNCATE TABLE
 
@@ -370,7 +370,7 @@ class MySQLTest extends TestCase
         $result = $schema->truncate('users');
         $this->assertBindingCount($result);
 
-        $this->assertEquals('TRUNCATE TABLE `users`', $result->query);
+        $this->assertSame('TRUNCATE TABLE `users`', $result->query);
     }
     // CREATE / DROP INDEX (standalone)
 
@@ -379,7 +379,7 @@ class MySQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->createIndex('users', 'idx_email', ['email']);
 
-        $this->assertEquals('CREATE INDEX `idx_email` ON `users` (`email`)', $result->query);
+        $this->assertSame('CREATE INDEX `idx_email` ON `users` (`email`)', $result->query);
     }
 
     public function testCreateUniqueIndex(): void
@@ -387,7 +387,7 @@ class MySQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->createIndex('users', 'idx_email', ['email'], unique: true);
 
-        $this->assertEquals('CREATE UNIQUE INDEX `idx_email` ON `users` (`email`)', $result->query);
+        $this->assertSame('CREATE UNIQUE INDEX `idx_email` ON `users` (`email`)', $result->query);
     }
 
     public function testCreateFulltextIndex(): void
@@ -395,7 +395,7 @@ class MySQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->createIndex('posts', 'idx_body_ft', ['body'], type: 'fulltext');
 
-        $this->assertEquals('CREATE FULLTEXT INDEX `idx_body_ft` ON `posts` (`body`)', $result->query);
+        $this->assertSame('CREATE FULLTEXT INDEX `idx_body_ft` ON `posts` (`body`)', $result->query);
     }
 
     public function testCreateSpatialIndex(): void
@@ -403,7 +403,7 @@ class MySQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->createIndex('locations', 'idx_geo', ['coords'], type: 'spatial');
 
-        $this->assertEquals('CREATE SPATIAL INDEX `idx_geo` ON `locations` (`coords`)', $result->query);
+        $this->assertSame('CREATE SPATIAL INDEX `idx_geo` ON `locations` (`coords`)', $result->query);
     }
 
     public function testDropIndex(): void
@@ -411,7 +411,7 @@ class MySQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropIndex('users', 'idx_email');
 
-        $this->assertEquals('DROP INDEX `idx_email` ON `users`', $result->query);
+        $this->assertSame('DROP INDEX `idx_email` ON `users`', $result->query);
     }
     // CREATE / DROP VIEW
 
@@ -421,11 +421,11 @@ class MySQLTest extends TestCase
         $builder = (new SQLBuilder())->from('users')->filter([Query::equal('active', [true])]);
         $result = $schema->createView('active_users', $builder);
 
-        $this->assertEquals(
+        $this->assertSame(
             'CREATE VIEW `active_users` AS SELECT * FROM `users` WHERE `active` IN (?)',
             $result->query
         );
-        $this->assertEquals([true], $result->bindings);
+        $this->assertSame([true], $result->bindings);
     }
 
     public function testCreateOrReplaceView(): void
@@ -434,11 +434,11 @@ class MySQLTest extends TestCase
         $builder = (new SQLBuilder())->from('users')->filter([Query::equal('active', [true])]);
         $result = $schema->createOrReplaceView('active_users', $builder);
 
-        $this->assertEquals(
+        $this->assertSame(
             'CREATE OR REPLACE VIEW `active_users` AS SELECT * FROM `users` WHERE `active` IN (?)',
             $result->query
         );
-        $this->assertEquals([true], $result->bindings);
+        $this->assertSame([true], $result->bindings);
     }
 
     public function testDropView(): void
@@ -446,7 +446,7 @@ class MySQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropView('active_users');
 
-        $this->assertEquals('DROP VIEW `active_users`', $result->query);
+        $this->assertSame('DROP VIEW `active_users`', $result->query);
     }
     // FOREIGN KEY (standalone)
 
@@ -463,7 +463,7 @@ class MySQLTest extends TestCase
             onUpdate: ForeignKeyAction::SetNull
         );
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE `orders` ADD CONSTRAINT `fk_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE SET NULL',
             $result->query
         );
@@ -474,7 +474,7 @@ class MySQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->addForeignKey('orders', 'fk_user', 'user_id', 'users', 'id');
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE `orders` ADD CONSTRAINT `fk_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)',
             $result->query
         );
@@ -485,7 +485,7 @@ class MySQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropForeignKey('orders', 'fk_user');
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE `orders` DROP FOREIGN KEY `fk_user`',
             $result->query
         );
@@ -501,7 +501,7 @@ class MySQLTest extends TestCase
             body: 'SELECT COUNT(*) INTO total FROM orders WHERE orders.user_id = user_id;'
         );
 
-        $this->assertEquals(
+        $this->assertSame(
             'CREATE PROCEDURE `update_stats`(IN `user_id` INT, OUT `total` INT) BEGIN SELECT COUNT(*) INTO total FROM orders WHERE orders.user_id = user_id; END',
             $result->query
         );
@@ -512,7 +512,7 @@ class MySQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropProcedure('update_stats');
 
-        $this->assertEquals('DROP PROCEDURE `update_stats`', $result->query);
+        $this->assertSame('DROP PROCEDURE `update_stats`', $result->query);
     }
     // TRIGGER
 
@@ -527,7 +527,7 @@ class MySQLTest extends TestCase
             body: 'SET NEW.updated_at = NOW(3);'
         );
 
-        $this->assertEquals(
+        $this->assertSame(
             'CREATE TRIGGER `trg_updated_at` BEFORE UPDATE ON `users` FOR EACH ROW BEGIN SET NEW.updated_at = NOW(3); END',
             $result->query
         );
@@ -538,7 +538,7 @@ class MySQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropTrigger('trg_updated_at');
 
-        $this->assertEquals('DROP TRIGGER `trg_updated_at`', $result->query);
+        $this->assertSame('DROP TRIGGER `trg_updated_at`', $result->query);
     }
 
     // Schema edge cases
@@ -611,7 +611,7 @@ class MySQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropIfExists('users');
 
-        $this->assertEquals('DROP TABLE IF EXISTS `users`', $result->query);
+        $this->assertSame('DROP TABLE IF EXISTS `users`', $result->query);
     }
 
     public function testCreateOrReplaceViewFromBuilder(): void
@@ -669,7 +669,7 @@ class MySQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropTrigger('trg_old');
 
-        $this->assertEquals('DROP TRIGGER `trg_old`', $result->query);
+        $this->assertSame('DROP TRIGGER `trg_old`', $result->query);
     }
 
     public function testCreateTableTimestampWithoutPrecision(): void
@@ -701,7 +701,7 @@ class MySQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->createIndex('users', 'idx_multi', ['first_name', 'last_name']);
 
-        $this->assertEquals('CREATE INDEX `idx_multi` ON `users` (`first_name`, `last_name`)', $result->query);
+        $this->assertSame('CREATE INDEX `idx_multi` ON `users` (`first_name`, `last_name`)', $result->query);
     }
 
     public function testAlterAddAndDropForeignKey(): void
@@ -758,7 +758,7 @@ class MySQLTest extends TestCase
             'CREATE TABLE `products` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `name` VARCHAR(100) NOT NULL, `price` INT NOT NULL, `active` TINYINT(1) NOT NULL DEFAULT 1, PRIMARY KEY (`id`), INDEX `idx_name` (`name`), UNIQUE INDEX `uniq_price` (`price`))',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
         $this->assertBindingCount($result);
     }
 
@@ -774,7 +774,7 @@ class MySQLTest extends TestCase
             'ALTER TABLE `users` ADD COLUMN `phone` VARCHAR(20) NULL, DROP COLUMN `legacy_field`',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
         $this->assertBindingCount($result);
     }
 
@@ -793,7 +793,7 @@ class MySQLTest extends TestCase
             'CREATE TABLE `orders` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `customer_id` INT NOT NULL, PRIMARY KEY (`id`), FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE CASCADE ON UPDATE CASCADE)',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
         $this->assertBindingCount($result);
     }
 
@@ -803,7 +803,7 @@ class MySQLTest extends TestCase
         $result = $schema->drop('sessions');
 
         $this->assertSame('DROP TABLE `sessions`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
         $this->assertBindingCount($result);
     }
 
@@ -832,7 +832,7 @@ class MySQLTest extends TestCase
             'CREATE DATABASE `myapp` /*!40100 DEFAULT CHARACTER SET utf8mb4 */',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testChangeColumn(): void
@@ -845,7 +845,7 @@ class MySQLTest extends TestCase
             'ALTER TABLE `users` CHANGE COLUMN `name` `full_name` VARCHAR(500)',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testModifyColumn(): void
@@ -858,7 +858,7 @@ class MySQLTest extends TestCase
             'ALTER TABLE `users` MODIFY `email` TEXT',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCommentOnTable(): void
@@ -871,7 +871,7 @@ class MySQLTest extends TestCase
             "ALTER TABLE `users` COMMENT = 'Main user table'",
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCommentOnTableEscapesSingleQuotes(): void
@@ -896,7 +896,7 @@ class MySQLTest extends TestCase
             "ALTER TABLE `events` ADD PARTITION (PARTITION `p2024` VALUES LESS THAN ('2025-01-01'))",
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testDropPartition(): void
@@ -909,7 +909,7 @@ class MySQLTest extends TestCase
             'ALTER TABLE `events` DROP PARTITION `p2023`',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCreateIfNotExists(): void

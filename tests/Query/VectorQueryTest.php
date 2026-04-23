@@ -13,7 +13,7 @@ class VectorQueryTest extends TestCase
         $vector = [0.1, 0.2, 0.3];
         $query = Query::vectorDot('embedding', $vector);
         $this->assertSame(Method::VectorDot, $query->getMethod());
-        $this->assertEquals([$vector], $query->getValues());
+        $this->assertSame([$vector], $query->getValues());
     }
 
     public function testVectorCosine(): void

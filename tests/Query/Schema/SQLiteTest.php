@@ -47,11 +47,11 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'CREATE TABLE `users` (`id` INTEGER AUTOINCREMENT NOT NULL, `name` VARCHAR(255) NOT NULL, `email` VARCHAR(255) NOT NULL, PRIMARY KEY (`id`), UNIQUE (`email`))',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testCreateTableAllColumnTypes(): void
@@ -237,11 +237,11 @@ class SQLiteTest extends TestCase
         $result = $schema->rename('old_table', 'new_table');
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE `old_table` RENAME TO `new_table`',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testTruncateUsesDeleteFrom(): void
@@ -250,8 +250,8 @@ class SQLiteTest extends TestCase
         $result = $schema->truncate('users');
         $this->assertBindingCount($result);
 
-        $this->assertEquals('DELETE FROM `users`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('DELETE FROM `users`', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testDropIndexWithoutTableName(): void
@@ -260,8 +260,8 @@ class SQLiteTest extends TestCase
         $result = $schema->dropIndex('users', 'idx_email');
         $this->assertBindingCount($result);
 
-        $this->assertEquals('DROP INDEX `idx_email`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('DROP INDEX `idx_email`', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testRenameIndexThrowsUnsupported(): void
@@ -328,8 +328,8 @@ class SQLiteTest extends TestCase
         $result = $schema->drop('users');
         $this->assertBindingCount($result);
 
-        $this->assertEquals('DROP TABLE `users`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame('DROP TABLE `users`', $result->query);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testDropTableIfExists(): void
@@ -337,7 +337,7 @@ class SQLiteTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropIfExists('users');
 
-        $this->assertEquals('DROP TABLE IF EXISTS `users`', $result->query);
+        $this->assertSame('DROP TABLE IF EXISTS `users`', $result->query);
     }
 
     public function testAlterAddColumn(): void
@@ -359,7 +359,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE `users` DROP COLUMN `age`',
             $result->query
         );
@@ -373,7 +373,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE `users` RENAME COLUMN `bio` TO `biography`',
             $result->query
         );
@@ -384,7 +384,7 @@ class SQLiteTest extends TestCase
         $schema = new Schema();
         $result = $schema->createIndex('users', 'idx_email', ['email']);
 
-        $this->assertEquals('CREATE INDEX `idx_email` ON `users` (`email`)', $result->query);
+        $this->assertSame('CREATE INDEX `idx_email` ON `users` (`email`)', $result->query);
     }
 
     public function testCreateUniqueIndex(): void
@@ -392,7 +392,7 @@ class SQLiteTest extends TestCase
         $schema = new Schema();
         $result = $schema->createIndex('users', 'idx_email', ['email'], unique: true);
 
-        $this->assertEquals('CREATE UNIQUE INDEX `idx_email` ON `users` (`email`)', $result->query);
+        $this->assertSame('CREATE UNIQUE INDEX `idx_email` ON `users` (`email`)', $result->query);
     }
 
     public function testCreateView(): void
@@ -401,11 +401,11 @@ class SQLiteTest extends TestCase
         $builder = (new SQLBuilder())->from('users')->filter([Query::equal('active', [true])]);
         $result = $schema->createView('active_users', $builder);
 
-        $this->assertEquals(
+        $this->assertSame(
             'CREATE VIEW `active_users` AS SELECT * FROM `users` WHERE `active` IN (?)',
             $result->query
         );
-        $this->assertEquals([true], $result->bindings);
+        $this->assertSame([true], $result->bindings);
     }
 
     public function testCreateOrReplaceView(): void
@@ -414,11 +414,11 @@ class SQLiteTest extends TestCase
         $builder = (new SQLBuilder())->from('users')->filter([Query::equal('active', [true])]);
         $result = $schema->createOrReplaceView('active_users', $builder);
 
-        $this->assertEquals(
+        $this->assertSame(
             'CREATE OR REPLACE VIEW `active_users` AS SELECT * FROM `users` WHERE `active` IN (?)',
             $result->query
         );
-        $this->assertEquals([true], $result->bindings);
+        $this->assertSame([true], $result->bindings);
     }
 
     public function testDropView(): void
@@ -426,7 +426,7 @@ class SQLiteTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropView('active_users');
 
-        $this->assertEquals('DROP VIEW `active_users`', $result->query);
+        $this->assertSame('DROP VIEW `active_users`', $result->query);
     }
 
     public function testAddForeignKeyStandalone(): void
@@ -442,7 +442,7 @@ class SQLiteTest extends TestCase
             onUpdate: ForeignKeyAction::SetNull
         );
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE `orders` ADD CONSTRAINT `fk_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE SET NULL',
             $result->query
         );
@@ -462,7 +462,7 @@ class SQLiteTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropForeignKey('orders', 'fk_user');
 
-        $this->assertEquals(
+        $this->assertSame(
             'ALTER TABLE `orders` DROP FOREIGN KEY `fk_user`',
             $result->query
         );
@@ -477,7 +477,7 @@ class SQLiteTest extends TestCase
             body: 'SELECT COUNT(*) INTO total FROM orders WHERE orders.user_id = user_id;'
         );
 
-        $this->assertEquals(
+        $this->assertSame(
             'CREATE PROCEDURE `update_stats`(IN `user_id` INT, OUT `total` INT) BEGIN SELECT COUNT(*) INTO total FROM orders WHERE orders.user_id = user_id; END',
             $result->query
         );
@@ -488,7 +488,7 @@ class SQLiteTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropProcedure('update_stats');
 
-        $this->assertEquals('DROP PROCEDURE `update_stats`', $result->query);
+        $this->assertSame('DROP PROCEDURE `update_stats`', $result->query);
     }
 
     public function testCreateTrigger(): void
@@ -502,7 +502,7 @@ class SQLiteTest extends TestCase
             body: 'SET NEW.updated_at = datetime();'
         );
 
-        $this->assertEquals(
+        $this->assertSame(
             'CREATE TRIGGER `trg_updated_at` BEFORE UPDATE ON `users` FOR EACH ROW BEGIN SET NEW.updated_at = datetime(); END',
             $result->query
         );
@@ -513,7 +513,7 @@ class SQLiteTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropTrigger('trg_updated_at');
 
-        $this->assertEquals('DROP TRIGGER `trg_updated_at`', $result->query);
+        $this->assertSame('DROP TRIGGER `trg_updated_at`', $result->query);
     }
 
     public function testCreateTableWithMultiplePrimaryKeys(): void
@@ -607,7 +607,7 @@ class SQLiteTest extends TestCase
             'CREATE TABLE `products` (`id` INTEGER AUTOINCREMENT NOT NULL, `name` VARCHAR(100) NOT NULL, `price` INTEGER NOT NULL, PRIMARY KEY (`id`), INDEX `idx_name` (`name`))',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
     }
 
     public function testExactDropTable(): void
@@ -616,7 +616,7 @@ class SQLiteTest extends TestCase
         $result = $schema->drop('sessions');
 
         $this->assertSame('DROP TABLE `sessions`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
         $this->assertBindingCount($result);
     }
 
@@ -626,7 +626,7 @@ class SQLiteTest extends TestCase
         $result = $schema->rename('old_name', 'new_name');
 
         $this->assertSame('ALTER TABLE `old_name` RENAME TO `new_name`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
         $this->assertBindingCount($result);
     }
 
@@ -636,7 +636,7 @@ class SQLiteTest extends TestCase
         $result = $schema->truncate('logs');
 
         $this->assertSame('DELETE FROM `logs`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
         $this->assertBindingCount($result);
     }
 
@@ -646,7 +646,7 @@ class SQLiteTest extends TestCase
         $result = $schema->dropIndex('users', 'idx_email');
 
         $this->assertSame('DROP INDEX `idx_email`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
         $this->assertBindingCount($result);
     }
 
@@ -665,7 +665,7 @@ class SQLiteTest extends TestCase
             'CREATE TABLE `orders` (`id` INTEGER AUTOINCREMENT NOT NULL, `customer_id` INTEGER NOT NULL, PRIMARY KEY (`id`), FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE CASCADE ON UPDATE CASCADE)',
             $result->query
         );
-        $this->assertEquals([], $result->bindings);
+        $this->assertSame([], $result->bindings);
         $this->assertBindingCount($result);
     }
 

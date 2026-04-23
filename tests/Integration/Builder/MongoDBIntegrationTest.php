@@ -70,9 +70,9 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnMongoDB($result);
 
         $this->assertCount(3, $rows);
-        $this->assertEquals('Charlie', $rows[0]['name']);
-        $this->assertEquals('Alice', $rows[1]['name']);
-        $this->assertEquals('Diana', $rows[2]['name']);
+        $this->assertSame('Charlie', $rows[0]['name']);
+        $this->assertSame('Alice', $rows[1]['name']);
+        $this->assertSame('Diana', $rows[2]['name']);
     }
 
     public function testSelectWithJoin(): void
@@ -90,7 +90,7 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $this->assertCount(4, $rows);
         /** @var array<string, mixed> $joined */
         $joined = $rows[0]['u'];
-        $this->assertEquals('Alice', $joined['name']);
+        $this->assertSame('Alice', $joined['name']);
     }
 
     public function testSelectWithLeftJoin(): void
@@ -106,7 +106,7 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnMongoDB($result);
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('Diana', $rows[0]['name']);
+        $this->assertSame('Diana', $rows[0]['name']);
     }
 
     public function testInsertSingleRow(): void
@@ -127,7 +127,7 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnMongoDB($select);
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('Frank', $rows[0]['name']);
+        $this->assertSame('Frank', $rows[0]['name']);
     }
 
     public function testInsertMultipleRows(): void
@@ -150,8 +150,8 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnMongoDB($select);
 
         $this->assertCount(2, $rows);
-        $this->assertEquals('Frank', $rows[0]['name']);
-        $this->assertEquals('Grace', $rows[1]['name']);
+        $this->assertSame('Frank', $rows[0]['name']);
+        $this->assertSame('Grace', $rows[1]['name']);
     }
 
     public function testUpdateWithWhere(): void
@@ -173,7 +173,7 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnMongoDB($select);
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('CA', $rows[0]['country']);
+        $this->assertSame('CA', $rows[0]['country']);
     }
 
     public function testDeleteWithWhere(): void
@@ -253,7 +253,7 @@ class MongoDBIntegrationTest extends IntegrationTestCase
 
         $this->assertCount(3, $rows);
         $countries = \array_column($rows, 'country');
-        $this->assertEquals(['DE', 'UK', 'US'], $countries);
+        $this->assertSame(['DE', 'UK', 'US'], $countries);
     }
 
     public function testSelectWithSubqueryInWhere(): void
@@ -298,8 +298,8 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnMongoDB($check);
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('Alice Updated', $rows[0]['name']);
-        $this->assertEquals(31, $rows[0]['age']);
+        $this->assertSame('Alice Updated', $rows[0]['name']);
+        $this->assertSame(31, $rows[0]['age']);
     }
 
     public function testSelectWithWindowFunction(): void
@@ -319,8 +319,8 @@ class MongoDBIntegrationTest extends IntegrationTestCase
 
         // Check first user's rows are numbered
         $user1Rows = \array_values(\array_filter($rows, fn ($r) => $r['user_id'] === 1));
-        $this->assertEquals(1, $user1Rows[0]['rn']);
-        $this->assertEquals(2, $user1Rows[1]['rn']);
+        $this->assertSame(1, $user1Rows[0]['rn']);
+        $this->assertSame(2, $user1Rows[1]['rn']);
     }
 
     public function testFilterStartsWith(): void
@@ -334,7 +334,7 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnMongoDB($result);
 
         $this->assertCount(1, $rows);
-        $this->assertEquals('Alice', $rows[0]['name']);
+        $this->assertSame('Alice', $rows[0]['name']);
     }
 
     public function testFilterContains(): void
@@ -381,8 +381,8 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $rows = $this->executeOnMongoDB($result);
 
         $this->assertCount(2, $rows);
-        $this->assertEquals('Bob', $rows[0]['name']);
-        $this->assertEquals('Charlie', $rows[1]['name']);
+        $this->assertSame('Bob', $rows[0]['name']);
+        $this->assertSame('Charlie', $rows[1]['name']);
     }
 
     public function testFilterRegex(): void
@@ -398,7 +398,7 @@ class MongoDBIntegrationTest extends IntegrationTestCase
 
         $this->assertCount(3, $rows);
         $names = \array_column($rows, 'name');
-        $this->assertEquals(['Alice', 'Bob', 'Charlie'], $names);
+        $this->assertSame(['Alice', 'Bob', 'Charlie'], $names);
     }
 
     public function testAggregateSum(): void
