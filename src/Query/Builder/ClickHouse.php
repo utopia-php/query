@@ -31,6 +31,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     use Trait\ClickHouse\LimitBy;
     use Trait\ClickHouse\WithFill;
     use Trait\FullOuterJoins;
+    use Trait\GroupByModifiers;
     use Trait\StatisticalAggregates;
     use Trait\StringAggregates;
 
@@ -54,8 +55,6 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
 
     /** @var list<string> */
     protected array $rawJoinClauses = [];
-
-    protected ?string $groupByModifier = null;
 
     /**
      * Add PREWHERE filters (evaluated before reading all columns — major ClickHouse optimization)
@@ -266,7 +265,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         $this->limitByClause = null;
         $this->arrayJoins = [];
         $this->rawJoinClauses = [];
-        $this->groupByModifier = null;
+        $this->resetGroupByModifier();
 
         return $this;
     }

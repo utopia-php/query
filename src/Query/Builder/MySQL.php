@@ -8,13 +8,13 @@ use Utopia\Query\Builder\Feature\Hints;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\LateralJoins;
 use Utopia\Query\Builder\Feature\StringAggregates;
-use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
 
 class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJoins, StringAggregates, GroupByModifiers
 {
     use Trait\ConditionalAggregates;
+    use Trait\GroupByModifiers;
     use Trait\Hints;
     use Trait\LateralJoins;
     use Trait\StringAggregates;
@@ -26,8 +26,6 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     protected string $updateJoinRight = '';
 
     protected string $updateJoinAlias = '';
-
-    protected ?string $groupByModifier = null;
 
     protected string $deleteAlias = '';
 
@@ -374,12 +372,6 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     }
 
     #[\Override]
-    public function withTotals(): static
-    {
-        throw new UnsupportedException('WITH TOTALS is not supported by MySQL.');
-    }
-
-    #[\Override]
     public function withRollup(): static
     {
         $this->groupByModifier = 'WITH ROLLUP';
@@ -388,18 +380,12 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     }
 
     #[\Override]
-    public function withCube(): static
-    {
-        throw new UnsupportedException('WITH CUBE is not supported by MySQL.');
-    }
-
-    #[\Override]
     public function reset(): static
     {
         parent::reset();
         $this->hints = [];
         $this->jsonSets = [];
-        $this->groupByModifier = null;
+        $this->resetGroupByModifier();
         $this->updateJoinTable = '';
         $this->updateJoinLeft = '';
         $this->updateJoinRight = '';

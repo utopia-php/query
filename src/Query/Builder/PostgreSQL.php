@@ -22,7 +22,6 @@ use Utopia\Query\Builder\Feature\TableSampling;
 use Utopia\Query\Builder\PostgreSQL\DeleteUsing;
 use Utopia\Query\Builder\PostgreSQL\MergeTarget;
 use Utopia\Query\Builder\PostgreSQL\UpdateFrom;
-use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
@@ -31,6 +30,7 @@ use Utopia\Query\Schema\ColumnType;
 class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf, ConditionalAggregates, Merge, LateralJoins, TableSampling, FullOuterJoins, StringAggregates, OrderedSetAggregates, DistinctOn, AggregateFilter, GroupByModifiers, Sequences
 {
     use Trait\FullOuterJoins;
+    use Trait\GroupByModifiers;
     use Trait\LateralJoins;
     use Trait\PostgreSQL\AggregateFilter;
     use Trait\PostgreSQL\DistinctOn;
@@ -64,8 +64,6 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
 
     /** @var list<string> */
     protected array $distinctOnColumns = [];
-
-    protected ?string $groupByModifier = null;
 
     #[\Override]
     protected function compileRandom(): string
@@ -680,12 +678,6 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     }
 
     #[\Override]
-    public function withTotals(): static
-    {
-        throw new UnsupportedException('WITH TOTALS is not supported by PostgreSQL.');
-    }
-
-    #[\Override]
     public function withRollup(): static
     {
         $this->groupByModifier = 'ROLLUP';
@@ -757,7 +749,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         $this->mergeTarget = null;
         $this->mergeClauses = [];
         $this->distinctOnColumns = [];
-        $this->groupByModifier = null;
+        $this->resetGroupByModifier();
 
         return $this;
     }
