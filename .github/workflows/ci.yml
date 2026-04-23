@@ -252,6 +252,4 @@ jobs:
             | Methods | **${{ steps.coverage.outputs.methods }}%** | ${{ steps.coverage.outputs.methods_covered }} / ${{ steps.coverage.outputs.methods_total }} |
             | Classes | **${{ steps.coverage.outputs.classes }}%** | ${{ steps.coverage.outputs.classes_covered }} / ${{ steps.coverage.outputs.classes_total }} |
 
-            _Branch coverage omitted — PCOV reports line coverage only; xdebug is 10× slower and not worth the CI time for the branch metric alone._
-
             Full per-file breakdown in the [job summary](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
