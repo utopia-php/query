@@ -592,16 +592,14 @@ class MySQLTest extends TestCase
 
     public function testOffsetOnly(): void
     {
-        // OFFSET without LIMIT is invalid in MySQL/ClickHouse, so offset is suppressed
-        $result = (new Builder())
+        // OFFSET without LIMIT is invalid in MySQL/ClickHouse; the builder refuses it.
+        $this->expectException(ValidationException::class);
+        (new Builder())
             ->from('t')
             ->offset(50)
             ->build();
-        $this->assertBindingCount($result);
-
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
-        $this->assertEquals([], $result->bindings);
     }
+
 
     public function testCursorAfter(): void
     {
@@ -2181,16 +2179,14 @@ class MySQLTest extends TestCase
 
     public function testOffsetZero(): void
     {
-        $result = (new Builder())
+        // OFFSET without LIMIT is invalid in MySQL/ClickHouse; the builder refuses it.
+        $this->expectException(ValidationException::class);
+        (new Builder())
             ->from('t')
             ->offset(0)
             ->build();
-        $this->assertBindingCount($result);
-
-        // OFFSET without LIMIT is suppressed
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
-        $this->assertEquals([], $result->bindings);
     }
+
 
     public function testFluentChainingReturnsSameInstance(): void
     {
@@ -5887,12 +5883,10 @@ class MySQLTest extends TestCase
 
     public function testNegativeOffset(): void
     {
-        // OFFSET without LIMIT is suppressed
-        $result = (new Builder())->from('t')->offset(-5)->build();
-        $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->expectException(ValidationException::class);
+        (new Builder())->from('t')->offset(-5)->build();
     }
+
 
     public function testEqualWithNullOnly(): void
     {
@@ -5993,12 +5987,10 @@ class MySQLTest extends TestCase
 
     public function testMultipleOffsetsFirstWins(): void
     {
-        // OFFSET without LIMIT is suppressed
-        $result = (new Builder())->from('t')->offset(5)->offset(50)->build();
-        $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->expectException(ValidationException::class);
+        (new Builder())->from('t')->offset(5)->offset(50)->build();
     }
+
 
     public function testCursorAfterAndBeforeFirstWins(): void
     {

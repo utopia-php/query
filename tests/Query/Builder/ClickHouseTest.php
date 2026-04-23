@@ -5517,12 +5517,10 @@ class ClickHouseTest extends TestCase
 
     public function testNegativeOffset(): void
     {
-        // OFFSET without LIMIT is suppressed
-        $result = (new Builder())->from('t')->offset(-5)->build();
-        $this->assertBindingCount($result);
-        $this->assertEquals('SELECT * FROM `t`', $result->query);
-        $this->assertEquals([], $result->bindings);
+        $this->expectException(ValidationException::class);
+        (new Builder())->from('t')->offset(-5)->build();
     }
+
 
     public function testLimitZero(): void
     {
@@ -5541,11 +5539,10 @@ class ClickHouseTest extends TestCase
 
     public function testMultipleOffsetsFirstWins(): void
     {
-        // OFFSET without LIMIT is suppressed
-        $result = (new Builder())->from('t')->offset(5)->offset(50)->build();
-        $this->assertBindingCount($result);
-        $this->assertEquals([], $result->bindings);
+        $this->expectException(ValidationException::class);
+        (new Builder())->from('t')->offset(5)->offset(50)->build();
     }
+
 
     public function testCursorAfterAndBeforeFirstWins(): void
     {
