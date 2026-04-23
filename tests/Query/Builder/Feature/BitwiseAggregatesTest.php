@@ -3,12 +3,15 @@
 namespace Tests\Query\Builder\Feature;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\ClickHouse as ClickHouseBuilder;
 use Utopia\Query\Builder\MySQL as MySQLBuilder;
 use Utopia\Query\Query;
 
 class BitwiseAggregatesTest extends TestCase
 {
+    use AssertsBindingCount;
+
     public function testBitAndWithAliasEmitsBitAndAndAsAlias(): void
     {
         $result = (new ClickHouseBuilder())
@@ -16,6 +19,7 @@ class BitwiseAggregatesTest extends TestCase
             ->bitAnd('flags', 'and_flags')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('BIT_AND(`flags`) AS `and_flags`', $result->query);
     }
 
@@ -26,6 +30,7 @@ class BitwiseAggregatesTest extends TestCase
             ->bitOr('flags', 'or_flags')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('BIT_OR(`flags`) AS `or_flags`', $result->query);
     }
 
@@ -36,6 +41,7 @@ class BitwiseAggregatesTest extends TestCase
             ->bitXor('flags', 'xor_flags')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('BIT_XOR(`flags`) AS `xor_flags`', $result->query);
     }
 
@@ -46,6 +52,7 @@ class BitwiseAggregatesTest extends TestCase
             ->bitAnd('flags')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('BIT_AND(`flags`)', $result->query);
         $this->assertStringNotContainsString('AS ``', $result->query);
     }
@@ -57,6 +64,7 @@ class BitwiseAggregatesTest extends TestCase
             ->bitAnd('flags', 'a')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('BIT_AND(`flags`) AS `a`', $result->query);
     }
 
@@ -67,6 +75,7 @@ class BitwiseAggregatesTest extends TestCase
             ->bitOr('flags', 'o')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertSame([], $result->bindings);
     }
 
@@ -78,6 +87,7 @@ class BitwiseAggregatesTest extends TestCase
             ->filter([Query::equal('tenant', ['acme'])])
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertSame(['acme'], $result->bindings);
     }
 }

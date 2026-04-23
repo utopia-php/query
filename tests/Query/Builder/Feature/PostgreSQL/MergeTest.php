@@ -3,11 +3,14 @@
 namespace Tests\Query\Builder\Feature\PostgreSQL;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\PostgreSQL as Builder;
 use Utopia\Query\Query;
 
 class MergeTest extends TestCase
 {
+    use AssertsBindingCount;
+
     public function testMergeHappyPathEmitsMergeIntoUsingOnClauses(): void
     {
         $source = (new Builder())->from('staging')->select(['id', 'name']);
@@ -20,6 +23,7 @@ class MergeTest extends TestCase
             ->whenNotMatched('INSERT (id, name) VALUES (src.id, src.name)')
             ->executeMerge();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('MERGE INTO "users"', $result->query);
         $this->assertStringContainsString('USING (', $result->query);
         $this->assertStringContainsString(') AS "src"', $result->query);
@@ -38,6 +42,7 @@ class MergeTest extends TestCase
             ->whenMatched('UPDATE SET qty = src.qty')
             ->executeMerge();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('MERGE INTO "order_lines"', $result->query);
     }
 
@@ -54,6 +59,7 @@ class MergeTest extends TestCase
             ->whenMatched('UPDATE SET name = src.name')
             ->executeMerge();
 
+        $this->assertBindingCount($result);
         // The source subquery's binding must come before any later merge
         // clause bindings.
         $this->assertSame('pending', $result->bindings[0]);
@@ -72,6 +78,7 @@ class MergeTest extends TestCase
             ->whenMatched('UPDATE SET name = src.name')
             ->executeMerge();
 
+        $this->assertBindingCount($result);
         // Source binding first, then ON-clause binding.
         $this->assertSame(['pending', 'US'], $result->bindings);
     }
@@ -87,6 +94,7 @@ class MergeTest extends TestCase
             ->whenMatched('UPDATE SET name = src.name')
             ->executeMerge();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('WHEN MATCHED', $result->query);
         $this->assertStringNotContainsString('WHEN NOT MATCHED', $result->query);
     }

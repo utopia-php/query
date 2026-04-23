@@ -3,11 +3,14 @@
 namespace Tests\Query\Builder\Feature\PostgreSQL;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\PostgreSQL as Builder;
 use Utopia\Query\Builder\VectorMetric;
 
 class VectorSearchTest extends TestCase
 {
+    use AssertsBindingCount;
+
     public function testOrderByVectorDistanceCosineUsesCosineOperator(): void
     {
         $result = (new Builder())
@@ -15,6 +18,7 @@ class VectorSearchTest extends TestCase
             ->orderByVectorDistance('embedding', [0.1, 0.2, 0.3], VectorMetric::Cosine)
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('"embedding" <=> ?::vector', $result->query);
     }
 
@@ -25,6 +29,7 @@ class VectorSearchTest extends TestCase
             ->orderByVectorDistance('embedding', [1.0, 2.0], VectorMetric::Euclidean)
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('"embedding" <-> ?::vector', $result->query);
     }
 
@@ -35,6 +40,7 @@ class VectorSearchTest extends TestCase
             ->orderByVectorDistance('embedding', [1.0, 2.0], VectorMetric::Dot)
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('"embedding" <#> ?::vector', $result->query);
     }
 
@@ -45,6 +51,7 @@ class VectorSearchTest extends TestCase
             ->orderByVectorDistance('embedding', [0.1, 0.2, 0.3], VectorMetric::Cosine)
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertSame('[0.1,0.2,0.3]', $result->bindings[0]);
     }
 
@@ -55,6 +62,7 @@ class VectorSearchTest extends TestCase
             ->orderByVectorDistance('embedding', [], VectorMetric::Cosine)
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertSame('[]', $result->bindings[0]);
     }
 
@@ -65,6 +73,7 @@ class VectorSearchTest extends TestCase
             ->orderByVectorDistance('embedding', [1.0], VectorMetric::Cosine)
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('"embedding"', $result->query);
     }
 }

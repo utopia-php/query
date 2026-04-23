@@ -3,6 +3,7 @@
 namespace Tests\Query\Builder\Feature;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\JoinType;
 use Utopia\Query\Builder\MySQL as MySQLBuilder;
 use Utopia\Query\Builder\PostgreSQL as PostgreSQLBuilder;
@@ -10,6 +11,8 @@ use Utopia\Query\Query;
 
 class LateralJoinsTest extends TestCase
 {
+    use AssertsBindingCount;
+
     public function testJoinLateralEmitsJoinLateralAndOnTrueForPostgreSQL(): void
     {
         $sub = (new PostgreSQLBuilder())->from('orders')->select(['id']);
@@ -19,6 +22,7 @@ class LateralJoinsTest extends TestCase
             ->joinLateral($sub, 'o')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('JOIN LATERAL (', $result->query);
         $this->assertStringContainsString(') AS "o" ON true', $result->query);
     }
@@ -32,6 +36,7 @@ class LateralJoinsTest extends TestCase
             ->leftJoinLateral($sub, 'o')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('LEFT JOIN LATERAL (', $result->query);
     }
 
@@ -44,6 +49,7 @@ class LateralJoinsTest extends TestCase
             ->joinLateral($sub, 'o', JoinType::Left)
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('LEFT JOIN LATERAL', $result->query);
     }
 
@@ -58,6 +64,7 @@ class LateralJoinsTest extends TestCase
             ->joinLateral($sub, 'o')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertSame([0 => 100, 1 => 'shipped'], $result->bindings);
     }
 
@@ -70,6 +77,7 @@ class LateralJoinsTest extends TestCase
             ->joinLateral($sub, 'o')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('JOIN LATERAL (', $result->query);
         $this->assertStringContainsString(') AS `o`', $result->query);
     }

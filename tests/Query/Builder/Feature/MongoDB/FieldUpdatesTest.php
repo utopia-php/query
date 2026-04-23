@@ -3,12 +3,15 @@
 namespace Tests\Query\Builder\Feature\MongoDB;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\MongoDB as Builder;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
 
 class FieldUpdatesTest extends TestCase
 {
+    use AssertsBindingCount;
+
     /**
      * @return array<string, mixed>
      */
@@ -28,6 +31,7 @@ class FieldUpdatesTest extends TestCase
             ->filter([Query::equal('_id', ['x'])])
             ->update();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var array<string, mixed> $update */
         $update = $op['update'];
@@ -44,6 +48,7 @@ class FieldUpdatesTest extends TestCase
             ->filter([Query::equal('_id', ['x'])])
             ->update();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var array<string, mixed> $update */
         $update = $op['update'];
@@ -59,6 +64,7 @@ class FieldUpdatesTest extends TestCase
             ->filter([Query::equal('_id', ['x'])])
             ->update();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var array<string, mixed> $update */
         $update = $op['update'];
@@ -74,6 +80,7 @@ class FieldUpdatesTest extends TestCase
             ->filter([Query::equal('_id', ['x'])])
             ->update();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var array<string, mixed> $update */
         $update = $op['update'];
@@ -89,6 +96,7 @@ class FieldUpdatesTest extends TestCase
             ->filter([Query::equal('_id', ['x'])])
             ->update();
 
+        $this->assertBindingCount($result);
         // Bindings: pullAll values (10, 20) then _id binding.
         $this->assertContains(10, $result->bindings);
         $this->assertContains(20, $result->bindings);
@@ -102,6 +110,7 @@ class FieldUpdatesTest extends TestCase
             ->filter([Query::equal('_id', ['x'])])
             ->update();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var array<string, mixed> $update */
         $update = $op['update'];
@@ -117,6 +126,7 @@ class FieldUpdatesTest extends TestCase
             ->filter([Query::equal('_id', ['x'])])
             ->update();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var array<string, mixed> $update */
         $update = $op['update'];

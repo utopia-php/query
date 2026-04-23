@@ -3,10 +3,13 @@
 namespace Tests\Query\Builder\Feature\PostgreSQL;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\PostgreSQL as Builder;
 
 class OrderedSetAggregatesTest extends TestCase
 {
+    use AssertsBindingCount;
+
     public function testArrayAggQuotesColumnAndAlias(): void
     {
         $result = (new Builder())
@@ -14,6 +17,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->arrayAgg('name', 'names')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('ARRAY_AGG("name") AS "names"', $result->query);
     }
 
@@ -26,6 +30,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->every('c', 'ev')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('BOOL_AND("a") AS "ba"', $result->query);
         $this->assertStringContainsString('BOOL_OR("b") AS "bo"', $result->query);
         $this->assertStringContainsString('EVERY("c") AS "ev"', $result->query);
@@ -38,6 +43,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->percentileCont(0.5, 'value', 'median')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString(
             'PERCENTILE_CONT(?) WITHIN GROUP (ORDER BY "value") AS "median"',
             $result->query,
@@ -52,6 +58,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->percentileDisc(0.95, 'value', 'p95')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString(
             'PERCENTILE_DISC(?) WITHIN GROUP (ORDER BY "value") AS "p95"',
             $result->query,
@@ -66,6 +73,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->arrayAgg('name')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('ARRAY_AGG("name")', $result->query);
         $this->assertStringNotContainsString('AS ""', $result->query);
     }
@@ -77,6 +85,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->mode('city')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString(
             'MODE() WITHIN GROUP (ORDER BY "city")',
             $result->query,
@@ -91,6 +100,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->mode('city', 'top_city')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString(
             'MODE() WITHIN GROUP (ORDER BY "city") AS "top_city"',
             $result->query,
@@ -104,6 +114,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->mode('users.city', 'top_city')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString(
             'MODE() WITHIN GROUP (ORDER BY "users"."city") AS "top_city"',
             $result->query,
@@ -118,6 +129,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->percentileCont(0.75, 'value', 'p75')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertSame([0.25, 0.75], $result->bindings);
     }
 }

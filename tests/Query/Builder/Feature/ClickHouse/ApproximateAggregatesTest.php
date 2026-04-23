@@ -3,11 +3,14 @@
 namespace Tests\Query\Builder\Feature\ClickHouse;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\ClickHouse as Builder;
 use Utopia\Query\Exception\ValidationException;
 
 class ApproximateAggregatesTest extends TestCase
 {
+    use AssertsBindingCount;
+
     public function testQuantilesEmitsMultipleLevels(): void
     {
         $result = (new Builder())
@@ -15,6 +18,7 @@ class ApproximateAggregatesTest extends TestCase
             ->quantiles([0.25, 0.5, 0.75], 'value')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('quantiles(0.25, 0.5, 0.75)(`value`)', $result->query);
     }
 
@@ -25,6 +29,7 @@ class ApproximateAggregatesTest extends TestCase
             ->quantiles([0.25, 0.5, 0.75], 'value', 'qs')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('quantiles(0.25, 0.5, 0.75)(`value`) AS `qs`', $result->query);
     }
 

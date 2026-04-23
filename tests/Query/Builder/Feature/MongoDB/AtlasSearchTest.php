@@ -3,10 +3,13 @@
 namespace Tests\Query\Builder\Feature\MongoDB;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\MongoDB as Builder;
 
 class AtlasSearchTest extends TestCase
 {
+    use AssertsBindingCount;
+
     /**
      * @return array<string, mixed>
      */
@@ -25,6 +28,7 @@ class AtlasSearchTest extends TestCase
             ->search(['text' => ['query' => 'hello', 'path' => 'body']], 'default')
             ->build();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -42,6 +46,7 @@ class AtlasSearchTest extends TestCase
             ->search(['text' => ['query' => 't', 'path' => 't']])
             ->build();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -58,6 +63,7 @@ class AtlasSearchTest extends TestCase
             ->search(['text' => ['query' => 't', 'path' => 't']])
             ->build();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -72,6 +78,7 @@ class AtlasSearchTest extends TestCase
             ->searchMeta(['facet' => []], 'default')
             ->build();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -86,6 +93,7 @@ class AtlasSearchTest extends TestCase
             ->vectorSearch('embedding', [0.1, 0.2], 50, 5, 'vi', ['category' => 'x'])
             ->build();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -107,6 +115,7 @@ class AtlasSearchTest extends TestCase
             ->vectorSearch('embedding', [0.1], 10, 1)
             ->build();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];

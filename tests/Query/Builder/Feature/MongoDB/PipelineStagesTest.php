@@ -3,10 +3,13 @@
 namespace Tests\Query\Builder\Feature\MongoDB;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\MongoDB as Builder;
 
 class PipelineStagesTest extends TestCase
 {
+    use AssertsBindingCount;
+
     /**
      * @return array<string, mixed>
      */
@@ -40,6 +43,7 @@ class PipelineStagesTest extends TestCase
             ->bucket('price', [0, 100, 200], 'Other', ['count' => ['$sum' => 1]])
             ->build();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -60,6 +64,7 @@ class PipelineStagesTest extends TestCase
             ->bucket('amount', [0, 50])
             ->build();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -79,6 +84,7 @@ class PipelineStagesTest extends TestCase
             ->bucketAuto('price', 5)
             ->build();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -100,6 +106,7 @@ class PipelineStagesTest extends TestCase
             ->facet(['a' => $facetA, 'b' => $facetB])
             ->build();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -119,6 +126,7 @@ class PipelineStagesTest extends TestCase
             ->graphLookup('users', '$manager', 'manager', '_id', 'chain')
             ->build();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -138,6 +146,7 @@ class PipelineStagesTest extends TestCase
             ->outputToCollection('archive')
             ->build();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
@@ -153,6 +162,7 @@ class PipelineStagesTest extends TestCase
             ->replaceRoot('$user')
             ->build();
 
+        $this->assertBindingCount($result);
         $op = $this->decode($result->query);
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];

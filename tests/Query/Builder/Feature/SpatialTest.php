@@ -3,11 +3,14 @@
 namespace Tests\Query\Builder\Feature;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\MySQL as MySQLBuilder;
 use Utopia\Query\Builder\PostgreSQL as PostgreSQLBuilder;
 
 class SpatialTest extends TestCase
 {
+    use AssertsBindingCount;
+
     public function testFilterDistanceBindsPointAndDistanceInOrder(): void
     {
         $result = (new MySQLBuilder())
@@ -15,6 +18,7 @@ class SpatialTest extends TestCase
             ->filterDistance('coords', [10.5, 20.25], '<', 100.0)
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertSame([0 => 'POINT(10.5 20.25)', 1 => 100.0], $result->bindings);
     }
 
@@ -25,6 +29,7 @@ class SpatialTest extends TestCase
             ->filterIntersects('area', [1.0, 2.0])
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('ST_Intersects(`area`', $result->query);
     }
 
@@ -35,6 +40,7 @@ class SpatialTest extends TestCase
             ->filterIntersects('area', [1.0, 2.0])
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('ST_Intersects("area"', $result->query);
     }
 
@@ -45,6 +51,7 @@ class SpatialTest extends TestCase
             ->filterNotIntersects('area', [1.0, 2.0])
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('NOT ST_Intersects', $result->query);
     }
 
@@ -55,6 +62,7 @@ class SpatialTest extends TestCase
             ->filterCovers('region', [1.0, 2.0])
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('ST_Covers(', $result->query);
     }
 
@@ -65,6 +73,7 @@ class SpatialTest extends TestCase
             ->filterSpatialEquals('area', [3.0, 4.0])
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('ST_Equals(', $result->query);
     }
 
@@ -75,6 +84,7 @@ class SpatialTest extends TestCase
             ->filterTouches('area', [1.0, 2.0])
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('ST_Touches(', $result->query);
     }
 
@@ -85,6 +95,7 @@ class SpatialTest extends TestCase
             ->filterCrosses('path', [[0.0, 0.0], [1.0, 1.0]])
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertIsString($result->bindings[0]);
         $this->assertStringContainsString('LINESTRING', $result->bindings[0]);
     }
@@ -97,6 +108,7 @@ class SpatialTest extends TestCase
             ->filterNotOverlaps('b', [2.0, 2.0])
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertCount(2, $result->bindings);
         $this->assertSame('POINT(1 1)', $result->bindings[0]);
         $this->assertSame('POINT(2 2)', $result->bindings[1]);

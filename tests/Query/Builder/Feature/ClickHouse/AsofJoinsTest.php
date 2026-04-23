@@ -3,6 +3,7 @@
 namespace Tests\Query\Builder\Feature\ClickHouse;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\ClickHouse as Builder;
 use Utopia\Query\Builder\ClickHouse\AsofOperator;
 use Utopia\Query\Exception\ValidationException;
@@ -10,6 +11,8 @@ use Utopia\Query\Query;
 
 class AsofJoinsTest extends TestCase
 {
+    use AssertsBindingCount;
+
     public function testAsofJoinEmitsEquiAndInequalityConditions(): void
     {
         $result = (new Builder())
@@ -23,6 +26,7 @@ class AsofJoinsTest extends TestCase
             )
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString(
             'ASOF JOIN `quotes` ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`ts` >= `quotes`.`ts`',
             $result->query,
@@ -43,6 +47,7 @@ class AsofJoinsTest extends TestCase
             )
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString(
             'ASOF JOIN `quotes` AS `q` ON `trades`.`symbol` = `q`.`symbol` AND `trades`.`ts` > `q`.`ts`',
             $result->query,
@@ -65,6 +70,7 @@ class AsofJoinsTest extends TestCase
             )
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString(
             'ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`exchange` = `quotes`.`exchange` AND `trades`.`ts` >= `quotes`.`ts`',
             $result->query,
@@ -84,6 +90,7 @@ class AsofJoinsTest extends TestCase
             )
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('ASOF LEFT JOIN `quotes`', $result->query);
     }
 
@@ -118,6 +125,7 @@ class AsofJoinsTest extends TestCase
             ->filter([Query::equal('trades.symbol', ['AAPL'])])
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertLessThan(\strpos($result->query, 'WHERE'), \strpos($result->query, 'ASOF JOIN'));
         $this->assertSame(['AAPL'], $result->bindings);
     }
@@ -135,6 +143,7 @@ class AsofJoinsTest extends TestCase
             )
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertSame([], $result->bindings);
     }
 }

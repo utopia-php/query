@@ -3,11 +3,14 @@
 namespace Tests\Query\Builder\Feature\PostgreSQL;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\PostgreSQL as Builder;
 use Utopia\Query\Query;
 
 class ReturningTest extends TestCase
 {
+    use AssertsBindingCount;
+
     public function testInsertReturningListQuotesColumns(): void
     {
         $result = (new Builder())
@@ -16,6 +19,7 @@ class ReturningTest extends TestCase
             ->returning(['id', 'name'])
             ->insert();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('RETURNING "id", "name"', $result->query);
     }
 
@@ -27,6 +31,7 @@ class ReturningTest extends TestCase
             ->returning()
             ->insert();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('RETURNING *', $result->query);
     }
 
@@ -40,6 +45,7 @@ class ReturningTest extends TestCase
             ->returning([])
             ->insert();
 
+        $this->assertBindingCount($result);
         $this->assertStringNotContainsString('RETURNING', $result->query);
     }
 
@@ -52,6 +58,7 @@ class ReturningTest extends TestCase
             ->returning(['id'])
             ->update();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('RETURNING "id"', $result->query);
     }
 
@@ -63,6 +70,7 @@ class ReturningTest extends TestCase
             ->returning(['id'])
             ->delete();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('RETURNING "id"', $result->query);
     }
 
@@ -75,6 +83,7 @@ class ReturningTest extends TestCase
             ->returning(['id', 'name'])
             ->update();
 
+        $this->assertBindingCount($result);
         // RETURNING should not add bindings; only SET and WHERE contribute.
         $this->assertSame([0 => 'Jane', 1 => 42], $result->bindings);
     }

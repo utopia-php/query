@@ -3,11 +3,14 @@
 namespace Tests\Query\Builder\Feature\ClickHouse;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\ClickHouse as Builder;
 use Utopia\Query\Query;
 
 class ArrayJoinsTest extends TestCase
 {
+    use AssertsBindingCount;
+
     public function testArrayJoinEmitsArrayJoinClauseAndQuotesColumn(): void
     {
         $result = (new Builder())
@@ -15,6 +18,7 @@ class ArrayJoinsTest extends TestCase
             ->arrayJoin('tags')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('ARRAY JOIN `tags`', $result->query);
     }
 
@@ -25,6 +29,7 @@ class ArrayJoinsTest extends TestCase
             ->arrayJoin('tags', 'tag')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
     }
 
@@ -35,6 +40,7 @@ class ArrayJoinsTest extends TestCase
             ->leftArrayJoin('tags')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('LEFT ARRAY JOIN `tags`', $result->query);
     }
 
@@ -45,6 +51,7 @@ class ArrayJoinsTest extends TestCase
             ->leftArrayJoin('tags', 'tag')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('LEFT ARRAY JOIN `tags` AS `tag`', $result->query);
     }
 
@@ -55,6 +62,7 @@ class ArrayJoinsTest extends TestCase
             ->arrayJoin('tags', '')
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertStringContainsString('ARRAY JOIN `tags`', $result->query);
         $this->assertStringNotContainsString('AS ``', $result->query);
     }
@@ -67,6 +75,7 @@ class ArrayJoinsTest extends TestCase
             ->filter([Query::equal('tag', ['important'])])
             ->build();
 
+        $this->assertBindingCount($result);
         $this->assertLessThan(\strpos($result->query, 'WHERE'), \strpos($result->query, 'ARRAY JOIN'));
         $this->assertSame(['important'], $result->bindings);
     }
