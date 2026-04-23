@@ -12,6 +12,7 @@ use Utopia\Query\Parser\PostgreSQL as PostgreSQLParser;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\Index;
 use Utopia\Query\Schema\MySQL as MySQLSchema;
+use Utopia\Query\Schema\ParameterDirection;
 use Utopia\Query\Schema\PostgreSQL as PostgreSQLSchema;
 use Utopia\Query\Type;
 
@@ -229,5 +230,67 @@ class SecurityRegressionTest extends TestCase
             columns: ['name'],
             collations: ['name' => '"en_US"'],
         );
+    }
+
+    public function testCreateProcedureRejectsCommaInjectionInType(): void
+    {
+        $schema = new PostgreSQLSchema();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid procedure parameter type');
+
+        $schema->createProcedure('p', [
+            [ParameterDirection::In, 'x', 'VARCHAR(255), DROP TABLE x --'],
+        ], 'SELECT 1');
+    }
+
+    public function testSelectCastRejectsCommaInjectionInType(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid cast type');
+
+        (new MySQLBuilder())
+            ->from('t')
+            ->selectCast('c', 'VARCHAR(255), DROP TABLE x --', 'a');
+    }
+
+    public function testSelectCastRejectsQuoteInjectionInType(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid cast type');
+
+        (new MySQLBuilder())
+            ->from('t')
+            ->selectCast('c', "INT'; DROP TABLE x; --", 'a');
+    }
+
+    public function testSelectCastRejectsCommentSequenceInType(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid cast type');
+
+        (new MySQLBuilder())
+            ->from('t')
+            ->selectCast('c', 'INT /* danger */', 'a');
+    }
+
+    public function testAlterColumnTypeRejectsCommaInjectionInType(): void
+    {
+        $schema = new PostgreSQLSchema();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid column type');
+
+        $schema->alterColumnType('users', 'age', 'INTEGER, DROP TABLE users --');
+    }
+
+    public function testSelectCastAcceptsStructuredType(): void
+    {
+        $result = (new MySQLBuilder())
+            ->from('t')
+            ->selectCast('c', 'DECIMAL(10, 2)', 'a')
+            ->build();
+
+        $this->assertStringContainsString('CAST(`c` AS DECIMAL(10, 2))', $result->query);
     }
 }

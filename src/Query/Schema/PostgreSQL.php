@@ -429,7 +429,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
      */
     public function alterColumnType(string $table, string $column, string $type, string $using = ''): Statement
     {
-        if (! \preg_match('/^[A-Za-z0-9_() ,]+$/', $type)) {
+        if (! \preg_match('/^[A-Za-z_][A-Za-z0-9_]*(\s+[A-Za-z_][A-Za-z0-9_]*)*(\s*\(\s*[A-Za-z0-9_,\s]+\s*\))?$/', $type)) {
             throw new ValidationException('Invalid column type: ' . $type);
         }
 
