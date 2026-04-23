@@ -303,7 +303,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
             ->select(['user_id'])
             ->count('*', 'order_count')
             ->groupBy(['user_id'])
-            ->havingRaw('COUNT(*) > ?', [1])
+            ->having([Query::greaterThan('order_count', 1)])
             ->sortAsc('user_id')
             ->build();
 
