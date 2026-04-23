@@ -838,7 +838,8 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
 
         $result = (new Builder())
             ->from('left_side', 'l')
-            ->select(['l.id', 'r.id'])
+            ->selectRaw('"l"."id" AS "left_id"')
+            ->selectRaw('"r"."id" AS "right_id"')
             ->fullOuterJoin('right_side', 'l.id', 'r.id', '=', 'r')
             ->build();
 
@@ -846,11 +847,22 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
 
         $this->assertCount(3, $rows);
 
-        $leftIds = array_map(static fn (array $r): ?int => $r['id'] === null ? null : (int) $r['id'], $rows); // @phpstan-ignore cast.int
-        sort($leftIds);
-        $this->assertContains(null, $leftIds);
+        $leftIds = array_map(
+            static fn (array $r): ?int => $r['left_id'] === null ? null : (int) $r['left_id'], // @phpstan-ignore cast.int
+            $rows,
+        );
+        $rightIds = array_map(
+            static fn (array $r): ?int => $r['right_id'] === null ? null : (int) $r['right_id'], // @phpstan-ignore cast.int
+            $rows,
+        );
+
         $this->assertContains(1, $leftIds);
         $this->assertContains(2, $leftIds);
+        $this->assertContains(null, $leftIds);
+
+        $this->assertContains(2, $rightIds);
+        $this->assertContains(3, $rightIds);
+        $this->assertContains(null, $rightIds);
     }
 
     public function testTableSampleBernoulli(): void
