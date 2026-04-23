@@ -278,7 +278,8 @@ class MySQLIntegrationTest extends IntegrationTestCase
             $violation->execute();
             $this->fail('Expected CHECK constraint violation');
         } catch (\PDOException $e) {
-            $this->assertStringContainsString('3819', (string) $e->getCode());
+            $this->assertIsArray($e->errorInfo);
+            $this->assertSame(3819, $e->errorInfo[1]);
         }
     }
 
