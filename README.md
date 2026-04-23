@@ -30,12 +30,14 @@ composer require utopia-php/query
   - [Helpers](#helpers)
 - [Query Builder](#query-builder)
   - [Basic Usage](#basic-usage)
+  - [Raw and Column Predicates](#raw-and-column-predicates)
   - [Aggregations](#aggregations)
   - [Statistical Aggregates](#statistical-aggregates)
   - [Bitwise Aggregates](#bitwise-aggregates)
   - [Conditional Aggregates](#conditional-aggregates)
   - [String Aggregates](#string-aggregates)
   - [Group By Modifiers](#group-by-modifiers)
+  - [Sequences](#sequences)
   - [Joins](#joins)
   - [Unions and Set Operations](#unions-and-set-operations)
   - [CTEs (Common Table Expressions)](#ctes-common-table-expressions)
@@ -63,6 +65,9 @@ composer require utopia-php/query
 - [Schema Builder](#schema-builder)
   - [Creating Tables](#creating-tables)
   - [Altering Tables](#altering-tables)
+  - [CHECK Constraints](#check-constraints)
+  - [Generated Columns](#generated-columns)
+  - [Composite Primary Keys](#composite-primary-keys)
   - [Indexes](#indexes)
   - [Foreign Keys](#foreign-keys)
   - [Partitions](#partitions)
@@ -113,8 +118,10 @@ Query::endsWith('filename', '.pdf');
 Query::search('content', 'hello world');
 Query::regex('slug', '^[a-z0-9-]+$');
 
-// Array / contains
-Query::contains('tags', ['php', 'utopia']);
+// Substring matching (LIKE '%value%')
+Query::containsString('title', ['urgent', 'important']);
+
+// Array / containment (for array or relationship attributes)
 Query::containsAny('categories', ['news', 'blog']);
 Query::containsAll('permissions', ['read', 'write']);
 Query::notContains('labels', ['deprecated']);
@@ -131,6 +138,8 @@ Query::notExists('legacyField');
 Query::createdAfter('2024-01-01');
 Query::updatedBetween('2024-01-01', '2024-06-30');
 ```
+
+> **Note:** `Query::contains()` is deprecated — use `Query::containsString()` for string substring matching or `Query::containsAny()` for array/relationship attributes.
 
 ### Ordering and Pagination
 
@@ -224,9 +233,11 @@ $queries = Query::parseQueries([$json1, $json2]);
 ### Helpers
 
 ```php
-// Group queries by type
-$grouped = Query::groupByType($queries);
-// $grouped->filters, $grouped->limit, $grouped->orderAttributes, etc.
+// Group queries by type — returns a ParsedQuery value object
+$parsed = Query::groupByType($queries);
+// $parsed->filters, $parsed->selections, $parsed->aggregations, $parsed->groupBy,
+// $parsed->having, $parsed->joins, $parsed->unions, $parsed->limit, $parsed->offset,
+// $parsed->cursor, $parsed->cursorDirection, $parsed->distinct
 
 // Filter by method type
 $cursors = Query::getByType($queries, [Method::CursorAfter, Method::CursorBefore]);
@@ -246,12 +257,12 @@ $errors = Query::validate($queries, ['name', 'age', 'status']);
 
 ## Query Builder
 
-The builder generates parameterized queries from the fluent API. Every `build()`, `insert()`, `update()`, and `delete()` call returns a `Plan` with `->query` (the query string), `->bindings` (the parameter array), and `->readOnly` (whether the query is read-only).
+The builder generates parameterized queries from the fluent API. Every `build()`, `insert()`, `update()`, and `delete()` call returns a `Statement` with `->query` (the query string), `->bindings` (the parameter array), and `->readOnly` (whether the query is read-only).
 
 Six dialect implementations are provided:
 
 - `Utopia\Query\Builder\MySQL` — MySQL
-- `Utopia\Query\Builder\MariaDB` — MariaDB (extends MySQL with dialect-specific spatial handling)
+- `Utopia\Query\Builder\MariaDB` — MariaDB (extends MySQL with `RETURNING`, sequences, and dialect-specific spatial handling)
 - `Utopia\Query\Builder\PostgreSQL` — PostgreSQL
 - `Utopia\Query\Builder\SQLite` — SQLite
 - `Utopia\Query\Builder\ClickHouse` — ClickHouse
@@ -308,6 +319,40 @@ $result = (new Builder())
 $stmt = $pdo->prepare($result->query);
 $stmt->execute($result->bindings);
 $rows = $stmt->fetchAll();
+```
+
+### Raw and Column Predicates
+
+In addition to the typed `filter()` API, two escape hatches are available on every SQL dialect (MySQL, MariaDB, PostgreSQL, SQLite, ClickHouse). Both throw `ValidationException` on the MongoDB builder.
+
+**`whereRaw()`** — emit a raw SQL fragment with its own bindings. The caller owns the SQL:
+
+```php
+use Utopia\Query\Builder\MySQL as Builder;
+
+$result = (new Builder())
+    ->from('users')
+    ->whereRaw('LENGTH(`bio`) > ?', [100])
+    ->build();
+
+// SELECT * FROM `users` WHERE LENGTH(`bio`) > ?
+```
+
+**`whereColumn()`** — typed column-to-column predicate with quoting. The operator is validated against `['=', '!=', '<>', '<', '>', '<=', '>=']`:
+
+```php
+// Correlated subquery for a lateral join
+$topOrder = (new Builder())
+    ->from('orders')
+    ->select(['product', 'amount'])
+    ->whereColumn('orders.user_id', '=', 'u.id')
+    ->sortDesc('amount')
+    ->limit(1);
+
+$result = (new Builder())
+    ->from('users', 'u')
+    ->joinLateral($topOrder, 'top_order')
+    ->build();
 ```
 
 ### Aggregations
@@ -437,7 +482,7 @@ $result = (new Builder())
     ->withRollup()
     ->build();
 
-// WITH CUBE — adds subtotals for all dimension combinations
+// WITH CUBE — adds subtotals for all dimension combinations (MySQL 8.0.1+, PostgreSQL, ClickHouse)
 $result = (new Builder())
     ->from('sales')
     ->select(['region', 'product'])
@@ -447,12 +492,35 @@ $result = (new Builder())
     ->build();
 
 // WITH TOTALS (ClickHouse) — adds a totals row
-$result = (new \Utopia\Query\Builder\ClickHouse())
+use Utopia\Query\Builder\ClickHouse as ChBuilder;
+
+$result = (new ChBuilder())
     ->from('events')
     ->select(['event_type'])
     ->count('*', 'cnt')
     ->groupBy(['event_type'])
     ->withTotals()
+    ->build();
+```
+
+### Sequences
+
+Available on MariaDB and PostgreSQL via the `Sequences` interface. Emits `NEXTVAL()` and `CURRVAL()` as select expressions:
+
+```php
+use Utopia\Query\Builder\PostgreSQL as Builder;
+
+// Advance the sequence and return the next value
+$result = (new Builder())
+    ->nextVal('order_seq', 'next_id')
+    ->build();
+
+// PostgreSQL: SELECT nextval('order_seq') AS "next_id"
+// MariaDB:    SELECT NEXTVAL(`order_seq`) AS `next_id`
+
+// Return the session-local current value
+$result = (new Builder())
+    ->currVal('order_seq', 'current_id')
     ->build();
 ```
 
@@ -493,7 +561,9 @@ $result = (new Builder())
 **Full outer joins** (PostgreSQL, ClickHouse):
 
 ```php
-$result = (new \Utopia\Query\Builder\PostgreSQL())
+use Utopia\Query\Builder\PostgreSQL as Builder;
+
+$result = (new Builder())
     ->from('left_table')
     ->fullOuterJoin('right_table', 'left_table.id', 'right_table.id')
     ->build();
@@ -501,10 +571,13 @@ $result = (new \Utopia\Query\Builder\PostgreSQL())
 // SELECT * FROM "left_table" FULL OUTER JOIN "right_table" ON "left_table"."id" = "right_table"."id"
 ```
 
-**Lateral joins** (MySQL, PostgreSQL):
+**Lateral joins** (MySQL, MariaDB, PostgreSQL):
 
 ```php
-$sub = (new Builder())->from('orders')->filter([Query::raw('orders.user_id = users.id')])->limit(3);
+$sub = (new Builder())
+    ->from('orders')
+    ->whereColumn('orders.user_id', '=', 'users.id')
+    ->limit(3);
 
 $result = (new Builder())
     ->from('users')
@@ -625,20 +698,20 @@ Supported WHEN shapes:
 
 ### Inserts
 
+`set()` takes an associative row array. Calling it multiple times appends rows for a batch insert:
+
 ```php
 // Single row
 $result = (new Builder())
     ->into('users')
-    ->set('name', 'Alice')
-    ->set('email', 'alice@example.com')
+    ->set(['name' => 'Alice', 'email' => 'alice@example.com'])
     ->insert();
 
-// Batch insert
+// Batch insert — one set() call per row
 $result = (new Builder())
     ->into('users')
-    ->set('name', 'Alice')->set('email', 'alice@example.com')
-    ->addRow()
-    ->set('name', 'Bob')->set('email', 'bob@example.com')
+    ->set(['name' => 'Alice', 'email' => 'alice@example.com'])
+    ->set(['name' => 'Bob', 'email' => 'bob@example.com'])
     ->insert();
 
 // INSERT ... SELECT
@@ -646,7 +719,7 @@ $source = (new Builder())->from('archived_users')->filter([Query::equal('status'
 
 $result = (new Builder())
     ->into('users')
-    ->fromSelect($source, ['name', 'email'])
+    ->fromSelect(['name', 'email'], $source)
     ->insertSelect();
 ```
 
@@ -655,7 +728,7 @@ $result = (new Builder())
 ```php
 $result = (new Builder())
     ->from('users')
-    ->set('status', 'inactive')
+    ->set(['status' => 'inactive'])
     ->setRaw('updated_at', 'NOW()')
     ->filter([Query::equal('id', [42])])
     ->update();
@@ -678,21 +751,23 @@ $result = (new Builder())
 
 Available on MySQL, PostgreSQL, and SQLite builders (`Builder\SQL` subclasses):
 
+`onConflict()` takes the conflict key columns and the columns to update on conflict:
+
 ```php
 // MySQL — ON DUPLICATE KEY UPDATE
 $result = (new Builder())
     ->into('counters')
-    ->set('key', 'visits')
-    ->set('value', 1)
-    ->onConflict(['key'])
+    ->set(['key' => 'visits', 'value' => 1])
+    ->onConflict(['key'], ['value'])
     ->upsert();
 
 // PostgreSQL — ON CONFLICT (...) DO UPDATE SET
-$result = (new \Utopia\Query\Builder\PostgreSQL())
+use Utopia\Query\Builder\PostgreSQL as PgBuilder;
+
+$result = (new PgBuilder())
     ->into('counters')
-    ->set('key', 'visits')
-    ->set('value', 1)
-    ->onConflict(['key'])
+    ->set(['key' => 'visits', 'value' => 1])
+    ->onConflict(['key'], ['value'])
     ->upsert();
 ```
 
@@ -701,9 +776,8 @@ $result = (new \Utopia\Query\Builder\PostgreSQL())
 ```php
 $result = (new Builder())
     ->into('counters')
-    ->set('key', 'visits')
-    ->set('value', 1)
-    ->onConflict(['key'])
+    ->set(['key' => 'visits', 'value' => 1])
+    ->onConflict(['key'], [])
     ->insertOrIgnore();
 
 // MySQL:      INSERT IGNORE INTO `counters` ...
@@ -718,8 +792,8 @@ $source = (new Builder())->from('staging')->select(['key', 'value']);
 
 $result = (new Builder())
     ->into('counters')
-    ->fromSelect($source, ['key', 'value'])
-    ->onConflict(['key'])
+    ->fromSelect(['key', 'value'], $source)
+    ->onConflict(['key'], ['value'])
     ->upsertSelect();
 ```
 
@@ -760,6 +834,8 @@ $builder->rollback();         // ROLLBACK
 Available on all builders. MySQL and PostgreSQL provide extended options:
 
 ```php
+use Utopia\Query\Builder\MySQL as Builder;
+
 // Basic explain
 $result = (new Builder())
     ->from('users')
@@ -767,12 +843,14 @@ $result = (new Builder())
     ->explain();
 
 // MySQL — with format
-$result = (new \Utopia\Query\Builder\MySQL())
+$result = (new Builder())
     ->from('users')
     ->explain(analyze: true, format: 'JSON');
 
 // PostgreSQL — with analyze, verbose, buffers, format
-$result = (new \Utopia\Query\Builder\PostgreSQL())
+use Utopia\Query\Builder\PostgreSQL as PgBuilder;
+
+$result = (new PgBuilder())
     ->from('users')
     ->explain(analyze: true, verbose: true, buffers: true, format: 'JSON');
 ```
@@ -784,7 +862,7 @@ $result = (new \Utopia\Query\Builder\PostgreSQL())
 ```php
 $result = (new Builder())
     ->from('users')
-    ->when($filterActive, fn(Builder $b) => $b->filter([Query::equal('status', ['active'])]))
+    ->when($filterActive, fn (Builder $b) => $b->filter([Query::equal('status', ['active'])]))
     ->build();
 ```
 
@@ -801,10 +879,12 @@ $withSort = $base->clone()->sortAsc('name');
 **Build callbacks** run before or after building:
 
 ```php
+use Utopia\Query\Builder\Statement;
+
 $result = (new Builder())
     ->from('users')
-    ->beforeBuild(fn(Builder $b) => $b->filter([Query::isNotNull('email')]))
-    ->afterBuild(fn(Plan $r) => new Plan("/* traced */ {$r->query}", $r->bindings, $r->readOnly))
+    ->beforeBuild(fn (Builder $b) => $b->filter([Query::isNotNull('email')]))
+    ->afterBuild(fn (Statement $s) => new Statement("/* traced */ {$s->query}", $s->bindings, $s->readOnly))
     ->build();
 ```
 
@@ -947,15 +1027,22 @@ $result = (new Builder())
 
 // WHERE JSON_CONTAINS(`tags`, ?) AND JSON_EXTRACT(`metadata`, '$.color') = ?
 
-// Mutations (in UPDATE)
+// Mutations (in UPDATE) — combine with set() or setRaw() as needed
 $result = (new Builder())
     ->from('products')
     ->filter([Query::equal('id', [1])])
     ->setJsonAppend('tags', ['new-tag'])
     ->update();
+
+// Set a JSON path to a typed value — JSON_SET on MySQL, jsonb_set on PostgreSQL, json_set on SQLite
+$result = (new Builder())
+    ->from('products')
+    ->filter([Query::equal('id', [1])])
+    ->setJsonPath('metadata', '$.level', 42)
+    ->update();
 ```
 
-JSON mutation methods: `setJsonAppend`, `setJsonPrepend`, `setJsonInsert`, `setJsonRemove`, `setJsonIntersect`, `setJsonDiff`, `setJsonUnique`.
+JSON mutation methods: `setJsonAppend`, `setJsonPrepend`, `setJsonInsert`, `setJsonRemove`, `setJsonIntersect`, `setJsonDiff`, `setJsonUnique`, `setJsonPath`.
 
 **Query hints:**
 
@@ -985,7 +1072,7 @@ $result = (new Builder())
 ```php
 $result = (new Builder())
     ->from('users')
-    ->set('status', 'premium')
+    ->set(['status' => 'premium'])
     ->updateJoin('orders', 'users.id', 'orders.user_id')
     ->filter([Query::greaterThan('orders.total', 1000)])
     ->update();
@@ -995,10 +1082,13 @@ $result = (new Builder())
 
 ```php
 $result = (new Builder())
-    ->from('users')
-    ->deleteUsing('u', 'orders', 'u.id', 'orders.user_id')
+    ->from('users', 'u')
+    ->deleteJoin('u', 'orders', 'u.id', 'orders.user_id')
     ->filter([Query::equal('orders.status', ['cancelled'])])
     ->delete();
+
+// DELETE `u` FROM `users` AS `u` JOIN `orders` ON `u`.`id` = `orders`.`user_id`
+//   WHERE `orders`.`status` IN (?)
 ```
 
 ### MariaDB
@@ -1007,12 +1097,37 @@ $result = (new Builder())
 use Utopia\Query\Builder\MariaDB as Builder;
 ```
 
-Extends MySQL with MariaDB-specific spatial handling:
-- Uses `ST_DISTANCE_SPHERE()` for meter-based distance calculations
-- Uses `ST_GeomFromText()` without the `axis-order` parameter
-- Validates that distance-in-meters only works between POINT types
+Extends MySQL with MariaDB-specific features and spatial handling:
 
-All other MySQL features (JSON, hints, lateral joins, etc.) are inherited.
+- Uses `ST_DISTANCE_SPHERE()` for meter-based distance calculations.
+- Uses `ST_GeomFromText()` without the `axis-order` parameter.
+- Validates that distance-in-meters only works between POINT types.
+
+All MySQL features (JSON, hints, lateral joins, UPDATE/DELETE JOIN, etc.) are inherited.
+
+**`RETURNING`** (MariaDB 10.5+) — get affected rows back from `INSERT`, `UPDATE`, or `DELETE`:
+
+```php
+$result = (new Builder())
+    ->into('users')
+    ->set(['name' => 'Alice'])
+    ->returning(['id', 'created_at'])
+    ->insert();
+
+// INSERT INTO `users` (`name`) VALUES (?) RETURNING `id`, `created_at`
+```
+
+`returning()` cannot be combined with `upsert()` — MariaDB does not support `RETURNING` with `ON DUPLICATE KEY UPDATE`. Doing so throws `ValidationException`. Clear the returning columns with `returning([])` first, or issue a separate `update()` statement.
+
+**Sequences** — native sequence support via `nextVal()` and `currVal()`:
+
+```php
+$result = (new Builder())
+    ->nextVal('order_seq', 'next_id')
+    ->build();
+
+// SELECT NEXTVAL(`order_seq`) AS `next_id`
+```
 
 ### PostgreSQL
 
@@ -1057,6 +1172,15 @@ $result = (new Builder())
     ->build();
 
 // WHERE "tags" @> ?::jsonb
+
+// setJsonPath compiles to jsonb_set with a translated text-array path
+$result = (new Builder())
+    ->from('products')
+    ->filter([Query::equal('id', [1])])
+    ->setJsonPath('data', '$.name', 'NewValue')
+    ->update();
+
+// UPDATE "products" SET "data" = jsonb_set("data", '{name}', to_jsonb(?::text), true) WHERE "id" IN (?)
 ```
 
 **Full-text search** — `to_tsvector() @@ websearch_to_tsquery()`:
@@ -1077,7 +1201,7 @@ $result = (new Builder())
 ```php
 $result = (new Builder())
     ->into('users')
-    ->set('name', 'Alice')
+    ->set(['name' => 'Alice'])
     ->returning(['id', 'created_at'])
     ->insert();
 
@@ -1120,10 +1244,14 @@ $result = (new Builder())
     ->arrayAgg('name', 'all_names')
     ->percentileCont(0.5, 'salary', 'median_salary')
     ->percentileDisc(0.9, 'salary', 'p90_salary')
+    ->mode('city', 'top_city')
     ->boolAnd('is_active', 'all_active')
     ->boolOr('is_admin', 'any_admin')
     ->every('is_verified', 'all_verified')
     ->build();
+
+// mode() emits `mode() WITHIN GROUP (ORDER BY "city") AS "top_city"` — returns the most
+// frequent value in the column (ties broken arbitrarily).
 ```
 
 **MERGE** — SQL standard MERGE statement:
@@ -1146,17 +1274,21 @@ $result = (new Builder())
 // UPDATE ... FROM
 $result = (new Builder())
     ->from('users')
-    ->set('status', 'premium')
+    ->set(['status' => 'premium'])
     ->updateFrom('orders', 'o')
     ->updateFromWhere('"users"."id" = "o"."user_id"')
     ->update();
 
-// DELETE ... USING
+// DELETE ... USING — PostgreSQL semantics differ from MySQL's deleteJoin
 $result = (new Builder())
     ->from('users')
     ->deleteUsing('old_users', '"users"."id" = "old_users"."id"')
     ->delete();
 ```
+
+**Sequences** — native sequence support via `nextVal()` / `currVal()` (see [Sequences](#sequences)).
+
+**Recursive CTEs** — both `withRecursive()` and `withRecursiveSeedStep()` compile to standard `WITH RECURSIVE` syntax.
 
 **Table sampling:**
 
@@ -1177,11 +1309,12 @@ use Utopia\Query\Builder\SQLite as Builder;
 ```
 
 Extends `Builder\SQL` with SQLite-specific behavior:
-- JSON support via `json_each()` and `json_extract()`
-- Conditional aggregates using `CASE WHEN` syntax
-- `INSERT OR IGNORE` for insertOrIgnore
-- Regex and full-text search throw `UnsupportedException`
-- Spatial queries throw `UnsupportedException`
+
+- JSON support via `json_each()` and `json_extract()`. `setJsonPath` compiles to `json_set`.
+- Conditional aggregates using `CASE WHEN` syntax.
+- `INSERT OR IGNORE` for `insertOrIgnore()`.
+- Regex and full-text search throw `UnsupportedException`.
+- Spatial queries throw `UnsupportedException`.
 
 ### ClickHouse
 
@@ -1265,22 +1398,33 @@ $result = (new Builder())
     ->build();
 ```
 
-**ASOF JOIN** — join on the closest matching row (time-series):
+**ASOF JOIN** — join on the closest matching row (time-series). Requires one or more equi-join pairs plus exactly one inequality condition:
 
 ```php
+use Utopia\Query\Builder\ClickHouse\AsofOperator;
+
+// For each trade, find the most recent quote with the same symbol
 $result = (new Builder())
-    ->from('trades')
-    ->asofJoin('quotes', 'trades.timestamp', 'quotes.timestamp', 'q')
+    ->from('trades', 't')
+    ->select(['t.symbol', 't.ts', 't.price', 'q.bid'])
+    ->asofJoin(
+        table: 'quotes',
+        equiPairs: ['t.symbol' => 'q.symbol'],
+        leftInequality: 't.ts',
+        operator: AsofOperator::GreaterThanEqual,
+        rightInequality: 'q.ts',
+        alias: 'q',
+    )
+    ->sortAsc('t.ts')
     ->build();
 
-// SELECT * FROM `trades` ASOF JOIN `quotes` AS `q` ON `trades`.`timestamp` >= `quotes`.`timestamp`
-
-// LEFT variant
-$result = (new Builder())
-    ->from('trades')
-    ->asofLeftJoin('quotes', 'trades.timestamp', 'quotes.timestamp')
-    ->build();
+// SELECT `t`.`symbol`, `t`.`ts`, `t`.`price`, `q`.`bid` FROM `trades` AS `t`
+//   ASOF JOIN `quotes` AS `q`
+//     ON `t`.`symbol` = `q`.`symbol` AND `t`.`ts` >= `q`.`ts`
+//   ORDER BY `t`.`ts` ASC
 ```
+
+`asofLeftJoin()` takes the same arguments and emits `ASOF LEFT JOIN`, preserving left rows with no match. `AsofOperator` variants: `LessThan`, `LessThanEqual`, `GreaterThan`, `GreaterThanEqual`.
 
 **ORDER BY ... WITH FILL** — fill gaps in ordered results:
 
@@ -1300,6 +1444,7 @@ $result = (new Builder())
 $result = (new Builder())
     ->from('events')
     ->quantile(0.95, 'response_time', 'p95')
+    ->quantiles([0.25, 0.5, 0.75, 0.95], 'response_time', 'quartiles')
     ->quantileExact(0.99, 'response_time', 'p99')
     ->median('response_time', 'med')
     ->uniq('user_id', 'approx_users')
@@ -1307,14 +1452,10 @@ $result = (new Builder())
     ->uniqCombined('user_id', 'combined_users')
     ->build();
 
-// SELECT quantile(0.95)(`response_time`) AS `p95`,
-//   quantileExact(0.99)(`response_time`) AS `p99`,
-//   median(`response_time`) AS `med`,
-//   uniq(`user_id`) AS `approx_users`,
-//   uniqExact(`user_id`) AS `exact_users`,
-//   uniqCombined(`user_id`) AS `combined_users`
-//   FROM `events`
+// quantiles(0.25, 0.5, 0.75, 0.95)(`response_time`) AS `quartiles`
 ```
+
+`quantiles()` computes multiple quantile levels in a single pass. Levels are validated to be in `[0, 1]`; the array must be non-empty.
 
 Additional approximate aggregates: `argMin()`, `argMax()`, `topK()`, `topKWeighted()`, `anyValue()`, `anyLastValue()`, `groupUniqArray()`, `groupArrayMovingAvg()`, `groupArrayMovingSum()`.
 
@@ -1322,11 +1463,11 @@ Additional approximate aggregates: `argMin()`, `argMax()`, `topK()`, `topKWeight
 
 ```php
 // startsWith/endsWith → native functions
-Query::startsWith('name', 'Al');   // startsWith(`name`, ?)
-Query::endsWith('file', '.pdf');   // endsWith(`file`, ?)
+Query::startsWith('name', 'Al');                 // startsWith(`name`, ?)
+Query::endsWith('file', '.pdf');                 // endsWith(`file`, ?)
 
-// contains/notContains → position()
-Query::contains('tags', ['php']);   // position(`tags`, ?) > 0
+// containsString → position()
+Query::containsString('tags', ['php']);          // position(`tags`, ?) > 0
 ```
 
 **Regex** — uses `match()` function instead of `REGEXP`.
@@ -1336,7 +1477,7 @@ Query::contains('tags', ['php']);   // position(`tags`, ?) > 0
 ```php
 $result = (new Builder())
     ->from('events')
-    ->set('status', 'archived')
+    ->set(['status' => 'archived'])
     ->filter([Query::lessThan('created_at', '2024-01-01')])
     ->update();
 
@@ -1351,7 +1492,7 @@ $result = (new Builder())
 use Utopia\Query\Builder\MongoDB as Builder;
 ```
 
-The MongoDB builder generates JSON operation documents instead of SQL. The `Plan->query` contains a JSON-encoded operation and `Plan->bindings` contains parameter values.
+The MongoDB builder generates JSON operation documents instead of SQL. The `Statement->query` contains a JSON-encoded operation and `Statement->bindings` contains parameter values. `whereRaw()` and `whereColumn()` are not supported and throw `ValidationException`.
 
 **Basic queries:**
 
@@ -1404,8 +1545,8 @@ $result = (new Builder())
 $result = (new Builder())
     ->from('lists')
     ->filter([Query::equal('_id', ['list_1'])])
-    ->popFirst('items')   // Remove first element
-    ->popLast('queue')    // Remove last element
+    ->popFirst('items')   // Remove first element — $pop: -1
+    ->popLast('queue')    // Remove last element — $pop: 1
     ->pullAll('tags', ['deprecated', 'old'])
     ->update();
 
@@ -1482,7 +1623,7 @@ $result = (new Builder())
         connectToField: '_id',
         as: 'reporting_chain',
         maxDepth: 5,
-        depthField: 'level'
+        depthField: 'level',
     )
     ->build();
 
@@ -1529,7 +1670,7 @@ $result = (new Builder())
         numCandidates: 100,
         limit: 10,
         index: 'vector_index',
-        filter: ['category' => 'tech']
+        filter: ['category' => 'tech'],
     )
     ->build();
 ```
@@ -1560,32 +1701,34 @@ Unsupported features are not on the class — consumers type-hint the interface 
 |---------|:-------:|:---:|:-----:|:-------:|:----------:|:------:|:----------:|:-------:|
 | Selects, Filters, Aggregates, Joins, Unions, CTEs, Inserts, Updates, Deletes, Hooks | x | | | | | | | |
 | Windows | x | | | | | | | |
+| `whereRaw` / `whereColumn` | | x | | | | | x | |
 | Locking, Transactions, Upsert | | x | | | | | | |
 | Spatial, Full-Text Search | | x | | | | | | |
-| Statistical Aggregates | | x | | | | | x | |
-| Bitwise Aggregates | | x | | | | | x | |
+| Statistical Aggregates | | | x | x | x | x | x | |
+| Bitwise Aggregates | | | x | x | x | x | x | |
 | Conditional Aggregates | | | x | x | x | x | x | |
-| JSON | | | x | x | x | x | | |
+| JSON (incl. `setJsonPath`) | | | x | x | x | x | | |
 | Hints | | | x | x | | | x | |
 | Lateral Joins | | | x | x | x | | | |
 | String Aggregates | | | x | x | x | | x | |
 | Group By Modifiers | | | x | x | x | | x | |
+| Sequences (`nextVal`/`currVal`) | | | | x | x | | | |
+| `RETURNING` | | | | x | x | | | |
 | Full Outer Joins | | | | | x | | x | |
 | Table Sampling | | | | | x | | x | x |
 | Merge | | | | | x | | | |
-| Returning | | | | | x | | | |
 | Vector Search | | | | | x | | | |
 | DISTINCT ON | | | | | x | | | |
 | Aggregate FILTER | | | | | x | | | |
-| Ordered-Set Aggregates | | | | | x | | | |
+| Ordered-Set Aggregates (incl. `mode`) | | | | | x | | | |
 | PREWHERE, FINAL, SAMPLE | | | | | | | x | |
 | LIMIT BY | | | | | | | x | |
 | ARRAY JOIN | | | | | | | x | |
-| ASOF JOIN | | | | | | | x | |
+| ASOF JOIN (typed operator) | | | | | | | x | |
 | WITH FILL | | | | | | | x | |
-| Approximate Aggregates | | | | | | | x | |
-| Upsert | | | | | | | | x |
-| Full-Text Search | | | | | | | | x |
+| Approximate Aggregates (incl. `quantiles`) | | | | | | | x | |
+| Upsert (Mongo-style) | | | | | | | | x |
+| Full-Text Search (Mongo) | | | | | | | | x |
 | Field Updates | | | | | | | | x |
 | Array Push Modifiers | | | | | | | | x |
 | Conditional Array Updates | | | | | | | | x |
@@ -1598,6 +1741,7 @@ The schema builder generates DDL statements for table creation, alteration, inde
 
 ```php
 use Utopia\Query\Schema\MySQL as Schema;
+use Utopia\Query\Schema\Table;
 // or: PostgreSQL, ClickHouse, SQLite, MongoDB
 ```
 
@@ -1606,7 +1750,7 @@ use Utopia\Query\Schema\MySQL as Schema;
 ```php
 $schema = new Schema();
 
-$result = $schema->create('users', function ($table) {
+$result = $schema->create('users', function (Table $table) {
     $table->id();
     $table->string('name', 255);
     $table->string('email', 255)->unique();
@@ -1622,24 +1766,82 @@ $result->query; // CREATE TABLE `users` (...)
 Use `createIfNotExists()` to add `IF NOT EXISTS`:
 
 ```php
-$result = $schema->createIfNotExists('users', function ($table) {
+$result = $schema->createIfNotExists('users', function (Table $table) {
     $table->id();
     $table->string('name', 255);
 });
 ```
 
-Available column types: `id`, `string`, `text`, `mediumText`, `longText`, `integer`, `bigInteger`, `float`, `boolean`, `datetime`, `timestamp`, `json`, `binary`, `enum`, `point`, `linestring`, `polygon`, `vector` (PostgreSQL only), `timestamps`.
+Available column types: `id`, `string`, `text`, `mediumText`, `longText`, `integer`, `bigInteger`, `serial`, `bigSerial`, `smallSerial`, `float`, `boolean`, `datetime`, `timestamp`, `json`, `binary`, `enum`, `point`, `linestring`, `polygon`, `vector` (PostgreSQL only), `timestamps`.
 
-Column modifiers: `nullable()`, `default($value)`, `unsigned()`, `unique()`, `primary()`, `autoIncrement()`, `after($column)`, `comment($text)`, `collation($collation)`.
+Column modifiers: `nullable()`, `default($value)`, `unsigned()`, `unique()`, `primary()`, `autoIncrement()`, `after($column)`, `comment($text)`, `collation($collation)`, `check($expression)`, `generatedAs($expression)` + `stored()` / `virtual()`, `ttl($expression)` (ClickHouse), `userType($name)` (PostgreSQL).
+
+**SERIAL types** — auto-incrementing integers. PostgreSQL emits native `SERIAL` / `BIGSERIAL` / `SMALLSERIAL`; MySQL/MariaDB compile to `INT AUTO_INCREMENT` / `BIGINT AUTO_INCREMENT` / `SMALLINT AUTO_INCREMENT`; SQLite maps to `INTEGER`. ClickHouse and MongoDB throw `UnsupportedException`:
+
+```php
+$result = $schema->create('orders', function (Table $table) {
+    $table->serial('id')->primary();
+    $table->bigSerial('external_id');
+});
+```
 
 ### Altering Tables
 
 ```php
-$result = $schema->alter('users', function ($table) {
+$result = $schema->alter('users', function (Table $table) {
     $table->string('phone', 20)->nullable();
     $table->modifyColumn('name', 'string', 500);
     $table->renameColumn('email', 'email_address');
     $table->dropColumn('legacy_field');
+});
+```
+
+### CHECK Constraints
+
+Typed `CHECK` constraints are supported at both the table and column level on MySQL 8.0.16+, MariaDB, PostgreSQL, and SQLite. ClickHouse throws `UnsupportedException`.
+
+```php
+$result = $schema->create('people', function (Table $table) {
+    $table->id();
+    $table->integer('age')->check('>= 0');                   // column-level
+    $table->string('email', 255);
+
+    $table->check('age_range', '`age` >= 0 AND `age` < 150'); // table-level
+});
+```
+
+Constraint names are validated as standard SQL identifiers; expressions are emitted verbatim and must come from trusted sources — never from untrusted input.
+
+### Generated Columns
+
+Generated columns compute their value from an expression. Both `STORED` and `VIRTUAL` are supported on MySQL, MariaDB, and SQLite. PostgreSQL supports only `STORED` (calling `virtual()` and compiling for PostgreSQL throws `UnsupportedException`). ClickHouse throws `UnsupportedException` for generated columns.
+
+```php
+$result = $schema->create('boxes', function (Table $table) {
+    $table->id();
+    $table->integer('width');
+    $table->integer('height');
+    $table->integer('area')
+        ->generatedAs('`width` * `height`')
+        ->stored();
+
+    $table->integer('half_area')
+        ->generatedAs('(`width` * `height`) / 2')
+        ->virtual();
+});
+```
+
+### Composite Primary Keys
+
+Declare a primary key across two or more columns with `Table::primary([...])`. Mixing a column-level `->primary()` with `Table::primary([...])` throws `ValidationException`. MongoDB throws `UnsupportedException`.
+
+```php
+$result = $schema->create('order_items', function (Table $table) {
+    $table->integer('order_id');
+    $table->integer('product_id');
+    $table->integer('quantity');
+
+    $table->primary(['order_id', 'product_id']);
 });
 ```
 
@@ -1653,7 +1855,9 @@ $result = $schema->dropIndex('users', 'idx_email');
 PostgreSQL supports index methods, operator classes, and concurrent creation:
 
 ```php
-$schema = new \Utopia\Query\Schema\PostgreSQL();
+use Utopia\Query\Schema\PostgreSQL as Schema;
+
+$schema = new Schema();
 
 // GIN trigram index
 $result = $schema->createIndex('users', 'idx_name_trgm', ['name'],
@@ -1689,7 +1893,7 @@ Available on MySQL, PostgreSQL, and ClickHouse:
 
 ```php
 // Define partition strategy in table creation
-$result = $schema->create('events', function ($table) {
+$result = $schema->create('events', function (Table $table) {
     $table->id();
     $table->datetime('created_at');
     $table->partitionByRange('created_at');
@@ -1702,7 +1906,17 @@ $result = $schema->createPartition('events', 'events_2024', "VALUES LESS THAN ('
 $result = $schema->dropPartition('events', 'events_2024');
 ```
 
-Partition strategies: `partitionByRange()`, `partitionByList()`, `partitionByHash()`.
+Partition strategies: `partitionByRange($expression)`, `partitionByList($expression)`, `partitionByHash($expression, ?int $partitions = null)`. The optional partition count on `partitionByHash()` emits `PARTITIONS <count>` (MySQL/MariaDB HASH/KEY semantics) and must be `>= 1`:
+
+```php
+$result = $schema->create('users', function (Table $table) {
+    $table->id();
+    $table->integer('user_id');
+    $table->partitionByHash('`user_id`', 4);
+});
+
+// ... PARTITION BY HASH(`user_id`) PARTITIONS 4
+```
 
 ### Comments
 
@@ -1747,7 +1961,9 @@ $result = $schema->createTrigger('before_insert_users', 'users',
 ### PostgreSQL Schema Extensions
 
 ```php
-$schema = new \Utopia\Query\Schema\PostgreSQL();
+use Utopia\Query\Schema\PostgreSQL as Schema;
+
+$schema = new Schema();
 
 // Extensions (e.g., pgvector, pg_trgm)
 $result = $schema->createExtension('vector');
@@ -1762,9 +1978,15 @@ BEGIN
 END;
 ');
 
-// Custom types
-$result = $schema->createType('status_type', ['active', 'inactive', 'banned']);
-$result = $schema->dropType('status_type');
+// Custom types — reference from a column via Column::userType()
+$result = $schema->createType('mood_type', ['happy', 'sad', 'angry']);
+
+$result = $schema->create('users', function (Table $table) {
+    $table->id();
+    $table->string('mood')->userType('mood_type');
+});
+
+$result = $schema->dropType('mood_type');
 
 // Sequences
 $result = $schema->createSequence('order_seq', start: 1000, incrementBy: 1);
@@ -1786,14 +2008,17 @@ $result = $schema->dropIndex('orders', 'idx_status');
 // DROP INDEX "idx_status"
 ```
 
-Type differences from MySQL: `INTEGER` (not `INT`), `DOUBLE PRECISION` (not `DOUBLE`), `BOOLEAN` (not `TINYINT(1)`), `JSONB` (not `JSON`), `BYTEA` (not `BLOB`), `VECTOR(n)` for pgvector, `GEOMETRY(type, srid)` for PostGIS. Enums use `TEXT CHECK (col IN (...))`. Auto-increment uses `GENERATED BY DEFAULT AS IDENTITY`.
+Type differences from MySQL: `INTEGER` (not `INT`), `DOUBLE PRECISION` (not `DOUBLE`), `BOOLEAN` (not `TINYINT(1)`), `JSONB` (not `JSON`), `BYTEA` (not `BLOB`), `SERIAL` / `BIGSERIAL` / `SMALLSERIAL` for auto-incrementing ints, `VECTOR(n)` for pgvector, `GEOMETRY(type, srid)` for PostGIS. Enums use `TEXT CHECK (col IN (...))` (or a user-defined enum type via `userType()`).
 
 ### ClickHouse Schema
 
 ```php
-$schema = new \Utopia\Query\Schema\ClickHouse();
+use Utopia\Query\Schema\ClickHouse as Schema;
+use Utopia\Query\Schema\ClickHouse\Engine;
 
-$result = $schema->create('events', function ($table) {
+$schema = new Schema();
+
+$result = $schema->create('events', function (Table $table) {
     $table->string('event_id', 36)->primary();
     $table->string('event_type', 50);
     $table->integer('count');
@@ -1803,22 +2028,71 @@ $result = $schema->create('events', function ($table) {
 // CREATE TABLE `events` (...) ENGINE = MergeTree() ORDER BY (...)
 ```
 
-ClickHouse uses `Nullable(type)` wrapping for nullable columns, `Enum8(...)` for enums, `Tuple(Float64, Float64)` for points, and `TYPE minmax GRANULARITY 3` for indexes. Foreign keys, stored procedures, and triggers throw `UnsupportedException`.
+ClickHouse uses `Nullable(type)` wrapping for nullable columns, `Enum8(...)` for enums, `Tuple(Float64, Float64)` for points, and `TYPE minmax GRANULARITY 3` for indexes. Foreign keys, stored procedures, triggers, generated columns, and CHECK constraints throw `UnsupportedException`.
 
-Supports `TableComments`, `ColumnComments`, and `DropPartition` interfaces.
+Supports the `TableComments`, `ColumnComments`, and `DropPartition` interfaces.
+
+**Engine selection** — choose from 10 variants of the `Engine` enum:
+
+```php
+// Standard MergeTree family
+$schema->create('dedup', function (Table $table) {
+    $table->bigInteger('id')->primary();
+    $table->integer('version');
+    $table->engine(Engine::ReplacingMergeTree, 'version');
+});
+// ... ENGINE = ReplacingMergeTree(`version`) ORDER BY (`id`)
+
+$schema->create('metrics', function (Table $table) {
+    $table->integer('key')->primary();
+    $table->bigInteger('total')->unsigned();
+    $table->engine(Engine::SummingMergeTree, 'total');
+});
+
+// CollapsingMergeTree requires a sign column (throws ValidationException otherwise)
+// ReplicatedMergeTree requires zookeeper_path + replica_name
+$schema->create('replicated', function (Table $table) {
+    $table->integer('id')->primary();
+    $table->engine(Engine::ReplicatedMergeTree, '/clickhouse/tables/events', 'replica_1');
+});
+
+// Non-MergeTree engines skip the ORDER BY tuple() fallback entirely
+$schema->create('cache', function (Table $table) {
+    $table->integer('id')->primary();
+    $table->string('value');
+    $table->engine(Engine::Memory);
+});
+// CREATE TABLE `cache` (...) ENGINE = Memory
+```
+
+The 10 variants: `MergeTree`, `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`, `CollapsingMergeTree`, `ReplicatedMergeTree`, `Memory`, `Log`, `TinyLog`, `StripeLog`.
+
+**TTL** — table-level and column-level time-to-live expressions:
+
+```php
+$schema->create('events', function (Table $table) {
+    $table->integer('id')->primary();
+    $table->datetime('ts');
+    $table->datetime('expires_at')->ttl('now() + INTERVAL 1 HOUR'); // column-level
+
+    $table->ttl('ts + INTERVAL 1 DAY'); // table-level
+});
+```
+
+TTL expressions are emitted verbatim; they must not be empty or contain semicolons. Dialects other than ClickHouse throw `UnsupportedException`.
 
 ### SQLite Schema
 
 ```php
-$schema = new \Utopia\Query\Schema\SQLite();
+use Utopia\Query\Schema\SQLite as Schema;
 ```
 
-SQLite uses simplified type mappings: `INTEGER` for booleans, `TEXT` for datetimes/JSON, `REAL` for floats, `BLOB` for binary. Auto-increment uses `AUTOINCREMENT`. Vector and spatial types are not supported. Foreign keys, stored procedures, and triggers throw `UnsupportedException`.
+SQLite uses simplified type mappings: `INTEGER` for booleans, `TEXT` for datetimes/JSON, `REAL` for floats, `BLOB` for binary. Auto-increment uses `AUTOINCREMENT`. Vector and spatial types are not supported. Foreign keys, stored procedures, and triggers throw `UnsupportedException`. SERIAL types map to `INTEGER`. Both `STORED` and `VIRTUAL` generated columns are supported.
 
 ### MongoDB Schema
 
 ```php
-$schema = new \Utopia\Query\Schema\MongoDB();
+use Utopia\Query\Schema\MongoDB as Schema;
 ```
 
 The MongoDB schema generates JSON commands for collection management with BSON type validation.
@@ -1826,7 +2100,9 @@ The MongoDB schema generates JSON commands for collection management with BSON t
 **Creating collections** with JSON Schema validation:
 
 ```php
-$result = $schema->create('users', function ($table) {
+$schema = new Schema();
+
+$result = $schema->create('users', function (Table $table) {
     $table->string('name', 255);
     $table->string('email', 255)->unique();
     $table->integer('age')->nullable();
@@ -1840,7 +2116,7 @@ $result = $schema->create('users', function ($table) {
 **Altering collections:**
 
 ```php
-$result = $schema->alter('users', function ($table) {
+$result = $schema->alter('users', function (Table $table) {
     $table->string('phone', 20)->nullable();
 });
 
@@ -1866,7 +2142,9 @@ $result = $schema->analyzeTable('users');
 **Views:**
 
 ```php
-$query = (new \Utopia\Query\Builder\MongoDB())->from('users')->filter([Query::equal('active', [true])]);
+use Utopia\Query\Builder\MongoDB as Builder;
+
+$query = (new Builder())->from('users')->filter([Query::equal('active', [true])]);
 $result = $schema->createView('active_users', $query);
 ```
 
@@ -1877,7 +2155,7 @@ $result = $schema->createDatabase('analytics');
 $result = $schema->dropDatabase('analytics');
 ```
 
-Column types map to BSON types: `string` → `string`, `integer`/`bigInteger` → `int`, `float`/`double` → `double`, `boolean` → `bool`, `datetime`/`timestamp` → `date`, `json` → `object`, `binary` → `binData`.
+Column types map to BSON types: `string` → `string`, `integer`/`bigInteger` → `int`, `float`/`double` → `double`, `boolean` → `bool`, `datetime`/`timestamp` → `date`, `json` → `object`, `binary` → `binData`. Composite primary keys, CHECK constraints, generated columns, SERIAL types, and user-defined types all throw `UnsupportedException`.
 
 ## Wire Protocol Parsers
 
