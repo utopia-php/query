@@ -167,6 +167,14 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             }
         }
 
+        if (! empty($blueprint->compositePrimaryKey) && ! empty($primaryKeys)) {
+            throw new ValidationException('Cannot combine column-level primary() with Blueprint::primary() composite key.');
+        }
+
+        if (empty($primaryKeys) && ! empty($blueprint->compositePrimaryKey)) {
+            $primaryKeys = \array_map(fn (string $c): string => $this->quote($c), $blueprint->compositePrimaryKey);
+        }
+
         // Indexes (ClickHouse uses INDEX ... TYPE ... GRANULARITY ...)
         foreach ($blueprint->indexes as $index) {
             $cols = \array_map(fn (string $c): string => $this->quote($c), $index->columns);

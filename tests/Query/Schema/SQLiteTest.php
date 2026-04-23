@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\SQLite as SQLBuilder;
 use Utopia\Query\Exception\UnsupportedException;
+use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\Feature\ForeignKeys;
@@ -526,6 +527,34 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('PRIMARY KEY (`order_id`, `product_id`)', $result->query);
+    }
+
+    public function testCreateTableWithCompositePrimaryKey(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('order_items', function (Blueprint $table) {
+            $table->integer('order_id');
+            $table->integer('product_id');
+            $table->integer('quantity');
+            $table->primary(['order_id', 'product_id']);
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('PRIMARY KEY (`order_id`, `product_id`)', $result->query);
+    }
+
+    public function testCreateTableRejectsMixedColumnAndBlueprintPrimary(): void
+    {
+        $schema = new Schema();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Cannot combine column-level primary() with Blueprint::primary() composite key.');
+
+        $schema->create('order_items', function (Blueprint $table) {
+            $table->integer('order_id')->primary();
+            $table->integer('product_id');
+            $table->primary(['order_id', 'product_id']);
+        });
     }
 
     public function testCreateTableWithDefaultNull(): void

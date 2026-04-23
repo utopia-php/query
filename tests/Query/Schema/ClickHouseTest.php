@@ -309,6 +309,34 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('ORDER BY (`id`, `created_at`)', $result->query);
     }
 
+    public function testCreateTableWithCompositePrimaryKey(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Blueprint $table) {
+            $table->bigInteger('id');
+            $table->datetime('created_at', 3);
+            $table->string('name');
+            $table->primary(['id', 'created_at']);
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('ORDER BY (`id`, `created_at`)', $result->query);
+    }
+
+    public function testCreateTableRejectsMixedColumnAndBlueprintPrimary(): void
+    {
+        $schema = new Schema();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Cannot combine column-level primary() with Blueprint::primary() composite key.');
+
+        $schema->create('events', function (Blueprint $table) {
+            $table->bigInteger('id')->primary();
+            $table->datetime('created_at', 3);
+            $table->primary(['id', 'created_at']);
+        });
+    }
+
     public function testAlterMultipleOperations(): void
     {
         $schema = new Schema();

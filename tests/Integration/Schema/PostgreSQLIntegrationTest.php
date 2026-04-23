@@ -393,9 +393,9 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $this->trackPostgresTable($table);
 
         $result = $this->schema->create($table, function (Blueprint $bp) {
-            $bp->rawColumn('"id" INT NOT NULL');
-            $bp->rawColumn('"created_at" DATE NOT NULL');
-            $bp->rawColumn('PRIMARY KEY ("id", "created_at")');
+            $bp->integer('id');
+            $bp->timestamp('created_at');
+            $bp->primary(['id', 'created_at']);
             $bp->partitionByRange('"created_at"');
         });
 

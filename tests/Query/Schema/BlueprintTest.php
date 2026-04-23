@@ -491,4 +491,55 @@ class BlueprintTest extends TestCase
 
         $bp->partitionByHash('`id`', -5);
     }
+
+    public function testCompositePrimaryKeyPropertyIsReadable(): void
+    {
+        $bp = new Blueprint();
+        $this->assertSame([], $bp->compositePrimaryKey);
+    }
+
+    public function testPrimaryPopulatesCompositePrimaryKey(): void
+    {
+        $bp = new Blueprint();
+        $bp->primary(['id', 'created_at']);
+
+        $this->assertSame(['id', 'created_at'], $bp->compositePrimaryKey);
+    }
+
+    public function testPrimaryReturnsStaticForChaining(): void
+    {
+        $bp = new Blueprint();
+        $result = $bp->primary(['a', 'b']);
+
+        $this->assertSame($bp, $result);
+    }
+
+    public function testPrimaryRejectsSingleColumn(): void
+    {
+        $bp = new Blueprint();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('at least two columns');
+
+        $bp->primary(['id']);
+    }
+
+    public function testPrimaryRejectsEmptyArray(): void
+    {
+        $bp = new Blueprint();
+
+        $this->expectException(ValidationException::class);
+
+        $bp->primary([]);
+    }
+
+    public function testPrimaryRejectsInvalidColumnName(): void
+    {
+        $bp = new Blueprint();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid column name');
+
+        $bp->primary(['id', 'bad name;']);
+    }
 }

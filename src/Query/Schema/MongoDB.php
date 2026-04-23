@@ -52,6 +52,10 @@ class MongoDB extends Schema
         $blueprint = new Blueprint();
         $definition($blueprint);
 
+        if (! empty($blueprint->compositePrimaryKey)) {
+            throw new UnsupportedException('Composite primary keys are not supported in MongoDB; documents use "_id" implicitly.');
+        }
+
         $properties = [];
         $required = [];
 

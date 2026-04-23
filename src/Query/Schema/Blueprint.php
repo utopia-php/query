@@ -37,6 +37,9 @@ class Blueprint
     /** @var list<CheckConstraint> */
     public private(set) array $checks = [];
 
+    /** @var list<string> */
+    public private(set) array $compositePrimaryKey = [];
+
     public private(set) ?PartitionType $partitionType = null;
     public private(set) string $partitionExpression = '';
     public private(set) ?int $partitionCount = null;
@@ -60,6 +63,32 @@ class Blueprint
     public function check(string $name, string $expression): static
     {
         $this->checks[] = new CheckConstraint($name, $expression);
+
+        return $this;
+    }
+
+    /**
+     * Declare a composite PRIMARY KEY across two or more columns.
+     *
+     * For a single-column primary key, use {@see Column::primary()} instead.
+     *
+     * @param  list<string>  $columns
+     *
+     * @throws ValidationException if fewer than two columns are provided or any column name is invalid.
+     */
+    public function primary(array $columns): static
+    {
+        if (\count($columns) < 2) {
+            throw new ValidationException('Blueprint::primary(array) requires at least two columns; use Column::primary() for single-column keys.');
+        }
+
+        foreach ($columns as $column) {
+            if (! \preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $column)) {
+                throw new ValidationException('Invalid column name in composite primary key: ' . $column);
+            }
+        }
+
+        $this->compositePrimaryKey = $columns;
 
         return $this;
     }

@@ -108,6 +108,20 @@ class MongoDBTest extends TestCase
         $this->assertNotContains('email', $required);
     }
 
+    public function testCreateCollectionRejectsCompositePrimaryKey(): void
+    {
+        $schema = new Schema();
+
+        $this->expectException(UnsupportedException::class);
+        $this->expectExceptionMessage('Composite primary keys are not supported in MongoDB');
+
+        $schema->create('order_items', function (Blueprint $table) {
+            $table->integer('order_id');
+            $table->integer('product_id');
+            $table->primary(['order_id', 'product_id']);
+        });
+    }
+
     public function testDrop(): void
     {
         $schema = new Schema();

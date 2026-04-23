@@ -67,6 +67,10 @@ abstract class Schema
             }
         }
 
+        if (! empty($blueprint->compositePrimaryKey) && ! empty($primaryKeys)) {
+            throw new ValidationException('Cannot combine column-level primary() with Blueprint::primary() composite key.');
+        }
+
         // Raw column definitions (bypass typed Column objects)
         foreach ($blueprint->rawColumnDefs as $rawDef) {
             $columnDefs[] = $rawDef;
@@ -75,6 +79,10 @@ abstract class Schema
         // Inline PRIMARY KEY constraint
         if (! empty($primaryKeys)) {
             $columnDefs[] = 'PRIMARY KEY (' . \implode(', ', $primaryKeys) . ')';
+        } elseif (! empty($blueprint->compositePrimaryKey)) {
+            $columnDefs[] = 'PRIMARY KEY ('
+                . \implode(', ', \array_map(fn (string $c): string => $this->quote($c), $blueprint->compositePrimaryKey))
+                . ')';
         }
 
         // Inline UNIQUE constraints for columns marked unique
