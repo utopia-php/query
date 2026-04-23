@@ -178,21 +178,31 @@ jobs:
           php -r '
             $xml = simplexml_load_file("coverage/combined.xml");
             $metrics = $xml->project->metrics;
-            $lineRate = (int) $metrics["statements"] > 0
-              ? 100 * (int) $metrics["coveredstatements"] / (int) $metrics["statements"]
-              : 0;
-            $branchRate = (int) $metrics["conditionals"] > 0
-              ? 100 * (int) $metrics["coveredconditionals"] / (int) $metrics["conditionals"]
-              : 0;
-            $methodRate = (int) $metrics["methods"] > 0
-              ? 100 * (int) $metrics["coveredmethods"] / (int) $metrics["methods"]
-              : 0;
-            $classRate = (int) $metrics["classes"] > 0
-              ? 100 * (int) $metrics["coveredclasses"] / (int) $metrics["classes"]
-              : 0;
+            $lines = (int) $metrics["statements"];
+            $coveredLines = (int) $metrics["coveredstatements"];
+            $methods = (int) $metrics["methods"];
+            $coveredMethods = (int) $metrics["coveredmethods"];
+            // Clover does not emit coveredclasses at the project level.
+            // A class counts as covered when every method is covered.
+            $classes = 0;
+            $coveredClasses = 0;
+            foreach ($xml->xpath("//class") as $class) {
+                $classes++;
+                $classMethods = (int) $class->metrics["methods"];
+                $classCoveredMethods = (int) $class->metrics["coveredmethods"];
+                if ($classMethods > 0 && $classCoveredMethods === $classMethods) {
+                    $coveredClasses++;
+                }
+            }
+            $lineRate = $lines > 0 ? 100 * $coveredLines / $lines : 0;
+            $methodRate = $methods > 0 ? 100 * $coveredMethods / $methods : 0;
+            $classRate = $classes > 0 ? 100 * $coveredClasses / $classes : 0;
             $out = sprintf(
-              "lines=%.2f\nbranches=%.2f\nmethods=%.2f\nclasses=%.2f\n",
-              $lineRate, $branchRate, $methodRate, $classRate
+              "lines=%.2f\nmethods=%.2f\nclasses=%.2f\nlines_covered=%d\nlines_total=%d\nmethods_covered=%d\nmethods_total=%d\nclasses_covered=%d\nclasses_total=%d\n",
+              $lineRate, $methodRate, $classRate,
+              $coveredLines, $lines,
+              $coveredMethods, $methods,
+              $coveredClasses, $classes
             );
             file_put_contents(getenv("GITHUB_OUTPUT"), $out, FILE_APPEND);
           '
@@ -200,19 +210,25 @@ jobs:
       - name: Write coverage to job summary
         env:
           LINES: ${{ steps.coverage.outputs.lines }}
-          BRANCHES: ${{ steps.coverage.outputs.branches }}
           METHODS: ${{ steps.coverage.outputs.methods }}
           CLASSES: ${{ steps.coverage.outputs.classes }}
+          LINES_COVERED: ${{ steps.coverage.outputs.lines_covered }}
+          LINES_TOTAL: ${{ steps.coverage.outputs.lines_total }}
+          METHODS_COVERED: ${{ steps.coverage.outputs.methods_covered }}
+          METHODS_TOTAL: ${{ steps.coverage.outputs.methods_total }}
+          CLASSES_COVERED: ${{ steps.coverage.outputs.classes_covered }}
+          CLASSES_TOTAL: ${{ steps.coverage.outputs.classes_total }}
         run: |
           {
             echo "## Coverage summary (unit + integration)"
             echo ""
-            echo "| Metric | Covered |"
-            echo "|---|---|"
-            echo "| Lines | ${LINES}% |"
-            echo "| Branches | ${BRANCHES}% |"
-            echo "| Methods | ${METHODS}% |"
-            echo "| Classes | ${CLASSES}% |"
+            echo "| Metric | Covered | Ratio |"
+            echo "|---|---|---|"
+            echo "| Lines | ${LINES}% | ${LINES_COVERED} / ${LINES_TOTAL} |"
+            echo "| Methods | ${METHODS}% | ${METHODS_COVERED} / ${METHODS_TOTAL} |"
+            echo "| Classes | ${CLASSES}% | ${CLASSES_COVERED} / ${CLASSES_TOTAL} |"
+            echo ""
+            echo "_Branch coverage requires xdebug; not reported (PCOV line-coverage only)._"
             echo ""
             echo "<details><summary>Per-file coverage</summary>"
             echo ""
@@ -230,11 +246,12 @@ jobs:
           message: |
             ## 📊 Coverage (unit + integration)
 
-            | Metric | Covered |
-            |---|---|
-            | Lines | **${{ steps.coverage.outputs.lines }}%** |
-            | Branches | **${{ steps.coverage.outputs.branches }}%** |
-            | Methods | **${{ steps.coverage.outputs.methods }}%** |
-            | Classes | **${{ steps.coverage.outputs.classes }}%** |
+            | Metric | Covered | Ratio |
+            |---|---|---|
+            | Lines | **${{ steps.coverage.outputs.lines }}%** | ${{ steps.coverage.outputs.lines_covered }} / ${{ steps.coverage.outputs.lines_total }} |
+            | Methods | **${{ steps.coverage.outputs.methods }}%** | ${{ steps.coverage.outputs.methods_covered }} / ${{ steps.coverage.outputs.methods_total }} |
+            | Classes | **${{ steps.coverage.outputs.classes }}%** | ${{ steps.coverage.outputs.classes_covered }} / ${{ steps.coverage.outputs.classes_total }} |
+
+            _Branch coverage omitted — PCOV reports line coverage only; xdebug is 10× slower and not worth the CI time for the branch metric alone._
 
             Full per-file breakdown in the [job summary](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
