@@ -28,6 +28,20 @@ class Tokenizer
         'WITHIN' => true,
     ];
 
+    /**
+     * Single-character operator lookup table. Used by tryReadOperator to
+     * avoid allocating a haystack array on every character.
+     */
+    private const SINGLE_OPERATORS = [
+        '=' => true,
+        '<' => true,
+        '>' => true,
+        '+' => true,
+        '-' => true,
+        '/' => true,
+        '%' => true,
+    ];
+
     private string $sql;
 
     private int $length;
@@ -185,12 +199,17 @@ class Tokenizer
      */
     public static function filter(array $tokens): array
     {
-        return array_values(array_filter(
-            $tokens,
-            fn (Token $t) => $t->type !== TokenType::Whitespace
-                && $t->type !== TokenType::LineComment
-                && $t->type !== TokenType::BlockComment
-        ));
+        $result = [];
+        foreach ($tokens as $token) {
+            if (
+                $token->type !== TokenType::Whitespace
+                && $token->type !== TokenType::LineComment
+                && $token->type !== TokenType::BlockComment
+            ) {
+                $result[] = $token;
+            }
+        }
+        return $result;
     }
 
     protected function getIdentifierQuoteChar(): string
@@ -436,7 +455,7 @@ class Tokenizer
             return new Token(TokenType::Operator, $twoChar, $start);
         }
 
-        if (in_array($char, ['=', '<', '>', '+', '-', '/', '%'], true)) {
+        if (isset(self::SINGLE_OPERATORS[$char])) {
             $this->pos++;
             return new Token(TokenType::Operator, $char, $start);
         }

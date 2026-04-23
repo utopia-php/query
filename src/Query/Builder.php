@@ -2257,12 +2257,13 @@ abstract class Builder implements
      */
     private function combineAstExpressions(array $expressions, string $operator): Expression
     {
-        if (\count($expressions) === 1) {
+        $n = \count($expressions);
+        if ($n === 1) {
             return $expressions[0];
         }
 
         $result = $expressions[0];
-        for ($i = 1; $i < \count($expressions); $i++) {
+        for ($i = 1; $i < $n; $i++) {
             $result = new Binary($result, $operator, $expressions[$i]);
         }
 
