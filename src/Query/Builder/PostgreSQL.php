@@ -4,7 +4,6 @@ namespace Utopia\Query\Builder;
 
 use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Serializer\PostgreSQL as PostgreSQLSerializer;
-use Utopia\Query\Builder as BaseBuilder;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\FullOuterJoins;
 use Utopia\Query\Builder\Feature\GroupByModifiers;
@@ -20,6 +19,9 @@ use Utopia\Query\Builder\Feature\PostgreSQL\VectorSearch;
 use Utopia\Query\Builder\Feature\Sequences;
 use Utopia\Query\Builder\Feature\StringAggregates;
 use Utopia\Query\Builder\Feature\TableSampling;
+use Utopia\Query\Builder\PostgreSQL\DeleteUsing;
+use Utopia\Query\Builder\PostgreSQL\MergeTarget;
+use Utopia\Query\Builder\PostgreSQL\UpdateFrom;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
@@ -50,32 +52,11 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     /** @var ?array{attribute: string, vector: array<float>, metric: VectorMetric} */
     protected ?array $vectorOrder = null;
 
-    protected string $updateFromTable = '';
+    protected ?UpdateFrom $updateFrom = null;
 
-    protected string $updateFromAlias = '';
+    protected ?DeleteUsing $deleteUsing = null;
 
-    protected string $updateFromCondition = '';
-
-    /** @var list<mixed> */
-    protected array $updateFromBindings = [];
-
-    protected string $deleteUsingTable = '';
-
-    protected string $deleteUsingCondition = '';
-
-    /** @var list<mixed> */
-    protected array $deleteUsingBindings = [];
-
-    protected string $mergeTarget = '';
-
-    protected ?BaseBuilder $mergeSource = null;
-
-    protected string $mergeSourceAlias = '';
-
-    protected string $mergeCondition = '';
-
-    /** @var list<mixed> */
-    protected array $mergeConditionBindings = [];
+    protected ?MergeTarget $mergeTarget = null;
 
     /** @var list<MergeClause> */
     protected array $mergeClauses = [];
@@ -194,16 +175,26 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
 
     public function updateFrom(string $table, string $alias = ''): static
     {
-        $this->updateFromTable = $table;
-        $this->updateFromAlias = $alias;
+        $current = $this->updateFrom;
+        $this->updateFrom = new UpdateFrom(
+            table: $table,
+            alias: $alias,
+            condition: $current === null ? '' : $current->condition,
+            bindings: $current === null ? [] : $current->bindings,
+        );
 
         return $this;
     }
 
     public function updateFromWhere(string $condition, mixed ...$bindings): static
     {
-        $this->updateFromCondition = $condition;
-        $this->updateFromBindings = \array_values($bindings);
+        $current = $this->updateFrom;
+        $this->updateFrom = new UpdateFrom(
+            table: $current === null ? '' : $current->table,
+            alias: $current === null ? '' : $current->alias,
+            condition: $condition,
+            bindings: \array_values($bindings),
+        );
 
         return $this;
     }
@@ -215,7 +206,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
             $this->setRaw($col, $condition->expression, $condition->bindings);
         }
 
-        if ($this->updateFromTable !== '') {
+        if ($this->updateFrom !== null && $this->updateFrom->table !== '') {
             $result = $this->buildUpdateFrom();
             $this->jsonSets = [];
 
@@ -233,15 +224,20 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         $this->bindings = [];
         $this->validateTable();
 
+        $updateFrom = $this->updateFrom;
+        if ($updateFrom === null) {
+            throw new ValidationException('No UPDATE FROM target specified.');
+        }
+
         $assignments = $this->compileAssignments();
 
         if (empty($assignments)) {
             throw new ValidationException('No assignments for UPDATE. Call set() or setRaw() before update().');
         }
 
-        $fromClause = $this->quote($this->updateFromTable);
-        if ($this->updateFromAlias !== '') {
-            $fromClause .= ' AS ' . $this->quote($this->updateFromAlias);
+        $fromClause = $this->quote($updateFrom->table);
+        if ($updateFrom->alias !== '') {
+            $fromClause .= ' AS ' . $this->quote($updateFrom->alias);
         }
 
         $sql = 'UPDATE ' . $this->quote($this->table)
@@ -250,33 +246,27 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
 
         $parts = [$sql];
 
-        $updateFromWhereClauses = [];
-        if ($this->updateFromCondition !== '') {
-            $updateFromWhereClauses[] = $this->updateFromCondition;
-            foreach ($this->updateFromBindings as $binding) {
+        $extraWhere = [];
+        if ($updateFrom->condition !== '') {
+            $extraWhere[] = $updateFrom->condition;
+            foreach ($updateFrom->bindings as $binding) {
                 $this->addBinding($binding);
             }
         }
 
         $this->compileWhereClauses($parts);
-
-        if (! empty($updateFromWhereClauses)) {
-            $lastPart = end($parts);
-            if (\is_string($lastPart) && \str_starts_with($lastPart, 'WHERE ')) {
-                $parts[\count($parts) - 1] = $lastPart . ' AND ' . \implode(' AND ', $updateFromWhereClauses);
-            } else {
-                $parts[] = 'WHERE ' . \implode(' AND ', $updateFromWhereClauses);
-            }
-        }
+        $this->mergeIntoWhereClause($parts, $extraWhere);
 
         return new Statement(\implode(' ', $parts), $this->bindings, executor: $this->executor);
     }
 
     public function deleteUsing(string $table, string $condition, mixed ...$bindings): static
     {
-        $this->deleteUsingTable = $table;
-        $this->deleteUsingCondition = $condition;
-        $this->deleteUsingBindings = \array_values($bindings);
+        $this->deleteUsing = new DeleteUsing(
+            table: $table,
+            condition: $condition,
+            bindings: \array_values($bindings),
+        );
 
         return $this;
     }
@@ -284,7 +274,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     #[\Override]
     public function delete(): Statement
     {
-        if ($this->deleteUsingTable !== '') {
+        if ($this->deleteUsing !== null && $this->deleteUsing->table !== '') {
             $result = $this->buildDeleteUsing();
 
             return $this->appendReturning($result);
@@ -300,31 +290,52 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         $this->bindings = [];
         $this->validateTable();
 
+        $deleteUsing = $this->deleteUsing;
+        if ($deleteUsing === null) {
+            throw new ValidationException('No DELETE USING target specified.');
+        }
+
         $sql = 'DELETE FROM ' . $this->quote($this->table)
-            . ' USING ' . $this->quote($this->deleteUsingTable);
+            . ' USING ' . $this->quote($deleteUsing->table);
 
         $parts = [$sql];
 
-        $deleteUsingWhereClauses = [];
-        if ($this->deleteUsingCondition !== '') {
-            $deleteUsingWhereClauses[] = $this->deleteUsingCondition;
-            foreach ($this->deleteUsingBindings as $binding) {
+        $extraWhere = [];
+        if ($deleteUsing->condition !== '') {
+            $extraWhere[] = $deleteUsing->condition;
+            foreach ($deleteUsing->bindings as $binding) {
                 $this->addBinding($binding);
             }
         }
 
         $this->compileWhereClauses($parts);
-
-        if (! empty($deleteUsingWhereClauses)) {
-            $lastPart = end($parts);
-            if (\is_string($lastPart) && \str_starts_with($lastPart, 'WHERE ')) {
-                $parts[\count($parts) - 1] = $lastPart . ' AND ' . \implode(' AND ', $deleteUsingWhereClauses);
-            } else {
-                $parts[] = 'WHERE ' . \implode(' AND ', $deleteUsingWhereClauses);
-            }
-        }
+        $this->mergeIntoWhereClause($parts, $extraWhere);
 
         return new Statement(\implode(' ', $parts), $this->bindings, executor: $this->executor);
+    }
+
+    /**
+     * Merge additional conditions into the trailing WHERE clause in $parts.
+     * If the last part already begins with "WHERE ", append with AND; otherwise
+     * push a new WHERE fragment. No-op when $extra is empty.
+     *
+     * @param  array<string>  $parts
+     * @param  list<string>   $extra
+     */
+    private function mergeIntoWhereClause(array &$parts, array $extra): void
+    {
+        if (empty($extra)) {
+            return;
+        }
+
+        $lastPart = \end($parts);
+        if (\is_string($lastPart) && \str_starts_with($lastPart, 'WHERE ')) {
+            $parts[\count($parts) - 1] = $lastPart . ' AND ' . \implode(' AND ', $extra);
+
+            return;
+        }
+
+        $parts[] = 'WHERE ' . \implode(' AND ', $extra);
     }
 
     #[\Override]
@@ -766,18 +777,9 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         $this->jsonSets = [];
         $this->vectorOrder = null;
         $this->resetReturning();
-        $this->updateFromTable = '';
-        $this->updateFromAlias = '';
-        $this->updateFromCondition = '';
-        $this->updateFromBindings = [];
-        $this->deleteUsingTable = '';
-        $this->deleteUsingCondition = '';
-        $this->deleteUsingBindings = [];
-        $this->mergeTarget = '';
-        $this->mergeSource = null;
-        $this->mergeSourceAlias = '';
-        $this->mergeCondition = '';
-        $this->mergeConditionBindings = [];
+        $this->updateFrom = null;
+        $this->deleteUsing = null;
+        $this->mergeTarget = null;
         $this->mergeClauses = [];
         $this->distinctOnColumns = [];
         $this->groupByModifier = null;
