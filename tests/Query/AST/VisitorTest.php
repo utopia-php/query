@@ -232,6 +232,35 @@ class VisitorTest extends TestCase
         $walker->walk($stmt, $visitor);
     }
 
+    public function testColumnValidatorRejectsStarByDefault(): void
+    {
+        $stmt = new Select(
+            columns: [new Star()],
+            from: new Table('users'),
+        );
+
+        $walker = new Walker();
+        $visitor = new ColumnValidator(['name', 'email']);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Wildcard (*) selection is not allowed');
+        $walker->walk($stmt, $visitor);
+    }
+
+    public function testColumnValidatorAllowsStarWhenOptedIn(): void
+    {
+        $stmt = new Select(
+            columns: [new Star()],
+            from: new Table('users'),
+        );
+
+        $walker = new Walker();
+        $visitor = new ColumnValidator(['name', 'email'], allowStar: true);
+
+        $result = $walker->walk($stmt, $visitor);
+        $this->assertInstanceOf(Select::class, $result);
+    }
+
     public function testFilterInjectorEmptyWhere(): void
     {
         $stmt = new Select(

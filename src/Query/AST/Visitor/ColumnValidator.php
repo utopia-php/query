@@ -5,6 +5,7 @@ namespace Utopia\Query\AST\Visitor;
 use Utopia\Query\AST\Expression;
 use Utopia\Query\AST\Reference\Column;
 use Utopia\Query\AST\Reference\Table;
+use Utopia\Query\AST\Star;
 use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\AST\Visitor;
 use Utopia\Query\Exception;
@@ -12,8 +13,10 @@ use Utopia\Query\Exception;
 class ColumnValidator implements Visitor
 {
     /** @param string[] $allowedColumns */
-    public function __construct(private readonly array $allowedColumns)
-    {
+    public function __construct(
+        private readonly array $allowedColumns,
+        private readonly bool $allowStar = false,
+    ) {
     }
 
     #[\Override]
@@ -23,6 +26,8 @@ class ColumnValidator implements Visitor
             if (!in_array($expression->name, $this->allowedColumns, true)) {
                 throw new Exception("Column '{$expression->name}' is not in the allowed list");
             }
+        } elseif ($expression instanceof Star && !$this->allowStar) {
+            throw new Exception('Wildcard (*) selection is not allowed; list explicit columns or construct ColumnValidator with allowStar: true');
         }
         return $expression;
     }

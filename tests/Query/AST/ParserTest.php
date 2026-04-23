@@ -700,6 +700,30 @@ class ParserTest extends TestCase
         $this->assertSame(10, $stmt->limit->value);
     }
 
+    public function testFetchNextRows(): void
+    {
+        $stmt = $this->parse('SELECT * FROM users FETCH NEXT 10 ROWS ONLY');
+
+        $this->assertInstanceOf(Literal::class, $stmt->limit);
+        $this->assertSame(10, $stmt->limit->value);
+    }
+
+    public function testFetchFirstSingularRow(): void
+    {
+        $stmt = $this->parse('SELECT * FROM users FETCH FIRST 1 ROW ONLY');
+
+        $this->assertInstanceOf(Literal::class, $stmt->limit);
+        $this->assertSame(1, $stmt->limit->value);
+    }
+
+    public function testFetchNextSingularRow(): void
+    {
+        $stmt = $this->parse('SELECT * FROM users FETCH NEXT 1 ROW ONLY');
+
+        $this->assertInstanceOf(Literal::class, $stmt->limit);
+        $this->assertSame(1, $stmt->limit->value);
+    }
+
     public function testBacktickIdentifierUndoublesEscapedDelimiter(): void
     {
         $stmt = $this->parse('SELECT `foo``bar` FROM t');

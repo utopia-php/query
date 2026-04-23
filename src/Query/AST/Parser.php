@@ -132,9 +132,15 @@ class Parser
 
         if ($this->matchKeyword('FETCH')) {
             $this->advance();
-            $this->consumeKeyword('FIRST');
+            if (!$this->matchKeyword('FIRST', 'NEXT')) {
+                throw new Exception('Expected FIRST or NEXT after FETCH at position ' . $this->current()->position);
+            }
+            $this->advance();
             $limit = $this->parseExpression();
-            $this->consumeKeyword('ROWS');
+            if (!$this->matchKeyword('ROW', 'ROWS')) {
+                throw new Exception('Expected ROW or ROWS at position ' . $this->current()->position);
+            }
+            $this->advance();
             $this->expectIdentifierValue('ONLY');
         }
 
@@ -172,7 +178,7 @@ class Parser
         $name = $this->expectIdentifier();
         $columns = [];
 
-        if ($this->current()->type === TokenType::LeftParen && !$this->matchKeyword('AS')) {
+        if ($this->current()->type === TokenType::LeftParen) {
             if ($this->peekIsColumnList()) {
                 $this->expect(TokenType::LeftParen);
                 $columns[] = $this->expectIdentifier();
