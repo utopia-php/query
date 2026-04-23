@@ -448,18 +448,16 @@ class MongoDB extends BaseBuilder implements
             return true;
         }
 
+        return $this->hasPipelineOnlyFeature($grouped)
+            || $this->hasSubqueryFeature($grouped);
+    }
+
+    private function hasPipelineOnlyFeature(ParsedQuery $grouped): bool
+    {
         return ! empty($grouped->aggregations)
             || ! empty($grouped->groupBy)
             || ! empty($grouped->having)
-            || ! empty($grouped->joins)
             || ! empty($this->windowSelects)
-            || ! empty($this->unions)
-            || ! empty($this->ctes)
-            || ! empty($this->subSelects)
-            || ! empty($this->rawSelects)
-            || ! empty($this->lateralJoins)
-            || ! empty($this->whereInSubqueries)
-            || ! empty($this->existsSubqueries)
             || $grouped->distinct
             || $this->textSearchTerm !== null
             || $this->sampleSize !== null
@@ -473,6 +471,18 @@ class MongoDB extends BaseBuilder implements
             || $this->searchStage !== null
             || $this->searchMetaStage !== null
             || $this->vectorSearchStage !== null;
+    }
+
+    private function hasSubqueryFeature(ParsedQuery $grouped): bool
+    {
+        return ! empty($grouped->joins)
+            || ! empty($this->unions)
+            || ! empty($this->ctes)
+            || ! empty($this->subSelects)
+            || ! empty($this->rawSelects)
+            || ! empty($this->lateralJoins)
+            || ! empty($this->whereInSubqueries)
+            || ! empty($this->existsSubqueries);
     }
 
     private function buildFind(ParsedQuery $grouped): Statement
@@ -522,217 +532,32 @@ class MongoDB extends BaseBuilder implements
     {
         $pipeline = [];
 
-        // $searchMeta replaces other stages (returns metadata only)
+        // $searchMeta short-circuits: returns metadata only, no further stages.
         if ($this->searchMetaStage !== null) {
             $pipeline[] = [PipelineStage::SearchMeta->value => $this->searchMetaStage];
 
-            $operation = [
-                'collection' => $this->table,
-                'operation' => Operation::Aggregate->value,
-                'pipeline' => $pipeline,
-            ];
-
-            if ($this->indexHint !== null) {
-                $operation['hint'] = $this->indexHint;
-            }
-
-            return new Statement(
-                \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
-                $this->bindings,
-                readOnly: true,
-                executor: $this->executor,
-            );
+            return $this->buildAggregateStatement($pipeline);
         }
 
-        // Atlas $search must be FIRST stage
-        if ($this->searchStage !== null) {
-            $pipeline[] = [PipelineStage::Search->value => $this->searchStage];
-        }
+        $this->appendSearchStages($pipeline);
+        $this->appendJoinStages($pipeline, $grouped);
+        $this->appendFilterStages($pipeline, $grouped);
+        $this->appendGroupingStages($pipeline, $grouped);
+        $this->appendWindowStages($pipeline);
+        $this->appendProjectionStage($pipeline, $grouped);
+        $this->appendUnionStages($pipeline);
+        $this->appendOrderingStages($pipeline);
+        $this->appendPaginationStages($pipeline, $grouped);
+        $this->appendOutputStages($pipeline);
 
-        // $vectorSearch must be FIRST stage
-        if ($this->vectorSearchStage !== null) {
-            $pipeline[] = [PipelineStage::VectorSearch->value => $this->vectorSearchStage];
-        }
+        return $this->buildAggregateStatement($pipeline);
+    }
 
-        // Text search must be first (after Atlas search)
-        if ($this->textSearchTerm !== null) {
-            $this->addBinding($this->textSearchTerm);
-            $pipeline[] = [PipelineStage::Match->value => [PipelineStage::Text->value => ['$search' => '?']]];
-        }
-
-        // $sample for table sampling
-        if ($this->sampleSize !== null) {
-            $size = (int) \ceil($this->sampleSize);
-            $pipeline[] = [PipelineStage::Sample->value => ['size' => $size]];
-        }
-
-        // JOINs via $lookup
-        foreach ($grouped->joins as $joinQuery) {
-            $stages = $this->buildJoinStages($joinQuery);
-            foreach ($stages as $stage) {
-                $pipeline[] = $stage;
-            }
-        }
-
-        // $graphLookup (after $match, similar position to $lookup)
-        if ($this->graphLookupStage !== null) {
-            $pipeline[] = [PipelineStage::GraphLookup->value => $this->graphLookupStage];
-        }
-
-        // WHERE IN subqueries
-        foreach ($this->whereInSubqueries as $idx => $sub) {
-            $stages = $this->buildWhereInSubquery($sub, $idx);
-            foreach ($stages as $stage) {
-                $pipeline[] = $stage;
-            }
-        }
-
-        // EXISTS subqueries
-        foreach ($this->existsSubqueries as $idx => $sub) {
-            $stages = $this->buildExistsSubquery($sub, $idx);
-            foreach ($stages as $stage) {
-                $pipeline[] = $stage;
-            }
-        }
-
-        // $match (WHERE filter)
-        $filter = $this->buildFilter($grouped);
-        if (! empty($filter)) {
-            $pipeline[] = [PipelineStage::Match->value => $filter];
-        }
-
-        // DISTINCT without GROUP BY
-        if ($grouped->distinct && empty($grouped->groupBy) && empty($grouped->aggregations)) {
-            $stages = $this->buildDistinct($grouped);
-            foreach ($stages as $stage) {
-                $pipeline[] = $stage;
-            }
-        }
-
-        // $bucket replaces $group
-        if ($this->bucketStage !== null) {
-            $pipeline[] = [PipelineStage::Bucket->value => $this->bucketStage];
-        } elseif ($this->bucketAutoStage !== null) {
-            $pipeline[] = [PipelineStage::BucketAuto->value => $this->bucketAutoStage];
-        } elseif (! empty($grouped->groupBy) || ! empty($grouped->aggregations)) {
-            // GROUP BY + Aggregation
-            $pipeline[] = [PipelineStage::Group->value => $this->buildGroup($grouped)];
-
-            $reshape = $this->buildProjectFromGroup($grouped);
-            if (! empty($reshape)) {
-                $pipeline[] = [PipelineStage::Project->value => $reshape];
-            }
-        }
-
-        // $replaceRoot (after $group or as needed)
-        if ($this->replaceRootExpr !== null) {
-            $pipeline[] = [PipelineStage::ReplaceRoot->value => ['newRoot' => $this->replaceRootExpr]];
-        }
-
-        // HAVING
-        if (! empty($grouped->having) || ! empty($this->rawHavings)) {
-            $havingFilter = $this->buildHaving($grouped);
-            if (! empty($havingFilter)) {
-                $pipeline[] = [PipelineStage::Match->value => $havingFilter];
-            }
-        }
-
-        // Window functions ($setWindowFields)
-        if (! empty($this->windowSelects)) {
-            $stages = $this->buildWindowFunctions();
-            foreach ($stages as $stage) {
-                $pipeline[] = $stage;
-            }
-        }
-
-        // SELECT / $project (if not using group, distinct, or bucket)
-        if (empty($grouped->groupBy) && empty($grouped->aggregations) && ! $grouped->distinct
-            && $this->bucketStage === null && $this->bucketAutoStage === null) {
-            $projection = $this->buildProjection($grouped);
-            if (! empty($projection)) {
-                // Preserve window function output aliases in the projection
-                foreach ($this->windowSelects as $win) {
-                    $projection[$win->alias] = 1;
-                }
-                $pipeline[] = [PipelineStage::Project->value => $projection];
-            }
-        }
-
-        // $facet (typically last or after $match)
-        if ($this->facetStages !== null) {
-            $facetDoc = [];
-            foreach ($this->facetStages as $name => $data) {
-                $facetDoc[$name] = $data['pipeline'];
-                foreach ($data['bindings'] as $binding) {
-                    $this->addBinding($binding);
-                }
-            }
-            $pipeline[] = [PipelineStage::Facet->value => $facetDoc];
-        }
-
-        // UNION ($unionWith)
-        foreach ($this->unions as $union) {
-            /** @var array<string, mixed>|null $subOp */
-            $subOp = \json_decode($union->query, true);
-            if ($subOp === null) {
-                throw new UnsupportedException('Cannot parse union query for MongoDB.');
-            }
-
-            $subPipeline = $this->operationToPipeline($subOp);
-            $unionWith = ['coll' => $subOp['collection']];
-            if (! empty($subPipeline)) {
-                $unionWith['pipeline'] = $subPipeline;
-            }
-            $pipeline[] = [PipelineStage::UnionWith->value => $unionWith];
-            $this->addBindings($union->bindings);
-        }
-
-        // Random ordering via $addFields + $sort
-        $hasRandomOrder = false;
-        $orderQueries = Query::getByType($this->pendingQueries, [Method::OrderRandom], false);
-        if (! empty($orderQueries)) {
-            $hasRandomOrder = true;
-            $pipeline[] = [PipelineStage::AddFields->value => ['_rand' => ['$rand' => new stdClass()]]];
-        }
-
-        // ORDER BY
-        $sort = $this->buildSort();
-        if ($hasRandomOrder) {
-            $sort['_rand'] = 1;
-        }
-        if (! empty($sort)) {
-            $pipeline[] = [PipelineStage::Sort->value => $sort];
-        }
-
-        // Remove _rand field
-        if ($hasRandomOrder) {
-            $pipeline[] = [PipelineStage::Unset->value => '_rand'];
-        }
-
-        // OFFSET
-        if ($grouped->offset !== null) {
-            $pipeline[] = [PipelineStage::Skip->value => $grouped->offset];
-        }
-
-        // LIMIT
-        if ($grouped->limit !== null) {
-            $pipeline[] = [PipelineStage::Limit->value => $grouped->limit];
-        }
-
-        // $merge at the very end of pipeline
-        if ($this->mergeStage !== null) {
-            $pipeline[] = [PipelineStage::Merge->value => $this->mergeStage];
-        }
-
-        // $out at the very end of pipeline (only one of $merge/$out allowed)
-        if ($this->outStage !== null && $this->mergeStage === null) {
-            if (isset($this->outStage['db'])) {
-                $pipeline[] = [PipelineStage::Out->value => $this->outStage];
-            } else {
-                $pipeline[] = [PipelineStage::Out->value => $this->outStage['coll']];
-            }
-        }
-
+    /**
+     * @param  list<array<string, mixed>>  $pipeline
+     */
+    private function buildAggregateStatement(array $pipeline): Statement
+    {
         $operation = [
             'collection' => $this->table,
             'operation' => Operation::Aggregate->value,
@@ -749,6 +574,256 @@ class MongoDB extends BaseBuilder implements
             readOnly: true,
             executor: $this->executor,
         );
+    }
+
+    /**
+     * Atlas $search, $vectorSearch, full-text $match, and $sample stages.
+     * Atlas search stages must be first in the pipeline.
+     *
+     * @param  list<array<string, mixed>>  $pipeline
+     */
+    private function appendSearchStages(array &$pipeline): void
+    {
+        if ($this->searchStage !== null) {
+            $pipeline[] = [PipelineStage::Search->value => $this->searchStage];
+        }
+
+        if ($this->vectorSearchStage !== null) {
+            $pipeline[] = [PipelineStage::VectorSearch->value => $this->vectorSearchStage];
+        }
+
+        if ($this->textSearchTerm !== null) {
+            $this->addBinding($this->textSearchTerm);
+            $pipeline[] = [PipelineStage::Match->value => [PipelineStage::Text->value => ['$search' => '?']]];
+        }
+
+        if ($this->sampleSize !== null) {
+            $size = (int) \ceil($this->sampleSize);
+            $pipeline[] = [PipelineStage::Sample->value => ['size' => $size]];
+        }
+    }
+
+    /**
+     * $lookup stages for JOINs and $graphLookup for recursive traversal.
+     *
+     * @param  list<array<string, mixed>>  $pipeline
+     */
+    private function appendJoinStages(array &$pipeline, ParsedQuery $grouped): void
+    {
+        foreach ($grouped->joins as $joinQuery) {
+            foreach ($this->buildJoinStages($joinQuery) as $stage) {
+                $pipeline[] = $stage;
+            }
+        }
+
+        if ($this->graphLookupStage !== null) {
+            $pipeline[] = [PipelineStage::GraphLookup->value => $this->graphLookupStage];
+        }
+    }
+
+    /**
+     * Subquery $lookups (WHERE IN / EXISTS) and the main $match stage for WHERE filters.
+     *
+     * @param  list<array<string, mixed>>  $pipeline
+     */
+    private function appendFilterStages(array &$pipeline, ParsedQuery $grouped): void
+    {
+        foreach ($this->whereInSubqueries as $idx => $sub) {
+            foreach ($this->buildWhereInSubquery($sub, $idx) as $stage) {
+                $pipeline[] = $stage;
+            }
+        }
+
+        foreach ($this->existsSubqueries as $idx => $sub) {
+            foreach ($this->buildExistsSubquery($sub, $idx) as $stage) {
+                $pipeline[] = $stage;
+            }
+        }
+
+        $filter = $this->buildFilter($grouped);
+        if (! empty($filter)) {
+            $pipeline[] = [PipelineStage::Match->value => $filter];
+        }
+    }
+
+    /**
+     * DISTINCT, $bucket/$bucketAuto, $group (with reshape $project),
+     * $replaceRoot, and HAVING $match.
+     *
+     * @param  list<array<string, mixed>>  $pipeline
+     */
+    private function appendGroupingStages(array &$pipeline, ParsedQuery $grouped): void
+    {
+        if ($grouped->distinct && empty($grouped->groupBy) && empty($grouped->aggregations)) {
+            foreach ($this->buildDistinct($grouped) as $stage) {
+                $pipeline[] = $stage;
+            }
+        }
+
+        if ($this->bucketStage !== null) {
+            $pipeline[] = [PipelineStage::Bucket->value => $this->bucketStage];
+        } elseif ($this->bucketAutoStage !== null) {
+            $pipeline[] = [PipelineStage::BucketAuto->value => $this->bucketAutoStage];
+        } elseif (! empty($grouped->groupBy) || ! empty($grouped->aggregations)) {
+            $pipeline[] = [PipelineStage::Group->value => $this->buildGroup($grouped)];
+
+            $reshape = $this->buildProjectFromGroup($grouped);
+            if (! empty($reshape)) {
+                $pipeline[] = [PipelineStage::Project->value => $reshape];
+            }
+        }
+
+        if ($this->replaceRootExpr !== null) {
+            $pipeline[] = [PipelineStage::ReplaceRoot->value => ['newRoot' => $this->replaceRootExpr]];
+        }
+
+        if (! empty($grouped->having) || ! empty($this->rawHavings)) {
+            $havingFilter = $this->buildHaving($grouped);
+            if (! empty($havingFilter)) {
+                $pipeline[] = [PipelineStage::Match->value => $havingFilter];
+            }
+        }
+    }
+
+    /**
+     * $setWindowFields stages for window functions.
+     *
+     * @param  list<array<string, mixed>>  $pipeline
+     */
+    private function appendWindowStages(array &$pipeline): void
+    {
+        if (empty($this->windowSelects)) {
+            return;
+        }
+
+        foreach ($this->buildWindowFunctions() as $stage) {
+            $pipeline[] = $stage;
+        }
+    }
+
+    /**
+     * SELECT $project stage (only applies when no group/distinct/bucket stage
+     * has already reshaped the document).
+     *
+     * @param  list<array<string, mixed>>  $pipeline
+     */
+    private function appendProjectionStage(array &$pipeline, ParsedQuery $grouped): void
+    {
+        if (! empty($grouped->groupBy) || ! empty($grouped->aggregations) || $grouped->distinct) {
+            return;
+        }
+        if ($this->bucketStage !== null || $this->bucketAutoStage !== null) {
+            return;
+        }
+
+        $projection = $this->buildProjection($grouped);
+        if (empty($projection)) {
+            return;
+        }
+
+        // Preserve window function output aliases in the projection.
+        foreach ($this->windowSelects as $win) {
+            $projection[$win->alias] = 1;
+        }
+        $pipeline[] = [PipelineStage::Project->value => $projection];
+    }
+
+    /**
+     * $facet stage and $unionWith stages for UNIONs.
+     *
+     * @param  list<array<string, mixed>>  $pipeline
+     */
+    private function appendUnionStages(array &$pipeline): void
+    {
+        if ($this->facetStages !== null) {
+            $facetDoc = [];
+            foreach ($this->facetStages as $name => $data) {
+                $facetDoc[$name] = $data['pipeline'];
+                foreach ($data['bindings'] as $binding) {
+                    $this->addBinding($binding);
+                }
+            }
+            $pipeline[] = [PipelineStage::Facet->value => $facetDoc];
+        }
+
+        foreach ($this->unions as $union) {
+            /** @var array<string, mixed>|null $subOp */
+            $subOp = \json_decode($union->query, true);
+            if ($subOp === null) {
+                throw new UnsupportedException('Cannot parse union query for MongoDB.');
+            }
+
+            $subPipeline = $this->operationToPipeline($subOp);
+            $unionWith = ['coll' => $subOp['collection']];
+            if (! empty($subPipeline)) {
+                $unionWith['pipeline'] = $subPipeline;
+            }
+            $pipeline[] = [PipelineStage::UnionWith->value => $unionWith];
+            $this->addBindings($union->bindings);
+        }
+    }
+
+    /**
+     * ORDER BY $sort stage (including random ordering via $addFields + $unset).
+     *
+     * @param  list<array<string, mixed>>  $pipeline
+     */
+    private function appendOrderingStages(array &$pipeline): void
+    {
+        $hasRandomOrder = ! empty(Query::getByType($this->pendingQueries, [Method::OrderRandom], false));
+        if ($hasRandomOrder) {
+            $pipeline[] = [PipelineStage::AddFields->value => ['_rand' => ['$rand' => new stdClass()]]];
+        }
+
+        $sort = $this->buildSort();
+        if ($hasRandomOrder) {
+            $sort['_rand'] = 1;
+        }
+        if (! empty($sort)) {
+            $pipeline[] = [PipelineStage::Sort->value => $sort];
+        }
+
+        if ($hasRandomOrder) {
+            $pipeline[] = [PipelineStage::Unset->value => '_rand'];
+        }
+    }
+
+    /**
+     * OFFSET $skip and LIMIT $limit stages.
+     *
+     * @param  list<array<string, mixed>>  $pipeline
+     */
+    private function appendPaginationStages(array &$pipeline, ParsedQuery $grouped): void
+    {
+        if ($grouped->offset !== null) {
+            $pipeline[] = [PipelineStage::Skip->value => $grouped->offset];
+        }
+
+        if ($grouped->limit !== null) {
+            $pipeline[] = [PipelineStage::Limit->value => $grouped->limit];
+        }
+    }
+
+    /**
+     * Terminal $merge or $out stage (only one of the two is emitted).
+     *
+     * @param  list<array<string, mixed>>  $pipeline
+     */
+    private function appendOutputStages(array &$pipeline): void
+    {
+        if ($this->mergeStage !== null) {
+            $pipeline[] = [PipelineStage::Merge->value => $this->mergeStage];
+
+            return;
+        }
+
+        if ($this->outStage !== null) {
+            if (isset($this->outStage['db'])) {
+                $pipeline[] = [PipelineStage::Out->value => $this->outStage];
+            } else {
+                $pipeline[] = [PipelineStage::Out->value => $this->outStage['coll']];
+            }
+        }
     }
 
     /**
