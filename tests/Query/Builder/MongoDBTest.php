@@ -4620,7 +4620,8 @@ class MongoDBTest extends TestCase
         /** @var list<array<string, mixed>> $filters */
         $filters = $options['arrayFilters'];
         $this->assertCount(1, $filters);
-        $this->assertArrayHasKey('elem', $filters[0]);
+        $this->assertArrayHasKey('elem.grade', $filters[0]);
+        $this->assertSame(['$gte' => 85], $filters[0]['elem.grade']);
     }
 
     public function testMultipleArrayFilters(): void
@@ -4640,6 +4641,8 @@ class MongoDBTest extends TestCase
         /** @var list<array<string, mixed>> $filters */
         $filters = $options['arrayFilters'];
         $this->assertCount(2, $filters);
+        $this->assertArrayHasKey('elem.grade', $filters[0]);
+        $this->assertArrayHasKey('other.type', $filters[1]);
     }
 
     public function testBucket(): void
