@@ -10,6 +10,7 @@ use Utopia\Query\Method;
 use Utopia\Query\Parser\MySQL as MySQLParser;
 use Utopia\Query\Parser\PostgreSQL as PostgreSQLParser;
 use Utopia\Query\Query;
+use Utopia\Query\Schema\Index;
 use Utopia\Query\Schema\MySQL as MySQLSchema;
 use Utopia\Query\Schema\PostgreSQL as PostgreSQLSchema;
 use Utopia\Query\Type;
@@ -216,5 +217,17 @@ class SecurityRegressionTest extends TestCase
             ->selectWindow('SUM("amount")', 'w', ['dept']);
 
         $this->assertInstanceOf(PostgreSQLBuilder::class, $builder);
+    }
+
+    public function testCreateIndexRejectsDoubleQuoteInCollation(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid collation');
+
+        new Index(
+            name: 'idx_name',
+            columns: ['name'],
+            collations: ['name' => '"en_US"'],
+        );
     }
 }

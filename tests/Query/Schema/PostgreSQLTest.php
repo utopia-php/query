@@ -19,6 +19,7 @@ use Utopia\Query\Schema\Feature\TableComments;
 use Utopia\Query\Schema\Feature\Triggers;
 use Utopia\Query\Schema\Feature\Types;
 use Utopia\Query\Schema\ForeignKeyAction;
+use Utopia\Query\Schema\Index;
 use Utopia\Query\Schema\IndexType;
 use Utopia\Query\Schema\ParameterDirection;
 use Utopia\Query\Schema\PostgreSQL as Schema;
@@ -1192,17 +1193,29 @@ class PostgreSQLTest extends TestCase
         );
     }
 
-    public function testCreateIndexAcceptsQuotedCollation(): void
+    public function testCreateIndexAcceptsPlainCollation(): void
     {
         $schema = new Schema();
         $result = $schema->createIndex(
             'users',
             'idx_name',
             ['name'],
-            collations: ['name' => '"en_US"'],
+            collations: ['name' => 'en_US'],
         );
 
-        $this->assertStringContainsString('COLLATE "en_US"', $result->query);
+        $this->assertStringContainsString('COLLATE en_US', $result->query);
+    }
+
+    public function testCreateIndexRejectsQuotedCollation(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid collation');
+
+        new Index(
+            name: 'idx_name',
+            columns: ['name'],
+            collations: ['name' => '"en_US"'],
+        );
     }
 
     public function testCreateTriggerRejectsDollarQuoteTerminatorInBody(): void
