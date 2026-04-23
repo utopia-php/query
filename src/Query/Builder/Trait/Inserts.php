@@ -8,6 +8,18 @@ use Utopia\Query\Exception\ValidationException;
 
 trait Inserts
 {
+    /** @var string[] */
+    protected array $conflictKeys = [];
+
+    /** @var string[] */
+    protected array $conflictUpdateColumns = [];
+
+    /** @var array<string, string> */
+    protected array $conflictRawSets = [];
+
+    /** @var array<string, list<mixed>> */
+    protected array $conflictRawSetBindings = [];
+
     #[\Override]
     public function into(string $table): static
     {
