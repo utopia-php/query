@@ -440,6 +440,12 @@ trait Selects
         $this->afterBuildCallbacks = [];
         $this->fetchCount = null;
         $this->fetchWithTies = false;
+        $this->filterHooks = [];
+        $this->attributeHooks = [];
+        $this->joinFilterHooks = [];
+        $this->qualify = false;
+        $this->aggregationAliases = [];
+        $this->executor = null;
 
         return $this;
     }
