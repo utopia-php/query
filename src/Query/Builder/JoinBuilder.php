@@ -22,6 +22,14 @@ class JoinBuilder
      */
     public function on(string $left, string $right, string $operator = '='): static
     {
+        if (!\preg_match('/^[a-zA-Z_][a-zA-Z0-9_.]*$/', $left)) {
+            throw new ValidationException('Invalid column name: ' . $left);
+        }
+
+        if (!\preg_match('/^[a-zA-Z_][a-zA-Z0-9_.]*$/', $right)) {
+            throw new ValidationException('Invalid column name: ' . $right);
+        }
+
         if (!\in_array($operator, self::ALLOWED_OPERATORS, true)) {
             throw new ValidationException('Invalid join operator: ' . $operator);
         }

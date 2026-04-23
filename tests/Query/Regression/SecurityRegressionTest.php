@@ -3,6 +3,7 @@
 namespace Tests\Query\Regression;
 
 use PHPUnit\Framework\TestCase;
+use Utopia\Query\Builder\JoinBuilder;
 use Utopia\Query\Builder\MySQL as MySQLBuilder;
 use Utopia\Query\Builder\PostgreSQL as PostgreSQLBuilder;
 use Utopia\Query\Exception\ValidationException;
@@ -336,5 +337,33 @@ class SecurityRegressionTest extends TestCase
         $result = (new MySQLBuilder())->from('users')->build();
 
         $this->assertStringContainsString('`users`', $result->query);
+    }
+
+    public function testJoinOnRejectsInjectionInLeftIdentifier(): void
+    {
+        $join = new JoinBuilder();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid column name');
+
+        $join->on('users.id); DROP TABLE users; --', 'orders.user_id');
+    }
+
+    public function testJoinOnRejectsInjectionInRightIdentifier(): void
+    {
+        $join = new JoinBuilder();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid column name');
+
+        $join->on('users.id', 'orders.user_id OR 1=1');
+    }
+
+    public function testJoinOnAcceptsValidIdentifiers(): void
+    {
+        $join = new JoinBuilder();
+        $join->on('users.id', 'orders.user_id');
+
+        $this->assertCount(1, $join->ons);
     }
 }
