@@ -249,6 +249,35 @@ abstract class IntegrationTestCase extends TestCase
         $this->connectClickhouse()->statement($sql);
     }
 
+    /**
+     * Returns a table/collection name suffixed with the paratest worker token,
+     * when present. This defuses the race where parallel workers share the same
+     * MySQL/MariaDB/PostgreSQL/ClickHouse/MongoDB containers and would otherwise
+     * clobber each other's `users`/`orders`/etc tables in setUp.
+     *
+     * Today `composer test:integration` runs phpunit (not paratest), so
+     * `TEST_TOKEN` is unset and this is a no-op that returns `$base` unchanged.
+     * If integration tests are ever parallelised, every test that creates or
+     * references a shared-container table should route its physical table name
+     * through this helper to keep workers isolated.
+     *
+     * Usage:
+     *
+     *     $users = $this->tableName('users');
+     *     $this->mysqlStatement("CREATE TABLE `{$users}` (...)");
+     *     $this->trackMysqlTable($users);
+     *     ...->from($users)->...->build();
+     */
+    protected function tableName(string $base): string
+    {
+        $token = getenv('TEST_TOKEN');
+        if ($token === false || $token === '') {
+            return $base;
+        }
+
+        return $base . '_' . $token;
+    }
+
     protected function trackMysqlTable(string $table): void
     {
         $this->mysqlCleanup[] = $table;

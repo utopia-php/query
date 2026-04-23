@@ -100,6 +100,18 @@ abstract class Builder implements
     /** @var list<Attribute> */
     protected array $attributeHooks = [];
 
+    /**
+     * Per-build memo of resolveAttribute() results keyed by raw name.
+     *
+     * Populated on first resolution, cleared at the top of build() and on
+     * reset(). The same attribute is resolved many times per build (SELECT,
+     * WHERE, GROUP BY, ORDER BY, JOIN ON, UPDATE SET) and each resolution
+     * iterates every registered attribute hook.
+     *
+     * @var array<string, string>
+     */
+    protected array $resolvedAttributeCache = [];
+
     /** @var list<JoinFilter> */
     protected array $joinFilterHooks = [];
 
@@ -410,6 +422,7 @@ abstract class Builder implements
     public function build(): Statement
     {
         $this->bindings = [];
+        $this->resolvedAttributeCache = [];
 
         foreach ($this->beforeBuildCallbacks as $callback) {
             $callback($this);
@@ -1602,9 +1615,16 @@ abstract class Builder implements
 
     protected function resolveAttribute(string $attribute): string
     {
+        if (isset($this->resolvedAttributeCache[$attribute])) {
+            return $this->resolvedAttributeCache[$attribute];
+        }
+
+        $raw = $attribute;
         foreach ($this->attributeHooks as $hook) {
             $attribute = $hook->resolve($attribute);
         }
+
+        $this->resolvedAttributeCache[$raw] = $attribute;
 
         return $attribute;
     }

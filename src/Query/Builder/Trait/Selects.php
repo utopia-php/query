@@ -137,7 +137,7 @@ trait Selects
     #[\Override]
     public function selectCast(string $column, string $type, string $alias = ''): static
     {
-        if (!\preg_match('/^[A-Za-z0-9_() ,]+$/', $type)) {
+        if (!\preg_match('/^[A-Za-z_][A-Za-z0-9_]*(\s+[A-Za-z_][A-Za-z0-9_]*)*(\s*\(\s*[A-Za-z0-9_,\s]+\s*\))?$/', $type)) {
             throw new ValidationException('Invalid cast type: ' . $type);
         }
 
@@ -399,6 +399,7 @@ trait Selects
     {
         $this->pendingQueries = [];
         $this->bindings = [];
+        $this->resolvedAttributeCache = [];
         $this->table = '';
         $this->alias = '';
         $this->unions = [];
