@@ -17,6 +17,7 @@ use Utopia\Query\Builder\Feature\PostgreSQL\Merge;
 use Utopia\Query\Builder\Feature\PostgreSQL\OrderedSetAggregates;
 use Utopia\Query\Builder\Feature\PostgreSQL\Returning;
 use Utopia\Query\Builder\Feature\PostgreSQL\VectorSearch;
+use Utopia\Query\Builder\Feature\Sequences;
 use Utopia\Query\Builder\Feature\StringAggregates;
 use Utopia\Query\Builder\Feature\TableSampling;
 use Utopia\Query\Exception\UnsupportedException;
@@ -25,7 +26,7 @@ use Utopia\Query\Method;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\ColumnType;
 
-class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf, ConditionalAggregates, Merge, LateralJoins, TableSampling, FullOuterJoins, StringAggregates, OrderedSetAggregates, DistinctOn, AggregateFilter, GroupByModifiers
+class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf, ConditionalAggregates, Merge, LateralJoins, TableSampling, FullOuterJoins, StringAggregates, OrderedSetAggregates, DistinctOn, AggregateFilter, GroupByModifiers, Sequences
 {
     use Trait\FullOuterJoins;
     use Trait\LateralJoins;
@@ -35,6 +36,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     use Trait\PostgreSQL\Merge;
     use Trait\PostgreSQL\OrderedSetAggregates;
     use Trait\PostgreSQL\Returning;
+    use Trait\PostgreSQL\Sequences;
     use Trait\PostgreSQL\VectorSearch;
 
     protected string $wrapChar = '"';

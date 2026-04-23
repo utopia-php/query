@@ -10,6 +10,7 @@ use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\Hints;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\LateralJoins;
+use Utopia\Query\Builder\Feature\Sequences;
 use Utopia\Query\Builder\MariaDB as Builder;
 use Utopia\Query\Builder\Plan;
 use Utopia\Query\Compiler;
@@ -1569,4 +1570,49 @@ class MariaDBTest extends TestCase
         $this->assertContains('active', $result->bindings);
     }
 
+    public function testImplementsSequences(): void
+    {
+        $this->assertInstanceOf(Sequences::class, new Builder());
+    }
+
+    public function testNextValEmitsSequenceCall(): void
+    {
+        $result = (new Builder())
+            ->fromNone()
+            ->nextVal('seq_user_id')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('NEXTVAL(`seq_user_id`)', $result->query);
+    }
+
+    public function testCurrValEmitsSequenceCall(): void
+    {
+        $result = (new Builder())
+            ->fromNone()
+            ->currVal('seq_user_id')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('LASTVAL(`seq_user_id`)', $result->query);
+    }
+
+    public function testNextValWithAlias(): void
+    {
+        $result = (new Builder())
+            ->fromNone()
+            ->nextVal('seq_user_id', 'next_id')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('NEXTVAL(`seq_user_id`) AS `next_id`', $result->query);
+    }
+
+    public function testNextValRejectsInvalidName(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid sequence name');
+
+        (new Builder())->nextVal('bad name; DROP TABLE x');
+    }
 }

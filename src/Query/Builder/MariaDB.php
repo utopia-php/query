@@ -3,14 +3,16 @@
 namespace Utopia\Query\Builder;
 
 use Utopia\Query\Builder\Feature\MariaDB\Returning;
+use Utopia\Query\Builder\Feature\Sequences;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\ColumnType;
 
-class MariaDB extends MySQL implements Returning
+class MariaDB extends MySQL implements Returning, Sequences
 {
     use Trait\MariaDB\Returning;
+    use Trait\MariaDB\Sequences;
 
     /** @var list<string> */
     protected array $returningColumns = [];

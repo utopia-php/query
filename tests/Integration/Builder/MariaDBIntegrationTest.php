@@ -123,7 +123,7 @@ class MariaDBIntegrationTest extends IntegrationTestCase
 
         $source = (new Builder())
             ->fromNone()
-            ->selectRaw('NEXTVAL(`seq_user_id`)')
+            ->nextVal('seq_user_id')
             ->selectRaw('?', ['SeqUser'])
             ->selectRaw('?', ['seq@example.com'])
             ->selectRaw('?', [21])

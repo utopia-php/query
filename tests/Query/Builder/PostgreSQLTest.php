@@ -22,6 +22,7 @@ use Utopia\Query\Builder\Feature\Locking;
 use Utopia\Query\Builder\Feature\PostgreSQL\Merge;
 use Utopia\Query\Builder\Feature\PostgreSQL\VectorSearch;
 use Utopia\Query\Builder\Feature\Selects;
+use Utopia\Query\Builder\Feature\Sequences;
 use Utopia\Query\Builder\Feature\Spatial;
 use Utopia\Query\Builder\Feature\TableSampling;
 use Utopia\Query\Builder\Feature\Transactions;
@@ -6491,4 +6492,49 @@ class PostgreSQLTest extends TestCase
         $this->assertContains('active', $result->bindings);
     }
 
+    public function testImplementsSequences(): void
+    {
+        $this->assertInstanceOf(Sequences::class, new Builder());
+    }
+
+    public function testNextValEmitsSequenceCall(): void
+    {
+        $result = (new Builder())
+            ->fromNone()
+            ->nextVal('seq_user_id')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("nextval('seq_user_id')", $result->query);
+    }
+
+    public function testCurrValEmitsSequenceCall(): void
+    {
+        $result = (new Builder())
+            ->fromNone()
+            ->currVal('seq_user_id')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString("currval('seq_user_id')", $result->query);
+    }
+
+    public function testNextValWithAlias(): void
+    {
+        $result = (new Builder())
+            ->fromNone()
+            ->nextVal('seq_user_id', 'next_id')
+            ->build();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('nextval(\'seq_user_id\') AS "next_id"', $result->query);
+    }
+
+    public function testNextValRejectsInvalidName(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid sequence name');
+
+        (new Builder())->nextVal('bad name; DROP TABLE x');
+    }
 }
