@@ -243,6 +243,28 @@ class MongoDBTest extends TestCase
         $this->assertSame(Type::TransactionEnd, $this->parser->parse($data));
     }
 
+    public function testStartTransactionFlagOnNonEligibleCommandIsIgnored(): void
+    {
+        // Only CRUD/aggregate commands can piggy-back startTransaction. A
+        // rogue `ping` carrying `startTransaction: true` must NOT classify
+        // as TransactionBegin — ping is not transaction-eligible, and the
+        // parser skips the scan entirely on the hot path.
+        $data = $this->buildOpMsg(['ping' => 1, '$db' => 'admin', 'startTransaction' => true]);
+        $this->assertSame(Type::Read, $this->parser->parse($data));
+    }
+
+    public function testStartTransactionFlagOnEligibleCommands(): void
+    {
+        foreach (['find', 'insert', 'update', 'delete', 'aggregate', 'findAndModify'] as $command) {
+            $data = $this->buildOpMsg([$command => 'users', '$db' => 'mydb', 'startTransaction' => true]);
+            $this->assertSame(
+                Type::TransactionBegin,
+                $this->parser->parse($data),
+                \sprintf('Command %s with startTransaction should be TransactionBegin', $command),
+            );
+        }
+    }
+
     // -- Edge Cases --
 
     public function testTooShortPacket(): void

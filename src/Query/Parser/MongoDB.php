@@ -73,6 +73,23 @@ class MongoDB implements Parser
     ];
 
     /**
+     * Commands that may legitimately carry a `startTransaction: true` flag
+     * alongside their payload. Only these commands require a BSON scan for
+     * the transaction flag — for everything else the command name alone
+     * determines the Type, avoiding the linear scan on the hot path.
+     *
+     * @var array<string, true>
+     */
+    private const TRANSACTION_ELIGIBLE_COMMANDS = [
+        'find' => true,
+        'insert' => true,
+        'update' => true,
+        'delete' => true,
+        'aggregate' => true,
+        'findAndModify' => true,
+    ];
+
+    /**
      * MongoDB OP_MSG opcode
      */
     private const OP_MSG = 2013;
@@ -105,21 +122,28 @@ class MongoDB implements Parser
         // Each element: type byte, cstring name, value
         $bsonOffset = 21;
 
-        // Check for startTransaction flag in the document
-        if ($this->hasBsonKey($data, $bsonOffset, 'startTransaction')) {
-            return Type::TransactionBegin;
-        }
-
-        // Extract the first key name (the command name)
+        // Extract the command name (first BSON key) up front. The command
+        // name alone determines the Type for the >99% case; only CRUD
+        // commands can piggy-back a `startTransaction: true` flag and
+        // therefore warrant the full BSON scan.
         $commandName = $this->extractFirstBsonKey($data, $bsonOffset);
 
         if ($commandName === null) {
             return Type::Unknown;
         }
 
-        // Transaction end commands
+        // Transaction end is determined by the command name itself — no scan.
         if ($commandName === 'commitTransaction' || $commandName === 'abortTransaction') {
             return Type::TransactionEnd;
+        }
+
+        // Only scan for the startTransaction flag on commands that can
+        // legitimately carry it. This avoids a linear BSON walk for pings,
+        // hellos, listCollections, serverStatus, etc. on every packet.
+        if (isset(self::TRANSACTION_ELIGIBLE_COMMANDS[$commandName])
+            && $this->hasBsonKey($data, $bsonOffset, 'startTransaction')
+        ) {
+            return Type::TransactionBegin;
         }
 
         // Read commands
