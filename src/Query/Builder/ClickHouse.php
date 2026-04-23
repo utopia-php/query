@@ -32,6 +32,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     use Trait\ClickHouse\WithFill;
     use Trait\FullOuterJoins;
     use Trait\StatisticalAggregates;
+    use Trait\StringAggregates;
 
     /**
      * @var array<Query>
@@ -213,37 +214,21 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     }
 
     #[\Override]
-    public function groupConcat(string $column, string $separator = ',', string $alias = '', ?array $orderBy = null): static
+    protected function groupConcatExpr(string $column, string $orderBy): string
     {
-        $col = $this->resolveAndWrap($column);
-        $expr = 'arrayStringConcat(groupArray(' . $col . '), ?)';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, [$separator]);
+        return 'arrayStringConcat(groupArray(' . $column . '), ?)';
     }
 
     #[\Override]
-    public function jsonArrayAgg(string $column, string $alias = ''): static
+    protected function jsonArrayAggExpr(string $column): string
     {
-        $expr = 'toJSONString(groupArray(' . $this->resolveAndWrap($column) . '))';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr);
+        return 'toJSONString(groupArray(' . $column . '))';
     }
 
     #[\Override]
-    public function jsonObjectAgg(string $keyColumn, string $valueColumn, string $alias = ''): static
+    protected function jsonObjectAggExpr(string $keyColumn, string $valueColumn): string
     {
-        $expr = 'toJSONString(CAST((groupArray(' . $this->resolveAndWrap($keyColumn) . '), groupArray(' . $this->resolveAndWrap($valueColumn) . ')) AS Map(String, String)))';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr);
+        return 'toJSONString(CAST((groupArray(' . $keyColumn . '), groupArray(' . $valueColumn . ')) AS Map(String, String)))';
     }
 
     #[\Override]

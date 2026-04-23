@@ -17,6 +17,7 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     use Trait\ConditionalAggregates;
     use Trait\Hints;
     use Trait\LateralJoins;
+    use Trait\StringAggregates;
 
     protected string $updateJoinTable = '';
 
@@ -344,49 +345,23 @@ class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJo
     }
 
     #[\Override]
-    public function groupConcat(string $column, string $separator = ',', string $alias = '', ?array $orderBy = null): static
+    protected function groupConcatExpr(string $column, string $orderBy): string
     {
-        $col = $this->resolveAndWrap($column);
-        $expr = 'GROUP_CONCAT(' . $col;
-        if ($orderBy !== null && $orderBy !== []) {
-            $orderCols = [];
-            foreach ($orderBy as $orderCol) {
-                if (\str_starts_with($orderCol, '-')) {
-                    $orderCols[] = $this->resolveAndWrap(\substr($orderCol, 1)) . ' DESC';
-                } else {
-                    $orderCols[] = $this->resolveAndWrap($orderCol) . ' ASC';
-                }
-            }
-            $expr .= ' ORDER BY ' . \implode(', ', $orderCols);
-        }
-        $expr .= ' SEPARATOR ?)';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
+        $suffix = $orderBy === '' ? '' : ' ' . $orderBy;
 
-        return $this->select($expr, [$separator]);
+        return 'GROUP_CONCAT(' . $column . $suffix . ' SEPARATOR ?)';
     }
 
     #[\Override]
-    public function jsonArrayAgg(string $column, string $alias = ''): static
+    protected function jsonArrayAggExpr(string $column): string
     {
-        $expr = 'JSON_ARRAYAGG(' . $this->resolveAndWrap($column) . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr);
+        return 'JSON_ARRAYAGG(' . $column . ')';
     }
 
     #[\Override]
-    public function jsonObjectAgg(string $keyColumn, string $valueColumn, string $alias = ''): static
+    protected function jsonObjectAggExpr(string $keyColumn, string $valueColumn): string
     {
-        $expr = 'JSON_OBJECTAGG(' . $this->resolveAndWrap($keyColumn) . ', ' . $this->resolveAndWrap($valueColumn) . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr);
+        return 'JSON_OBJECTAGG(' . $keyColumn . ', ' . $valueColumn . ')';
     }
 
     #[\Override]
