@@ -324,7 +324,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->filter([Query::contains('bio', ['php'])])
+            ->filter([Query::containsString('bio', ['php'])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -336,7 +336,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->filter([Query::contains('bio', ['php', 'js'])])
+            ->filter([Query::containsString('bio', ['php', 'js'])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -2915,7 +2915,7 @@ class MySQLTest extends TestCase
     public function testCompileFilterContainsSingle(): void
     {
         $builder = new Builder();
-        $sql = $builder->compileFilter(Query::contains('col', ['val']));
+        $sql = $builder->compileFilter(Query::containsString('col', ['val']));
         $this->assertSame('`col` LIKE ?', $sql);
         $this->assertSame(['%val%'], $builder->getBindings());
     }
@@ -2923,7 +2923,7 @@ class MySQLTest extends TestCase
     public function testCompileFilterContainsMultiple(): void
     {
         $builder = new Builder();
-        $sql = $builder->compileFilter(Query::contains('col', ['a', 'b']));
+        $sql = $builder->compileFilter(Query::containsString('col', ['a', 'b']));
         $this->assertSame('(`col` LIKE ? OR `col` LIKE ?)', $sql);
         $this->assertSame(['%a%', '%b%'], $builder->getBindings());
     }
@@ -3272,7 +3272,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->filter([Query::contains('bio', [''])])
+            ->filter([Query::containsString('bio', [''])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -3284,7 +3284,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->filter([Query::contains('bio', ['a', 'b', 'c', 'd', 'e'])])
+            ->filter([Query::containsString('bio', ['a', 'b', 'c', 'd', 'e'])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -5297,7 +5297,7 @@ class MySQLTest extends TestCase
         $result = (new Builder())
             ->from('t')
             ->filter([
-                Query::contains('bio', ['php', 'js', 'go']),
+                Query::containsString('bio', ['php', 'js', 'go']),
                 Query::equal('status', ['active']),
             ])
             ->build();
@@ -5848,7 +5848,7 @@ class MySQLTest extends TestCase
 
     public function testContainsWithSqlWildcard(): void
     {
-        $result = (new Builder())->from('t')->filter([Query::contains('bio', ['100%'])])->build();
+        $result = (new Builder())->from('t')->filter([Query::containsString('bio', ['100%'])])->build();
         $this->assertBindingCount($result);
         $this->assertSame('SELECT * FROM `t` WHERE `bio` LIKE ?', $result->query);
         $this->assertSame(['%100\%%'], $result->bindings);
@@ -8803,7 +8803,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->filter([Query::contains('bio', ['php', 'js'])])
+            ->filter([Query::containsString('bio', ['php', 'js'])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -8839,7 +8839,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->filter([Query::contains('bio', ['php'])])
+            ->filter([Query::containsString('bio', ['php'])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -12145,7 +12145,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->filter([Query::contains('data', [['nested' => 'value']])])
+            ->filter([Query::containsString('data', [['nested' => 'value']])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -12156,7 +12156,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->filter([Query::contains('col', [42])])
+            ->filter([Query::containsString('col', [42])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -12168,7 +12168,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->filter([Query::contains('col', [true])])
+            ->filter([Query::containsString('col', [true])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -12586,7 +12586,7 @@ class MySQLTest extends TestCase
 
     public function testSpatialAttributeTypeRedirectToCovers(): void
     {
-        $query = Query::contains('geom', [[1.0, 2.0]]);
+        $query = Query::containsString('geom', [[1.0, 2.0]]);
         $query->setAttributeType('point');
         $query->setOnArray(false);
 
@@ -12610,7 +12610,7 @@ class MySQLTest extends TestCase
 
     public function testArrayFilterContains(): void
     {
-        $query = Query::contains('tags', ['php', 'js']);
+        $query = Query::containsString('tags', ['php', 'js']);
         $query->setOnArray(true);
 
         $builder = new Builder();
@@ -13550,7 +13550,7 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->filter([Query::contains('bio', ['100%_test'])])
+            ->filter([Query::containsString('bio', ['100%_test'])])
             ->build();
         $this->assertBindingCount($result);
 

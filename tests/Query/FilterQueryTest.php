@@ -66,7 +66,7 @@ class FilterQueryTest extends TestCase
 
     public function testContains(): void
     {
-        $query = Query::contains('tags', ['php', 'js']);
+        $query = Query::containsString('tags', ['php', 'js']);
         $this->assertSame(Method::Contains, $query->getMethod());
         $this->assertSame(['php', 'js'], $query->getValues());
     }
@@ -87,7 +87,7 @@ class FilterQueryTest extends TestCase
 
     public function testContainsDeprecated(): void
     {
-        $query = Query::contains('tags', ['a', 'b']);
+        $query = Query::containsString('tags', ['a', 'b']);
         $this->assertSame(Method::Contains, $query->getMethod());
         $this->assertSame(['a', 'b'], $query->getValues());
     }

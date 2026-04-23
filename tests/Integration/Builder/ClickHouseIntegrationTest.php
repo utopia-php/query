@@ -395,7 +395,7 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
             ->select(['id', 'name', 'email'])
             ->filter([
                 Query::startsWith('email', 'a'),
-                Query::contains('name', ['Alice']),
+                Query::containsString('name', ['Alice']),
             ])
             ->build();
 

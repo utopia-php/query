@@ -5,3 +5,4 @@ composer.phar
 coverage
 coverage.xml
 .DS_Store
+.claude/worktrees/

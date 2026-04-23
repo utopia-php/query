@@ -927,7 +927,7 @@ class QueryHelperTest extends TestCase
         $this->assertCount(1, Query::diff($a, $b));
     }
 
-    // ── #[\Deprecated] on Query::contains() ────────────────────
+    // ── #[\Deprecated] on Query::containsString() ────────────────────
 
     public function testContainsHasDeprecatedAttribute(): void
     {
@@ -943,7 +943,7 @@ class QueryHelperTest extends TestCase
 
     public function testContainsStillFunctions(): void
     {
-        $query = @Query::contains('tags', ['a', 'b']);
+        $query = @Query::containsString('tags', ['a', 'b']);
         $this->assertSame(Method::Contains, $query->getMethod());
         $this->assertSame('tags', $query->getAttribute());
         $this->assertSame(['a', 'b'], $query->getValues());

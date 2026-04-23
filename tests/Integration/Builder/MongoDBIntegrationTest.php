@@ -342,7 +342,7 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $result = (new Builder())
             ->from('mg_users')
             ->select(['name'])
-            ->filter([Query::contains('email', ['test.com'])])
+            ->filter([Query::containsString('email', ['test.com'])])
             ->build();
 
         $rows = $this->executeOnMongoDB($result);

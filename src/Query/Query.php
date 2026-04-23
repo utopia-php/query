@@ -464,12 +464,25 @@ class Query
     }
 
     /**
-     * Helper method to create Query with contains method
+     * Helper method to create Query with contains method.
+     *
+     * @param  array<mixed>  $values
+     *
+     * @deprecated Use containsString() for string substring matching or containsAny() for array attributes.
+     */
+    #[\Deprecated('Use containsString() for string substring matching or containsAny() for array attributes.')]
+    public static function contains(string $attribute, array $values): static
+    {
+        return new static(Method::Contains, $attribute, $values);
+    }
+
+    /**
+     * Helper method to create Query for string substring matching.
+     * Compiles to LIKE '%value%' for each given value.
      *
      * @param  array<mixed>  $values
      */
-    #[\Deprecated('Use containsAny() for array attributes, or keep using contains() for string substring matching.')]
-    public static function contains(string $attribute, array $values): static
+    public static function containsString(string $attribute, array $values): static
     {
         return new static(Method::Contains, $attribute, $values);
     }

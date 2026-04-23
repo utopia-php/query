@@ -1512,7 +1512,7 @@ class SQLiteTest extends TestCase
             ->from('files')
             ->filter([
                 Query::startsWith('path', '/usr'),
-                Query::contains('name', ['test']),
+                Query::containsString('name', ['test']),
             ])
             ->build();
         $this->assertBindingCount($result);
@@ -1787,7 +1787,7 @@ class SQLiteTest extends TestCase
             ->filter([
                 Query::greaterThan('price', 10),
                 Query::startsWith('name', 'Pro'),
-                Query::contains('description', ['premium']),
+                Query::containsString('description', ['premium']),
                 Query::isNotNull('sku'),
             ])
             ->build();

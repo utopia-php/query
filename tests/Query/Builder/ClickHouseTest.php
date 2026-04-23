@@ -672,7 +672,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('events')
-            ->prewhere([Query::contains('name', ['foo'])])
+            ->prewhere([Query::containsString('name', ['foo'])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -684,7 +684,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('events')
-            ->prewhere([Query::contains('name', ['foo', 'bar'])])
+            ->prewhere([Query::containsString('name', ['foo', 'bar'])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -1991,7 +1991,7 @@ class ClickHouseTest extends TestCase
             ->from('logs')
             ->filter([
                 Query::regex('path', '^/api'),
-                Query::contains('msg', ['error']),
+                Query::containsString('msg', ['error']),
             ])
             ->build();
         $this->assertBindingCount($result);
@@ -2393,7 +2393,7 @@ class ClickHouseTest extends TestCase
 
     public function testFilterContainsSingleValue(): void
     {
-        $result = (new Builder())->from('t')->filter([Query::contains('a', ['foo'])])->build();
+        $result = (new Builder())->from('t')->filter([Query::containsString('a', ['foo'])])->build();
         $this->assertBindingCount($result);
         $this->assertSame('SELECT * FROM `t` WHERE position(`a`, ?) > 0', $result->query);
         $this->assertSame(['foo'], $result->bindings);
@@ -2401,7 +2401,7 @@ class ClickHouseTest extends TestCase
 
     public function testFilterContainsMultipleValues(): void
     {
-        $result = (new Builder())->from('t')->filter([Query::contains('a', ['foo', 'bar'])])->build();
+        $result = (new Builder())->from('t')->filter([Query::containsString('a', ['foo', 'bar'])])->build();
         $this->assertBindingCount($result);
         $this->assertSame('SELECT * FROM `t` WHERE (position(`a`, ?) > 0 OR position(`a`, ?) > 0)', $result->query);
         $this->assertSame(['foo', 'bar'], $result->bindings);
@@ -6009,7 +6009,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->filter([Query::contains('name', ['foo'])])
+            ->filter([Query::containsString('name', ['foo'])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -6021,7 +6021,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->filter([Query::contains('name', ['foo', 'bar'])])
+            ->filter([Query::containsString('name', ['foo', 'bar'])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -7850,7 +7850,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('articles')
             ->select(['id', 'title'])
-            ->filter([Query::contains('title', ['php'])])
+            ->filter([Query::containsString('title', ['php'])])
             ->build();
 
         $this->assertSame(
@@ -7866,7 +7866,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('articles')
             ->select(['id', 'title'])
-            ->filter([Query::contains('title', ['php', 'laravel'])])
+            ->filter([Query::containsString('title', ['php', 'laravel'])])
             ->build();
 
         $this->assertSame(
@@ -8335,7 +8335,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('events')
-            ->filter([Query::contains('name', ['mid'])])
+            ->filter([Query::containsString('name', ['mid'])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -8943,7 +8943,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('logs')
-            ->filter([Query::contains('message', ["it's a test"])])
+            ->filter([Query::containsString('message', ["it's a test"])])
             ->build();
         $this->assertBindingCount($result);
 

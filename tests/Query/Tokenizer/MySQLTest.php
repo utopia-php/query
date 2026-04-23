@@ -230,7 +230,6 @@ class MySQLTest extends TestCase
 
         $reflection = new ReflectionClass(MySQL::class);
         $method = $reflection->getMethod('replaceHashComments');
-        $method->setAccessible(true);
         $rewritten = $method->invoke($this->tokenizer, $sql);
 
         $this->assertIsString($rewritten);

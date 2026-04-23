@@ -1828,7 +1828,7 @@ class PostgreSQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->filter([Query::contains('path', ['a\\b'])])
+            ->filter([Query::containsString('path', ['a\\b'])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -1840,7 +1840,7 @@ class PostgreSQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
-            ->filter([Query::contains('bio', ['foo', 'bar'])])
+            ->filter([Query::containsString('bio', ['foo', 'bar'])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -4184,7 +4184,7 @@ class PostgreSQLTest extends TestCase
 
     public function testObjectFilterNestedContains(): void
     {
-        $query = Query::contains('data.name', ['mid']);
+        $query = Query::containsString('data.name', ['mid']);
         $query->setAttributeType(ColumnType::Object->value);
 
         $result = (new Builder())
@@ -4268,7 +4268,7 @@ class PostgreSQLTest extends TestCase
 
     public function testObjectFilterTopLevelContains(): void
     {
-        $query = Query::contains('tags', [['key' => 'val']]);
+        $query = Query::containsString('tags', [['key' => 'val']]);
         $query->setAttributeType(ColumnType::Object->value);
 
         $result = (new Builder())
@@ -4914,7 +4914,7 @@ class PostgreSQLTest extends TestCase
             ->from('t')
             ->filter([
                 Query::startsWith('name', 'John'),
-                Query::contains('name', ['Doe']),
+                Query::containsString('name', ['Doe']),
             ])
             ->build();
 
@@ -4946,7 +4946,7 @@ class PostgreSQLTest extends TestCase
             ->from('t')
             ->filter([
                 Query::notContains('bio', ['spam']),
-                Query::contains('title', ['important']),
+                Query::containsString('title', ['important']),
             ])
             ->build();
 

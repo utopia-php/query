@@ -298,7 +298,7 @@ class MongoDBTest extends TestCase
     {
         $result = (new Builder())
             ->from('users')
-            ->filter([Query::contains('name', ['test'])])
+            ->filter([Query::containsString('name', ['test'])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -1022,7 +1022,7 @@ class MongoDBTest extends TestCase
     {
         $result = (new Builder())
             ->from('users')
-            ->filter([Query::contains('bio', ['php', 'java'])])
+            ->filter([Query::containsString('bio', ['php', 'java'])])
             ->build();
         $this->assertBindingCount($result);
 
@@ -2943,7 +2943,7 @@ class MongoDBTest extends TestCase
         $result = (new Builder())
             ->from('users')
             ->filter([
-                Query::contains('name', ['test']),
+                Query::containsString('name', ['test']),
                 Query::startsWith('email', 'admin'),
             ])
             ->build();
@@ -2963,7 +2963,7 @@ class MongoDBTest extends TestCase
             ->from('posts')
             ->filter([
                 Query::notContains('body', ['spam']),
-                Query::contains('body', ['valuable']),
+                Query::containsString('body', ['valuable']),
             ])
             ->build();
         $this->assertBindingCount($result);
@@ -3876,7 +3876,7 @@ class MongoDBTest extends TestCase
     {
         $result = (new Builder())
             ->from('logs')
-            ->filter([Query::contains('message', ['file.txt'])])
+            ->filter([Query::containsString('message', ['file.txt'])])
             ->build();
         $this->assertBindingCount($result);
 
