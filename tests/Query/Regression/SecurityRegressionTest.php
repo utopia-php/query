@@ -116,7 +116,7 @@ class SecurityRegressionTest extends TestCase
     public function testMySqlCreateTableEnumEscapesTrailingBackslash(): void
     {
         $schema = new MySQLSchema();
-        $plan = $schema->create('widgets', function (\Utopia\Query\Schema\Blueprint $t): void {
+        $plan = $schema->create('widgets', function (\Utopia\Query\Schema\Table $t): void {
             $t->enum('grade', ['A', 'B', "bad\\"]);
         });
 
@@ -149,7 +149,7 @@ class SecurityRegressionTest extends TestCase
         // serialised with the backslash doubled so the closing quote cannot be
         // escaped by the payload under MySQL default SQL mode.
         $schema = new MySQLSchema();
-        $plan = $schema->create('notes', function (\Utopia\Query\Schema\Blueprint $t): void {
+        $plan = $schema->create('notes', function (\Utopia\Query\Schema\Table $t): void {
             $t->string('body')->default("evil\\");
         });
 

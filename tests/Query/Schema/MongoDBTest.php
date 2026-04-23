@@ -6,16 +6,16 @@ use PHPUnit\Framework\TestCase;
 use Utopia\Query\Builder\MongoDB as Builder;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Query;
-use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\MongoDB as Schema;
+use Utopia\Query\Schema\Table;
 
 class MongoDBTest extends TestCase
 {
     public function testCreateCollection(): void
     {
         $schema = new Schema();
-        $result = $schema->create('users', function (Blueprint $table) {
+        $result = $schema->create('users', function (Table $table) {
             $table->id('id');
             $table->string('name');
             $table->string('email');
@@ -41,7 +41,7 @@ class MongoDBTest extends TestCase
     public function testCreateCollectionWithTypes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('posts', function (Blueprint $table) {
+        $result = $schema->create('posts', function (Table $table) {
             $table->id('id');
             $table->string('title');
             $table->text('body');
@@ -70,7 +70,7 @@ class MongoDBTest extends TestCase
     public function testCreateCollectionWithEnumValidation(): void
     {
         $schema = new Schema();
-        $result = $schema->create('tasks', function (Blueprint $table) {
+        $result = $schema->create('tasks', function (Table $table) {
             $table->id('id');
             $table->enum('status', ['pending', 'active', 'completed']);
         });
@@ -90,7 +90,7 @@ class MongoDBTest extends TestCase
     public function testCreateCollectionWithRequired(): void
     {
         $schema = new Schema();
-        $result = $schema->create('users', function (Blueprint $table) {
+        $result = $schema->create('users', function (Table $table) {
             $table->id('id');
             $table->string('name');
             $table->string('email')->nullable();
@@ -115,7 +115,7 @@ class MongoDBTest extends TestCase
         $this->expectException(UnsupportedException::class);
         $this->expectExceptionMessage('Composite primary keys are not supported in MongoDB');
 
-        $schema->create('order_items', function (Blueprint $table) {
+        $schema->create('order_items', function (Table $table) {
             $table->integer('order_id');
             $table->integer('product_id');
             $table->primary(['order_id', 'product_id']);
@@ -238,7 +238,7 @@ class MongoDBTest extends TestCase
     public function testAlter(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->string('phone');
             $table->boolean('verified');
         });
@@ -260,7 +260,7 @@ class MongoDBTest extends TestCase
     public function testColumnComment(): void
     {
         $schema = new Schema();
-        $result = $schema->create('users', function (Blueprint $table) {
+        $result = $schema->create('users', function (Table $table) {
             $table->string('name')->comment('The display name');
         });
 
@@ -278,7 +278,7 @@ class MongoDBTest extends TestCase
     public function testAlterWithMultipleColumns(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->string('phone');
             $table->integer('age');
             $table->boolean('verified');
@@ -305,7 +305,7 @@ class MongoDBTest extends TestCase
     public function testAlterWithColumnComment(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->string('phone')->comment('User phone number');
         });
 
@@ -325,7 +325,7 @@ class MongoDBTest extends TestCase
         $this->expectExceptionMessage('MongoDB does not support dropping or renaming columns via schema');
 
         $schema = new Schema();
-        $schema->alter('users', function (Blueprint $table) {
+        $schema->alter('users', function (Table $table) {
             $table->dropColumn('old_field');
         });
     }
@@ -336,7 +336,7 @@ class MongoDBTest extends TestCase
         $this->expectExceptionMessage('MongoDB does not support dropping or renaming columns via schema');
 
         $schema = new Schema();
-        $schema->alter('users', function (Blueprint $table) {
+        $schema->alter('users', function (Table $table) {
             $table->renameColumn('old_name', 'new_name');
         });
     }
@@ -381,7 +381,7 @@ class MongoDBTest extends TestCase
     public function testCreateCollectionWithAllBsonTypes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('all_types', function (Blueprint $table) {
+        $result = $schema->create('all_types', function (Table $table) {
             $table->json('meta');
             $table->binary('data');
             $table->point('location');

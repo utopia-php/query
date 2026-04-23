@@ -4,27 +4,27 @@ namespace Tests\Query\Schema;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Exception\ValidationException;
-use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\CheckConstraint;
 use Utopia\Query\Schema\Column;
 use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\ForeignKey;
 use Utopia\Query\Schema\Index;
 use Utopia\Query\Schema\RenameColumn;
+use Utopia\Query\Schema\Table;
 
-class BlueprintTest extends TestCase
+class TableTest extends TestCase
 {
     // ── columns (public private(set)) ──────────────────────────
 
     public function testColumnsPropertyIsReadable(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $this->assertSame([], $bp->columns);
     }
 
     public function testColumnsPropertyPopulatedByString(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $col = $bp->string('name');
 
         $this->assertCount(1, $bp->columns);
@@ -35,7 +35,7 @@ class BlueprintTest extends TestCase
 
     public function testColumnsPropertyPopulatedByMultipleMethods(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->integer('age');
         $bp->boolean('active');
         $bp->text('bio');
@@ -48,7 +48,7 @@ class BlueprintTest extends TestCase
 
     public function testColumnsPropertyNotWritableExternally(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
 
         $this->expectException(\Error::class);
         /** @phpstan-ignore-next-line */
@@ -57,7 +57,7 @@ class BlueprintTest extends TestCase
 
     public function testColumnsPopulatedById(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->id('pk');
 
         $this->assertCount(1, $bp->columns);
@@ -69,7 +69,7 @@ class BlueprintTest extends TestCase
 
     public function testColumnsPopulatedByAddColumn(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->addColumn('score', ColumnType::Integer);
 
         $this->assertCount(1, $bp->columns);
@@ -78,7 +78,7 @@ class BlueprintTest extends TestCase
 
     public function testColumnsPopulatedByModifyColumn(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->modifyColumn('score', 'integer');
 
         $this->assertCount(1, $bp->columns);
@@ -89,13 +89,13 @@ class BlueprintTest extends TestCase
 
     public function testIndexesPropertyIsReadable(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $this->assertSame([], $bp->indexes);
     }
 
     public function testIndexesPopulatedByIndex(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->index(['email']);
 
         $this->assertCount(1, $bp->indexes);
@@ -105,7 +105,7 @@ class BlueprintTest extends TestCase
 
     public function testIndexesPopulatedByUniqueIndex(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->uniqueIndex(['email']);
 
         $this->assertCount(1, $bp->indexes);
@@ -114,7 +114,7 @@ class BlueprintTest extends TestCase
 
     public function testIndexesPopulatedByFulltextIndex(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->fulltextIndex(['body']);
 
         $this->assertCount(1, $bp->indexes);
@@ -123,7 +123,7 @@ class BlueprintTest extends TestCase
 
     public function testIndexesPopulatedBySpatialIndex(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->spatialIndex(['location']);
 
         $this->assertCount(1, $bp->indexes);
@@ -132,7 +132,7 @@ class BlueprintTest extends TestCase
 
     public function testIndexesPopulatedByAddIndex(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->addIndex('my_idx', ['col1', 'col2']);
 
         $this->assertCount(1, $bp->indexes);
@@ -142,7 +142,7 @@ class BlueprintTest extends TestCase
 
     public function testIndexesPropertyNotWritableExternally(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
 
         $this->expectException(\Error::class);
         /** @phpstan-ignore-next-line */
@@ -153,13 +153,13 @@ class BlueprintTest extends TestCase
 
     public function testForeignKeysPropertyIsReadable(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $this->assertSame([], $bp->foreignKeys);
     }
 
     public function testForeignKeysPopulatedByForeignKey(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->foreignKey('user_id')->references('id')->on('users');
 
         $this->assertCount(1, $bp->foreignKeys);
@@ -169,7 +169,7 @@ class BlueprintTest extends TestCase
 
     public function testForeignKeysPopulatedByAddForeignKey(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->addForeignKey('order_id')->references('id')->on('orders');
 
         $this->assertCount(1, $bp->foreignKeys);
@@ -178,7 +178,7 @@ class BlueprintTest extends TestCase
 
     public function testForeignKeysPropertyNotWritableExternally(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
 
         $this->expectException(\Error::class);
         /** @phpstan-ignore-next-line */
@@ -189,13 +189,13 @@ class BlueprintTest extends TestCase
 
     public function testDropColumnsPropertyIsReadable(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $this->assertSame([], $bp->dropColumns);
     }
 
     public function testDropColumnsPopulatedByDropColumn(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->dropColumn('old_field');
 
         $this->assertCount(1, $bp->dropColumns);
@@ -204,7 +204,7 @@ class BlueprintTest extends TestCase
 
     public function testDropColumnsMultiple(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->dropColumn('a');
         $bp->dropColumn('b');
         $bp->dropColumn('c');
@@ -217,13 +217,13 @@ class BlueprintTest extends TestCase
 
     public function testRenameColumnsPropertyIsReadable(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $this->assertSame([], $bp->renameColumns);
     }
 
     public function testRenameColumnsPopulatedByRenameColumn(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->renameColumn('old', 'new');
 
         $this->assertCount(1, $bp->renameColumns);
@@ -236,13 +236,13 @@ class BlueprintTest extends TestCase
 
     public function testDropIndexesPropertyIsReadable(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $this->assertSame([], $bp->dropIndexes);
     }
 
     public function testDropIndexesPopulatedByDropIndex(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->dropIndex('idx_old');
 
         $this->assertCount(1, $bp->dropIndexes);
@@ -253,13 +253,13 @@ class BlueprintTest extends TestCase
 
     public function testDropForeignKeysPropertyIsReadable(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $this->assertSame([], $bp->dropForeignKeys);
     }
 
     public function testDropForeignKeysPopulatedByDropForeignKey(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->dropForeignKey('fk_user');
 
         $this->assertCount(1, $bp->dropForeignKeys);
@@ -270,13 +270,13 @@ class BlueprintTest extends TestCase
 
     public function testRawColumnDefsPropertyIsReadable(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $this->assertSame([], $bp->rawColumnDefs);
     }
 
     public function testRawColumnDefsPopulatedByRawColumn(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->rawColumn('`my_col` VARCHAR(100) NOT NULL');
 
         $this->assertCount(1, $bp->rawColumnDefs);
@@ -287,13 +287,13 @@ class BlueprintTest extends TestCase
 
     public function testRawIndexDefsPropertyIsReadable(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $this->assertSame([], $bp->rawIndexDefs);
     }
 
     public function testRawIndexDefsPopulatedByRawIndex(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->rawIndex('INDEX `idx_custom` (`col1`)');
 
         $this->assertCount(1, $bp->rawIndexDefs);
@@ -304,7 +304,7 @@ class BlueprintTest extends TestCase
 
     public function testAllPropertiesStartEmpty(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
 
         $this->assertSame([], $bp->columns);
         $this->assertSame([], $bp->indexes);
@@ -319,7 +319,7 @@ class BlueprintTest extends TestCase
 
     public function testMultiplePropertiesPopulatedTogether(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->string('name');
         $bp->integer('age');
         $bp->index(['name']);
@@ -336,7 +336,7 @@ class BlueprintTest extends TestCase
 
     public function testAlterOperationsPopulateCorrectProperties(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->modifyColumn('score', ColumnType::BigInteger);
         $bp->renameColumn('old_name', 'new_name');
         $bp->dropColumn('obsolete');
@@ -353,7 +353,7 @@ class BlueprintTest extends TestCase
 
     public function testColumnTypeVariants(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->text('body');
         $bp->mediumText('summary');
         $bp->longText('content');
@@ -390,7 +390,7 @@ class BlueprintTest extends TestCase
 
     public function testTimestampsHelperAddsTwoColumns(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->timestamps(6);
 
         $this->assertCount(2, $bp->columns);
@@ -402,13 +402,13 @@ class BlueprintTest extends TestCase
 
     public function testChecksPropertyIsReadable(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $this->assertSame([], $bp->checks);
     }
 
     public function testCheckPopulatesChecksList(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->check('age_range', '`age` >= 0 AND `age` < 150');
 
         $this->assertCount(1, $bp->checks);
@@ -419,7 +419,7 @@ class BlueprintTest extends TestCase
 
     public function testCheckRejectsInvalidName(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('Invalid check constraint name');
@@ -429,7 +429,7 @@ class BlueprintTest extends TestCase
 
     public function testColumnCheckAttachesExpression(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $col = $bp->integer('age')->check('`age` >= 0');
 
         $this->assertSame('`age` >= 0', $col->checkExpression);
@@ -459,7 +459,7 @@ class BlueprintTest extends TestCase
 
     public function testPartitionByHashWithCount(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->partitionByHash('`id`', 4);
 
         $this->assertSame(4, $bp->partitionCount);
@@ -467,7 +467,7 @@ class BlueprintTest extends TestCase
 
     public function testPartitionByHashWithoutCount(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->partitionByHash('`id`');
 
         $this->assertNull($bp->partitionCount);
@@ -475,7 +475,7 @@ class BlueprintTest extends TestCase
 
     public function testPartitionByHashRejectsZeroCount(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('Partition count must be at least 1.');
@@ -485,7 +485,7 @@ class BlueprintTest extends TestCase
 
     public function testPartitionByHashRejectsNegativeCount(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
 
         $this->expectException(ValidationException::class);
 
@@ -494,13 +494,13 @@ class BlueprintTest extends TestCase
 
     public function testCompositePrimaryKeyPropertyIsReadable(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $this->assertSame([], $bp->compositePrimaryKey);
     }
 
     public function testPrimaryPopulatesCompositePrimaryKey(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $bp->primary(['id', 'created_at']);
 
         $this->assertSame(['id', 'created_at'], $bp->compositePrimaryKey);
@@ -508,7 +508,7 @@ class BlueprintTest extends TestCase
 
     public function testPrimaryReturnsStaticForChaining(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
         $result = $bp->primary(['a', 'b']);
 
         $this->assertSame($bp, $result);
@@ -516,7 +516,7 @@ class BlueprintTest extends TestCase
 
     public function testPrimaryRejectsSingleColumn(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('at least two columns');
@@ -526,7 +526,7 @@ class BlueprintTest extends TestCase
 
     public function testPrimaryRejectsEmptyArray(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
 
         $this->expectException(ValidationException::class);
 
@@ -535,7 +535,7 @@ class BlueprintTest extends TestCase
 
     public function testPrimaryRejectsInvalidColumnName(): void
     {
-        $bp = new Blueprint();
+        $bp = new Table();
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('Invalid column name');

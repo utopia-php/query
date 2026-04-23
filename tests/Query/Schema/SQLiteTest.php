@@ -8,13 +8,13 @@ use Utopia\Query\Builder\SQLite as SQLBuilder;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
-use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\Feature\ForeignKeys;
 use Utopia\Query\Schema\Feature\Procedures;
 use Utopia\Query\Schema\Feature\Triggers;
 use Utopia\Query\Schema\ForeignKeyAction;
 use Utopia\Query\Schema\ParameterDirection;
 use Utopia\Query\Schema\SQLite as Schema;
+use Utopia\Query\Schema\Table;
 use Utopia\Query\Schema\TriggerEvent;
 use Utopia\Query\Schema\TriggerTiming;
 
@@ -40,7 +40,7 @@ class SQLiteTest extends TestCase
     public function testCreateTableBasic(): void
     {
         $schema = new Schema();
-        $result = $schema->create('users', function (Blueprint $table) {
+        $result = $schema->create('users', function (Table $table) {
             $table->id();
             $table->string('name', 255);
             $table->string('email', 255)->unique();
@@ -57,7 +57,7 @@ class SQLiteTest extends TestCase
     public function testCreateTableAllColumnTypes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('test_types', function (Blueprint $table) {
+        $result = $schema->create('test_types', function (Table $table) {
             $table->integer('int_col');
             $table->bigInteger('big_col');
             $table->float('float_col');
@@ -80,7 +80,7 @@ class SQLiteTest extends TestCase
     public function testColumnTypeStringMapsToVarchar(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->string('name', 100);
         });
         $this->assertBindingCount($result);
@@ -91,7 +91,7 @@ class SQLiteTest extends TestCase
     public function testColumnTypeBooleanMapsToInteger(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->boolean('active');
         });
         $this->assertBindingCount($result);
@@ -102,7 +102,7 @@ class SQLiteTest extends TestCase
     public function testColumnTypeDatetimeMapsToText(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->datetime('created_at');
         });
         $this->assertBindingCount($result);
@@ -113,7 +113,7 @@ class SQLiteTest extends TestCase
     public function testColumnTypeTimestampMapsToText(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->timestamp('updated_at');
         });
         $this->assertBindingCount($result);
@@ -124,7 +124,7 @@ class SQLiteTest extends TestCase
     public function testColumnTypeJsonMapsToText(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->json('data');
         });
         $this->assertBindingCount($result);
@@ -135,7 +135,7 @@ class SQLiteTest extends TestCase
     public function testColumnTypeBinaryMapsToBlob(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->binary('content');
         });
         $this->assertBindingCount($result);
@@ -146,7 +146,7 @@ class SQLiteTest extends TestCase
     public function testColumnTypeEnumMapsToText(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->enum('status', ['a', 'b']);
         });
         $this->assertBindingCount($result);
@@ -157,7 +157,7 @@ class SQLiteTest extends TestCase
     public function testColumnTypeSpatialMapsToText(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->point('coords', 4326);
             $table->linestring('path');
             $table->polygon('area');
@@ -171,7 +171,7 @@ class SQLiteTest extends TestCase
     public function testColumnTypeUuid7MapsToVarchar36(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->string('uid', 36);
         });
         $this->assertBindingCount($result);
@@ -185,7 +185,7 @@ class SQLiteTest extends TestCase
         $this->expectExceptionMessage('Vector type is not supported in SQLite.');
 
         $schema = new Schema();
-        $schema->create('t', function (Blueprint $table) {
+        $schema->create('t', function (Table $table) {
             $table->vector('embedding', 768);
         });
     }
@@ -193,7 +193,7 @@ class SQLiteTest extends TestCase
     public function testAutoIncrementUsesAutoincrement(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->id();
         });
         $this->assertBindingCount($result);
@@ -205,7 +205,7 @@ class SQLiteTest extends TestCase
     public function testUnsignedIsEmptyString(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->integer('age')->unsigned();
         });
         $this->assertBindingCount($result);
@@ -276,7 +276,7 @@ class SQLiteTest extends TestCase
     public function testCreateTableWithNullableAndDefault(): void
     {
         $schema = new Schema();
-        $result = $schema->create('posts', function (Blueprint $table) {
+        $result = $schema->create('posts', function (Table $table) {
             $table->id();
             $table->text('bio')->nullable();
             $table->boolean('active')->default(true);
@@ -292,7 +292,7 @@ class SQLiteTest extends TestCase
     public function testCreateTableWithForeignKey(): void
     {
         $schema = new Schema();
-        $result = $schema->create('posts', function (Blueprint $table) {
+        $result = $schema->create('posts', function (Table $table) {
             $table->id();
             $table->foreignKey('user_id')
                 ->references('id')->on('users')
@@ -309,7 +309,7 @@ class SQLiteTest extends TestCase
     public function testCreateTableWithIndexes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('users', function (Blueprint $table) {
+        $result = $schema->create('users', function (Table $table) {
             $table->id();
             $table->string('name');
             $table->string('email');
@@ -343,7 +343,7 @@ class SQLiteTest extends TestCase
     public function testAlterAddColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->addColumn('avatar_url', 'string', 255)->nullable();
         });
         $this->assertBindingCount($result);
@@ -354,7 +354,7 @@ class SQLiteTest extends TestCase
     public function testAlterDropColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->dropColumn('age');
         });
         $this->assertBindingCount($result);
@@ -368,7 +368,7 @@ class SQLiteTest extends TestCase
     public function testAlterRenameColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->renameColumn('bio', 'biography');
         });
         $this->assertBindingCount($result);
@@ -519,7 +519,7 @@ class SQLiteTest extends TestCase
     public function testCreateTableWithMultiplePrimaryKeys(): void
     {
         $schema = new Schema();
-        $result = $schema->create('order_items', function (Blueprint $table) {
+        $result = $schema->create('order_items', function (Table $table) {
             $table->integer('order_id')->primary();
             $table->integer('product_id')->primary();
             $table->integer('quantity');
@@ -532,7 +532,7 @@ class SQLiteTest extends TestCase
     public function testCreateTableWithCompositePrimaryKey(): void
     {
         $schema = new Schema();
-        $result = $schema->create('order_items', function (Blueprint $table) {
+        $result = $schema->create('order_items', function (Table $table) {
             $table->integer('order_id');
             $table->integer('product_id');
             $table->integer('quantity');
@@ -543,14 +543,14 @@ class SQLiteTest extends TestCase
         $this->assertStringContainsString('PRIMARY KEY (`order_id`, `product_id`)', $result->query);
     }
 
-    public function testCreateTableRejectsMixedColumnAndBlueprintPrimary(): void
+    public function testCreateTableRejectsMixedColumnAndTablePrimary(): void
     {
         $schema = new Schema();
 
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('Cannot combine column-level primary() with Blueprint::primary() composite key.');
+        $this->expectExceptionMessage('Cannot combine column-level primary() with Table::primary() composite key.');
 
-        $schema->create('order_items', function (Blueprint $table) {
+        $schema->create('order_items', function (Table $table) {
             $table->integer('order_id')->primary();
             $table->integer('product_id');
             $table->primary(['order_id', 'product_id']);
@@ -560,7 +560,7 @@ class SQLiteTest extends TestCase
     public function testCreateTableWithDefaultNull(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->string('name')->nullable()->default(null);
         });
         $this->assertBindingCount($result);
@@ -571,7 +571,7 @@ class SQLiteTest extends TestCase
     public function testCreateTableWithNumericDefault(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->float('score')->default(0.5);
         });
         $this->assertBindingCount($result);
@@ -582,7 +582,7 @@ class SQLiteTest extends TestCase
     public function testCreateTableWithTimestamps(): void
     {
         $schema = new Schema();
-        $result = $schema->create('posts', function (Blueprint $table) {
+        $result = $schema->create('posts', function (Table $table) {
             $table->id();
             $table->timestamps();
         });
@@ -595,7 +595,7 @@ class SQLiteTest extends TestCase
     public function testExactCreateTableWithColumnsAndIndexes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('products', function (Blueprint $table) {
+        $result = $schema->create('products', function (Table $table) {
             $table->id();
             $table->string('name', 100);
             $table->integer('price');
@@ -653,7 +653,7 @@ class SQLiteTest extends TestCase
     public function testExactCreateTableWithForeignKey(): void
     {
         $schema = new Schema();
-        $result = $schema->create('orders', function (Blueprint $table) {
+        $result = $schema->create('orders', function (Table $table) {
             $table->id();
             $table->integer('customer_id');
             $table->foreignKey('customer_id')
@@ -672,7 +672,7 @@ class SQLiteTest extends TestCase
     public function testColumnTypeFloatMapsToReal(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->float('ratio');
         });
         $this->assertBindingCount($result);
@@ -683,7 +683,7 @@ class SQLiteTest extends TestCase
     public function testCreateIfNotExists(): void
     {
         $schema = new Schema();
-        $result = $schema->createIfNotExists('t', function (Blueprint $table) {
+        $result = $schema->createIfNotExists('t', function (Table $table) {
             $table->integer('id')->primary();
         });
         $this->assertBindingCount($result);
@@ -694,7 +694,7 @@ class SQLiteTest extends TestCase
     public function testAlterMultipleOperations(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->addColumn('avatar', 'string', 255)->nullable();
             $table->dropColumn('age');
             $table->renameColumn('bio', 'biography');
@@ -709,7 +709,7 @@ class SQLiteTest extends TestCase
     public function testSerialColumnMapsToInteger(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->serial('id')->primary();
         });
 
@@ -721,7 +721,7 @@ class SQLiteTest extends TestCase
         $this->expectException(UnsupportedException::class);
 
         $schema = new Schema();
-        $schema->create('t', function (Blueprint $table) {
+        $schema->create('t', function (Table $table) {
             $table->integer('id')->primary();
             $table->string('mood')->userType('mood_type');
         });

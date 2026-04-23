@@ -3,9 +3,9 @@
 namespace Tests\Integration\Schema;
 
 use Tests\Integration\IntegrationTestCase;
-use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\PostgreSQL;
+use Utopia\Query\Schema\Table;
 
 class PostgreSQLIntegrationTest extends IntegrationTestCase
 {
@@ -22,7 +22,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $table = 'test_basic_' . uniqid();
         $this->trackPostgresTable($table);
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->integer('age');
             $bp->string('name', 100);
             $bp->float('score');
@@ -47,7 +47,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $table = 'test_identity_' . uniqid();
         $this->trackPostgresTable($table);
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->id();
             $bp->string('label', 50);
         });
@@ -72,7 +72,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $table = 'test_jsonb_' . uniqid();
         $this->trackPostgresTable($table);
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
             $bp->json('metadata');
         });
@@ -90,12 +90,12 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $table = 'test_alter_add_' . uniqid();
         $this->trackPostgresTable($table);
 
-        $create = $this->schema->create($table, function (Blueprint $bp) {
+        $create = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
         });
         $this->postgresStatement($create->query);
 
-        $alter = $this->schema->alter($table, function (Blueprint $bp) {
+        $alter = $this->schema->alter($table, function (Table $bp) {
             $bp->addColumn('description', ColumnType::Text);
         });
         $this->postgresStatement($alter->query);
@@ -111,13 +111,13 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $table = 'test_alter_drop_' . uniqid();
         $this->trackPostgresTable($table);
 
-        $create = $this->schema->create($table, function (Blueprint $bp) {
+        $create = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
             $bp->string('temp', 100);
         });
         $this->postgresStatement($create->query);
 
-        $alter = $this->schema->alter($table, function (Blueprint $bp) {
+        $alter = $this->schema->alter($table, function (Table $bp) {
             $bp->dropColumn('temp');
         });
         $this->postgresStatement($alter->query);
@@ -132,7 +132,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
     {
         $table = 'test_drop_' . uniqid();
 
-        $create = $this->schema->create($table, function (Blueprint $bp) {
+        $create = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
         });
         $this->postgresStatement($create->query);
@@ -157,7 +157,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $table = 'test_bool_text_' . uniqid();
         $this->trackPostgresTable($table);
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
             $bp->boolean('is_active');
             $bp->text('bio');
@@ -179,7 +179,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $table = 'test_unique_' . uniqid();
         $this->trackPostgresTable($table);
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
             $bp->string('email', 255)->unique();
         });
@@ -205,7 +205,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $table = 'test_null_def_' . uniqid();
         $this->trackPostgresTable($table);
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
             $bp->string('nickname', 100)->nullable()->default('anonymous');
             $bp->integer('score')->default(0);
@@ -228,7 +228,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $table = 'test_truncate_' . uniqid();
         $this->trackPostgresTable($table);
 
-        $create = $this->schema->create($table, function (Blueprint $bp) {
+        $create = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
             $bp->string('name', 50);
         });
@@ -256,7 +256,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $table = 'test_check_' . uniqid();
         $this->trackPostgresTable($table);
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
             $bp->integer('age');
             $bp->check('age_min', '"age" >= 18');
@@ -280,7 +280,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $table = 'test_generated_' . uniqid();
         $this->trackPostgresTable($table);
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
             $bp->integer('price');
             $bp->integer('quantity');
@@ -312,7 +312,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $table = 'test_serial_' . uniqid();
         $this->trackPostgresTable($table);
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->bigSerial('id')->primary();
             $bp->string('label', 50);
         });
@@ -350,7 +350,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
             $createType = $this->schema->createType($typeName, ['happy', 'sad', 'neutral']);
             $this->postgresStatement($createType->query);
 
-            $result = $this->schema->create($table, function (Blueprint $bp) use ($typeName) {
+            $result = $this->schema->create($table, function (Table $bp) use ($typeName) {
                 $bp->integer('id')->primary();
                 $bp->string('mood')->userType($typeName);
             });
@@ -392,7 +392,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $this->trackPostgresTable($partition);
         $this->trackPostgresTable($table);
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id');
             $bp->timestamp('created_at');
             $bp->primary(['id', 'created_at']);

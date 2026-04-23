@@ -102,11 +102,11 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
     }
 
     /**
-     * @param  callable(Blueprint): void  $definition
+     * @param  callable(Table): void  $definition
      */
     public function alter(string $table, callable $definition): Plan
     {
-        $blueprint = new Blueprint();
+        $blueprint = new Table();
         $definition($blueprint);
 
         $alterations = [];
@@ -148,11 +148,11 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
     }
 
     /**
-     * @param  callable(Blueprint): void  $definition
+     * @param  callable(Table): void  $definition
      */
     public function create(string $table, callable $definition, bool $ifNotExists = false): Plan
     {
-        $blueprint = new Blueprint();
+        $blueprint = new Table();
         $definition($blueprint);
 
         $columnDefs = [];
@@ -168,7 +168,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         }
 
         if (! empty($blueprint->compositePrimaryKey) && ! empty($primaryKeys)) {
-            throw new ValidationException('Cannot combine column-level primary() with Blueprint::primary() composite key.');
+            throw new ValidationException('Cannot combine column-level primary() with Table::primary() composite key.');
         }
 
         if (empty($primaryKeys) && ! empty($blueprint->compositePrimaryKey)) {

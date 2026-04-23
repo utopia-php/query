@@ -45,11 +45,11 @@ class MongoDB extends Schema
     }
 
     /**
-     * @param callable(Blueprint): void $definition
+     * @param callable(Table): void $definition
      */
     public function create(string $table, callable $definition, bool $ifNotExists = false): Plan
     {
-        $blueprint = new Blueprint();
+        $blueprint = new Table();
         $definition($blueprint);
 
         if (! empty($blueprint->compositePrimaryKey)) {
@@ -108,11 +108,11 @@ class MongoDB extends Schema
     }
 
     /**
-     * @param callable(Blueprint): void $definition
+     * @param callable(Table): void $definition
      */
     public function alter(string $table, callable $definition): Plan
     {
-        $blueprint = new Blueprint();
+        $blueprint = new Table();
         $definition($blueprint);
 
         if (! empty($blueprint->dropColumns) || ! empty($blueprint->renameColumns)) {

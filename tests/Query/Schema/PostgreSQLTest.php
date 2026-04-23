@@ -7,7 +7,6 @@ use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\PostgreSQL as PgBuilder;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
-use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\Column;
 use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\Feature\ColumnComments;
@@ -23,6 +22,7 @@ use Utopia\Query\Schema\ForeignKeyAction;
 use Utopia\Query\Schema\IndexType;
 use Utopia\Query\Schema\ParameterDirection;
 use Utopia\Query\Schema\PostgreSQL as Schema;
+use Utopia\Query\Schema\Table;
 use Utopia\Query\Schema\TriggerEvent;
 use Utopia\Query\Schema\TriggerTiming;
 
@@ -51,7 +51,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableBasic(): void
     {
         $schema = new Schema();
-        $result = $schema->create('users', function (Blueprint $table) {
+        $result = $schema->create('users', function (Table $table) {
             $table->id();
             $table->string('name', 255);
             $table->string('email', 255)->unique();
@@ -68,7 +68,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableColumnTypes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('test_types', function (Blueprint $table) {
+        $result = $schema->create('test_types', function (Table $table) {
             $table->integer('int_col');
             $table->bigInteger('big_col');
             $table->float('float_col');
@@ -97,7 +97,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableSpatialTypes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('locations', function (Blueprint $table) {
+        $result = $schema->create('locations', function (Table $table) {
             $table->id();
             $table->point('coords', 4326);
             $table->linestring('path');
@@ -113,7 +113,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableVectorType(): void
     {
         $schema = new Schema();
-        $result = $schema->create('embeddings', function (Blueprint $table) {
+        $result = $schema->create('embeddings', function (Table $table) {
             $table->id();
             $table->vector('embedding', 128);
         });
@@ -125,7 +125,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableUnsignedIgnored(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->integer('age')->unsigned();
         });
         $this->assertBindingCount($result);
@@ -138,7 +138,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableNoInlineComment(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->string('name')->comment('User display name');
         });
         $this->assertBindingCount($result);
@@ -151,7 +151,7 @@ class PostgreSQLTest extends TestCase
     public function testAutoIncrementUsesIdentity(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->id();
         });
         $this->assertBindingCount($result);
@@ -259,7 +259,7 @@ class PostgreSQLTest extends TestCase
     public function testAlterModifyUsesAlterColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->modifyColumn('name', 'string', 500);
         });
         $this->assertBindingCount($result);
@@ -270,7 +270,7 @@ class PostgreSQLTest extends TestCase
     public function testAlterAddIndexUsesCreateIndex(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->addIndex('idx_email', ['email']);
         });
         $this->assertBindingCount($result);
@@ -282,7 +282,7 @@ class PostgreSQLTest extends TestCase
     public function testAlterDropIndexIsStandalone(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->dropIndex('idx_email');
         });
         $this->assertBindingCount($result);
@@ -293,7 +293,7 @@ class PostgreSQLTest extends TestCase
     public function testAlterColumnAndIndexSeparateStatements(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->addColumn('score', 'integer');
             $table->addIndex('idx_score', ['score']);
         });
@@ -306,7 +306,7 @@ class PostgreSQLTest extends TestCase
     public function testAlterDropForeignKeyUsesConstraint(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('orders', function (Blueprint $table) {
+        $result = $schema->alter('orders', function (Table $table) {
             $table->dropForeignKey('fk_old');
         });
         $this->assertBindingCount($result);
@@ -402,7 +402,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableWithMultiplePrimaryKeys(): void
     {
         $schema = new Schema();
-        $result = $schema->create('order_items', function (Blueprint $table) {
+        $result = $schema->create('order_items', function (Table $table) {
             $table->integer('order_id')->primary();
             $table->integer('product_id')->primary();
         });
@@ -414,7 +414,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableWithCompositePrimaryKey(): void
     {
         $schema = new Schema();
-        $result = $schema->create('order_items', function (Blueprint $table) {
+        $result = $schema->create('order_items', function (Table $table) {
             $table->integer('order_id');
             $table->integer('product_id');
             $table->integer('quantity');
@@ -425,14 +425,14 @@ class PostgreSQLTest extends TestCase
         $this->assertStringContainsString('PRIMARY KEY ("order_id", "product_id")', $result->query);
     }
 
-    public function testCreateTableRejectsMixedColumnAndBlueprintPrimary(): void
+    public function testCreateTableRejectsMixedColumnAndTablePrimary(): void
     {
         $schema = new Schema();
 
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('Cannot combine column-level primary() with Blueprint::primary() composite key.');
+        $this->expectExceptionMessage('Cannot combine column-level primary() with Table::primary() composite key.');
 
-        $schema->create('order_items', function (Blueprint $table) {
+        $schema->create('order_items', function (Table $table) {
             $table->integer('order_id')->primary();
             $table->integer('product_id');
             $table->primary(['order_id', 'product_id']);
@@ -442,7 +442,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableWithDefaultNull(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->string('name')->nullable()->default(null);
         });
         $this->assertBindingCount($result);
@@ -453,7 +453,7 @@ class PostgreSQLTest extends TestCase
     public function testAlterAddMultipleColumns(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->addColumn('first_name', 'string', 100);
             $table->addColumn('last_name', 'string', 100);
             $table->dropColumn('name');
@@ -467,7 +467,7 @@ class PostgreSQLTest extends TestCase
     public function testAlterAddForeignKey(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('orders', function (Blueprint $table) {
+        $result = $schema->alter('orders', function (Table $table) {
             $table->addForeignKey('user_id')->references('id')->on('users')->onDelete(ForeignKeyAction::Cascade);
         });
         $this->assertBindingCount($result);
@@ -502,7 +502,7 @@ class PostgreSQLTest extends TestCase
     public function testAlterRenameColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->renameColumn('bio', 'biography');
         });
         $this->assertBindingCount($result);
@@ -513,7 +513,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableWithTimestamps(): void
     {
         $schema = new Schema();
-        $result = $schema->create('posts', function (Blueprint $table) {
+        $result = $schema->create('posts', function (Table $table) {
             $table->id();
             $table->timestamps();
         });
@@ -526,7 +526,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableWithForeignKey(): void
     {
         $schema = new Schema();
-        $result = $schema->create('posts', function (Blueprint $table) {
+        $result = $schema->create('posts', function (Table $table) {
             $table->id();
             $table->foreignKey('user_id')
                 ->references('id')->on('users')
@@ -561,7 +561,7 @@ class PostgreSQLTest extends TestCase
     public function testAlterWithUniqueIndex(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->addIndex('idx_email', ['email']);
             $table->addIndex('idx_name', ['name']);
         });
@@ -575,7 +575,7 @@ class PostgreSQLTest extends TestCase
     public function testExactCreateTableWithTypes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('accounts', function (Blueprint $table) {
+        $result = $schema->create('accounts', function (Table $table) {
             $table->id();
             $table->string('username', 50);
             $table->boolean('verified');
@@ -593,7 +593,7 @@ class PostgreSQLTest extends TestCase
     public function testExactAlterTableAddColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('accounts', function (Blueprint $table) {
+        $result = $schema->alter('accounts', function (Table $table) {
             $table->addColumn('bio', 'text')->nullable();
         });
 
@@ -946,7 +946,7 @@ class PostgreSQLTest extends TestCase
     public function testAlterAddColumnAndRenameAndDropCombined(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->addColumn('phone', 'string', 20);
             $table->renameColumn('bio', 'biography');
             $table->dropColumn('old_field');
@@ -961,7 +961,7 @@ class PostgreSQLTest extends TestCase
     public function testAlterAddForeignKeyWithOnUpdate(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('orders', function (Blueprint $table) {
+        $result = $schema->alter('orders', function (Table $table) {
             $table->addForeignKey('user_id')
                 ->references('id')
                 ->on('users')
@@ -977,7 +977,7 @@ class PostgreSQLTest extends TestCase
     public function testAlterAddIndexWithMethod(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('docs', function (Blueprint $table) {
+        $result = $schema->alter('docs', function (Table $table) {
             $table->addIndex('idx_content', ['content'], IndexType::Index, method: 'gin');
         });
         $this->assertBindingCount($result);
@@ -988,7 +988,7 @@ class PostgreSQLTest extends TestCase
     public function testColumnDefinitionUnsignedIgnored(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->integer('val')->unsigned();
         });
         $this->assertBindingCount($result);
@@ -999,7 +999,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateIfNotExists(): void
     {
         $schema = new Schema();
-        $result = $schema->createIfNotExists('users', function (Blueprint $table) {
+        $result = $schema->createIfNotExists('users', function (Table $table) {
             $table->id();
             $table->string('name');
         });
@@ -1011,7 +1011,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableWithRawColumnDefs(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->id();
             $table->rawColumn('"custom_col" TEXT NOT NULL DEFAULT \'\'');
         });
@@ -1023,7 +1023,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableWithRawIndexDefs(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->id();
             $table->string('name');
             $table->rawIndex('INDEX "idx_custom" ("name")');
@@ -1036,7 +1036,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableWithPartitionByRange(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->id();
             $table->datetime('created_at');
             $table->partitionByRange('created_at');
@@ -1049,7 +1049,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableWithPartitionByList(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->id();
             $table->string('region');
             $table->partitionByList('region');
@@ -1062,7 +1062,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableWithPartitionByHash(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->id();
             $table->partitionByHash('id');
         });
@@ -1074,7 +1074,7 @@ class PostgreSQLTest extends TestCase
     public function testAlterWithForeignKeyOnDeleteAndUpdate(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('orders', function (Blueprint $table) {
+        $result = $schema->alter('orders', function (Table $table) {
             $table->addForeignKey('user_id')
                 ->references('id')->on('users')
                 ->onDelete(ForeignKeyAction::Cascade)
@@ -1233,10 +1233,10 @@ class PostgreSQLTest extends TestCase
         );
     }
 
-    public function testBlueprintAddIndexWithStringType(): void
+    public function testTableAddIndexWithStringType(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->addIndex('idx_name', ['name'], 'unique');
         });
         $this->assertBindingCount($result);
@@ -1247,7 +1247,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableWithSerialColumnEmitsSerial(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->serial('id')->primary();
         });
         $this->assertBindingCount($result);
@@ -1260,7 +1260,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableWithBigSerialColumnEmitsBigSerial(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->bigSerial('id')->primary();
         });
         $this->assertBindingCount($result);
@@ -1272,7 +1272,7 @@ class PostgreSQLTest extends TestCase
     public function testCreateTableWithSmallSerialColumnEmitsSmallSerial(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->smallSerial('id')->primary();
         });
         $this->assertBindingCount($result);
@@ -1283,7 +1283,7 @@ class PostgreSQLTest extends TestCase
     public function testReferenceUserDefinedType(): void
     {
         $schema = new Schema();
-        $result = $schema->create('surveys', function (Blueprint $table) {
+        $result = $schema->create('surveys', function (Table $table) {
             $table->integer('id')->primary();
             $table->string('mood')->userType('mood_type');
         });

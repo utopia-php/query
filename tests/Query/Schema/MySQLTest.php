@@ -8,7 +8,6 @@ use Utopia\Query\Builder\MySQL as SQLBuilder;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
-use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\Column;
 use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\Feature\CreatePartition;
@@ -21,6 +20,7 @@ use Utopia\Query\Schema\ForeignKeyAction;
 use Utopia\Query\Schema\Index;
 use Utopia\Query\Schema\MySQL as Schema;
 use Utopia\Query\Schema\ParameterDirection;
+use Utopia\Query\Schema\Table;
 use Utopia\Query\Schema\TriggerEvent;
 use Utopia\Query\Schema\TriggerTiming;
 
@@ -49,7 +49,7 @@ class MySQLTest extends TestCase
     public function testCreateTableBasic(): void
     {
         $schema = new Schema();
-        $result = $schema->create('users', function (Blueprint $table) {
+        $result = $schema->create('users', function (Table $table) {
             $table->id();
             $table->string('name', 255);
             $table->string('email', 255)->unique();
@@ -66,7 +66,7 @@ class MySQLTest extends TestCase
     public function testCreateTableAllColumnTypes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('test_types', function (Blueprint $table) {
+        $result = $schema->create('test_types', function (Table $table) {
             $table->integer('int_col');
             $table->bigInteger('big_col');
             $table->float('float_col');
@@ -95,7 +95,7 @@ class MySQLTest extends TestCase
     public function testCreateTableWithNullableAndDefault(): void
     {
         $schema = new Schema();
-        $result = $schema->create('posts', function (Blueprint $table) {
+        $result = $schema->create('posts', function (Table $table) {
             $table->id();
             $table->text('bio')->nullable();
             $table->boolean('active')->default(true);
@@ -113,7 +113,7 @@ class MySQLTest extends TestCase
     public function testCreateTableWithUnsigned(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->integer('age')->unsigned();
         });
         $this->assertBindingCount($result);
@@ -124,7 +124,7 @@ class MySQLTest extends TestCase
     public function testCreateTableWithTimestamps(): void
     {
         $schema = new Schema();
-        $result = $schema->create('posts', function (Blueprint $table) {
+        $result = $schema->create('posts', function (Table $table) {
             $table->id();
             $table->timestamps();
         });
@@ -137,7 +137,7 @@ class MySQLTest extends TestCase
     public function testCreateTableWithForeignKey(): void
     {
         $schema = new Schema();
-        $result = $schema->create('posts', function (Blueprint $table) {
+        $result = $schema->create('posts', function (Table $table) {
             $table->id();
             $table->foreignKey('user_id')
                 ->references('id')->on('users')
@@ -154,7 +154,7 @@ class MySQLTest extends TestCase
     public function testCreateTableWithIndexes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('users', function (Blueprint $table) {
+        $result = $schema->create('users', function (Table $table) {
             $table->id();
             $table->string('name');
             $table->string('email');
@@ -170,7 +170,7 @@ class MySQLTest extends TestCase
     public function testCreateTableWithSpatialTypes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('locations', function (Blueprint $table) {
+        $result = $schema->create('locations', function (Table $table) {
             $table->id();
             $table->point('coords', 4326);
             $table->linestring('path');
@@ -189,7 +189,7 @@ class MySQLTest extends TestCase
         $this->expectExceptionMessage('Vector type is not supported in MySQL.');
 
         $schema = new Schema();
-        $schema->create('embeddings', function (Blueprint $table) {
+        $schema->create('embeddings', function (Table $table) {
             $table->vector('embedding', 768);
         });
     }
@@ -197,7 +197,7 @@ class MySQLTest extends TestCase
     public function testCreateTableWithComment(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->string('name')->comment('User display name');
         });
         $this->assertBindingCount($result);
@@ -209,7 +209,7 @@ class MySQLTest extends TestCase
     public function testAlterAddColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->addColumn('avatar_url', 'string', 255)->nullable()->after('email');
         });
         $this->assertBindingCount($result);
@@ -223,7 +223,7 @@ class MySQLTest extends TestCase
     public function testAlterModifyColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->modifyColumn('name', 'string', 500);
         });
         $this->assertBindingCount($result);
@@ -237,7 +237,7 @@ class MySQLTest extends TestCase
     public function testAlterRenameColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->renameColumn('bio', 'biography');
         });
         $this->assertBindingCount($result);
@@ -251,7 +251,7 @@ class MySQLTest extends TestCase
     public function testAlterDropColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->dropColumn('age');
         });
         $this->assertBindingCount($result);
@@ -265,7 +265,7 @@ class MySQLTest extends TestCase
     public function testAlterAddIndex(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->addIndex('idx_name', ['name']);
         });
         $this->assertBindingCount($result);
@@ -279,7 +279,7 @@ class MySQLTest extends TestCase
     public function testAlterDropIndex(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->dropIndex('idx_old');
         });
         $this->assertBindingCount($result);
@@ -293,7 +293,7 @@ class MySQLTest extends TestCase
     public function testAlterAddForeignKey(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->addForeignKey('dept_id')
                 ->references('id')->on('departments');
         });
@@ -308,7 +308,7 @@ class MySQLTest extends TestCase
     public function testAlterDropForeignKey(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->dropForeignKey('fk_old');
         });
         $this->assertBindingCount($result);
@@ -322,7 +322,7 @@ class MySQLTest extends TestCase
     public function testAlterMultipleOperations(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->addColumn('avatar', 'string', 255)->nullable();
             $table->dropColumn('age');
             $table->renameColumn('bio', 'biography');
@@ -546,7 +546,7 @@ class MySQLTest extends TestCase
     public function testCreateTableWithMultiplePrimaryKeys(): void
     {
         $schema = new Schema();
-        $result = $schema->create('order_items', function (Blueprint $table) {
+        $result = $schema->create('order_items', function (Table $table) {
             $table->integer('order_id')->primary();
             $table->integer('product_id')->primary();
             $table->integer('quantity');
@@ -559,7 +559,7 @@ class MySQLTest extends TestCase
     public function testCreateTableWithCompositePrimaryKey(): void
     {
         $schema = new Schema();
-        $result = $schema->create('order_items', function (Blueprint $table) {
+        $result = $schema->create('order_items', function (Table $table) {
             $table->integer('order_id');
             $table->integer('product_id');
             $table->integer('quantity');
@@ -570,14 +570,14 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('PRIMARY KEY (`order_id`, `product_id`)', $result->query);
     }
 
-    public function testCreateTableRejectsMixedColumnAndBlueprintPrimary(): void
+    public function testCreateTableRejectsMixedColumnAndTablePrimary(): void
     {
         $schema = new Schema();
 
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('Cannot combine column-level primary() with Blueprint::primary() composite key.');
+        $this->expectExceptionMessage('Cannot combine column-level primary() with Table::primary() composite key.');
 
-        $schema->create('order_items', function (Blueprint $table) {
+        $schema->create('order_items', function (Table $table) {
             $table->integer('order_id')->primary();
             $table->integer('product_id');
             $table->primary(['order_id', 'product_id']);
@@ -587,7 +587,7 @@ class MySQLTest extends TestCase
     public function testCreateTableWithDefaultNull(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->string('name')->nullable()->default(null);
         });
         $this->assertBindingCount($result);
@@ -598,7 +598,7 @@ class MySQLTest extends TestCase
     public function testCreateTableWithNumericDefault(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->float('score')->default(0.5);
         });
         $this->assertBindingCount($result);
@@ -626,7 +626,7 @@ class MySQLTest extends TestCase
     public function testAlterMultipleColumnsAndIndexes(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->addColumn('first_name', 'string', 100);
             $table->addColumn('last_name', 'string', 100);
             $table->dropColumn('name');
@@ -643,7 +643,7 @@ class MySQLTest extends TestCase
     public function testCreateTableForeignKeyWithAllActions(): void
     {
         $schema = new Schema();
-        $result = $schema->create('comments', function (Blueprint $table) {
+        $result = $schema->create('comments', function (Table $table) {
             $table->id();
             $table->foreignKey('post_id')
                 ->references('id')->on('posts')
@@ -675,7 +675,7 @@ class MySQLTest extends TestCase
     public function testCreateTableTimestampWithoutPrecision(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->timestamp('ts_col');
         });
         $this->assertBindingCount($result);
@@ -687,7 +687,7 @@ class MySQLTest extends TestCase
     public function testCreateTableDatetimeWithoutPrecision(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->datetime('dt_col');
         });
         $this->assertBindingCount($result);
@@ -707,7 +707,7 @@ class MySQLTest extends TestCase
     public function testAlterAddAndDropForeignKey(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('orders', function (Blueprint $table) {
+        $result = $schema->alter('orders', function (Table $table) {
             $table->addForeignKey('user_id')->references('id')->on('users');
             $table->dropForeignKey('fk_old_user');
         });
@@ -717,10 +717,10 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('DROP FOREIGN KEY `fk_old_user`', $result->query);
     }
 
-    public function testBlueprintAutoGeneratedIndexName(): void
+    public function testTableAutoGeneratedIndexName(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->string('first');
             $table->string('last');
             $table->index(['first', 'last']);
@@ -730,10 +730,10 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('INDEX `idx_first_last`', $result->query);
     }
 
-    public function testBlueprintAutoGeneratedUniqueIndexName(): void
+    public function testTableAutoGeneratedUniqueIndexName(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->string('email');
             $table->uniqueIndex(['email']);
         });
@@ -745,7 +745,7 @@ class MySQLTest extends TestCase
     public function testExactCreateTableWithColumnsAndIndexes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('products', function (Blueprint $table) {
+        $result = $schema->create('products', function (Table $table) {
             $table->id();
             $table->string('name', 100);
             $table->integer('price');
@@ -765,7 +765,7 @@ class MySQLTest extends TestCase
     public function testExactAlterTableAddAndDropColumns(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->addColumn('phone', 'string', 20)->nullable();
             $table->dropColumn('legacy_field');
         });
@@ -781,7 +781,7 @@ class MySQLTest extends TestCase
     public function testExactCreateTableWithForeignKey(): void
     {
         $schema = new Schema();
-        $result = $schema->create('orders', function (Blueprint $table) {
+        $result = $schema->create('orders', function (Table $table) {
             $table->id();
             $table->integer('customer_id');
             $table->foreignKey('customer_id')
@@ -915,7 +915,7 @@ class MySQLTest extends TestCase
     public function testCreateIfNotExists(): void
     {
         $schema = new Schema();
-        $result = $schema->createIfNotExists('users', function (Blueprint $table) {
+        $result = $schema->createIfNotExists('users', function (Table $table) {
             $table->id();
             $table->string('name');
         });
@@ -927,7 +927,7 @@ class MySQLTest extends TestCase
     public function testCreateTableWithRawColumnDefs(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->id();
             $table->rawColumn('`custom_col` VARCHAR(255) NOT NULL DEFAULT ""');
         });
@@ -939,7 +939,7 @@ class MySQLTest extends TestCase
     public function testCreateTableWithRawIndexDefs(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->id();
             $table->string('name');
             $table->rawIndex('INDEX `idx_custom` (`name`(10))');
@@ -952,7 +952,7 @@ class MySQLTest extends TestCase
     public function testCreateTableWithPartitionByRange(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->id();
             $table->datetime('created_at');
             $table->partitionByRange('YEAR(created_at)');
@@ -965,7 +965,7 @@ class MySQLTest extends TestCase
     public function testCreateTableWithPartitionByList(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->id();
             $table->string('region');
             $table->partitionByList('region');
@@ -978,7 +978,7 @@ class MySQLTest extends TestCase
     public function testCreateTableWithPartitionByHash(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->id();
             $table->partitionByHash('id');
         });
@@ -990,7 +990,7 @@ class MySQLTest extends TestCase
     public function testAlterWithForeignKeyOnDeleteAndUpdate(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('orders', function (Blueprint $table) {
+        $result = $schema->alter('orders', function (Table $table) {
             $table->addForeignKey('user_id')
                 ->references('id')->on('users')
                 ->onDelete(ForeignKeyAction::Cascade)
@@ -1112,10 +1112,10 @@ class MySQLTest extends TestCase
         $this->assertSame('ANALYZE TABLE `users`', $result->query);
     }
 
-    public function testBlueprintJsonColumn(): void
+    public function testTableJsonColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->json('metadata');
         });
         $this->assertBindingCount($result);
@@ -1123,10 +1123,10 @@ class MySQLTest extends TestCase
         $this->assertStringContainsString('JSON NOT NULL', $result->query);
     }
 
-    public function testBlueprintBinaryColumn(): void
+    public function testTableBinaryColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->binary('data');
         });
         $this->assertBindingCount($result);
@@ -1150,10 +1150,10 @@ class MySQLTest extends TestCase
         $this->assertNull($col->length);
     }
 
-    public function testBlueprintAddIndexWithStringType(): void
+    public function testTableAddIndexWithStringType(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Blueprint $table) {
+        $result = $schema->alter('users', function (Table $table) {
             $table->addIndex('idx_name', ['name'], 'unique');
         });
         $this->assertBindingCount($result);
@@ -1188,7 +1188,7 @@ class MySQLTest extends TestCase
     public function testEnumBackslashEscaping(): void
     {
         $schema = new Schema();
-        $result = $schema->create('items', function (Blueprint $table) {
+        $result = $schema->create('items', function (Table $table) {
             // Input: `a\` and `b'c`. Expect backslash doubled and quote doubled.
             $table->enum('status', ['a\\', "b'c"]);
         });
@@ -1200,7 +1200,7 @@ class MySQLTest extends TestCase
     public function testDefaultValueBackslashEscaping(): void
     {
         $schema = new Schema();
-        $result = $schema->create('items', function (Blueprint $table) {
+        $result = $schema->create('items', function (Table $table) {
             // Input: a\' OR 1=1 -- . Expect backslash doubled, quote doubled.
             $table->string('name')->default("a\\' OR 1=1 --");
         });
@@ -1211,7 +1211,7 @@ class MySQLTest extends TestCase
     public function testCommentBackslashEscaping(): void
     {
         $schema = new Schema();
-        $result = $schema->create('items', function (Blueprint $table) {
+        $result = $schema->create('items', function (Table $table) {
             $table->string('name')->comment('trailing\\');
         });
 
@@ -1229,7 +1229,7 @@ class MySQLTest extends TestCase
     public function testSerialColumnMapsToIntWithAutoIncrement(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->serial('id')->primary();
         });
 
@@ -1240,7 +1240,7 @@ class MySQLTest extends TestCase
     public function testBigSerialColumnMapsToBigIntWithAutoIncrement(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->bigSerial('id')->primary();
         });
 
@@ -1253,7 +1253,7 @@ class MySQLTest extends TestCase
         $this->expectException(UnsupportedException::class);
 
         $schema = new Schema();
-        $schema->create('t', function (Blueprint $table) {
+        $schema->create('t', function (Table $table) {
             $table->integer('id')->primary();
             $table->string('mood')->userType('mood_type');
         });

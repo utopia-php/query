@@ -3,10 +3,10 @@
 namespace Tests\Integration\Schema;
 
 use Tests\Integration\IntegrationTestCase;
-use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\ClickHouse;
 use Utopia\Query\Schema\ClickHouse\Engine;
 use Utopia\Query\Schema\ColumnType;
+use Utopia\Query\Schema\Table;
 
 class ClickHouseIntegrationTest extends IntegrationTestCase
 {
@@ -23,7 +23,7 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $table = 'test_mergetree_' . uniqid();
         $this->trackClickhouseTable($table);
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
             $bp->string('name', 100);
             $bp->integer('value');
@@ -52,7 +52,7 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $table = 'test_nullable_' . uniqid();
         $this->trackClickhouseTable($table);
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
             $bp->string('optional_name', 100)->nullable();
             $bp->integer('optional_count')->nullable();
@@ -83,12 +83,12 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $table = 'test_alter_add_' . uniqid();
         $this->trackClickhouseTable($table);
 
-        $create = $this->schema->create($table, function (Blueprint $bp) {
+        $create = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
         });
         $this->clickhouseStatement($create->query);
 
-        $alter = $this->schema->alter($table, function (Blueprint $bp) {
+        $alter = $this->schema->alter($table, function (Table $bp) {
             $bp->addColumn('description', ColumnType::String, 200);
         });
         $this->clickhouseStatement($alter->query);
@@ -106,7 +106,7 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
     {
         $table = 'test_drop_' . uniqid();
 
-        $create = $this->schema->create($table, function (Blueprint $bp) {
+        $create = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
         });
         $this->clickhouseStatement($create->query);
@@ -127,7 +127,7 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $table = 'test_dt64_' . uniqid();
         $this->trackClickhouseTable($table);
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
             $bp->datetime('created_at', 3);
             $bp->datetime('updated_at', 6);
@@ -157,7 +157,7 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $table = 'test_replacing_' . uniqid();
         $this->trackClickhouseTable($table);
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->unsigned()->primary();
             $bp->string('name');
             $bp->integer('version')->unsigned();
@@ -190,7 +190,7 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $table = 'test_summing_' . uniqid();
         $this->trackClickhouseTable($table);
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->integer('key')->unsigned()->primary();
             $bp->bigInteger('total')->unsigned();
             $bp->engine(Engine::SummingMergeTree, 'total');
@@ -290,12 +290,12 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
 
     public function testCreateTableWithPartitionBy(): void
     {
-        // Schema builder's Blueprint supports partitionByHash as a raw
+        // Schema builder's Table supports partitionByHash as a raw
         // expression pass-through — use it to emit PARTITION BY toYYYYMM(ts).
         $table = 'test_partition_' . uniqid();
         $this->trackClickhouseTable($table);
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
             $bp->datetime('ts');
             $bp->partitionByHash('toYYYYMM(`ts`)');

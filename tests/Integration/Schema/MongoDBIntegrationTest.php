@@ -4,8 +4,8 @@ namespace Tests\Integration\Schema;
 
 use MongoDB\Driver\Exception\BulkWriteException;
 use Tests\Integration\IntegrationTestCase;
-use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\MongoDB;
+use Utopia\Query\Schema\Table;
 
 class MongoDBIntegrationTest extends IntegrationTestCase
 {
@@ -23,7 +23,7 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $collection = 'schema_create_' . \uniqid();
         $this->trackMongoCollection($collection);
 
-        $plan = $this->schema->create($collection, function (Blueprint $bp) {
+        $plan = $this->schema->create($collection, function (Table $bp) {
             $bp->integer('id');
             $bp->string('name', 100);
             $bp->integer('age')->nullable();
@@ -59,7 +59,7 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $mongo = $this->mongoClient;
         $this->assertNotNull($mongo);
 
-        $mongo->command($this->schema->create($collection, function (Blueprint $bp) {
+        $mongo->command($this->schema->create($collection, function (Table $bp) {
             $bp->integer('id');
             $bp->string('email', 255);
         })->query);
@@ -78,7 +78,7 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $mongo = $this->mongoClient;
         $this->assertNotNull($mongo);
 
-        $mongo->command($this->schema->create($collection, function (Blueprint $bp) {
+        $mongo->command($this->schema->create($collection, function (Table $bp) {
             $bp->integer('id');
             $bp->string('country', 32);
             $bp->string('city', 64);
@@ -106,7 +106,7 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $mongo = $this->mongoClient;
         $this->assertNotNull($mongo);
 
-        $mongo->command($this->schema->create($collection, function (Blueprint $bp) {
+        $mongo->command($this->schema->create($collection, function (Table $bp) {
             $bp->integer('id');
             $bp->string('email', 255);
         })->query);
@@ -133,7 +133,7 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $mongo = $this->mongoClient;
         $this->assertNotNull($mongo);
 
-        $mongo->command($this->schema->create($collection, function (Blueprint $bp) {
+        $mongo->command($this->schema->create($collection, function (Table $bp) {
             $bp->integer('id');
         })->query);
 

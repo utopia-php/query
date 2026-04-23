@@ -3,9 +3,9 @@
 namespace Tests\Integration\Schema;
 
 use Tests\Integration\IntegrationTestCase;
-use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\SQLite;
+use Utopia\Query\Schema\Table;
 
 class SQLiteIntegrationTest extends IntegrationTestCase
 {
@@ -21,7 +21,7 @@ class SQLiteIntegrationTest extends IntegrationTestCase
     {
         $table = 'test_basic_' . uniqid();
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->integer('age');
             $bp->string('name', 100);
             $bp->float('score');
@@ -44,7 +44,7 @@ class SQLiteIntegrationTest extends IntegrationTestCase
     {
         $table = 'test_pk_unique_' . uniqid();
 
-        $result = $this->schema->create($table, function (Blueprint $bp) {
+        $result = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
             $bp->string('email', 255)->unique();
         });
@@ -83,12 +83,12 @@ class SQLiteIntegrationTest extends IntegrationTestCase
     {
         $table = 'test_alter_add_' . uniqid();
 
-        $create = $this->schema->create($table, function (Blueprint $bp) {
+        $create = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
         });
         $this->sqliteStatement($create->query);
 
-        $alter = $this->schema->alter($table, function (Blueprint $bp) {
+        $alter = $this->schema->alter($table, function (Table $bp) {
             $bp->addColumn('description', ColumnType::Text);
         });
         $this->sqliteStatement($alter->query);
@@ -103,7 +103,7 @@ class SQLiteIntegrationTest extends IntegrationTestCase
     {
         $table = 'test_index_' . uniqid();
 
-        $create = $this->schema->create($table, function (Blueprint $bp) {
+        $create = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
             $bp->string('email', 255);
         });
@@ -129,7 +129,7 @@ class SQLiteIntegrationTest extends IntegrationTestCase
     {
         $table = 'test_drop_' . uniqid();
 
-        $create = $this->schema->create($table, function (Blueprint $bp) {
+        $create = $this->schema->create($table, function (Table $bp) {
             $bp->integer('id')->primary();
         });
         $this->sqliteStatement($create->query);

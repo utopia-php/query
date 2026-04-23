@@ -5,7 +5,7 @@ namespace Utopia\Query\Schema;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\ClickHouse\Engine;
 
-class Blueprint
+class Table
 {
     /** @var list<Column> */
     public private(set) array $columns = [];
@@ -79,7 +79,7 @@ class Blueprint
     public function primary(array $columns): static
     {
         if (\count($columns) < 2) {
-            throw new ValidationException('Blueprint::primary(array) requires at least two columns; use Column::primary() for single-column keys.');
+            throw new ValidationException('Table::primary(array) requires at least two columns; use Column::primary() for single-column keys.');
         }
 
         foreach ($columns as $column) {

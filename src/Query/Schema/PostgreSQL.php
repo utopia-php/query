@@ -279,11 +279,11 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
     }
 
     /**
-     * @param  callable(Blueprint): void  $definition
+     * @param  callable(Table): void  $definition
      */
     public function alter(string $table, callable $definition): Plan
     {
-        $blueprint = new Blueprint();
+        $blueprint = new Table();
         $definition($blueprint);
 
         $alterations = [];

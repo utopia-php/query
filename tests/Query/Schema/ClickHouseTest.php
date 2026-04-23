@@ -8,7 +8,6 @@ use Utopia\Query\Builder\ClickHouse as ClickHouseBuilder;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
-use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\ClickHouse as Schema;
 use Utopia\Query\Schema\ClickHouse\Engine;
 use Utopia\Query\Schema\Feature\ColumnComments;
@@ -17,6 +16,7 @@ use Utopia\Query\Schema\Feature\ForeignKeys;
 use Utopia\Query\Schema\Feature\Procedures;
 use Utopia\Query\Schema\Feature\TableComments;
 use Utopia\Query\Schema\Feature\Triggers;
+use Utopia\Query\Schema\Table;
 
 class ClickHouseTest extends TestCase
 {
@@ -26,7 +26,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableBasic(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('name');
             $table->datetime('created_at', 3);
@@ -44,7 +44,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableColumnTypes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('test_types', function (Blueprint $table) {
+        $result = $schema->create('test_types', function (Table $table) {
             $table->integer('int_col');
             $table->integer('uint_col')->unsigned();
             $table->bigInteger('big_col');
@@ -71,7 +71,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableNullableWrapping(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->string('name')->nullable();
         });
         $this->assertBindingCount($result);
@@ -82,7 +82,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableWithEnum(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->enum('status', ['active', 'inactive']);
         });
         $this->assertBindingCount($result);
@@ -93,7 +93,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableWithVector(): void
     {
         $schema = new Schema();
-        $result = $schema->create('embeddings', function (Blueprint $table) {
+        $result = $schema->create('embeddings', function (Table $table) {
             $table->vector('embedding', 768);
         });
         $this->assertBindingCount($result);
@@ -104,7 +104,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableWithSpatialTypes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('geo', function (Blueprint $table) {
+        $result = $schema->create('geo', function (Table $table) {
             $table->point('coords');
             $table->linestring('path');
             $table->polygon('area');
@@ -122,7 +122,7 @@ class ClickHouseTest extends TestCase
         $this->expectExceptionMessage('Foreign keys are not supported in ClickHouse');
 
         $schema = new Schema();
-        $schema->create('t', function (Blueprint $table) {
+        $schema->create('t', function (Table $table) {
             $table->foreignKey('user_id')->references('id')->on('users');
         });
     }
@@ -130,7 +130,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableWithIndex(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('name');
             $table->index(['name']);
@@ -144,7 +144,7 @@ class ClickHouseTest extends TestCase
     public function testAlterAddColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('events', function (Blueprint $table) {
+        $result = $schema->alter('events', function (Table $table) {
             $table->addColumn('score', 'float');
         });
         $this->assertBindingCount($result);
@@ -155,7 +155,7 @@ class ClickHouseTest extends TestCase
     public function testAlterModifyColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('events', function (Blueprint $table) {
+        $result = $schema->alter('events', function (Table $table) {
             $table->modifyColumn('name', 'string');
         });
         $this->assertBindingCount($result);
@@ -166,7 +166,7 @@ class ClickHouseTest extends TestCase
     public function testAlterRenameColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('events', function (Blueprint $table) {
+        $result = $schema->alter('events', function (Table $table) {
             $table->renameColumn('old', 'new');
         });
         $this->assertBindingCount($result);
@@ -177,7 +177,7 @@ class ClickHouseTest extends TestCase
     public function testAlterDropColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('events', function (Blueprint $table) {
+        $result = $schema->alter('events', function (Table $table) {
             $table->dropColumn('old_col');
         });
         $this->assertBindingCount($result);
@@ -191,7 +191,7 @@ class ClickHouseTest extends TestCase
         $this->expectExceptionMessage('Foreign keys are not supported in ClickHouse');
 
         $schema = new Schema();
-        $schema->alter('events', function (Blueprint $table) {
+        $schema->alter('events', function (Table $table) {
             $table->addForeignKey('user_id')->references('id')->on('users');
         });
     }
@@ -275,7 +275,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableWithDefaultValue(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->integer('count')->default(0);
         });
@@ -287,7 +287,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableWithComment(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('name')->comment('User name');
         });
@@ -299,7 +299,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableMultiplePrimaryKeys(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->datetime('created_at', 3)->primary();
             $table->string('name');
@@ -312,7 +312,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableWithCompositePrimaryKey(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id');
             $table->datetime('created_at', 3);
             $table->string('name');
@@ -323,14 +323,14 @@ class ClickHouseTest extends TestCase
         $this->assertStringContainsString('ORDER BY (`id`, `created_at`)', $result->query);
     }
 
-    public function testCreateTableRejectsMixedColumnAndBlueprintPrimary(): void
+    public function testCreateTableRejectsMixedColumnAndTablePrimary(): void
     {
         $schema = new Schema();
 
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('Cannot combine column-level primary() with Blueprint::primary() composite key.');
+        $this->expectExceptionMessage('Cannot combine column-level primary() with Table::primary() composite key.');
 
-        $schema->create('events', function (Blueprint $table) {
+        $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->datetime('created_at', 3);
             $table->primary(['id', 'created_at']);
@@ -340,7 +340,7 @@ class ClickHouseTest extends TestCase
     public function testAlterMultipleOperations(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('events', function (Blueprint $table) {
+        $result = $schema->alter('events', function (Table $table) {
             $table->addColumn('score', 'float');
             $table->dropColumn('old_col');
             $table->renameColumn('nm', 'name');
@@ -355,7 +355,7 @@ class ClickHouseTest extends TestCase
     public function testAlterDropIndex(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('events', function (Blueprint $table) {
+        $result = $schema->alter('events', function (Table $table) {
             $table->dropIndex('idx_name');
         });
         $this->assertBindingCount($result);
@@ -366,7 +366,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableWithMultipleIndexes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('name');
             $table->string('type');
@@ -382,7 +382,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableTimestampWithoutPrecision(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->timestamp('ts_col');
         });
@@ -395,7 +395,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableDatetimeWithoutPrecision(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->datetime('dt_col');
         });
@@ -408,7 +408,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableWithCompositeIndex(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('name');
             $table->string('type');
@@ -425,7 +425,7 @@ class ClickHouseTest extends TestCase
         $this->expectException(UnsupportedException::class);
 
         $schema = new Schema();
-        $schema->alter('events', function (Blueprint $table) {
+        $schema->alter('events', function (Table $table) {
             $table->dropForeignKey('fk_old');
         });
     }
@@ -433,7 +433,7 @@ class ClickHouseTest extends TestCase
     public function testExactCreateTableWithEngine(): void
     {
         $schema = new Schema();
-        $result = $schema->create('metrics', function (Blueprint $table) {
+        $result = $schema->create('metrics', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('name');
             $table->float('value');
@@ -451,7 +451,7 @@ class ClickHouseTest extends TestCase
     public function testExactAlterTableAddColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('metrics', function (Blueprint $table) {
+        $result = $schema->alter('metrics', function (Table $table) {
             $table->addColumn('description', 'text')->nullable();
         });
 
@@ -518,7 +518,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableWithPartition(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('name');
             $table->datetime('created_at', 3);
@@ -534,7 +534,7 @@ class ClickHouseTest extends TestCase
     public function testCreateTableIfNotExists(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('name');
         }, ifNotExists: true);
@@ -546,7 +546,7 @@ class ClickHouseTest extends TestCase
     public function testCompileAutoIncrementReturnsEmpty(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->bigInteger('id')->primary()->autoIncrement();
         });
         $this->assertBindingCount($result);
@@ -558,7 +558,7 @@ class ClickHouseTest extends TestCase
     public function testCompileUnsignedReturnsEmpty(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Blueprint $table) {
+        $result = $schema->create('t', function (Table $table) {
             $table->integer('val')->unsigned();
         });
         $this->assertBindingCount($result);
@@ -594,7 +594,7 @@ class ClickHouseTest extends TestCase
     public function testEnumEscapesBackslash(): void
     {
         $schema = new Schema();
-        $result = $schema->create('items', function (Blueprint $table) {
+        $result = $schema->create('items', function (Table $table) {
             // Input: a\' ; backslash must be escaped BEFORE the quote
             // so the quote-escape `\'` is not cancelled by a trailing `\`.
             $table->enum('status', ["a\\'b"]);
@@ -607,7 +607,7 @@ class ClickHouseTest extends TestCase
     public function testCreateMergeTreeWithoutPrimaryKeysEmitsOrderByTuple(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->string('name');
             $table->integer('count');
         });
@@ -624,7 +624,7 @@ class ClickHouseTest extends TestCase
         $this->expectExceptionMessage('ALTER TABLE requires at least one alteration.');
 
         $schema = new Schema();
-        $schema->alter('events', function (Blueprint $table) {
+        $schema->alter('events', function (Table $table) {
             // no alterations
         });
     }
@@ -632,7 +632,7 @@ class ClickHouseTest extends TestCase
     public function testCreateReplacingMergeTreeEmitsEngineWithVersion(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->integer('version');
             $table->engine(Engine::ReplacingMergeTree, 'version');
@@ -646,7 +646,7 @@ class ClickHouseTest extends TestCase
     public function testCreateSummingMergeTreeEmitsEngineWithColumns(): void
     {
         $schema = new Schema();
-        $result = $schema->create('metrics', function (Blueprint $table) {
+        $result = $schema->create('metrics', function (Table $table) {
             $table->integer('key')->primary();
             $table->bigInteger('total')->unsigned();
             $table->bigInteger('count')->unsigned();
@@ -663,7 +663,7 @@ class ClickHouseTest extends TestCase
         $this->expectExceptionMessage('CollapsingMergeTree requires a sign column.');
 
         $schema = new Schema();
-        $schema->create('events', function (Blueprint $table) {
+        $schema->create('events', function (Table $table) {
             $table->integer('id')->primary();
             $table->engine(Engine::CollapsingMergeTree);
         });
@@ -672,7 +672,7 @@ class ClickHouseTest extends TestCase
     public function testCreateMemoryEngineSkipsOrderBy(): void
     {
         $schema = new Schema();
-        $result = $schema->create('cache', function (Blueprint $table) {
+        $result = $schema->create('cache', function (Table $table) {
             $table->integer('id')->primary();
             $table->string('value');
             $table->engine(Engine::Memory);
@@ -686,7 +686,7 @@ class ClickHouseTest extends TestCase
     public function testCreateAggregatingMergeTreeEmitsEmptyArgs(): void
     {
         $schema = new Schema();
-        $result = $schema->create('agg', function (Blueprint $table) {
+        $result = $schema->create('agg', function (Table $table) {
             $table->integer('key')->primary();
             $table->engine(Engine::AggregatingMergeTree);
         });
@@ -700,7 +700,7 @@ class ClickHouseTest extends TestCase
         $this->expectException(ValidationException::class);
 
         $schema = new Schema();
-        $schema->create('events', function (Blueprint $table) {
+        $schema->create('events', function (Table $table) {
             $table->integer('id')->primary();
             $table->engine(Engine::ReplicatedMergeTree, '/clickhouse/tables/events');
         });
@@ -709,7 +709,7 @@ class ClickHouseTest extends TestCase
     public function testTableLevelTTL(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->integer('id')->primary();
             $table->datetime('ts');
             $table->ttl('ts + INTERVAL 1 DAY');
@@ -725,7 +725,7 @@ class ClickHouseTest extends TestCase
         $this->expectException(ValidationException::class);
 
         $schema = new Schema();
-        $schema->create('events', function (Blueprint $table) {
+        $schema->create('events', function (Table $table) {
             $table->integer('id')->primary();
             $table->ttl('ts + INTERVAL 1 DAY;');
         });
@@ -734,7 +734,7 @@ class ClickHouseTest extends TestCase
     public function testColumnLevelTTL(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Blueprint $table) {
+        $result = $schema->create('events', function (Table $table) {
             $table->integer('id')->primary();
             $table->string('temporary')->ttl('ts + INTERVAL 1 DAY');
             $table->datetime('ts');

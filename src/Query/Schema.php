@@ -6,9 +6,9 @@ use Closure;
 use Utopia\Query\Builder\Plan;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
-use Utopia\Query\Schema\Blueprint;
 use Utopia\Query\Schema\Column;
 use Utopia\Query\Schema\IndexType;
+use Utopia\Query\Schema\Table;
 
 abstract class Schema
 {
@@ -32,7 +32,7 @@ abstract class Schema
     abstract protected function compileAutoIncrement(): string;
 
     /**
-     * @param  callable(Blueprint): void  $definition
+     * @param  callable(Table): void  $definition
      */
     public function createIfNotExists(string $table, callable $definition): Plan
     {
@@ -40,11 +40,11 @@ abstract class Schema
     }
 
     /**
-     * @param  callable(Blueprint): void  $definition
+     * @param  callable(Table): void  $definition
      */
     public function create(string $table, callable $definition, bool $ifNotExists = false): Plan
     {
-        $blueprint = new Blueprint();
+        $blueprint = new Table();
         $definition($blueprint);
 
         if ($blueprint->ttl !== null) {
@@ -68,7 +68,7 @@ abstract class Schema
         }
 
         if (! empty($blueprint->compositePrimaryKey) && ! empty($primaryKeys)) {
-            throw new ValidationException('Cannot combine column-level primary() with Blueprint::primary() composite key.');
+            throw new ValidationException('Cannot combine column-level primary() with Table::primary() composite key.');
         }
 
         // Raw column definitions (bypass typed Column objects)
@@ -140,11 +140,11 @@ abstract class Schema
     }
 
     /**
-     * @param  callable(Blueprint): void  $definition
+     * @param  callable(Table): void  $definition
      */
     public function alter(string $table, callable $definition): Plan
     {
-        $blueprint = new Blueprint();
+        $blueprint = new Table();
         $definition($blueprint);
 
         $alterations = [];
