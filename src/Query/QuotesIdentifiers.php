@@ -2,6 +2,8 @@
 
 namespace Utopia\Query;
 
+use Utopia\Query\Exception\ValidationException;
+
 trait QuotesIdentifiers
 {
     protected string $wrapChar = '`';
@@ -10,6 +12,10 @@ trait QuotesIdentifiers
     {
         if ($identifier === '*') {
             return '*';
+        }
+
+        if (\preg_match('/[\x00-\x1f\x7f]/', $identifier) === 1) {
+            throw new ValidationException('Identifier contains control character');
         }
 
         if (!\str_contains($identifier, '.')) {

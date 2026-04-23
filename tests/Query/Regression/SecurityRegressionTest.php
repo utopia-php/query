@@ -314,4 +314,27 @@ class SecurityRegressionTest extends TestCase
         // must bail on the out-of-bounds docLen instead of scanning past it.
         $this->assertSame(Type::Unknown, $parser->parse($data));
     }
+
+    public function testQuoteRejectsNullByteInIdentifier(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Identifier contains control character');
+
+        (new MySQLBuilder())->from("users\x00 DROP TABLE x")->build();
+    }
+
+    public function testQuoteRejectsControlByteInIdentifier(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Identifier contains control character');
+
+        (new MySQLBuilder())->from("users\x1f")->build();
+    }
+
+    public function testQuoteAcceptsValidIdentifier(): void
+    {
+        $result = (new MySQLBuilder())->from('users')->build();
+
+        $this->assertStringContainsString('`users`', $result->query);
+    }
 }
