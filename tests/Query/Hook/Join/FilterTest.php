@@ -37,7 +37,7 @@ class FilterTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id` AND active = ?', $result->query);
+        $this->assertSame('SELECT * FROM `users` LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id` AND active = ?', $result->query);
         $this->assertStringNotContainsString('WHERE', $result->query);
         $this->assertSame([1], $result->bindings);
     }
@@ -61,9 +61,9 @@ class FilterTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $result->query);
+        $this->assertSame('SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` WHERE active = ?', $result->query);
         $this->assertStringNotContainsString('ON `users`.`id` = `orders`.`user_id` AND', $result->query);
-        $this->assertStringContainsString('WHERE active = ?', $result->query);
+        $this->assertSame('SELECT * FROM `users` JOIN `orders` ON `users`.`id` = `orders`.`user_id` WHERE active = ?', $result->query);
         $this->assertSame([1], $result->bindings);
     }
 
@@ -106,9 +106,9 @@ class FilterTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CROSS JOIN `settings`', $result->query);
+        $this->assertSame('SELECT * FROM `users` CROSS JOIN `settings` WHERE active = ?', $result->query);
         $this->assertStringNotContainsString('CROSS JOIN `settings` AND', $result->query);
-        $this->assertStringContainsString('WHERE active = ?', $result->query);
+        $this->assertSame('SELECT * FROM `users` CROSS JOIN `settings` WHERE active = ?', $result->query);
         $this->assertSame([1], $result->bindings);
     }
 
@@ -142,10 +142,7 @@ class FilterTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString(
-            'LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id` AND active = ? AND visible = ?',
-            $result->query
-        );
+        $this->assertSame('SELECT * FROM `users` LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id` AND active = ? AND visible = ?', $result->query);
         $this->assertSame([1, true], $result->bindings);
     }
 
@@ -201,9 +198,9 @@ class FilterTest extends TestCase
         $this->assertBindingCount($result);
 
         // Filter-only hooks should still apply to WHERE, not to joins
-        $this->assertStringContainsString('LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $result->query);
+        $this->assertSame('SELECT * FROM `users` LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id` WHERE deleted = ?', $result->query);
         $this->assertStringNotContainsString('ON `users`.`id` = `orders`.`user_id` AND', $result->query);
-        $this->assertStringContainsString('WHERE deleted = ?', $result->query);
+        $this->assertSame('SELECT * FROM `users` LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id` WHERE deleted = ?', $result->query);
         $this->assertSame([0], $result->bindings);
     }
 
@@ -232,9 +229,9 @@ class FilterTest extends TestCase
         $this->assertBindingCount($result);
 
         // Filter applies to WHERE for main table
-        $this->assertStringContainsString('WHERE main_active = ?', $result->query);
+        $this->assertSame('SELECT * FROM `users` LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id` AND join_active = ? WHERE main_active = ?', $result->query);
         // JoinFilter applies to ON for join
-        $this->assertStringContainsString('ON `users`.`id` = `orders`.`user_id` AND join_active = ?', $result->query);
+        $this->assertSame('SELECT * FROM `users` LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id` AND join_active = ? WHERE main_active = ?', $result->query);
         // ON binding first, then WHERE binding
         $this->assertSame([1, 1], $result->bindings);
     }
@@ -249,7 +246,7 @@ class FilterTest extends TestCase
 
         $this->assertNotNull($condition);
         $this->assertSame(Placement::On, $condition->placement);
-        $this->assertStringContainsString('id IN', $condition->condition->expression);
+        $this->assertSame('id IN (SELECT DISTINCT document_id FROM mydb_orders_perms WHERE role IN (?) AND type = ?)', $condition->condition->expression);
     }
 
     public function testPermissionInnerJoinWherePlacement(): void
@@ -271,7 +268,7 @@ class FilterTest extends TestCase
 
         $this->assertNotNull($condition);
         $this->assertSame(Placement::On, $condition->placement);
-        $this->assertStringContainsString('tenant_id IN', $condition->condition->expression);
+        $this->assertSame('tenant_id IN (?)', $condition->condition->expression);
     }
 
     public function testTenantInnerJoinWherePlacement(): void
@@ -304,6 +301,6 @@ class FilterTest extends TestCase
         );
         $result = $permHook->filterJoin('orders', JoinType::Left);
         $this->assertNotNull($result);
-        $this->assertStringContainsString('mydb_orders_perms', $result->condition->expression);
+        $this->assertSame('id IN (SELECT DISTINCT document_id FROM mydb_orders_perms WHERE role IN (?) AND type = ?)', $result->condition->expression);
     }
 }

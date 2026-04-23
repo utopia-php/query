@@ -18,10 +18,7 @@ class AggregateFilterTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString(
-            'COUNT(*) FILTER (WHERE status = ?) AS "active_count"',
-            $result->query,
-        );
+        $this->assertSame('SELECT COUNT(*) FILTER (WHERE status = ?) AS "active_count" FROM "orders"', $result->query);
         $this->assertSame(['active'], $result->bindings);
     }
 
@@ -33,7 +30,7 @@ class AggregateFilterTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('COUNT(*) FILTER (WHERE status = ?)', $result->query);
+        $this->assertSame('SELECT COUNT(*) FILTER (WHERE status = ?) FROM "orders"', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -45,10 +42,7 @@ class AggregateFilterTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString(
-            'COUNT(*) FILTER (WHERE total > 100) AS "big_count"',
-            $result->query,
-        );
+        $this->assertSame('SELECT COUNT(*) FILTER (WHERE total > 100) AS "big_count" FROM "orders"', $result->query);
         $this->assertSame([], $result->bindings);
     }
 
@@ -61,8 +55,7 @@ class AggregateFilterTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('COUNT(*) FILTER (WHERE status = ?) AS "active_count"', $result->query);
-        $this->assertStringContainsString('COUNT(*) FILTER (WHERE status = ?) AS "cancelled_count"', $result->query);
+        $this->assertSame('SELECT COUNT(*) FILTER (WHERE status = ?) AS "active_count", COUNT(*) FILTER (WHERE status = ?) AS "cancelled_count" FROM "orders"', $result->query);
         $this->assertSame(['active', 'cancelled'], $result->bindings);
     }
 
@@ -74,10 +67,7 @@ class AggregateFilterTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString(
-            'SUM("amount") FILTER (WHERE status = ?) AS "active_total"',
-            $result->query,
-        );
+        $this->assertSame('SELECT SUM("amount") FILTER (WHERE status = ?) AS "active_total" FROM "orders"', $result->query);
     }
 
     public function testSelectAggregateFilterBindingsAppendInOrder(): void

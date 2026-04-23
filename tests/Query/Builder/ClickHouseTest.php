@@ -506,15 +506,7 @@ class ClickHouseTest extends TestCase
         $query = $result->query;
 
         // Verify clause ordering
-        $this->assertStringContainsString('SELECT', $query);
-        $this->assertStringContainsString('FROM `events` FINAL SAMPLE 0.1', $query);
-        $this->assertStringContainsString('JOIN `users`', $query);
-        $this->assertStringContainsString('PREWHERE `event_type` IN (?)', $query);
-        $this->assertStringContainsString('WHERE `events`.`amount` > ?', $query);
-        $this->assertStringContainsString('GROUP BY `users`.`country`', $query);
-        $this->assertStringContainsString('HAVING COUNT(*) > ?', $query);
-        $this->assertStringContainsString('ORDER BY `total` DESC', $query);
-        $this->assertStringContainsString('LIMIT ?', $query);
+        $this->assertSame('SELECT COUNT(*) AS `total`, `users`.`country` FROM `events` FINAL SAMPLE 0.1 JOIN `users` ON `events`.`user_id` = `users`.`id` PREWHERE `event_type` IN (?) WHERE `events`.`amount` > ? GROUP BY `users`.`country` HAVING COUNT(*) > ? ORDER BY `total` DESC LIMIT ?', $query);
 
         // Verify ordering: PREWHERE before WHERE
         $this->assertLessThan(strpos($query, 'WHERE'), strpos($query, 'PREWHERE'));
@@ -939,8 +931,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
-        $this->assertStringContainsString('GROUP BY `type`', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `total` FROM `events` PREWHERE `type` IN (?) GROUP BY `type`', $result->query);
     }
 
     public function testPrewhereWithHaving(): void
@@ -954,8 +945,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
-        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `total` FROM `events` PREWHERE `type` IN (?) GROUP BY `type` HAVING COUNT(*) > ?', $result->query);
     }
 
     public function testPrewhereWithOrderBy(): void
@@ -1000,8 +990,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
-        $this->assertStringContainsString('UNION (SELECT', $result->query);
+        $this->assertSame('(SELECT * FROM `events` PREWHERE `type` IN (?)) UNION (SELECT * FROM `archive` WHERE `year` IN (?))', $result->query);
     }
 
     public function testPrewhereWithDistinct(): void
@@ -1014,8 +1003,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SELECT DISTINCT', $result->query);
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
+        $this->assertSame('SELECT DISTINCT `user_id` FROM `events` PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testPrewhereWithAggregations(): void
@@ -1027,8 +1015,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SUM(`amount`) AS `total_amount`', $result->query);
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
+        $this->assertSame('SELECT SUM(`amount`) AS `total_amount` FROM `events` PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testPrewhereBindingOrderWithProvider(): void
@@ -1120,7 +1107,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertSame('SELECT * FROM `events` PREWHERE `ts` > ?', $result->query);
         // "PREWHERE" contains "WHERE" as a substring, so we check there is no standalone WHERE clause
         $withoutPrewhere = str_replace('PREWHERE', '', $result->query);
         $this->assertStringNotContainsString('WHERE', $withoutPrewhere);
@@ -1135,7 +1122,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertSame('SELECT * FROM `events` PREWHERE `type` IN (?)', $result->query);
         $withoutPrewhere = str_replace('PREWHERE', '', $result->query);
         $this->assertStringNotContainsString('WHERE', $withoutPrewhere);
     }
@@ -1227,8 +1214,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
-        $this->assertStringContainsString('JOIN `users`', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL JOIN `users` ON `events`.`uid` = `users`.`id`', $result->query);
     }
 
     public function testFinalWithAggregations(): void
@@ -1240,8 +1226,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(*) AS `total`', $result->query);
-        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `total` FROM `events` FINAL', $result->query);
     }
 
     public function testFinalWithGroupByHaving(): void
@@ -1255,9 +1240,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
-        $this->assertStringContainsString('GROUP BY `type`', $result->query);
-        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` FINAL GROUP BY `type` HAVING COUNT(*) > ?', $result->query);
     }
 
     public function testFinalWithDistinct(): void
@@ -1310,8 +1293,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
-        $this->assertStringContainsString('`_cursor` > ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL WHERE `_cursor` > ? ORDER BY `_cursor` ASC', $result->query);
     }
 
     public function testFinalWithUnion(): void
@@ -1324,8 +1306,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
-        $this->assertStringContainsString('UNION (SELECT', $result->query);
+        $this->assertSame('(SELECT * FROM `events` FINAL) UNION (SELECT * FROM `archive`)', $result->query);
     }
 
     public function testFinalWithPrewhere(): void
@@ -1381,13 +1362,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $query = $result->query;
-        $this->assertStringContainsString('SELECT `name`', $query);
-        $this->assertStringContainsString('FROM `events` FINAL SAMPLE 0.1', $query);
-        $this->assertStringContainsString('PREWHERE', $query);
-        $this->assertStringContainsString('WHERE', $query);
-        $this->assertStringContainsString('ORDER BY', $query);
-        $this->assertStringContainsString('LIMIT', $query);
-        $this->assertStringContainsString('OFFSET', $query);
+        $this->assertSame('SELECT `name` FROM `events` FINAL SAMPLE 0.1 PREWHERE `type` IN (?) WHERE `count` > ? ORDER BY `ts` DESC LIMIT ? OFFSET ?', $query);
     }
 
     public function testFinalCalledMultipleTimesIdempotent(): void
@@ -1447,8 +1422,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
-        $this->assertStringContainsString('`col_status`', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL WHERE `col_status` IN (?)', $result->query);
     }
 
     public function testFinalWithConditionProvider(): void
@@ -1465,8 +1439,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
-        $this->assertStringContainsString('deleted = ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL WHERE deleted = ?', $result->query);
     }
 
     public function testFinalResetClearsFlag(): void
@@ -1490,7 +1463,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FINAL', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL', $result->query);
 
         $result2 = (new Builder())
             ->from('events')
@@ -1549,8 +1522,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SAMPLE 0.3', $result->query);
-        $this->assertStringContainsString('JOIN `users`', $result->query);
+        $this->assertSame('SELECT * FROM `events` SAMPLE 0.3 JOIN `users` ON `events`.`uid` = `users`.`id`', $result->query);
     }
 
     public function testSampleWithAggregations(): void
@@ -1562,8 +1534,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SAMPLE 0.1', $result->query);
-        $this->assertStringContainsString('COUNT(*)', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` SAMPLE 0.1', $result->query);
     }
 
     public function testSampleWithGroupByHaving(): void
@@ -1577,9 +1548,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
-        $this->assertStringContainsString('GROUP BY', $result->query);
-        $this->assertStringContainsString('HAVING', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` SAMPLE 0.5 GROUP BY `type` HAVING COUNT(*) > ?', $result->query);
     }
 
     public function testSampleWithDistinct(): void
@@ -1592,8 +1561,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SELECT DISTINCT', $result->query);
-        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertSame('SELECT DISTINCT `user_id` FROM `events` SAMPLE 0.5', $result->query);
     }
 
     public function testSampleWithSort(): void
@@ -1631,8 +1599,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
-        $this->assertStringContainsString('`_cursor` > ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` SAMPLE 0.5 WHERE `_cursor` > ? ORDER BY `_cursor` ASC', $result->query);
     }
 
     public function testSampleWithUnion(): void
@@ -1645,8 +1612,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
-        $this->assertStringContainsString('UNION', $result->query);
+        $this->assertSame('(SELECT * FROM `events` SAMPLE 0.5) UNION (SELECT * FROM `archive`)', $result->query);
     }
 
     public function testSampleWithPrewhere(): void
@@ -1699,9 +1665,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $query = $result->query;
-        $this->assertStringContainsString('SAMPLE 0.1', $query);
-        $this->assertStringContainsString('SELECT `name`', $query);
-        $this->assertStringContainsString('WHERE `count` > ?', $query);
+        $this->assertSame('SELECT `name` FROM `events` SAMPLE 0.1 WHERE `count` > ? ORDER BY `ts` DESC LIMIT ?', $query);
     }
 
     public function testSampleInToRawSql(): void
@@ -1753,7 +1717,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertSame('SELECT * FROM `events` SAMPLE 0.5', $result->query);
 
         $result2 = (new Builder())
             ->from('events')
@@ -1791,8 +1755,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
-        $this->assertStringContainsString('`r_col`', $result->query);
+        $this->assertSame('SELECT * FROM `events` SAMPLE 0.5 WHERE `r_col` IN (?)', $result->query);
     }
 
     public function testRegexBasicPattern(): void
@@ -1985,8 +1948,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('match(`path`, ?)', $result->query);
-        $this->assertStringContainsString('`status` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `logs` WHERE ((match(`path`, ?) OR match(`path`, ?)) AND `status` IN (?))', $result->query);
     }
 
     public function testRegexWithFinal(): void
@@ -1998,8 +1960,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `logs` FINAL', $result->query);
-        $this->assertStringContainsString('match(`path`, ?)', $result->query);
+        $this->assertSame('SELECT * FROM `logs` FINAL WHERE match(`path`, ?)', $result->query);
     }
 
     public function testRegexWithSample(): void
@@ -2011,8 +1972,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
-        $this->assertStringContainsString('match(`path`, ?)', $result->query);
+        $this->assertSame('SELECT * FROM `logs` SAMPLE 0.5 WHERE match(`path`, ?)', $result->query);
     }
 
     public function testRegexInToRawSql(): void
@@ -2036,8 +1996,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('match(`path`, ?)', $result->query);
-        $this->assertStringContainsString('position(`msg`, ?) > 0', $result->query);
+        $this->assertSame('SELECT * FROM `logs` WHERE match(`path`, ?) AND position(`msg`, ?) > 0', $result->query);
     }
 
     public function testRegexCombinedWithStartsWith(): void
@@ -2051,8 +2010,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('match(`path`, ?)', $result->query);
-        $this->assertStringContainsString('startsWith(`msg`, ?)', $result->query);
+        $this->assertSame('SELECT * FROM `logs` WHERE match(`path`, ?) AND startsWith(`msg`, ?)', $result->query);
     }
 
     public function testRegexPrewhereWithRegexWhere(): void
@@ -2064,8 +2022,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE match(`path`, ?)', $result->query);
-        $this->assertStringContainsString('WHERE match(`msg`, ?)', $result->query);
+        $this->assertSame('SELECT * FROM `logs` PREWHERE match(`path`, ?) WHERE match(`msg`, ?)', $result->query);
         $this->assertSame(['^/api', 'error'], $result->bindings);
     }
 
@@ -2115,7 +2072,7 @@ class ClickHouseTest extends TestCase
                 ->build();
             $this->fail('Expected Exception was not thrown');
         } catch (Exception $e) {
-            $this->assertStringContainsString('Full-text search', $e->getMessage());
+            $this->assertSame('Full-text search is not supported by this dialect.', $e->getMessage());
         }
     }
 
@@ -2208,7 +2165,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('rand()', $result->query);
+        $this->assertSame('SELECT * FROM `events` ORDER BY rand()', $result->query);
         $this->assertStringNotContainsString('RAND()', $result->query);
     }
 
@@ -2311,9 +2268,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN `users`', $result->query);
-        $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
-        $this->assertStringContainsString('ORDER BY rand()', $result->query);
+        $this->assertSame('SELECT * FROM `events` JOIN `users` ON `events`.`uid` = `users`.`id` WHERE `status` IN (?) ORDER BY rand()', $result->query);
     }
 
     public function testRandomSortAlone(): void
@@ -2555,8 +2510,7 @@ class ClickHouseTest extends TestCase
         ])->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('(`a` IN (?) OR (`b` > ? AND `c` < ?))', $result->query);
-        $this->assertStringContainsString('`d` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE ((`a` IN (?) OR (`b` > ? AND `c` < ?)) AND `d` IN (?))', $result->query);
     }
 
     public function testFilterWithFloats(): void
@@ -2613,8 +2567,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('AVG(`price`) AS `avg_price`', $result->query);
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
+        $this->assertSame('SELECT AVG(`price`) AS `avg_price` FROM `events` PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testAggregationMinWithPrewhereWhere(): void
@@ -2627,9 +2580,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('MIN(`price`) AS `min_price`', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('WHERE', $result->query);
+        $this->assertSame('SELECT MIN(`price`) AS `min_price` FROM `events` PREWHERE `type` IN (?) WHERE `amount` > ?', $result->query);
     }
 
     public function testAggregationMaxWithAllClickHouseFeatures(): void
@@ -2643,9 +2594,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('MAX(`price`) AS `max_price`', $result->query);
-        $this->assertStringContainsString('FINAL SAMPLE 0.5', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertSame('SELECT MAX(`price`) AS `max_price` FROM `events` FINAL SAMPLE 0.5 PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testMultipleAggregationsWithPrewhereGroupByHaving(): void
@@ -2660,11 +2609,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(*) AS `cnt`', $result->query);
-        $this->assertStringContainsString('SUM(`amount`) AS `total`', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('GROUP BY `region`', $result->query);
-        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt`, SUM(`amount`) AS `total` FROM `events` PREWHERE `type` IN (?) GROUP BY `region` HAVING COUNT(*) > ?', $result->query);
     }
 
     public function testAggregationWithJoinFinal(): void
@@ -2677,9 +2622,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
-        $this->assertStringContainsString('JOIN `users`', $result->query);
-        $this->assertStringContainsString('COUNT(*)', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `total` FROM `events` FINAL JOIN `users` ON `events`.`uid` = `users`.`id`', $result->query);
     }
 
     public function testAggregationWithDistinctSample(): void
@@ -2692,8 +2635,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SELECT DISTINCT', $result->query);
-        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertSame('SELECT DISTINCT COUNT(`user_id`) AS `unique_users` FROM `events` SAMPLE 0.5', $result->query);
     }
 
     public function testAggregationWithAliasPrewhere(): void
@@ -2705,8 +2647,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(*) AS `click_count`', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `click_count` FROM `events` PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testAggregationWithoutAliasFinal(): void
@@ -2718,9 +2659,9 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(*)', $result->query);
+        $this->assertSame('SELECT COUNT(*) FROM `events` FINAL', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
-        $this->assertStringContainsString('FINAL', $result->query);
+        $this->assertSame('SELECT COUNT(*) FROM `events` FINAL', $result->query);
     }
 
     public function testCountStarAllClickHouseFeatures(): void
@@ -2734,9 +2675,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(*) AS `total`', $result->query);
-        $this->assertStringContainsString('FINAL SAMPLE 0.5', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `total` FROM `events` FINAL SAMPLE 0.5 PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testAggregationAllFeaturesUnion(): void
@@ -2752,8 +2691,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('UNION', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertSame('(SELECT COUNT(*) AS `total` FROM `events` FINAL SAMPLE 0.1 PREWHERE `type` IN (?)) UNION (SELECT COUNT(*) AS `total` FROM `archive`)', $result->query);
     }
 
     public function testAggregationAttributeResolverPrewhere(): void
@@ -2768,7 +2706,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SUM(`amount_cents`)', $result->query);
+        $this->assertSame('SELECT SUM(`amount_cents`) AS `total` FROM `events` PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testAggregationConditionProviderPrewhere(): void
@@ -2786,8 +2724,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('tenant = ?', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` PREWHERE `type` IN (?) WHERE tenant = ?', $result->query);
     }
 
     public function testGroupByHavingPrewhereFinal(): void
@@ -2803,10 +2740,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $query = $result->query;
-        $this->assertStringContainsString('FINAL', $query);
-        $this->assertStringContainsString('PREWHERE', $query);
-        $this->assertStringContainsString('GROUP BY', $query);
-        $this->assertStringContainsString('HAVING', $query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` FINAL PREWHERE `type` IN (?) GROUP BY `region` HAVING COUNT(*) > ?', $query);
     }
 
     public function testJoinWithFinalFeature(): void
@@ -2848,8 +2782,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN `users`', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertSame('SELECT * FROM `events` JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testJoinWithPrewhereWhere(): void
@@ -2862,9 +2795,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('WHERE', $result->query);
+        $this->assertSame('SELECT * FROM `events` JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `type` IN (?) WHERE `users`.`age` > ?', $result->query);
     }
 
     public function testJoinAllClickHouseFeatures(): void
@@ -2880,10 +2811,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $query = $result->query;
-        $this->assertStringContainsString('FINAL SAMPLE 0.1', $query);
-        $this->assertStringContainsString('JOIN', $query);
-        $this->assertStringContainsString('PREWHERE', $query);
-        $this->assertStringContainsString('WHERE', $query);
+        $this->assertSame('SELECT * FROM `events` FINAL SAMPLE 0.1 JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `type` IN (?) WHERE `users`.`age` > ?', $query);
     }
 
     public function testLeftJoinWithPrewhere(): void
@@ -2895,8 +2823,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LEFT JOIN `users`', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertSame('SELECT * FROM `events` LEFT JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testRightJoinWithPrewhere(): void
@@ -2908,8 +2835,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('RIGHT JOIN `users`', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertSame('SELECT * FROM `events` RIGHT JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testCrossJoinWithFinal(): void
@@ -2921,8 +2847,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
-        $this->assertStringContainsString('CROSS JOIN `config`', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL CROSS JOIN `config`', $result->query);
     }
 
     public function testMultipleJoinsWithPrewhere(): void
@@ -2935,9 +2860,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN `users`', $result->query);
-        $this->assertStringContainsString('LEFT JOIN `sessions`', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertSame('SELECT * FROM `events` JOIN `users` ON `events`.`uid` = `users`.`id` LEFT JOIN `sessions` ON `events`.`sid` = `sessions`.`id` PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testJoinAggregationPrewhereGroupBy(): void
@@ -2951,9 +2874,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('GROUP BY', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `type` IN (?) GROUP BY `users`.`country`', $result->query);
     }
 
     public function testJoinPrewhereBindingOrder(): void
@@ -2981,7 +2902,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE `user_id` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `events` JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `user_id` IN (?)', $result->query);
     }
 
     public function testJoinConditionProviderPrewhere(): void
@@ -2999,8 +2920,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('tenant = ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `type` IN (?) WHERE tenant = ?', $result->query);
     }
 
     public function testJoinPrewhereUnion(): void
@@ -3014,9 +2934,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('UNION', $result->query);
+        $this->assertSame('(SELECT * FROM `events` JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `type` IN (?)) UNION (SELECT * FROM `archive`)', $result->query);
     }
 
     public function testJoinClauseOrdering(): void
@@ -3057,8 +2975,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
-        $this->assertStringContainsString('UNION (SELECT * FROM `archive`)', $result->query);
+        $this->assertSame('(SELECT * FROM `events` FINAL) UNION (SELECT * FROM `archive`)', $result->query);
     }
 
     public function testUnionMainHasSample(): void
@@ -3071,8 +2988,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
-        $this->assertStringContainsString('UNION', $result->query);
+        $this->assertSame('(SELECT * FROM `events` SAMPLE 0.5) UNION (SELECT * FROM `archive`)', $result->query);
     }
 
     public function testUnionMainHasPrewhere(): void
@@ -3085,8 +3001,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('UNION', $result->query);
+        $this->assertSame('(SELECT * FROM `events` PREWHERE `type` IN (?)) UNION (SELECT * FROM `archive`)', $result->query);
     }
 
     public function testUnionMainHasAllClickHouseFeatures(): void
@@ -3102,9 +3017,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FINAL SAMPLE 0.1', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('UNION', $result->query);
+        $this->assertSame('(SELECT * FROM `events` FINAL SAMPLE 0.1 PREWHERE `type` IN (?) WHERE `count` > ?) UNION (SELECT * FROM `archive`)', $result->query);
     }
 
     public function testUnionAllWithPrewhere(): void
@@ -3117,8 +3030,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('UNION ALL', $result->query);
+        $this->assertSame('(SELECT * FROM `events` PREWHERE `type` IN (?)) UNION ALL (SELECT * FROM `archive`)', $result->query);
     }
 
     public function testUnionBindingOrderWithPrewhere(): void
@@ -3148,7 +3060,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertSame('(SELECT * FROM `events` PREWHERE `type` IN (?)) UNION (SELECT * FROM `archive1`) UNION (SELECT * FROM `archive2`)', $result->query);
         $this->assertSame(2, substr_count($result->query, 'UNION'));
     }
 
@@ -3163,9 +3075,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('UNION', $result->query);
+        $this->assertSame('(SELECT * FROM `events` JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `type` IN (?)) UNION (SELECT * FROM `archive`)', $result->query);
     }
 
     public function testUnionAggregationPrewhereFinal(): void
@@ -3180,10 +3090,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FINAL', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('COUNT(*)', $result->query);
-        $this->assertStringContainsString('UNION', $result->query);
+        $this->assertSame('(SELECT COUNT(*) AS `total` FROM `events` FINAL PREWHERE `type` IN (?)) UNION (SELECT COUNT(*) AS `total` FROM `archive`)', $result->query);
     }
 
     public function testUnionWithComplexMainQuery(): void
@@ -3203,13 +3110,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $query = $result->query;
-        $this->assertStringContainsString('SELECT `name`, `count`', $query);
-        $this->assertStringContainsString('FINAL SAMPLE 0.1', $query);
-        $this->assertStringContainsString('PREWHERE', $query);
-        $this->assertStringContainsString('WHERE', $query);
-        $this->assertStringContainsString('ORDER BY', $query);
-        $this->assertStringContainsString('LIMIT', $query);
-        $this->assertStringContainsString('UNION', $query);
+        $this->assertSame('(SELECT `name`, `count` FROM `events` FINAL SAMPLE 0.1 PREWHERE `type` IN (?) WHERE `count` > ? ORDER BY `count` DESC LIMIT ?) UNION (SELECT * FROM `archive` WHERE `year` IN (?))', $query);
     }
 
     public function testToRawSqlWithFinalFeature(): void
@@ -3285,12 +3186,7 @@ class ClickHouseTest extends TestCase
             ->offset(20)
             ->toRawSql();
 
-        $this->assertStringContainsString('FINAL SAMPLE 0.1', $sql);
-        $this->assertStringContainsString("PREWHERE `type` IN ('click')", $sql);
-        $this->assertStringContainsString('WHERE `count` > 5', $sql);
-        $this->assertStringContainsString('ORDER BY `ts` DESC', $sql);
-        $this->assertStringContainsString('LIMIT 10', $sql);
-        $this->assertStringContainsString('OFFSET 20', $sql);
+        $this->assertSame('SELECT * FROM `events` FINAL SAMPLE 0.1 PREWHERE `type` IN (\'click\') WHERE `count` > 5 ORDER BY `ts` DESC LIMIT 10 OFFSET 20', $sql);
     }
 
     public function testToRawSqlWithStringBindings(): void
@@ -3366,8 +3262,7 @@ class ClickHouseTest extends TestCase
             ->union($other)
             ->toRawSql();
 
-        $this->assertStringContainsString("PREWHERE `type` IN ('click')", $sql);
-        $this->assertStringContainsString('UNION', $sql);
+        $this->assertSame('(SELECT * FROM `events` PREWHERE `type` IN (\'click\')) UNION (SELECT * FROM `archive` WHERE `year` IN (2023))', $sql);
     }
 
     public function testToRawSqlWithJoinPrewhere(): void
@@ -3378,8 +3273,7 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('type', ['click'])])
             ->toRawSql();
 
-        $this->assertStringContainsString('JOIN `users`', $sql);
-        $this->assertStringContainsString("PREWHERE `type` IN ('click')", $sql);
+        $this->assertSame('SELECT * FROM `events` JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `type` IN (\'click\')', $sql);
     }
 
     public function testToRawSqlWithRegexMatch(): void
@@ -3457,7 +3351,7 @@ class ClickHouseTest extends TestCase
 
         $result = $builder->from('events')->filter([Query::equal('col', ['v'])])->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('`r_col`', $result->query);
+        $this->assertSame('SELECT * FROM `events` WHERE `r_col` IN (?)', $result->query);
     }
 
     public function testResetPreservesConditionProviders(): void
@@ -3476,7 +3370,7 @@ class ClickHouseTest extends TestCase
 
         $result = $builder->from('events')->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('tenant = ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` WHERE tenant = ?', $result->query);
     }
 
     public function testResetClearsTable(): void
@@ -3487,7 +3381,7 @@ class ClickHouseTest extends TestCase
 
         $result = $builder->from('logs')->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('FROM `logs`', $result->query);
+        $this->assertSame('SELECT * FROM `logs`', $result->query);
         $this->assertStringNotContainsString('events', $result->query);
     }
 
@@ -3552,7 +3446,7 @@ class ClickHouseTest extends TestCase
 
         $result = $builder->from('events')->prewhere([Query::equal('x', [1])])->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertSame('SELECT * FROM `events` PREWHERE `x` IN (?)', $result->query);
         $this->assertStringNotContainsString('FINAL', $result->query);
     }
 
@@ -3564,7 +3458,7 @@ class ClickHouseTest extends TestCase
 
         $result = $builder->from('events')->final()->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('FINAL', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL', $result->query);
         $this->assertStringNotContainsString('PREWHERE', $result->query);
     }
 
@@ -3576,7 +3470,7 @@ class ClickHouseTest extends TestCase
 
         $result = $builder->from('events')->sample(0.5)->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertSame('SELECT * FROM `events` SAMPLE 0.5', $result->query);
         $this->assertStringNotContainsString('FINAL', $result->query);
     }
 
@@ -3605,7 +3499,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `events` PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testWhenFalseDoesNotAddPrewhere(): void
@@ -3627,7 +3521,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FINAL', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL', $result->query);
     }
 
     public function testWhenFalseDoesNotAddFinal(): void
@@ -3649,7 +3543,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertSame('SELECT * FROM `events` SAMPLE 0.5', $result->query);
     }
 
     public function testWhenWithBothPrewhereAndFilter(): void
@@ -3665,8 +3559,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('WHERE', $result->query);
+        $this->assertSame('SELECT * FROM `events` PREWHERE `type` IN (?) WHERE `count` > ?', $result->query);
     }
 
     public function testWhenNestedWithClickHouseFeatures(): void
@@ -3682,7 +3575,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FINAL SAMPLE 0.5', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL SAMPLE 0.5', $result->query);
     }
 
     public function testWhenChainedMultipleTimesWithClickHouseFeatures(): void
@@ -3695,8 +3588,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FINAL SAMPLE 0.5', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL SAMPLE 0.5 PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testWhenAddsJoinAndPrewhere(): void
@@ -3712,8 +3604,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertSame('SELECT * FROM `events` JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `type` IN (?)', $result->query);
     }
 
     public function testWhenCombinedWithRegularWhen(): void
@@ -3725,8 +3616,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FINAL', $result->query);
-        $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL WHERE `status` IN (?)', $result->query);
     }
 
     public function testProviderWithPrewhere(): void
@@ -3743,8 +3633,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('deleted = ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` PREWHERE `type` IN (?) WHERE deleted = ?', $result->query);
     }
 
     public function testProviderWithFinal(): void
@@ -3761,8 +3650,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FINAL', $result->query);
-        $this->assertStringContainsString('deleted = ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL WHERE deleted = ?', $result->query);
     }
 
     public function testProviderWithSample(): void
@@ -3779,8 +3667,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
-        $this->assertStringContainsString('deleted = ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` SAMPLE 0.5 WHERE deleted = ?', $result->query);
     }
 
     public function testProviderPrewhereWhereBindingOrder(): void
@@ -3866,9 +3753,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FINAL SAMPLE 0.1', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('tenant = ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL SAMPLE 0.1 PREWHERE `type` IN (?) WHERE `count` > ? AND tenant = ?', $result->query);
     }
 
     public function testProviderPrewhereAggregation(): void
@@ -3886,9 +3771,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(*)', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('tenant = ?', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` PREWHERE `type` IN (?) WHERE tenant = ?', $result->query);
     }
 
     public function testProviderJoinsPrewhere(): void
@@ -3906,9 +3789,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('tenant = ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `type` IN (?) WHERE tenant = ?', $result->query);
     }
 
     public function testProviderReferencesTableNameFinal(): void
@@ -3925,8 +3806,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('events.deleted = ?', $result->query);
-        $this->assertStringContainsString('FINAL', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL WHERE events.deleted = ?', $result->query);
     }
 
     public function testCursorAfterWithPrewhere(): void
@@ -3939,8 +3819,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('`_cursor` > ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` PREWHERE `type` IN (?) WHERE `_cursor` > ? ORDER BY `_cursor` ASC', $result->query);
     }
 
     public function testCursorBeforeWithPrewhere(): void
@@ -3953,8 +3832,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('`_cursor` < ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` PREWHERE `type` IN (?) WHERE `_cursor` < ? ORDER BY `_cursor` ASC', $result->query);
     }
 
     public function testCursorPrewhereWhere(): void
@@ -3968,9 +3846,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('WHERE', $result->query);
-        $this->assertStringContainsString('`_cursor` > ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` PREWHERE `type` IN (?) WHERE `count` > ? AND `_cursor` > ? ORDER BY `_cursor` ASC', $result->query);
     }
 
     public function testCursorWithFinal(): void
@@ -3983,8 +3859,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FINAL', $result->query);
-        $this->assertStringContainsString('`_cursor` > ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL WHERE `_cursor` > ? ORDER BY `_cursor` ASC', $result->query);
     }
 
     public function testCursorWithSample(): void
@@ -3997,8 +3872,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
-        $this->assertStringContainsString('`_cursor` > ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` SAMPLE 0.5 WHERE `_cursor` > ? ORDER BY `_cursor` ASC', $result->query);
     }
 
     public function testCursorPrewhereBindingOrder(): void
@@ -4051,11 +3925,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $query = $result->query;
-        $this->assertStringContainsString('FINAL SAMPLE 0.1', $query);
-        $this->assertStringContainsString('PREWHERE', $query);
-        $this->assertStringContainsString('WHERE', $query);
-        $this->assertStringContainsString('`_cursor` > ?', $query);
-        $this->assertStringContainsString('LIMIT', $query);
+        $this->assertSame('SELECT * FROM `events` FINAL SAMPLE 0.1 PREWHERE `type` IN (?) WHERE `count` > ? AND `_cursor` > ? ORDER BY `_cursor` ASC LIMIT ?', $query);
     }
 
     public function testPageWithPrewhere(): void
@@ -4067,9 +3937,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('LIMIT ?', $result->query);
-        $this->assertStringContainsString('OFFSET ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` PREWHERE `type` IN (?) LIMIT ? OFFSET ?', $result->query);
         $this->assertSame(['click', 25, 25], $result->bindings);
     }
 
@@ -4082,9 +3950,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FINAL', $result->query);
-        $this->assertStringContainsString('LIMIT ?', $result->query);
-        $this->assertStringContainsString('OFFSET ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL LIMIT ? OFFSET ?', $result->query);
         $this->assertSame([10, 20], $result->bindings);
     }
 
@@ -4097,7 +3963,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
+        $this->assertSame('SELECT * FROM `events` SAMPLE 0.5 LIMIT ? OFFSET ?', $result->query);
         $this->assertSame([50, 0], $result->bindings);
     }
 
@@ -4112,10 +3978,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FINAL SAMPLE 0.1', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('LIMIT', $result->query);
-        $this->assertStringContainsString('OFFSET', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL SAMPLE 0.1 PREWHERE `type` IN (?) LIMIT ? OFFSET ?', $result->query);
     }
 
     public function testPageWithComplexClickHouseQuery(): void
@@ -4132,13 +3995,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $query = $result->query;
-        $this->assertStringContainsString('FINAL', $query);
-        $this->assertStringContainsString('SAMPLE', $query);
-        $this->assertStringContainsString('PREWHERE', $query);
-        $this->assertStringContainsString('WHERE', $query);
-        $this->assertStringContainsString('ORDER BY', $query);
-        $this->assertStringContainsString('LIMIT', $query);
-        $this->assertStringContainsString('OFFSET', $query);
+        $this->assertSame('SELECT * FROM `events` FINAL SAMPLE 0.1 PREWHERE `type` IN (?) WHERE `count` > ? ORDER BY `ts` DESC LIMIT ? OFFSET ?', $query);
     }
 
     public function testAllClickHouseMethodsReturnSameInstance(): void
@@ -4447,18 +4304,7 @@ class ClickHouseTest extends TestCase
         $query = $result->query;
 
         // All elements present
-        $this->assertStringContainsString('SELECT DISTINCT', $query);
-        $this->assertStringContainsString('FINAL', $query);
-        $this->assertStringContainsString('SAMPLE', $query);
-        $this->assertStringContainsString('JOIN', $query);
-        $this->assertStringContainsString('PREWHERE', $query);
-        $this->assertStringContainsString('WHERE', $query);
-        $this->assertStringContainsString('GROUP BY', $query);
-        $this->assertStringContainsString('HAVING', $query);
-        $this->assertStringContainsString('ORDER BY', $query);
-        $this->assertStringContainsString('LIMIT', $query);
-        $this->assertStringContainsString('OFFSET', $query);
-        $this->assertStringContainsString('UNION', $query);
+        $this->assertSame('(SELECT DISTINCT COUNT(*) AS `cnt`, `name` FROM `events` FINAL SAMPLE 0.1 JOIN `users` ON `events`.`uid` = `users`.`id` PREWHERE `type` IN (?) WHERE `count` > ? GROUP BY `name` HAVING COUNT(*) > ? ORDER BY `cnt` DESC LIMIT ? OFFSET ?) UNION (SELECT * FROM `archive`)', $query);
     }
 
     public function testQueriesMethodWithPrewhere(): void
@@ -4474,10 +4320,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
-        $this->assertStringContainsString('ORDER BY', $result->query);
-        $this->assertStringContainsString('LIMIT', $result->query);
+        $this->assertSame('SELECT * FROM `events` PREWHERE `type` IN (?) WHERE `status` IN (?) ORDER BY `ts` DESC LIMIT ?', $result->query);
     }
 
     public function testQueriesMethodWithFinal(): void
@@ -4492,8 +4335,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FINAL', $result->query);
-        $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL WHERE `status` IN (?) LIMIT ?', $result->query);
     }
 
     public function testQueriesMethodWithSample(): void
@@ -4507,8 +4349,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SAMPLE 0.5', $result->query);
-        $this->assertStringContainsString('WHERE', $result->query);
+        $this->assertSame('SELECT * FROM `events` SAMPLE 0.5 WHERE `status` IN (?)', $result->query);
     }
 
     public function testQueriesMethodWithAllClickHouseFeatures(): void
@@ -4526,10 +4367,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FINAL SAMPLE 0.1', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('WHERE', $result->query);
-        $this->assertStringContainsString('ORDER BY', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL SAMPLE 0.1 PREWHERE `type` IN (?) WHERE `status` IN (?) ORDER BY `ts` DESC LIMIT ?', $result->query);
     }
 
     public function testQueriesComparedToFluentApiSameSql(): void
@@ -4580,7 +4418,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertSame('SELECT * FROM `events` PREWHERE 1 = 0', $result->query);
     }
 
     public function testVeryLongTableNameWithFinalSample(): void
@@ -4628,9 +4466,7 @@ class ClickHouseTest extends TestCase
         $result2 = $builder->build();
 
         // ClickHouse state persists
-        $this->assertStringContainsString('FINAL', $result2->query);
-        $this->assertStringContainsString('SAMPLE', $result2->query);
-        $this->assertStringContainsString('PREWHERE', $result2->query);
+        $this->assertSame('SELECT * FROM `events` FINAL SAMPLE 0.1 PREWHERE `type` IN (?)', $result2->query);
 
         // Bindings are consistent
         $this->assertSame($result1->bindings, $result2->bindings);
@@ -4676,8 +4512,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $query = $result->query;
-        $this->assertStringContainsString('PREWHERE', $query);
-        $this->assertStringContainsString('WHERE', $query);
+        $this->assertSame('SELECT * FROM `events` PREWHERE `type` IN (?) WHERE `count` > ?', $query);
 
         $prewherePos = strpos($query, 'PREWHERE');
         $wherePos = strpos($query, 'WHERE');
@@ -4715,9 +4550,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $query = $result->query;
-        $this->assertStringContainsString('FROM `events` FINAL SAMPLE 0.1', $query);
-        $this->assertStringContainsString('JOIN `users`', $query);
-        $this->assertStringContainsString('LEFT JOIN `sessions`', $query);
+        $this->assertSame('SELECT * FROM `events` FINAL SAMPLE 0.1 JOIN `users` ON `events`.`uid` = `users`.`id` LEFT JOIN `sessions` ON `events`.`sid` = `sessions`.`id`', $query);
 
         // FINAL SAMPLE appears before JOINs
         $finalSamplePos = strpos($query, 'FINAL SAMPLE 0.1');
@@ -4849,7 +4682,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())->from('t')->sample(0.001)->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('SAMPLE 0.001', $result->query);
+        $this->assertSame('SELECT * FROM `t` SAMPLE 0.001', $result->query);
     }
 
     public function testCompileFilterStandalone(): void
@@ -4996,10 +4829,7 @@ class ClickHouseTest extends TestCase
             ->union($sub)
             ->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('UNION', $result->query);
-        $this->assertStringContainsString('FROM `archive` FINAL SAMPLE 0.5', $result->query);
+        $this->assertSame('(SELECT * FROM `events` FINAL PREWHERE `type` IN (?) WHERE `count` > ?) UNION (SELECT * FROM `archive` FINAL SAMPLE 0.5 WHERE `status` IN (?))', $result->query);
     }
 
     public function testUnionAllBothWithFinal(): void
@@ -5009,8 +4839,7 @@ class ClickHouseTest extends TestCase
             ->unionAll($sub)
             ->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('FROM `a` FINAL', $result->query);
-        $this->assertStringContainsString('UNION ALL (SELECT * FROM `b` FINAL)', $result->query);
+        $this->assertSame('(SELECT * FROM `a` FINAL) UNION ALL (SELECT * FROM `b` FINAL)', $result->query);
     }
 
     public function testPrewhereBindingOrderWithFilterAndHaving(): void
@@ -5094,8 +4923,7 @@ class ClickHouseTest extends TestCase
             ->rightJoin('users', 'events.uid', 'users.id')
             ->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('FROM `events` FINAL', $result->query);
-        $this->assertStringContainsString('RIGHT JOIN', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL RIGHT JOIN `users` ON `events`.`uid` = `users`.`id`', $result->query);
     }
 
     public function testCrossJoinWithPrewhereFeature(): void
@@ -5105,8 +4933,7 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('type', ['a'])])
             ->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('CROSS JOIN `colors`', $result->query);
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `events` CROSS JOIN `colors` PREWHERE `type` IN (?)', $result->query);
         $this->assertSame(['a'], $result->bindings);
     }
 
@@ -5116,7 +4943,7 @@ class ClickHouseTest extends TestCase
             ->join('other', 'a', 'b', '!=')
             ->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('JOIN `other` ON `a` != `b`', $result->query);
+        $this->assertSame('SELECT * FROM `t` JOIN `other` ON `a` != `b`', $result->query);
     }
 
     public function testConditionProviderInWhereNotPrewhere(): void
@@ -5138,7 +4965,7 @@ class ClickHouseTest extends TestCase
         $this->assertNotFalse($prewherePos);
         $this->assertNotFalse($wherePos);
         $this->assertGreaterThan($prewherePos, $wherePos);
-        $this->assertStringContainsString('WHERE _tenant = ?', $query);
+        $this->assertSame('SELECT * FROM `t` PREWHERE `type` IN (?) WHERE _tenant = ?', $query);
     }
 
     public function testConditionProviderWithNoFiltersClickHouse(): void
@@ -5189,8 +5016,7 @@ class ClickHouseTest extends TestCase
             ->sample(0.1)
             ->filter([Query::equal('type', ['click'])])
             ->toRawSql();
-        $this->assertStringContainsString('FROM `events` FINAL SAMPLE 0.1', $sql);
-        $this->assertStringContainsString("'click'", $sql);
+        $this->assertSame('SELECT * FROM `events` FINAL SAMPLE 0.1 WHERE `type` IN (\'click\')', $sql);
     }
 
     public function testToRawSqlWithPrewhereEdge(): void
@@ -5199,9 +5025,7 @@ class ClickHouseTest extends TestCase
             ->prewhere([Query::equal('type', ['click'])])
             ->filter([Query::greaterThan('count', 5)])
             ->toRawSql();
-        $this->assertStringContainsString('PREWHERE', $sql);
-        $this->assertStringContainsString("'click'", $sql);
-        $this->assertStringContainsString('5', $sql);
+        $this->assertSame('SELECT * FROM `events` PREWHERE `type` IN (\'click\') WHERE `count` > 5', $sql);
     }
 
     public function testToRawSqlWithUnionEdge(): void
@@ -5211,20 +5035,19 @@ class ClickHouseTest extends TestCase
             ->filter([Query::equal('y', [2])])
             ->union($sub)
             ->toRawSql();
-        $this->assertStringContainsString('FINAL', $sql);
-        $this->assertStringContainsString('UNION', $sql);
+        $this->assertSame('(SELECT * FROM `a` FINAL WHERE `y` IN (2)) UNION (SELECT * FROM `b` WHERE `x` IN (1))', $sql);
     }
 
     public function testToRawSqlWithBoolFalse(): void
     {
         $sql = (new Builder())->from('t')->filter([Query::equal('active', [false])])->toRawSql();
-        $this->assertStringContainsString('0', $sql);
+        $this->assertSame('SELECT * FROM `t` WHERE `active` IN (0)', $sql);
     }
 
     public function testToRawSqlWithNull(): void
     {
         $sql = (new Builder())->from('t')->filter([Query::raw('col = ?', [null])])->toRawSql();
-        $this->assertStringContainsString('NULL', $sql);
+        $this->assertSame('SELECT * FROM `t` WHERE col = NULL', $sql);
     }
 
     public function testToRawSqlMixedTypes(): void
@@ -5236,9 +5059,7 @@ class ClickHouseTest extends TestCase
                 Query::lessThan('score', 9.99),
             ])
             ->toRawSql();
-        $this->assertStringContainsString("'str'", $sql);
-        $this->assertStringContainsString('42', $sql);
-        $this->assertStringContainsString('9.99', $sql);
+        $this->assertSame('SELECT * FROM `t` WHERE `name` IN (\'str\') AND `age` > 42 AND `score` < 9.99', $sql);
     }
 
     public function testHavingMultipleSubQueries(): void
@@ -5252,7 +5073,7 @@ class ClickHouseTest extends TestCase
             ])
             ->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('HAVING COUNT(*) > ? AND COUNT(*) < ?', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `total` FROM `t` GROUP BY `status` HAVING COUNT(*) > ? AND COUNT(*) < ?', $result->query);
         $this->assertContains(5, $result->bindings);
         $this->assertContains(100, $result->bindings);
     }
@@ -5268,7 +5089,7 @@ class ClickHouseTest extends TestCase
             ])])
             ->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('HAVING (`total` > ? OR `total` < ?)', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `total` FROM `t` GROUP BY `status` HAVING (`total` > ? OR `total` < ?)', $result->query);
     }
 
     public function testResetClearsClickHouseProperties(): void
@@ -5320,9 +5141,9 @@ class ClickHouseTest extends TestCase
         $builder->reset()->from('other');
         $result = $builder->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('FROM `other`', $result->query);
+        $this->assertSame('SELECT * FROM `other` WHERE _tenant = ?', $result->query);
         $this->assertStringNotContainsString('FINAL', $result->query);
-        $this->assertStringContainsString('_tenant = ?', $result->query);
+        $this->assertSame('SELECT * FROM `other` WHERE _tenant = ?', $result->query);
     }
 
     public function testFinalSamplePrewhereFilterExactSql(): void
@@ -5548,7 +5369,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())->from('t')->cursorAfter('a')->cursorBefore('b')->sortAsc('_cursor')->build();
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('`_cursor` > ?', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `_cursor` > ? ORDER BY `_cursor` ASC', $result->query);
     }
 
     public function testDistinctWithUnion(): void
@@ -5807,7 +5628,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SETTINGS max_threads=4', $result->query);
+        $this->assertSame('SELECT * FROM `events` SETTINGS max_threads=4', $result->query);
     }
 
     public function testMultipleHints(): void
@@ -5819,7 +5640,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SETTINGS max_threads=4, max_memory_usage=1000000000', $result->query);
+        $this->assertSame('SELECT * FROM `events` SETTINGS max_threads=4, max_memory_usage=1000000000', $result->query);
     }
 
     public function testSettingsMethod(): void
@@ -5830,7 +5651,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SETTINGS max_threads=4, max_memory_usage=1000000000', $result->query);
+        $this->assertSame('SELECT * FROM `events` SETTINGS max_threads=4, max_memory_usage=1000000000', $result->query);
     }
 
     public function testImplementsWindows(): void
@@ -5846,7 +5667,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ROW_NUMBER() OVER (PARTITION BY `user_id` ORDER BY `timestamp` ASC) AS `rn`', $result->query);
+        $this->assertSame('SELECT ROW_NUMBER() OVER (PARTITION BY `user_id` ORDER BY `timestamp` ASC) AS `rn` FROM `events`', $result->query);
     }
 
     public function testDoesNotImplementSpatial(): void
@@ -5888,7 +5709,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE `status` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `t` PREWHERE `status` IN (?)', $result->query);
         $this->assertSame(['active'], $result->bindings);
     }
 
@@ -5903,7 +5724,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE `status` IN (?) AND `age` > ?', $result->query);
+        $this->assertSame('SELECT * FROM `t` PREWHERE `status` IN (?) AND `age` > ?', $result->query);
         $this->assertSame(['active', 18], $result->bindings);
     }
 
@@ -5965,7 +5786,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `t` FINAL', $result->query);
+        $this->assertSame('SELECT * FROM `t` FINAL', $result->query);
     }
 
     public function testFinalAppearsBeforeWhere(): void
@@ -5994,7 +5815,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `t` FINAL SAMPLE 0.5', $result->query);
+        $this->assertSame('SELECT * FROM `t` FINAL SAMPLE 0.5', $result->query);
     }
 
     public function testSampleFraction(): void
@@ -6005,7 +5826,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `t` SAMPLE 0.1', $result->query);
+        $this->assertSame('SELECT * FROM `t` SAMPLE 0.1', $result->query);
     }
 
     public function testSampleZeroThrows(): void
@@ -6081,8 +5902,7 @@ class ClickHouseTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`counter` = `counter` + 1', $result->query);
-        $this->assertStringContainsString('ALTER TABLE `t` UPDATE', $result->query);
+        $this->assertSame('ALTER TABLE `t` UPDATE `counter` = `counter` + 1 WHERE `id` IN (?)', $result->query);
     }
 
     public function testUpdateWithRawSetBindings(): void
@@ -6094,7 +5914,7 @@ class ClickHouseTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`name` = CONCAT(?, ?)', $result->query);
+        $this->assertSame('ALTER TABLE `t` UPDATE `name` = CONCAT(?, ?) WHERE `id` IN (?)', $result->query);
         $this->assertSame(['hello', ' world', 1], $result->bindings);
     }
 
@@ -6133,7 +5953,7 @@ class ClickHouseTest extends TestCase
             ->delete();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WHERE `status` IN (?) AND `age` < ?', $result->query);
+        $this->assertSame('ALTER TABLE `t` DELETE WHERE `status` IN (?) AND `age` < ?', $result->query);
         $this->assertSame(['old', 5], $result->bindings);
     }
 
@@ -6145,7 +5965,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('startsWith(`name`, ?)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE startsWith(`name`, ?)', $result->query);
         $this->assertSame(['foo'], $result->bindings);
     }
 
@@ -6157,7 +5977,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT startsWith(`name`, ?)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE NOT startsWith(`name`, ?)', $result->query);
         $this->assertSame(['foo'], $result->bindings);
     }
 
@@ -6169,7 +5989,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('endsWith(`name`, ?)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE endsWith(`name`, ?)', $result->query);
         $this->assertSame(['foo'], $result->bindings);
     }
 
@@ -6181,7 +6001,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT endsWith(`name`, ?)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE NOT endsWith(`name`, ?)', $result->query);
         $this->assertSame(['foo'], $result->bindings);
     }
 
@@ -6193,7 +6013,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('position(`name`, ?) > 0', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE position(`name`, ?) > 0', $result->query);
         $this->assertSame(['foo'], $result->bindings);
     }
 
@@ -6205,7 +6025,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('(position(`name`, ?) > 0 OR position(`name`, ?) > 0)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE (position(`name`, ?) > 0 OR position(`name`, ?) > 0)', $result->query);
         $this->assertSame(['foo', 'bar'], $result->bindings);
     }
 
@@ -6217,7 +6037,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('(position(`name`, ?) > 0 AND position(`name`, ?) > 0)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE (position(`name`, ?) > 0 AND position(`name`, ?) > 0)', $result->query);
         $this->assertSame(['foo', 'bar'], $result->bindings);
     }
 
@@ -6229,7 +6049,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('position(`name`, ?) = 0', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE position(`name`, ?) = 0', $result->query);
         $this->assertSame(['foo'], $result->bindings);
     }
 
@@ -6241,7 +6061,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('(position(`name`, ?) = 0 AND position(`name`, ?) = 0)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE (position(`name`, ?) = 0 AND position(`name`, ?) = 0)', $result->query);
         $this->assertSame(['a', 'b'], $result->bindings);
     }
 
@@ -6253,7 +6073,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('match(`name`, ?)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE match(`name`, ?)', $result->query);
         $this->assertSame(['^test'], $result->bindings);
     }
 
@@ -6275,7 +6095,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SETTINGS max_threads=4, enable_optimize_predicate_expression=1', $result->query);
+        $this->assertSame('SELECT * FROM `t` SETTINGS max_threads=4, enable_optimize_predicate_expression=1', $result->query);
     }
 
     public function testHintAndSettingsCombined(): void
@@ -6287,7 +6107,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SETTINGS max_threads=2, enable_optimize_predicate_expression=1', $result->query);
+        $this->assertSame('SELECT * FROM `t` SETTINGS max_threads=2, enable_optimize_predicate_expression=1', $result->query);
     }
 
     public function testHintsPreserveBindings(): void
@@ -6300,7 +6120,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertSame(['active'], $result->bindings);
-        $this->assertStringContainsString('SETTINGS max_threads=4', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `status` IN (?) SETTINGS max_threads=4', $result->query);
     }
 
     public function testHintsWithJoin(): void
@@ -6312,7 +6132,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SETTINGS max_threads=4', $result->query);
+        $this->assertSame('SELECT * FROM `t` JOIN `u` ON `t`.`uid` = `u`.`id` SETTINGS max_threads=4', $result->query);
         // SETTINGS must be at the very end
         $this->assertStringEndsWith('SETTINGS max_threads=4', $result->query);
     }
@@ -6348,7 +6168,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WITH RECURSIVE `tree` AS', $result->query);
+        $this->assertSame('WITH RECURSIVE `tree` AS (SELECT * FROM `categories` WHERE `parent_id` IN (?)) SELECT * FROM `tree`', $result->query);
     }
 
     public function testCTEBindingOrder(): void
@@ -6376,7 +6196,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ROW_NUMBER() OVER (PARTITION BY `user_id` ORDER BY `created_at` ASC) AS `rn`', $result->query);
+        $this->assertSame('SELECT ROW_NUMBER() OVER (PARTITION BY `user_id` ORDER BY `created_at` ASC) AS `rn` FROM `t`', $result->query);
     }
 
     public function testWindowFunctionOrderDescending(): void
@@ -6387,7 +6207,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ROW_NUMBER() OVER (PARTITION BY `user_id` ORDER BY `created_at` DESC) AS `rn`', $result->query);
+        $this->assertSame('SELECT ROW_NUMBER() OVER (PARTITION BY `user_id` ORDER BY `created_at` DESC) AS `rn` FROM `t`', $result->query);
     }
 
     public function testMultipleWindowFunctions(): void
@@ -6399,8 +6219,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ROW_NUMBER() OVER', $result->query);
-        $this->assertStringContainsString('SUM(`amount`) OVER', $result->query);
+        $this->assertSame('SELECT ROW_NUMBER() OVER (PARTITION BY `user_id` ORDER BY `created_at` ASC) AS `rn`, SUM(`amount`) OVER (PARTITION BY `user_id`) AS `total` FROM `t`', $result->query);
     }
 
     public function testSelectCaseExpression(): void
@@ -6416,7 +6235,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CASE WHEN `status` = ? THEN ? ELSE ? END AS `label`', $result->query);
+        $this->assertSame('SELECT CASE WHEN `status` = ? THEN ? ELSE ? END AS `label` FROM `t`', $result->query);
         $this->assertSame(['active', 'Active', 'Unknown'], $result->bindings);
     }
 
@@ -6433,8 +6252,7 @@ class ClickHouseTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ALTER TABLE `t` UPDATE', $result->query);
-        $this->assertStringContainsString('CASE WHEN `role` = ? THEN ? ELSE ? END', $result->query);
+        $this->assertSame('ALTER TABLE `t` UPDATE `label` = CASE WHEN `role` = ? THEN ? ELSE ? END WHERE `id` IN (?)', $result->query);
         $this->assertSame(['admin', 'Admin', 'User', 1], $result->bindings);
     }
 
@@ -6447,7 +6265,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('UNION', $result->query);
+        $this->assertSame('(SELECT * FROM `a`) UNION (SELECT * FROM `b`)', $result->query);
         $this->assertStringNotContainsString('UNION ALL', $result->query);
     }
 
@@ -6460,7 +6278,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('UNION ALL', $result->query);
+        $this->assertSame('(SELECT * FROM `a`) UNION ALL (SELECT * FROM `b`)', $result->query);
     }
 
     public function testUnionBindingsOrder(): void
@@ -6484,8 +6302,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LIMIT ?', $result->query);
-        $this->assertStringContainsString('OFFSET ?', $result->query);
+        $this->assertSame('SELECT * FROM `t` LIMIT ? OFFSET ?', $result->query);
         $this->assertSame([25, 25], $result->bindings);
     }
 
@@ -6498,7 +6315,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`_cursor` > ?', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `_cursor` > ? ORDER BY `_cursor` ASC', $result->query);
         $this->assertSame(['abc'], $result->bindings);
     }
 
@@ -6565,7 +6382,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         // ClickHouse forces all join filter conditions to WHERE placement
-        $this->assertStringContainsString('WHERE `active` = ?', $result->query);
+        $this->assertSame('SELECT * FROM `t` LEFT JOIN `u` ON `t`.`uid` = `u`.`id` WHERE `active` = ?', $result->query);
         $this->assertStringNotContainsString('ON `t`.`uid` = `u`.`id` AND', $result->query);
     }
 
@@ -6578,8 +6395,7 @@ class ClickHouseTest extends TestCase
             ->limit(10)
             ->toRawSql();
 
-        $this->assertStringContainsString('FROM `t` FINAL', $sql);
-        $this->assertStringContainsString("'active'", $sql);
+        $this->assertSame('SELECT * FROM `t` FINAL WHERE `status` IN (\'active\') LIMIT 10', $sql);
         $this->assertStringNotContainsString('?', $sql);
     }
 
@@ -6622,7 +6438,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('1 = 0', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE 1 = 0', $result->query);
     }
 
     public function testEqualWithNullOnly(): void
@@ -6633,7 +6449,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`x` IS NULL', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `x` IS NULL', $result->query);
     }
 
     public function testEqualWithNullAndValues(): void
@@ -6644,7 +6460,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('(`x` IN (?) OR `x` IS NULL)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE (`x` IN (?) OR `x` IS NULL)', $result->query);
         $this->assertContains(1, $result->bindings);
     }
 
@@ -6656,7 +6472,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`x` != ?', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `x` != ?', $result->query);
         $this->assertContains(42, $result->bindings);
     }
 
@@ -6668,7 +6484,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('(`age` > ? AND `age` < ?)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE (`age` > ? AND `age` < ?)', $result->query);
     }
 
     public function testOrFilter(): void
@@ -6679,7 +6495,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('(`role` IN (?) OR `role` IN (?))', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE (`role` IN (?) OR `role` IN (?))', $result->query);
     }
 
     public function testNestedAndInsideOr(): void
@@ -6693,7 +6509,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('((`age` > ? AND `age` < ?) OR (`score` > ? AND `score` < ?))', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE ((`age` > ? AND `age` < ?) OR (`score` > ? AND `score` < ?))', $result->query);
         $this->assertSame([18, 30, 80, 100], $result->bindings);
     }
 
@@ -6705,7 +6521,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`age` BETWEEN ? AND ?', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `age` BETWEEN ? AND ?', $result->query);
         $this->assertSame([18, 65], $result->bindings);
     }
 
@@ -6717,7 +6533,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`score` NOT BETWEEN ? AND ?', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `score` NOT BETWEEN ? AND ?', $result->query);
         $this->assertSame([0, 50], $result->bindings);
     }
 
@@ -6729,7 +6545,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('(`name` IS NOT NULL AND `email` IS NOT NULL)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE (`name` IS NOT NULL AND `email` IS NOT NULL)', $result->query);
     }
 
     public function testNotExistsSingle(): void
@@ -6740,7 +6556,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('(`name` IS NULL)', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE (`name` IS NULL)', $result->query);
     }
 
     public function testRawFilter(): void
@@ -6751,7 +6567,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('score > ?', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE score > ?', $result->query);
         $this->assertContains(10, $result->bindings);
     }
 
@@ -6763,7 +6579,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('1 = 1', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE 1 = 1', $result->query);
     }
 
     public function testDottedIdentifier(): void
@@ -6774,7 +6590,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`events`.`name`', $result->query);
+        $this->assertSame('SELECT `events`.`name` FROM `t`', $result->query);
     }
 
     public function testMultipleOrderBy(): void
@@ -6786,7 +6602,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY `name` ASC, `age` DESC', $result->query);
+        $this->assertSame('SELECT * FROM `t` ORDER BY `name` ASC, `age` DESC', $result->query);
     }
 
     public function testDistinctWithSelect(): void
@@ -6798,7 +6614,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SELECT DISTINCT `name`', $result->query);
+        $this->assertSame('SELECT DISTINCT `name` FROM `t`', $result->query);
     }
 
     public function testSumWithAlias(): void
@@ -6809,7 +6625,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SUM(`amount`) AS `total`', $result->query);
+        $this->assertSame('SELECT SUM(`amount`) AS `total` FROM `t`', $result->query);
     }
 
     public function testMultipleAggregates(): void
@@ -6821,8 +6637,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(*) AS `cnt`', $result->query);
-        $this->assertStringContainsString('SUM(`amount`) AS `total`', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt`, SUM(`amount`) AS `total` FROM `t`', $result->query);
     }
 
     public function testIsNullFilter(): void
@@ -6833,7 +6648,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`deleted_at` IS NULL', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `deleted_at` IS NULL', $result->query);
     }
 
     public function testIsNotNullFilter(): void
@@ -6844,7 +6659,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`name` IS NOT NULL', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `name` IS NOT NULL', $result->query);
     }
 
     public function testLessThan(): void
@@ -6855,7 +6670,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`age` < ?', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `age` < ?', $result->query);
         $this->assertSame([30], $result->bindings);
     }
 
@@ -6867,7 +6682,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`age` <= ?', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `age` <= ?', $result->query);
         $this->assertSame([30], $result->bindings);
     }
 
@@ -6879,7 +6694,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`score` > ?', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `score` > ?', $result->query);
         $this->assertSame([50], $result->bindings);
     }
 
@@ -6891,7 +6706,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`score` >= ?', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE `score` >= ?', $result->query);
         $this->assertSame([50], $result->bindings);
     }
 
@@ -6903,7 +6718,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('RIGHT JOIN `b` ON `a`.`id` = `b`.`a_id`', $result->query);
+        $this->assertSame('SELECT * FROM `a` RIGHT JOIN `b` ON `a`.`id` = `b`.`a_id`', $result->query);
     }
 
     public function testCrossJoin(): void
@@ -6914,7 +6729,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CROSS JOIN `b`', $result->query);
+        $this->assertSame('SELECT * FROM `a` CROSS JOIN `b`', $result->query);
         $this->assertStringNotContainsString(' ON ', $result->query);
     }
 
@@ -6950,7 +6765,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY rand()', $result->query);
+        $this->assertSame('SELECT * FROM `t` ORDER BY rand()', $result->query);
     }
 
     public function testTableAliasClickHouse(): void
@@ -6960,7 +6775,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `events` AS `e`', $result->query);
+        $this->assertSame('SELECT * FROM `events` AS `e`', $result->query);
     }
 
     public function testTableAliasWithFinal(): void
@@ -6971,7 +6786,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `events` FINAL AS `e`', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL AS `e`', $result->query);
     }
 
     public function testTableAliasWithSample(): void
@@ -6982,7 +6797,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `events` SAMPLE 0.1 AS `e`', $result->query);
+        $this->assertSame('SELECT * FROM `events` SAMPLE 0.1 AS `e`', $result->query);
     }
 
     public function testTableAliasWithFinalAndSample(): void
@@ -6994,7 +6809,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `events` FINAL SAMPLE 0.5 AS `e`', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL SAMPLE 0.5 AS `e`', $result->query);
     }
 
     public function testFromSubClickHouse(): void
@@ -7021,7 +6836,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`id` IN (SELECT `user_id` FROM `orders`)', $result->query);
+        $this->assertSame('SELECT * FROM `users` WHERE `id` IN (SELECT `user_id` FROM `orders`)', $result->query);
     }
 
     public function testOrderByRawClickHouse(): void
@@ -7032,7 +6847,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY toDate(`created_at`) ASC', $result->query);
+        $this->assertSame('SELECT * FROM `events` ORDER BY toDate(`created_at`) ASC', $result->query);
     }
 
     public function testGroupByRawClickHouse(): void
@@ -7044,7 +6859,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('GROUP BY toDate(`created_at`)', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` GROUP BY toDate(`created_at`)', $result->query);
     }
 
     public function testCountDistinctClickHouse(): void
@@ -7071,7 +6886,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN `users` ON `events`.`user_id` = `users`.`id`', $result->query);
+        $this->assertSame('SELECT * FROM `events` JOIN `users` ON `events`.`user_id` = `users`.`id`', $result->query);
     }
 
     public function testFilterExistsClickHouse(): void
@@ -7083,7 +6898,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('EXISTS (SELECT `id` FROM `orders`', $result->query);
+        $this->assertSame('SELECT * FROM `users` WHERE EXISTS (SELECT `id` FROM `orders` WHERE `orders`.`user_id` = `users`.`id`)', $result->query);
     }
 
     public function testExplainClickHouse(): void
@@ -7112,7 +6927,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CROSS JOIN `dates` AS `d`', $result->query);
+        $this->assertSame('SELECT * FROM `events` CROSS JOIN `dates` AS `d`', $result->query);
     }
 
     public function testWhereInSubqueryClickHouse(): void
@@ -7125,7 +6940,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`user_id` IN (SELECT `id` FROM `active_users`)', $result->query);
+        $this->assertSame('SELECT * FROM `events` WHERE `user_id` IN (SELECT `id` FROM `active_users`)', $result->query);
     }
 
     public function testWhereNotInSubqueryClickHouse(): void
@@ -7138,7 +6953,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`user_id` NOT IN (SELECT', $result->query);
+        $this->assertSame('SELECT * FROM `events` WHERE `user_id` NOT IN (SELECT `id` FROM `banned_users`)', $result->query);
     }
 
     public function testSelectSubClickHouse(): void
@@ -7151,7 +6966,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('(SELECT COUNT(*) FROM `events`) AS `event_count`', $result->query);
+        $this->assertSame('SELECT (SELECT COUNT(*) FROM `events`) AS `event_count` FROM `users`', $result->query);
     }
 
     public function testFromSubWithGroupByClickHouse(): void
@@ -7164,8 +6979,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM (SELECT `user_id` FROM `events`', $result->query);
-        $this->assertStringContainsString(') AS `sub`', $result->query);
+        $this->assertSame('SELECT `user_id` FROM (SELECT `user_id` FROM `events` GROUP BY `user_id`) AS `sub`', $result->query);
     }
 
     public function testFilterNotExistsClickHouse(): void
@@ -7178,7 +6992,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT EXISTS (SELECT', $result->query);
+        $this->assertSame('SELECT * FROM `users` WHERE NOT EXISTS (SELECT `id` FROM `banned`)', $result->query);
     }
 
     public function testHavingRawClickHouse(): void
@@ -7191,7 +7005,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` GROUP BY `user_id` HAVING COUNT(*) > ?', $result->query);
         $this->assertSame([10], $result->bindings);
     }
 
@@ -7203,7 +7017,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WHERE a = ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` WHERE a = ?', $result->query);
         $this->assertSame([1], $result->bindings);
     }
 
@@ -7216,8 +7030,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WHERE', $result->query);
-        $this->assertStringContainsString(' AND a = ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` WHERE `b` IN (?) AND a = ?', $result->query);
         $this->assertContains(1, $result->bindings);
         $this->assertContains(2, $result->bindings);
     }
@@ -7231,9 +7044,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FINAL', $result->query);
-        $this->assertStringContainsString('SAMPLE', $result->query);
-        $this->assertStringContainsString('AS `e`', $result->query);
+        $this->assertSame('SELECT * FROM `events` FINAL SAMPLE 0.5 AS `e`', $result->query);
     }
 
     public function testJoinWhereLeftJoinClickHouse(): void
@@ -7247,7 +7058,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LEFT JOIN `users` ON', $result->query);
+        $this->assertSame('SELECT * FROM `events` LEFT JOIN `users` ON `events`.`user_id` = `users`.`id` AND users.active = ?', $result->query);
         $this->assertSame([1], $result->bindings);
     }
 
@@ -7261,7 +7072,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN `users` AS `u`', $result->query);
+        $this->assertSame('SELECT * FROM `events` AS `e` JOIN `users` AS `u` ON `e`.`user_id` = `u`.`id`', $result->query);
     }
 
     public function testJoinWhereMultipleOnsClickHouse(): void
@@ -7275,10 +7086,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString(
-            'ON `events`.`user_id` = `users`.`id` AND `events`.`tenant_id` = `users`.`tenant_id`',
-            $result->query
-        );
+        $this->assertSame('SELECT * FROM `events` JOIN `users` ON `events`.`user_id` = `users`.`id` AND `events`.`tenant_id` = `users`.`tenant_id`', $result->query);
     }
 
     public function testExplainPreservesBindings(): void
@@ -7300,7 +7108,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(DISTINCT `user_id`)', $result->query);
+        $this->assertSame('SELECT COUNT(DISTINCT `user_id`) FROM `events`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -7316,8 +7124,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('IN (SELECT', $result->query);
-        $this->assertStringContainsString('NOT IN (SELECT', $result->query);
+        $this->assertSame('SELECT * FROM `events` WHERE `user_id` IN (SELECT `id` FROM `active_users`) AND `user_id` NOT IN (SELECT `id` FROM `banned_users`)', $result->query);
     }
 
     public function testPrewhereWithSubquery(): void
@@ -7331,8 +7138,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE', $result->query);
-        $this->assertStringContainsString('IN (SELECT', $result->query);
+        $this->assertSame('SELECT * FROM `events` PREWHERE `type` IN (?) WHERE `user_id` IN (SELECT `id` FROM `active_users`)', $result->query);
     }
 
     public function testSettingsStillAppear(): void
@@ -7344,8 +7150,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SETTINGS max_threads=4', $result->query);
-        $this->assertStringContainsString('ORDER BY `created_at` DESC', $result->query);
+        $this->assertSame('SELECT * FROM `events` ORDER BY `created_at` DESC SETTINGS max_threads=4', $result->query);
     }
 
     public function testExactSimpleSelect(): void
@@ -8308,7 +8113,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SETTINGS max_threads=4', $result->query);
+        $this->assertSame('SELECT * FROM `events` SETTINGS max_threads=4', $result->query);
     }
 
     public function testHintInvalidThrows(): void
@@ -8329,7 +8134,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SETTINGS max_threads=4, max_memory_usage=1000000', $result->query);
+        $this->assertSame('SELECT * FROM `events` SETTINGS max_threads=4, max_memory_usage=1000000', $result->query);
     }
 
     public function testSettingsInvalidKeyThrows(): void
@@ -8360,7 +8165,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SAMPLE 0.1', $result->query);
+        $this->assertSame('SELECT * FROM `events` SAMPLE 0.1', $result->query);
     }
 
     public function testCountWhenWithAlias(): void
@@ -8371,7 +8176,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('countIf(status = ?) AS `active_count`', $result->query);
+        $this->assertSame('SELECT countIf(status = ?) AS `active_count` FROM `events`', $result->query);
         $this->assertSame(['active'], $result->bindings);
     }
 
@@ -8383,7 +8188,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('countIf(status = ?)', $result->query);
+        $this->assertSame('SELECT countIf(status = ?) FROM `events`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -8395,7 +8200,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('sumIf(`amount`, status = ?) AS `active_total`', $result->query);
+        $this->assertSame('SELECT sumIf(`amount`, status = ?) AS `active_total` FROM `events`', $result->query);
     }
 
     public function testSumWhenWithoutAlias(): void
@@ -8417,7 +8222,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('avgIf(`amount`, status = ?) AS `avg_active`', $result->query);
+        $this->assertSame('SELECT avgIf(`amount`, status = ?) AS `avg_active` FROM `events`', $result->query);
     }
 
     public function testAvgWhenWithoutAlias(): void
@@ -8439,7 +8244,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('minIf(`amount`, status = ?) AS `min_active`', $result->query);
+        $this->assertSame('SELECT minIf(`amount`, status = ?) AS `min_active` FROM `events`', $result->query);
     }
 
     public function testMinWhenWithoutAlias(): void
@@ -8461,7 +8266,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('maxIf(`amount`, status = ?) AS `max_active`', $result->query);
+        $this->assertSame('SELECT maxIf(`amount`, status = ?) AS `max_active` FROM `events`', $result->query);
     }
 
     public function testMaxWhenWithoutAlias(): void
@@ -8483,7 +8288,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FULL OUTER JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $result->query);
+        $this->assertSame('SELECT * FROM `users` FULL OUTER JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $result->query);
     }
 
     public function testFullOuterJoinWithAlias(): void
@@ -8494,7 +8299,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FULL OUTER JOIN `orders` AS `o`', $result->query);
+        $this->assertSame('SELECT * FROM `users` FULL OUTER JOIN `orders` AS `o` ON `users`.`id` = `o`.`user_id`', $result->query);
     }
 
     public function testSampleValidationZeroThrows(): void
@@ -8534,7 +8339,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('position(`name`, ?) > 0', $result->query);
+        $this->assertSame('SELECT * FROM `events` WHERE position(`name`, ?) > 0', $result->query);
     }
 
     public function testResetClearsSettings(): void
@@ -8572,13 +8377,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WITH `filtered` AS', $result->query);
-        $this->assertStringContainsString('JOIN `users`', $result->query);
-        $this->assertStringContainsString('WHERE `users`.`status` IN (?)', $result->query);
-        $this->assertStringContainsString('GROUP BY `users`.`country`', $result->query);
-        $this->assertStringContainsString('HAVING SUM(`filtered`.`amount`) > ?', $result->query);
-        $this->assertStringContainsString('ORDER BY `total` DESC', $result->query);
-        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertSame('WITH `filtered` AS (SELECT `user_id`, `amount` FROM `raw_events` WHERE `amount` > ?) SELECT SUM(`filtered`.`amount`) AS `total` FROM `filtered` JOIN `users` ON `filtered`.`user_id` = `users`.`id` WHERE `users`.`status` IN (?) GROUP BY `users`.`country` HAVING SUM(`filtered`.`amount`) > ? ORDER BY `total` DESC LIMIT ?', $result->query);
     }
 
     public function testMultipleCTEsWithComplexQuery(): void
@@ -8604,9 +8403,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WITH `order_totals` AS', $result->query);
-        $this->assertStringContainsString('`active_customers` AS', $result->query);
-        $this->assertStringContainsString('JOIN `active_customers`', $result->query);
+        $this->assertSame('WITH `order_totals` AS (SELECT SUM(`total`) AS `order_total`, `customer_id` FROM `orders` GROUP BY `customer_id`), `active_customers` AS (SELECT `id`, `name` FROM `customers` WHERE `active` IN (?)) SELECT * FROM `order_totals` JOIN `active_customers` ON `order_totals`.`customer_id` = `active_customers`.`id` WHERE `order_total` > ? ORDER BY `order_total` DESC', $result->query);
     }
 
     public function testWindowFunctionWithJoinAndWhere(): void
@@ -8620,9 +8417,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ROW_NUMBER() OVER', $result->query);
-        $this->assertStringContainsString('JOIN `products`', $result->query);
-        $this->assertStringContainsString('WHERE `sales`.`amount` > ?', $result->query);
+        $this->assertSame('SELECT `products`.`name`, `sales`.`amount`, ROW_NUMBER() OVER (PARTITION BY `products`.`category` ORDER BY `sales`.`amount` ASC) AS `rn` FROM `sales` JOIN `products` ON `sales`.`product_id` = `products`.`id` WHERE `sales`.`amount` > ?', $result->query);
     }
 
     public function testWindowFunctionWithGroupBy(): void
@@ -8635,8 +8430,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SUM(amount) OVER', $result->query);
-        $this->assertStringContainsString('GROUP BY `category`, `date`', $result->query);
+        $this->assertSame('SELECT `category`, `date`, SUM(amount) OVER (PARTITION BY `category` ORDER BY `date` ASC) AS `running_total` FROM `sales` GROUP BY `category`, `date`', $result->query);
     }
 
     public function testMultipleWindowFunctionsInSameQuery(): void
@@ -8650,9 +8444,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ROW_NUMBER() OVER', $result->query);
-        $this->assertStringContainsString('RANK() OVER', $result->query);
-        $this->assertStringContainsString('SUM(salary) OVER', $result->query);
+        $this->assertSame('SELECT `name`, `department`, `salary`, ROW_NUMBER() OVER (PARTITION BY `department` ORDER BY `salary` ASC) AS `rn`, RANK() OVER (PARTITION BY `department` ORDER BY `salary` DESC) AS `rnk`, SUM(salary) OVER (PARTITION BY `department`) AS `dept_total` FROM `employees`', $result->query);
     }
 
     public function testNamedWindowDefinitionWithSelectWindow(): void
@@ -8666,8 +8458,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WINDOW `w` AS', $result->query);
-        $this->assertStringContainsString('OVER `w`', $result->query);
+        $this->assertSame('SELECT `category`, `date`, `amount`, SUM(amount) OVER `w` AS `running`, ROW_NUMBER() OVER `w` AS `rn` FROM `sales` WINDOW `w` AS (PARTITION BY `category` ORDER BY `date` ASC)', $result->query);
     }
 
     public function testJoinAggregateGroupByHaving(): void
@@ -8682,11 +8473,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN `customers`', $result->query);
-        $this->assertStringContainsString('COUNT(*) AS `order_count`', $result->query);
-        $this->assertStringContainsString('SUM(`orders`.`total`) AS `revenue`', $result->query);
-        $this->assertStringContainsString('GROUP BY `customers`.`country`', $result->query);
-        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `order_count`, SUM(`orders`.`total`) AS `revenue` FROM `orders` JOIN `customers` ON `orders`.`customer_id` = `customers`.`id` GROUP BY `customers`.`country` HAVING COUNT(*) > ?', $result->query);
     }
 
     public function testSelfJoinWithAlias(): void
@@ -8698,8 +8485,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `employees` AS `e`', $result->query);
-        $this->assertStringContainsString('LEFT JOIN `employees` AS `m`', $result->query);
+        $this->assertSame('SELECT `e`.`name`, `m`.`name` FROM `employees` AS `e` LEFT JOIN `employees` AS `m` ON `e`.`manager_id` = `m`.`id`', $result->query);
     }
 
     public function testTripleJoin(): void
@@ -8713,9 +8499,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN `customers`', $result->query);
-        $this->assertStringContainsString('JOIN `products`', $result->query);
-        $this->assertStringContainsString('LEFT JOIN `categories`', $result->query);
+        $this->assertSame('SELECT `customers`.`name`, `products`.`title`, `categories`.`label` FROM `orders` JOIN `customers` ON `orders`.`customer_id` = `customers`.`id` JOIN `products` ON `orders`.`product_id` = `products`.`id` LEFT JOIN `categories` ON `products`.`category_id` = `categories`.`id`', $result->query);
     }
 
     public function testUnionAllWithOrderLimit(): void
@@ -8734,9 +8518,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('UNION ALL', $result->query);
-        $this->assertStringContainsString('ORDER BY `ts` DESC', $result->query);
-        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertSame('(SELECT `id`, `name`, `ts` FROM `events` ORDER BY `ts` DESC LIMIT ?) UNION ALL (SELECT `id`, `name`, `ts` FROM `events_archive` WHERE `ts` > ?)', $result->query);
     }
 
     public function testMultipleUnionAlls(): void
@@ -8773,8 +8555,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SELECT', $result->query);
-        $this->assertStringContainsString('WHERE `active` IN (?)', $result->query);
+        $this->assertSame('SELECT (SELECT SUM(`total`) AS `customer_total`, `customer_id` FROM `orders` GROUP BY `customer_id`) AS `order_summary` FROM `customers` WHERE `active` IN (?)', $result->query);
     }
 
     public function testFromSubqueryWithFilter(): void
@@ -8792,9 +8573,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM (SELECT', $result->query);
-        $this->assertStringContainsString(') AS `user_events`', $result->query);
-        $this->assertStringContainsString('WHERE `event_count` > ?', $result->query);
+        $this->assertSame('SELECT * FROM (SELECT COUNT(*) AS `event_count`, `user_id` FROM `events` GROUP BY `user_id`) AS `user_events` WHERE `event_count` > ? ORDER BY `event_count` DESC', $result->query);
     }
 
     public function testFilterWhereInSubqueryWithOtherFilters(): void
@@ -8811,8 +8590,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`user_id` IN (SELECT', $result->query);
-        $this->assertStringContainsString('WHERE `total` > ?', $result->query);
+        $this->assertSame('SELECT * FROM `orders` WHERE `total` > ? AND `user_id` IN (SELECT `id` FROM `premium_users` WHERE `tier` IN (?))', $result->query);
     }
 
     public function testExistsSubqueryWithFilter(): void
@@ -8829,8 +8607,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('EXISTS (SELECT', $result->query);
-        $this->assertStringContainsString('`active` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `customers` WHERE `active` IN (?) AND EXISTS (SELECT * FROM `orders` WHERE orders.customer_id = customers.id AND `total` > ?)', $result->query);
     }
 
     public function testConditionalAggregatesCountIfGroupByHaving(): void
@@ -8844,10 +8621,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('countIf(status = ?) AS `completed_count`', $result->query);
-        $this->assertStringContainsString('countIf(status = ?) AS `pending_count`', $result->query);
-        $this->assertStringContainsString('GROUP BY `region`', $result->query);
-        $this->assertStringContainsString('HAVING `completed_count` > ?', $result->query);
+        $this->assertSame('SELECT countIf(status = ?) AS `completed_count`, countIf(status = ?) AS `pending_count` FROM `orders` GROUP BY `region` HAVING `completed_count` > ?', $result->query);
     }
 
     public function testSumIfWithGroupBy(): void
@@ -8860,8 +8634,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('sumIf(`amount`, type = ?) AS `credit_total`', $result->query);
-        $this->assertStringContainsString('sumIf(`amount`, type = ?) AS `debit_total`', $result->query);
+        $this->assertSame('SELECT sumIf(`amount`, type = ?) AS `credit_total`, sumIf(`amount`, type = ?) AS `debit_total` FROM `transactions` GROUP BY `account_id`', $result->query);
     }
 
     public function testTableSamplingWithWhereAndOrder(): void
@@ -8874,9 +8647,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SAMPLE 0.1', $result->query);
-        $this->assertStringContainsString('WHERE `type` IN (?)', $result->query);
-        $this->assertStringContainsString('ORDER BY `timestamp` DESC', $result->query);
+        $this->assertSame('SELECT * FROM `events` SAMPLE 0.1 WHERE `type` IN (?) ORDER BY `timestamp` DESC', $result->query);
     }
 
     public function testSettingsWithComplexQuery(): void
@@ -8892,9 +8663,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SETTINGS max_threads=4, max_memory_usage=1000000000', $result->query);
-        $this->assertStringContainsString('FINAL', $result->query);
-        $this->assertStringContainsString('JOIN `users`', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `total` FROM `events` FINAL JOIN `users` ON `events`.`uid` = `users`.`id` WHERE `count` > ? GROUP BY `users`.`country` SETTINGS max_threads=4, max_memory_usage=1000000000', $result->query);
     }
 
     public function testInsertSelectFromSubquery(): void
@@ -8910,9 +8679,7 @@ class ClickHouseTest extends TestCase
             ->insertSelect();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('INSERT INTO `users`', $result->query);
-        $this->assertStringContainsString('(`name`, `email`)', $result->query);
-        $this->assertStringContainsString('SELECT `name`, `email` FROM `staging`', $result->query);
+        $this->assertSame('INSERT INTO `users` (`name`, `email`) SELECT `name`, `email` FROM `staging` WHERE `imported` IN (?)', $result->query);
     }
 
     public function testCaseExpressionWithAggregate(): void
@@ -8931,8 +8698,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CASE WHEN `status` = ? THEN', $result->query);
-        $this->assertStringContainsString('COUNT(*) AS `total`', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `total`, CASE WHEN `status` = ? THEN ? WHEN `status` = ? THEN ? ELSE ? END AS `status_label` FROM `users` GROUP BY `status`', $result->query);
     }
 
     public function testExplainWithComplexQuery(): void
@@ -8948,7 +8714,7 @@ class ClickHouseTest extends TestCase
             ->explain();
 
         $this->assertStringStartsWith('EXPLAIN SELECT', $result->query);
-        $this->assertStringContainsString('FINAL', $result->query);
+        $this->assertSame('EXPLAIN SELECT COUNT(*) AS `total` FROM `events` FINAL JOIN `users` ON `events`.`uid` = `users`.`id` WHERE `count` > ? GROUP BY `users`.`country` HAVING COUNT(*) > ?', $result->query);
         $this->assertTrue($result->readOnly);
     }
 
@@ -8971,9 +8737,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('(`status` IN (?) AND `age` > ?)', $result->query);
-        $this->assertStringContainsString('(`score` < ? AND `role` != ?)', $result->query);
-        $this->assertStringContainsString(' OR ', $result->query);
+        $this->assertSame('SELECT * FROM `users` WHERE ((`status` IN (?) AND `age` > ?) OR (`score` < ? AND `role` != ?))', $result->query);
     }
 
     public function testTripleNestedLogicalOperators(): void
@@ -9010,9 +8774,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`deleted_at` IS NULL', $result->query);
-        $this->assertStringContainsString('`email` IS NOT NULL', $result->query);
-        $this->assertStringContainsString('`status` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `users` WHERE `deleted_at` IS NULL AND `email` IS NOT NULL AND `status` IN (?)', $result->query);
     }
 
     public function testBetweenAndNotEqualCombined(): void
@@ -9026,8 +8788,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`price` BETWEEN ? AND ?', $result->query);
-        $this->assertStringContainsString('`status` != ?', $result->query);
+        $this->assertSame('SELECT * FROM `products` WHERE `price` BETWEEN ? AND ? AND `status` != ?', $result->query);
         $this->assertSame([10, 100, 'discontinued'], $result->bindings);
     }
 
@@ -9057,8 +8818,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SELECT DISTINCT', $result->query);
-        $this->assertStringContainsString('COUNT(DISTINCT `user_id`)', $result->query);
+        $this->assertSame('SELECT DISTINCT COUNT(DISTINCT `user_id`) AS `unique_users` FROM `events`', $result->query);
     }
 
     public function testGroupByMultipleColumns(): void
@@ -9070,7 +8830,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('GROUP BY `region`, `category`, `year`', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `total` FROM `events` GROUP BY `region`, `category`, `year`', $result->query);
     }
 
     public function testEmptySelect(): void
@@ -9111,7 +8871,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($clonedResult);
 
         $this->assertStringNotContainsString('`count`', $originalResult->query);
-        $this->assertStringContainsString('`count` > ?', $clonedResult->query);
+        $this->assertSame('SELECT * FROM `events` WHERE `status` IN (?) AND `count` > ?', $clonedResult->query);
     }
 
     public function testResetAndRebuild(): void
@@ -9187,7 +8947,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('position(`message`, ?) > 0', $result->query);
+        $this->assertSame('SELECT * FROM `logs` WHERE position(`message`, ?) > 0', $result->query);
         $this->assertSame(["it's a test"], $result->bindings);
     }
 
@@ -9199,7 +8959,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('startsWith(`path`, ?)', $result->query);
+        $this->assertSame('SELECT * FROM `files` WHERE startsWith(`path`, ?)', $result->query);
         $this->assertSame(['/tmp/%test_'], $result->bindings);
     }
 
@@ -9242,7 +9002,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`email` IS NULL', $result->query);
+        $this->assertSame('SELECT * FROM `users` WHERE `email` IS NULL', $result->query);
         $this->assertSame([], $result->bindings);
     }
 
@@ -9259,7 +9019,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertTrue($callbackCalled);
-        $this->assertStringContainsString('`injected` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `events` WHERE `injected` IN (?)', $result->query);
     }
 
     public function testAfterBuildCallback(): void
@@ -9287,8 +9047,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FULL OUTER JOIN `right_table`', $result->query);
-        $this->assertStringContainsString('`left_table`.`id` IS NOT NULL', $result->query);
+        $this->assertSame('SELECT * FROM `left_table` FULL OUTER JOIN `right_table` ON `left_table`.`id` = `right_table`.`ref_id` WHERE `left_table`.`id` IS NOT NULL', $result->query);
     }
 
     public function testAvgIfWithAlias(): void
@@ -9299,7 +9058,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('avgIf(`amount`, region = ?) AS `avg_east`', $result->query);
+        $this->assertSame('SELECT avgIf(`amount`, region = ?) AS `avg_east` FROM `orders`', $result->query);
         $this->assertSame(['east'], $result->bindings);
     }
 
@@ -9311,7 +9070,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('minIf(`price`, category = ?) AS `min_electronics`', $result->query);
+        $this->assertSame('SELECT minIf(`price`, category = ?) AS `min_electronics` FROM `products`', $result->query);
     }
 
     public function testMaxIfWithAlias(): void
@@ -9322,7 +9081,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('maxIf(`price`, in_stock = ?) AS `max_available`', $result->query);
+        $this->assertSame('SELECT maxIf(`price`, in_stock = ?) AS `max_available` FROM `products`', $result->query);
     }
 
     public function testSampleValidationZeroBoundary(): void
@@ -9380,8 +9139,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringStartsWith('ALTER TABLE `events` UPDATE', $result->query);
-        $this->assertStringContainsString('`status` = ?', $result->query);
-        $this->assertStringContainsString('`updated_at` = ?', $result->query);
+        $this->assertSame('ALTER TABLE `events` UPDATE `status` = ?, `updated_at` = ? WHERE `status` IN (?)', $result->query);
     }
 
     public function testDeleteAlterTableWithMultipleFilters(): void
@@ -9396,8 +9154,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringStartsWith('ALTER TABLE `events` DELETE', $result->query);
-        $this->assertStringContainsString('`created_at` < ?', $result->query);
-        $this->assertStringContainsString('`archived` IN (?)', $result->query);
+        $this->assertSame('ALTER TABLE `events` DELETE WHERE `created_at` < ? AND `archived` IN (?)', $result->query);
     }
 
     public function testPrewhereWithSettings(): void
@@ -9410,9 +9167,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PREWHERE `type` IN (?)', $result->query);
-        $this->assertStringContainsString('WHERE `count` > ?', $result->query);
-        $this->assertStringContainsString('SETTINGS max_threads=2', $result->query);
+        $this->assertSame('SELECT * FROM `events` PREWHERE `type` IN (?) WHERE `count` > ? SETTINGS max_threads=2', $result->query);
     }
 
     public function testHintValidation(): void
@@ -9429,7 +9184,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('toDate(?) AS ref_date', $result->query);
+        $this->assertSame('SELECT toDate(?) AS ref_date FROM `events`', $result->query);
         $this->assertSame(['2024-01-01'], $result->bindings);
     }
 
@@ -9445,7 +9200,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`id` NOT IN (SELECT', $result->query);
+        $this->assertSame('SELECT * FROM `users` WHERE `id` NOT IN (SELECT `id` FROM `blocked_users`)', $result->query);
     }
 
     public function testImplementsLimitBy(): void
@@ -9503,7 +9258,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LIMIT ? BY `user_id`', $result->query);
+        $this->assertSame('SELECT `user_id`, `event_type` FROM `events` ORDER BY `timestamp` DESC LIMIT ? BY `user_id`', $result->query);
     }
 
     public function testLimitByMultipleColumns(): void
@@ -9515,7 +9270,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LIMIT ? BY `user_id`, `event_type`', $result->query);
+        $this->assertSame('SELECT * FROM `events` ORDER BY `timestamp` DESC LIMIT ? BY `user_id`, `event_type`', $result->query);
     }
 
     public function testLimitByWithLimit(): void
@@ -9528,7 +9283,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LIMIT ? BY `user_id` LIMIT ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` ORDER BY `timestamp` DESC LIMIT ? BY `user_id` LIMIT ?', $result->query);
         // LIMIT BY count binding should come before the final LIMIT binding
         $limitByIdx = \array_search(3, $result->bindings, true);
         $limitIdx = \array_search(100, $result->bindings, true);
@@ -9548,9 +9303,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LIMIT ? BY `user_id`', $result->query);
-        $this->assertStringContainsString('LIMIT ?', $result->query);
-        $this->assertStringContainsString('OFFSET ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` ORDER BY `timestamp` DESC LIMIT ? BY `user_id` LIMIT ? OFFSET ?', $result->query);
     }
 
     public function testLimitByWithOrderBy(): void
@@ -9562,8 +9315,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY `created_at` DESC', $result->query);
-        $this->assertStringContainsString('LIMIT ? BY `category`', $result->query);
+        $this->assertSame('SELECT * FROM `events` ORDER BY `created_at` DESC LIMIT ? BY `category`', $result->query);
         $orderPos = \strpos($result->query, 'ORDER BY');
         $limitByPos = \strpos($result->query, 'LIMIT ? BY');
         $this->assertLessThan($limitByPos, $orderPos);
@@ -9579,8 +9331,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
-        $this->assertStringContainsString('LIMIT ? BY `user_id`', $result->query);
+        $this->assertSame('SELECT * FROM `events` WHERE `status` IN (?) ORDER BY `timestamp` DESC LIMIT ? BY `user_id`', $result->query);
     }
 
     public function testLimitByWithSettings(): void
@@ -9592,8 +9343,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LIMIT ? BY `user_id`', $result->query);
-        $this->assertStringContainsString('SETTINGS max_threads=2', $result->query);
+        $this->assertSame('SELECT * FROM `events` LIMIT ? BY `user_id` SETTINGS max_threads=2', $result->query);
         $limitByPos = \strpos($result->query, 'LIMIT ? BY');
         $settingsPos = \strpos($result->query, 'SETTINGS');
         $this->assertLessThan($settingsPos, $limitByPos);
@@ -9628,7 +9378,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ARRAY JOIN `tags`', $result->query);
+        $this->assertSame('SELECT * FROM `events` ARRAY JOIN `tags`', $result->query);
     }
 
     public function testArrayJoinWithAlias(): void
@@ -9639,7 +9389,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
+        $this->assertSame('SELECT * FROM `events` ARRAY JOIN `tags` AS `tag`', $result->query);
     }
 
     public function testLeftArrayJoinBasic(): void
@@ -9650,7 +9400,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LEFT ARRAY JOIN `tags`', $result->query);
+        $this->assertSame('SELECT * FROM `events` LEFT ARRAY JOIN `tags`', $result->query);
     }
 
     public function testLeftArrayJoinWithAlias(): void
@@ -9661,7 +9411,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LEFT ARRAY JOIN `tags` AS `tag`', $result->query);
+        $this->assertSame('SELECT * FROM `events` LEFT ARRAY JOIN `tags` AS `tag`', $result->query);
     }
 
     public function testArrayJoinWithFilter(): void
@@ -9673,8 +9423,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
-        $this->assertStringContainsString('WHERE `tag` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `events` ARRAY JOIN `tags` AS `tag` WHERE `tag` IN (?)', $result->query);
         $arrayJoinPos = \strpos($result->query, 'ARRAY JOIN');
         $wherePos = \strpos($result->query, 'WHERE');
         $this->assertLessThan($wherePos, $arrayJoinPos);
@@ -9689,8 +9438,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
-        $this->assertStringContainsString('PREWHERE `status` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `events` ARRAY JOIN `tags` AS `tag` PREWHERE `status` IN (?)', $result->query);
         $arrayJoinPos = \strpos($result->query, 'ARRAY JOIN');
         $prewherePos = \strpos($result->query, 'PREWHERE');
         $this->assertLessThan($prewherePos, $arrayJoinPos);
@@ -9706,8 +9454,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
-        $this->assertStringContainsString('GROUP BY `tag`', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` ARRAY JOIN `tags` AS `tag` GROUP BY `tag`', $result->query);
     }
 
     public function testMultipleArrayJoins(): void
@@ -9719,8 +9466,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
-        $this->assertStringContainsString('LEFT ARRAY JOIN `metadata` AS `meta`', $result->query);
+        $this->assertSame('SELECT * FROM `events` ARRAY JOIN `tags` AS `tag` LEFT ARRAY JOIN `metadata` AS `meta`', $result->query);
     }
 
     public function testArrayJoinFluentChaining(): void
@@ -9759,7 +9505,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ASOF JOIN `quotes` ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`ts` >= `quotes`.`ts`', $result->query);
+        $this->assertSame('SELECT * FROM `trades` ASOF JOIN `quotes` ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`ts` >= `quotes`.`ts`', $result->query);
     }
 
     public function testAsofJoinWithAlias(): void
@@ -9777,7 +9523,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ASOF JOIN `quotes` AS `q` ON `trades`.`symbol` = `q`.`symbol` AND `trades`.`ts` >= `q`.`ts`', $result->query);
+        $this->assertSame('SELECT * FROM `trades` ASOF JOIN `quotes` AS `q` ON `trades`.`symbol` = `q`.`symbol` AND `trades`.`ts` >= `q`.`ts`', $result->query);
     }
 
     public function testAsofLeftJoinBasic(): void
@@ -9794,7 +9540,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ASOF LEFT JOIN `quotes` ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`ts` >= `quotes`.`ts`', $result->query);
+        $this->assertSame('SELECT * FROM `trades` ASOF LEFT JOIN `quotes` ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`ts` >= `quotes`.`ts`', $result->query);
     }
 
     public function testAsofLeftJoinWithAlias(): void
@@ -9812,7 +9558,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ASOF LEFT JOIN `quotes` AS `q` ON `trades`.`symbol` = `q`.`symbol` AND `trades`.`ts` >= `q`.`ts`', $result->query);
+        $this->assertSame('SELECT * FROM `trades` ASOF LEFT JOIN `quotes` AS `q` ON `trades`.`symbol` = `q`.`symbol` AND `trades`.`ts` >= `q`.`ts`', $result->query);
     }
 
     public function testAsofJoinWithFilter(): void
@@ -9830,8 +9576,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ASOF JOIN `quotes`', $result->query);
-        $this->assertStringContainsString('WHERE `trades`.`symbol` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `trades` ASOF JOIN `quotes` ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`ts` >= `quotes`.`ts` WHERE `trades`.`symbol` IN (?)', $result->query);
         $joinPos = \strpos($result->query, 'ASOF JOIN');
         $wherePos = \strpos($result->query, 'WHERE');
         $this->assertLessThan($wherePos, $joinPos);
@@ -9873,7 +9618,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY `date` ASC WITH FILL', $result->query);
+        $this->assertSame('SELECT * FROM `events` ORDER BY `date` ASC WITH FILL', $result->query);
     }
 
     public function testOrderWithFillDesc(): void
@@ -9884,7 +9629,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY `date` DESC WITH FILL', $result->query);
+        $this->assertSame('SELECT * FROM `events` ORDER BY `date` DESC WITH FILL', $result->query);
     }
 
     public function testOrderWithFillFrom(): void
@@ -9895,7 +9640,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY `value` ASC WITH FILL FROM ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` ORDER BY `value` ASC WITH FILL FROM ?', $result->query);
         $this->assertContains(0, $result->bindings);
     }
 
@@ -9907,7 +9652,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY `value` ASC WITH FILL FROM ? TO ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` ORDER BY `value` ASC WITH FILL FROM ? TO ?', $result->query);
         $this->assertContains(0, $result->bindings);
         $this->assertContains(100, $result->bindings);
     }
@@ -9920,7 +9665,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY `value` ASC WITH FILL FROM ? TO ? STEP ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` ORDER BY `value` ASC WITH FILL FROM ? TO ? STEP ?', $result->query);
         $this->assertSame([0, 100, 10], $result->bindings);
     }
 
@@ -9933,7 +9678,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY `date` ASC WITH FILL FROM ? TO ?, `count` DESC', $result->query);
+        $this->assertSame('SELECT * FROM `events` ORDER BY `date` ASC WITH FILL FROM ? TO ?, `count` DESC', $result->query);
     }
 
     public function testOrderWithFillFluentChaining(): void
@@ -9952,7 +9697,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('GROUP BY `event_type` WITH TOTALS', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` GROUP BY `event_type` WITH TOTALS', $result->query);
     }
 
     public function testWithRollupBasic(): void
@@ -9965,7 +9710,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('GROUP BY `year`, `month` WITH ROLLUP', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` GROUP BY `year`, `month` WITH ROLLUP', $result->query);
     }
 
     public function testWithCubeBasic(): void
@@ -9978,7 +9723,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('GROUP BY `city`, `category` WITH CUBE', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` GROUP BY `city`, `category` WITH CUBE', $result->query);
     }
 
     public function testWithTotalsWithHaving(): void
@@ -9992,7 +9737,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('GROUP BY `event_type` WITH TOTALS HAVING', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` GROUP BY `event_type` WITH TOTALS HAVING COUNT(*) > ?', $result->query);
         $groupByPos = \strpos($result->query, 'GROUP BY');
         $totalsPos = \strpos($result->query, 'WITH TOTALS');
         $havingPos = \strpos($result->query, 'HAVING');
@@ -10011,8 +9756,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WITH TOTALS', $result->query);
-        $this->assertStringContainsString('ORDER BY', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` GROUP BY `event_type` WITH TOTALS ORDER BY `cnt` DESC', $result->query);
         $totalsPos = \strpos($result->query, 'WITH TOTALS');
         $orderByPos = \strpos($result->query, 'ORDER BY');
         $this->assertLessThan($orderByPos, $totalsPos);
@@ -10060,9 +9804,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WITH TOTALS', $result->query);
-        $this->assertStringContainsString('LIMIT ? BY `user_id`', $result->query);
-        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` GROUP BY `event_type`, `user_id` WITH TOTALS ORDER BY `cnt` DESC LIMIT ? BY `user_id` LIMIT ?', $result->query);
     }
 
     public function testQuantileWithAlias(): void
@@ -10073,7 +9815,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('quantile(0.95)(`latency`) AS `p95`', $result->query);
+        $this->assertSame('SELECT quantile(0.95)(`latency`) AS `p95` FROM `events`', $result->query);
     }
 
     public function testQuantileWithoutAlias(): void
@@ -10084,7 +9826,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('quantile(0.5)(`latency`)', $result->query);
+        $this->assertSame('SELECT quantile(0.5)(`latency`) FROM `events`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -10096,7 +9838,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('quantileExact(0.99)(`response_time`) AS `p99_exact`', $result->query);
+        $this->assertSame('SELECT quantileExact(0.99)(`response_time`) AS `p99_exact` FROM `events`', $result->query);
     }
 
     public function testQuantileExactWithoutAlias(): void
@@ -10107,7 +9849,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('quantileExact(0.5)(`latency`)', $result->query);
+        $this->assertSame('SELECT quantileExact(0.5)(`latency`) FROM `events`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -10119,7 +9861,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('median(`latency`) AS `med`', $result->query);
+        $this->assertSame('SELECT median(`latency`) AS `med` FROM `events`', $result->query);
     }
 
     public function testMedianWithoutAlias(): void
@@ -10130,7 +9872,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('median(`latency`)', $result->query);
+        $this->assertSame('SELECT median(`latency`) FROM `events`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -10142,7 +9884,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('uniq(`user_id`) AS `unique_users`', $result->query);
+        $this->assertSame('SELECT uniq(`user_id`) AS `unique_users` FROM `events`', $result->query);
     }
 
     public function testUniqWithoutAlias(): void
@@ -10153,7 +9895,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('uniq(`user_id`)', $result->query);
+        $this->assertSame('SELECT uniq(`user_id`) FROM `events`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -10165,7 +9907,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('uniqExact(`user_id`) AS `exact_users`', $result->query);
+        $this->assertSame('SELECT uniqExact(`user_id`) AS `exact_users` FROM `events`', $result->query);
     }
 
     public function testUniqExactWithoutAlias(): void
@@ -10176,7 +9918,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('uniqExact(`user_id`)', $result->query);
+        $this->assertSame('SELECT uniqExact(`user_id`) FROM `events`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -10188,7 +9930,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('uniqCombined(`user_id`) AS `approx_users`', $result->query);
+        $this->assertSame('SELECT uniqCombined(`user_id`) AS `approx_users` FROM `events`', $result->query);
     }
 
     public function testUniqCombinedWithoutAlias(): void
@@ -10199,7 +9941,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('uniqCombined(`user_id`)', $result->query);
+        $this->assertSame('SELECT uniqCombined(`user_id`) FROM `events`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -10211,7 +9953,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('argMin(`url`, `timestamp`) AS `first_url`', $result->query);
+        $this->assertSame('SELECT argMin(`url`, `timestamp`) AS `first_url` FROM `events`', $result->query);
     }
 
     public function testArgMinWithoutAlias(): void
@@ -10222,7 +9964,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('argMin(`url`, `timestamp`)', $result->query);
+        $this->assertSame('SELECT argMin(`url`, `timestamp`) FROM `events`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -10234,7 +9976,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('argMax(`url`, `timestamp`) AS `last_url`', $result->query);
+        $this->assertSame('SELECT argMax(`url`, `timestamp`) AS `last_url` FROM `events`', $result->query);
     }
 
     public function testArgMaxWithoutAlias(): void
@@ -10245,7 +9987,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('argMax(`url`, `timestamp`)', $result->query);
+        $this->assertSame('SELECT argMax(`url`, `timestamp`) FROM `events`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -10257,7 +9999,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('topK(10)(`user_agent`) AS `top_agents`', $result->query);
+        $this->assertSame('SELECT topK(10)(`user_agent`) AS `top_agents` FROM `events`', $result->query);
     }
 
     public function testTopKWithoutAlias(): void
@@ -10268,7 +10010,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('topK(5)(`path`)', $result->query);
+        $this->assertSame('SELECT topK(5)(`path`) FROM `events`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -10280,7 +10022,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('topKWeighted(10)(`path`, `visits`) AS `top_paths`', $result->query);
+        $this->assertSame('SELECT topKWeighted(10)(`path`, `visits`) AS `top_paths` FROM `events`', $result->query);
     }
 
     public function testTopKWeightedWithoutAlias(): void
@@ -10291,7 +10033,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('topKWeighted(3)(`url`, `weight`)', $result->query);
+        $this->assertSame('SELECT topKWeighted(3)(`url`, `weight`) FROM `events`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -10303,7 +10045,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('any(`name`) AS `sample_name`', $result->query);
+        $this->assertSame('SELECT any(`name`) AS `sample_name` FROM `events`', $result->query);
     }
 
     public function testAnyValueWithoutAlias(): void
@@ -10314,7 +10056,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('any(`name`)', $result->query);
+        $this->assertSame('SELECT any(`name`) FROM `events`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -10326,7 +10068,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('anyLast(`name`) AS `last_name`', $result->query);
+        $this->assertSame('SELECT anyLast(`name`) AS `last_name` FROM `events`', $result->query);
     }
 
     public function testAnyLastValueWithoutAlias(): void
@@ -10337,7 +10079,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('anyLast(`name`)', $result->query);
+        $this->assertSame('SELECT anyLast(`name`) FROM `events`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -10350,7 +10092,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('groupUniqArray(`tag`) AS `unique_tags`', $result->query);
+        $this->assertSame('SELECT groupUniqArray(`tag`) AS `unique_tags` FROM `events` GROUP BY `user_id`', $result->query);
     }
 
     public function testGroupUniqArrayWithoutAlias(): void
@@ -10362,7 +10104,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('groupUniqArray(`tag`)', $result->query);
+        $this->assertSame('SELECT groupUniqArray(`tag`) FROM `events` GROUP BY `user_id`', $result->query);
     }
 
     public function testGroupArrayMovingAvgWithAlias(): void
@@ -10373,7 +10115,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('groupArrayMovingAvg(`value`) AS `moving_avg`', $result->query);
+        $this->assertSame('SELECT groupArrayMovingAvg(`value`) AS `moving_avg` FROM `events`', $result->query);
     }
 
     public function testGroupArrayMovingAvgWithoutAlias(): void
@@ -10384,7 +10126,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('groupArrayMovingAvg(`value`)', $result->query);
+        $this->assertSame('SELECT groupArrayMovingAvg(`value`) FROM `events`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -10396,7 +10138,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('groupArrayMovingSum(`value`) AS `running_total`', $result->query);
+        $this->assertSame('SELECT groupArrayMovingSum(`value`) AS `running_total` FROM `events`', $result->query);
     }
 
     public function testGroupArrayMovingSumWithoutAlias(): void
@@ -10407,7 +10149,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('groupArrayMovingSum(`value`)', $result->query);
+        $this->assertSame('SELECT groupArrayMovingSum(`value`) FROM `events`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -10420,8 +10162,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('quantile(0.95)(`latency`) AS `p95`', $result->query);
-        $this->assertStringContainsString('GROUP BY `endpoint`', $result->query);
+        $this->assertSame('SELECT quantile(0.95)(`latency`) AS `p95` FROM `events` GROUP BY `endpoint`', $result->query);
     }
 
     public function testMultipleAggregatesCombined(): void
@@ -10437,11 +10178,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('quantile(0.5)(`latency`) AS `p50`', $result->query);
-        $this->assertStringContainsString('quantile(0.95)(`latency`) AS `p95`', $result->query);
-        $this->assertStringContainsString('quantile(0.99)(`latency`) AS `p99`', $result->query);
-        $this->assertStringContainsString('uniq(`user_id`) AS `unique_users`', $result->query);
-        $this->assertStringContainsString('COUNT(*) AS `total`', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `total`, quantile(0.5)(`latency`) AS `p50`, quantile(0.95)(`latency`) AS `p95`, quantile(0.99)(`latency`) AS `p99`, uniq(`user_id`) AS `unique_users` FROM `requests` GROUP BY `endpoint`', $result->query);
     }
 
     public function testArgMinWithGroupBy(): void
@@ -10453,8 +10190,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('argMin(`url`, `timestamp`) AS `first_url`', $result->query);
-        $this->assertStringContainsString('GROUP BY `user_id`', $result->query);
+        $this->assertSame('SELECT argMin(`url`, `timestamp`) AS `first_url` FROM `events` GROUP BY `user_id`', $result->query);
     }
 
     public function testTopKWithFilter(): void
@@ -10466,8 +10202,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('topK(10)(`user_agent`) AS `top_agents`', $result->query);
-        $this->assertStringContainsString('WHERE `timestamp` > ?', $result->query);
+        $this->assertSame('SELECT topK(10)(`user_agent`) AS `top_agents` FROM `events` WHERE `timestamp` > ?', $result->query);
     }
 
     public function testClickHouseAggregateFluentChaining(): void
@@ -10511,18 +10246,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `events` FINAL SAMPLE 0.1', $result->query);
-        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
-        $this->assertStringContainsString('PREWHERE `event_type` IN (?)', $result->query);
-        $this->assertStringContainsString('WHERE `count` > ?', $result->query);
-        $this->assertStringContainsString('COUNT(*) AS `total`', $result->query);
-        $this->assertStringContainsString('quantile(0.95)(`latency`) AS `p95`', $result->query);
-        $this->assertStringContainsString('GROUP BY `tag`', $result->query);
-        $this->assertStringContainsString('WITH TOTALS', $result->query);
-        $this->assertStringContainsString('HAVING', $result->query);
-        $this->assertStringContainsString('ORDER BY `total` DESC', $result->query);
-        $this->assertStringContainsString('LIMIT ? BY `tag`', $result->query);
-        $this->assertStringContainsString('SETTINGS max_threads=4', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `total`, quantile(0.95)(`latency`) AS `p95` FROM `events` FINAL SAMPLE 0.1 ARRAY JOIN `tags` AS `tag` PREWHERE `event_type` IN (?) WHERE `count` > ? GROUP BY `tag` WITH TOTALS HAVING COUNT(*) > ? ORDER BY `total` DESC LIMIT ? BY `tag` LIMIT ? SETTINGS max_threads=4', $result->query);
     }
 
     public function testLimitByNoFinalLimit(): void
@@ -10534,7 +10258,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LIMIT ? BY `user_id`', $result->query);
+        $this->assertSame('SELECT * FROM `events` ORDER BY `timestamp` DESC LIMIT ? BY `user_id`', $result->query);
         $this->assertSame([5], $result->bindings);
     }
 
@@ -10547,8 +10271,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
-        $this->assertStringContainsString('ORDER BY `tag` ASC', $result->query);
+        $this->assertSame('SELECT * FROM `events` ARRAY JOIN `tags` AS `tag` ORDER BY `tag` ASC', $result->query);
         $arrayPos = \strpos($result->query, 'ARRAY JOIN');
         $orderPos = \strpos($result->query, 'ORDER BY');
         $this->assertLessThan($orderPos, $arrayPos);
@@ -10569,8 +10292,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ASOF JOIN `quotes`', $result->query);
-        $this->assertStringContainsString('PREWHERE', $result->query);
+        $this->assertSame('SELECT * FROM `trades` ASOF JOIN `quotes` ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`ts` >= `quotes`.`ts` PREWHERE `trades`.`exchange` IN (?)', $result->query);
     }
 
     public function testWithRollupWithOrderBy(): void
@@ -10584,8 +10306,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('GROUP BY `region`, `product` WITH ROLLUP', $result->query);
-        $this->assertStringContainsString('ORDER BY `total_amount` DESC', $result->query);
+        $this->assertSame('SELECT SUM(`amount`) AS `total_amount` FROM `sales` GROUP BY `region`, `product` WITH ROLLUP ORDER BY `total_amount` DESC', $result->query);
     }
 
     public function testWithCubeWithLimit(): void
@@ -10599,8 +10320,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('GROUP BY `region`, `product` WITH CUBE', $result->query);
-        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertSame('SELECT SUM(`amount`) AS `total` FROM `sales` GROUP BY `region`, `product` WITH CUBE LIMIT ?', $result->query);
     }
 
     public function testOrderWithFillWithLimitBy(): void
@@ -10612,8 +10332,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WITH FILL FROM ? TO ? STEP ?', $result->query);
-        $this->assertStringContainsString('LIMIT ? BY `metric_name`', $result->query);
+        $this->assertSame('SELECT * FROM `metrics` ORDER BY `date` ASC WITH FILL FROM ? TO ? STEP ? LIMIT ? BY `metric_name`', $result->query);
     }
 
     public function testGroupByModifierOverwrite(): void
@@ -10628,7 +10347,7 @@ class ClickHouseTest extends TestCase
         $result = $builder->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WITH ROLLUP', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` GROUP BY `type` WITH ROLLUP', $result->query);
         $this->assertStringNotContainsString('WITH TOTALS', $result->query);
     }
 
@@ -10657,7 +10376,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ARRAY JOIN `nested`.`tags` AS `tag`', $result->query);
+        $this->assertSame('SELECT * FROM `events` ARRAY JOIN `nested`.`tags` AS `tag`', $result->query);
     }
 
     public function testAsofJoinWithRegularJoin(): void
@@ -10675,8 +10394,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN `instruments`', $result->query);
-        $this->assertStringContainsString('ASOF JOIN `quotes`', $result->query);
+        $this->assertSame('SELECT * FROM `trades` JOIN `instruments` ON `trades`.`symbol` = `instruments`.`symbol` ASOF JOIN `quotes` ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`ts` >= `quotes`.`ts`', $result->query);
     }
 
     public function testWithTotalsNoHavingNoOrderBy(): void
@@ -10730,11 +10448,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('GROUP BY', $result->query);
-        $this->assertStringContainsString('HAVING', $result->query);
-        $this->assertStringContainsString('ORDER BY', $result->query);
-        $this->assertStringContainsString('LIMIT ? BY `user_id`', $result->query);
-        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` GROUP BY `user_id`, `event_type` HAVING COUNT(*) > ? ORDER BY `cnt` DESC LIMIT ? BY `user_id` LIMIT ?', $result->query);
     }
 
     public function testGroupConcatWithAlias(): void
@@ -10746,7 +10460,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('arrayStringConcat(groupArray(`name`), ?) AS `names`', $result->query);
+        $this->assertSame('SELECT arrayStringConcat(groupArray(`name`), ?) AS `names` FROM `events` GROUP BY `type`', $result->query);
     }
 
     public function testGroupConcatWithoutAlias(): void
@@ -10758,7 +10472,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('arrayStringConcat(groupArray(`name`), ?)', $result->query);
+        $this->assertSame('SELECT arrayStringConcat(groupArray(`name`), ?) FROM `events` GROUP BY `type`', $result->query);
         $this->assertSame([','], $result->bindings);
     }
 
@@ -10771,7 +10485,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('toJSONString(groupArray(`value`)) AS `values_json`', $result->query);
+        $this->assertSame('SELECT toJSONString(groupArray(`value`)) AS `values_json` FROM `events` GROUP BY `type`', $result->query);
     }
 
     public function testJsonObjectAggWithAlias(): void
@@ -10783,7 +10497,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('toJSONString(CAST((groupArray(`key`), groupArray(`value`)) AS Map(String, String))) AS `kv_json`', $result->query);
+        $this->assertSame('SELECT toJSONString(CAST((groupArray(`key`), groupArray(`value`)) AS Map(String, String))) AS `kv_json` FROM `events` GROUP BY `type`', $result->query);
     }
 
     public function testStddevWithAlias(): void
@@ -10794,7 +10508,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('stddevPop(`value`) AS `sd`', $result->query);
+        $this->assertSame('SELECT stddevPop(`value`) AS `sd` FROM `events`', $result->query);
         $this->assertStringNotContainsString('STDDEV(', $result->query);
     }
 
@@ -10806,7 +10520,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('STDDEV_POP(`value`) AS `sd_pop`', $result->query);
+        $this->assertSame('SELECT STDDEV_POP(`value`) AS `sd_pop` FROM `events`', $result->query);
     }
 
     public function testStddevSampWithAlias(): void
@@ -10817,7 +10531,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('STDDEV_SAMP(`value`) AS `sd_samp`', $result->query);
+        $this->assertSame('SELECT STDDEV_SAMP(`value`) AS `sd_samp` FROM `events`', $result->query);
     }
 
     public function testVarianceWithAlias(): void
@@ -10828,7 +10542,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('varPop(`value`) AS `var`', $result->query);
+        $this->assertSame('SELECT varPop(`value`) AS `var` FROM `events`', $result->query);
         $this->assertStringNotContainsString('VARIANCE(', $result->query);
     }
 
@@ -10840,7 +10554,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('VAR_POP(`value`) AS `vp`', $result->query);
+        $this->assertSame('SELECT VAR_POP(`value`) AS `vp` FROM `events`', $result->query);
     }
 
     public function testVarSampWithAlias(): void
@@ -10851,7 +10565,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('VAR_SAMP(`value`) AS `vs`', $result->query);
+        $this->assertSame('SELECT VAR_SAMP(`value`) AS `vs` FROM `events`', $result->query);
     }
 
     public function testBitAndWithAlias(): void
@@ -10862,7 +10576,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('BIT_AND(`flags`) AS `and_flags`', $result->query);
+        $this->assertSame('SELECT BIT_AND(`flags`) AS `and_flags` FROM `events`', $result->query);
     }
 
     public function testBitOrWithAlias(): void
@@ -10873,7 +10587,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('BIT_OR(`flags`) AS `or_flags`', $result->query);
+        $this->assertSame('SELECT BIT_OR(`flags`) AS `or_flags` FROM `events`', $result->query);
     }
 
     public function testBitXorWithAlias(): void
@@ -10884,7 +10598,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('BIT_XOR(`flags`) AS `xor_flags`', $result->query);
+        $this->assertSame('SELECT BIT_XOR(`flags`) AS `xor_flags` FROM `events`', $result->query);
     }
 
     public function testUniqWithGroupByAndFilter(): void
@@ -10897,9 +10611,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('uniq(`user_id`) AS `unique_users`', $result->query);
-        $this->assertStringContainsString('WHERE `timestamp` > ?', $result->query);
-        $this->assertStringContainsString('GROUP BY `event_type`', $result->query);
+        $this->assertSame('SELECT uniq(`user_id`) AS `unique_users` FROM `events` WHERE `timestamp` > ? GROUP BY `event_type`', $result->query);
     }
 
     public function testAnyValueWithGroupBy(): void
@@ -10912,8 +10624,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('any(`name`) AS `any_name`', $result->query);
-        $this->assertStringContainsString('COUNT(*) AS `cnt`', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt`, any(`name`) AS `any_name` FROM `events` GROUP BY `type`', $result->query);
     }
 
     public function testGroupUniqArrayWithFilter(): void
@@ -10926,8 +10637,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('groupUniqArray(`tag`) AS `unique_tags`', $result->query);
-        $this->assertStringContainsString('WHERE `status` IN (?)', $result->query);
+        $this->assertSame('SELECT groupUniqArray(`tag`) AS `unique_tags` FROM `events` WHERE `status` IN (?) GROUP BY `user_id`', $result->query);
     }
 
     public function testOrderWithFillToOnly(): void
@@ -10938,7 +10648,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY `value` ASC WITH FILL TO ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` ORDER BY `value` ASC WITH FILL TO ?', $result->query);
         $this->assertStringNotContainsString('FROM ?', $result->query);
         $this->assertSame([100], $result->bindings);
     }
@@ -10951,7 +10661,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY `value` ASC WITH FILL STEP ?', $result->query);
+        $this->assertSame('SELECT * FROM `events` ORDER BY `value` ASC WITH FILL STEP ?', $result->query);
         $this->assertStringNotContainsString('FROM ?', $result->query);
         $this->assertStringNotContainsString('TO ?', $result->query);
         $this->assertSame([5], $result->bindings);
@@ -10968,8 +10678,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WITH TOTALS', $result->query);
-        $this->assertStringContainsString('SETTINGS max_threads=2', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `events` GROUP BY `type` WITH TOTALS SETTINGS max_threads=2', $result->query);
         $totalsPos = \strpos($result->query, 'WITH TOTALS');
         $settingsPos = \strpos($result->query, 'SETTINGS');
         $this->assertLessThan($settingsPos, $totalsPos);
@@ -10984,8 +10693,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
-        $this->assertStringContainsString('SETTINGS max_threads=2', $result->query);
+        $this->assertSame('SELECT * FROM `events` ARRAY JOIN `tags` AS `tag` SETTINGS max_threads=2', $result->query);
     }
 
     public function testAsofJoinWithSettings(): void
@@ -11003,8 +10711,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ASOF JOIN', $result->query);
-        $this->assertStringContainsString('SETTINGS max_threads=2', $result->query);
+        $this->assertSame('SELECT * FROM `trades` ASOF JOIN `quotes` ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`ts` >= `quotes`.`ts` SETTINGS max_threads=2', $result->query);
     }
 
     public function testLimitByWithLimitAndSettings(): void
@@ -11017,8 +10724,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LIMIT ? BY `user_id`', $result->query);
-        $this->assertStringContainsString('SETTINGS max_threads=2', $result->query);
+        $this->assertSame('SELECT * FROM `events` LIMIT ? BY `user_id` LIMIT ? SETTINGS max_threads=2', $result->query);
     }
 
     public function testResetClearsAllNewState(): void
@@ -11053,8 +10759,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SELECT 1 + 1', $result->query);
-        $this->assertStringContainsString('FROM ``', $result->query);
+        $this->assertSame('SELECT 1 + 1 FROM ``', $result->query);
     }
 
     public function testSelectCastEmitsCastExpression(): void
@@ -11065,8 +10770,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CAST(`price` AS DECIMAL(10, 2))', $result->query);
-        $this->assertStringContainsString('`price_decimal`', $result->query);
+        $this->assertSame('SELECT CAST(`price` AS DECIMAL(10, 2)) AS `price_decimal` FROM `products`', $result->query);
     }
 
     public function testSelectCastRejectsInvalidType(): void
@@ -11232,11 +10936,7 @@ class ClickHouseTest extends TestCase
             10,
         ], $result->bindings);
 
-        $this->assertStringContainsString('`settings_table`', $result->query);
-        $this->assertStringContainsString('`settings_alias`', $result->query);
-        $this->assertStringContainsString('`array_join_col`', $result->query);
-        $this->assertStringContainsString('`limit_by_col`', $result->query);
-        $this->assertStringContainsString('`order_by_col`', $result->query);
+        $this->assertSame('SELECT `id`, `array_join_col`, `limit_by_col` FROM `settings_table` AS `settings_alias` WHERE `label` IN (?) AND `description` IN (?) AND `note` IN (?) ORDER BY `order_by_col` ASC LIMIT ?', $result->query);
 
         // Literals must not appear un-parameterised in the SQL.
         $this->assertStringNotContainsString('LIMIT 1 SETTINGS foo', $result->query);
@@ -11258,7 +10958,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`events`.`user_id` = `sessions`.`user_id`', $result->query);
+        $this->assertSame('SELECT * FROM `events` WHERE `events`.`user_id` = `sessions`.`user_id`', $result->query);
         $this->assertSame([], $result->bindings);
     }
 
@@ -11281,8 +10981,7 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WHERE', $result->query);
-        $this->assertStringContainsString(' AND `events`.`user_id` = `sessions`.`user_id`', $result->query);
+        $this->assertSame('SELECT * FROM `events` WHERE `status` IN (?) AND `events`.`user_id` = `sessions`.`user_id`', $result->query);
         $this->assertContains('active', $result->bindings);
     }
 

@@ -20,7 +20,7 @@ class BitwiseAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('BIT_AND(`flags`) AS `and_flags`', $result->query);
+        $this->assertSame('SELECT BIT_AND(`flags`) AS `and_flags` FROM `events`', $result->query);
     }
 
     public function testBitOrWithAliasEmitsBitOr(): void
@@ -31,7 +31,7 @@ class BitwiseAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('BIT_OR(`flags`) AS `or_flags`', $result->query);
+        $this->assertSame('SELECT BIT_OR(`flags`) AS `or_flags` FROM `events`', $result->query);
     }
 
     public function testBitXorWithAliasEmitsBitXor(): void
@@ -42,7 +42,7 @@ class BitwiseAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('BIT_XOR(`flags`) AS `xor_flags`', $result->query);
+        $this->assertSame('SELECT BIT_XOR(`flags`) AS `xor_flags` FROM `events`', $result->query);
     }
 
     public function testBitAndWithoutAliasOmitsAsClause(): void
@@ -53,7 +53,7 @@ class BitwiseAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('BIT_AND(`flags`)', $result->query);
+        $this->assertSame('SELECT BIT_AND(`flags`) FROM `events`', $result->query);
         $this->assertStringNotContainsString('AS ``', $result->query);
     }
 
@@ -65,7 +65,7 @@ class BitwiseAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('BIT_AND(`flags`) AS `a`', $result->query);
+        $this->assertSame('SELECT BIT_AND(`flags`) AS `a` FROM `events`', $result->query);
     }
 
     public function testBitwiseAggregateDoesNotAddBindings(): void

@@ -71,10 +71,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('INTEGER NOT NULL', $result->query);
-        $this->assertStringContainsString('REAL NOT NULL', $result->query);
-        $this->assertStringContainsString('TEXT NOT NULL', $result->query);
-        $this->assertStringContainsString('BLOB NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `test_types` (`int_col` INTEGER NOT NULL, `big_col` INTEGER NOT NULL, `float_col` REAL NOT NULL, `bool_col` INTEGER NOT NULL, `text_col` TEXT NOT NULL, `dt_col` TEXT NOT NULL, `ts_col` TEXT NOT NULL, `json_col` TEXT NOT NULL, `bin_col` BLOB NOT NULL, `status` TEXT NOT NULL)', $result->query);
     }
 
     public function testColumnTypeStringMapsToVarchar(): void
@@ -85,7 +82,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('VARCHAR(100) NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`name` VARCHAR(100) NOT NULL)', $result->query);
     }
 
     public function testColumnTypeBooleanMapsToInteger(): void
@@ -96,7 +93,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('INTEGER NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`active` INTEGER NOT NULL)', $result->query);
     }
 
     public function testColumnTypeDatetimeMapsToText(): void
@@ -107,7 +104,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('TEXT NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`created_at` TEXT NOT NULL)', $result->query);
     }
 
     public function testColumnTypeTimestampMapsToText(): void
@@ -118,7 +115,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('TEXT NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`updated_at` TEXT NOT NULL)', $result->query);
     }
 
     public function testColumnTypeJsonMapsToText(): void
@@ -129,7 +126,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('TEXT NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`data` TEXT NOT NULL)', $result->query);
     }
 
     public function testColumnTypeBinaryMapsToBlob(): void
@@ -140,7 +137,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('BLOB NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`content` BLOB NOT NULL)', $result->query);
     }
 
     public function testColumnTypeEnumMapsToText(): void
@@ -151,7 +148,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('TEXT NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`status` TEXT NOT NULL)', $result->query);
     }
 
     public function testColumnTypeSpatialMapsToText(): void
@@ -176,7 +173,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('VARCHAR(36) NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`uid` VARCHAR(36) NOT NULL)', $result->query);
     }
 
     public function testColumnTypeVectorThrowsUnsupported(): void
@@ -198,7 +195,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('AUTOINCREMENT', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`id` INTEGER AUTOINCREMENT NOT NULL, PRIMARY KEY (`id`))', $result->query);
         $this->assertStringNotContainsString('AUTO_INCREMENT', $result->query);
     }
 
@@ -285,8 +282,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NULL', $result->query);
-        $this->assertStringContainsString('DEFAULT', $result->query);
+        $this->assertSame('CREATE TABLE `posts` (`id` INTEGER AUTOINCREMENT NOT NULL, `bio` TEXT NULL, `active` INTEGER NOT NULL DEFAULT 1, `score` INTEGER NOT NULL DEFAULT 0, `status` VARCHAR(255) NOT NULL DEFAULT \'draft\', PRIMARY KEY (`id`))', $result->query);
     }
 
     public function testCreateTableWithForeignKey(): void
@@ -300,10 +296,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString(
-            'FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE SET NULL',
-            $result->query
-        );
+        $this->assertSame('CREATE TABLE `posts` (`id` INTEGER AUTOINCREMENT NOT NULL, PRIMARY KEY (`id`), FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE SET NULL)', $result->query);
     }
 
     public function testCreateTableWithIndexes(): void
@@ -318,8 +311,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('INDEX `idx_name_email` (`name`, `email`)', $result->query);
-        $this->assertStringContainsString('UNIQUE INDEX `uniq_email` (`email`)', $result->query);
+        $this->assertSame('CREATE TABLE `users` (`id` INTEGER AUTOINCREMENT NOT NULL, `name` VARCHAR(255) NOT NULL, `email` VARCHAR(255) NOT NULL, PRIMARY KEY (`id`), INDEX `idx_name_email` (`name`, `email`), UNIQUE INDEX `uniq_email` (`email`))', $result->query);
     }
 
     public function testDropTable(): void
@@ -348,7 +340,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ADD COLUMN `avatar_url` VARCHAR(255) NULL', $result->query);
+        $this->assertSame('ALTER TABLE `users` ADD COLUMN `avatar_url` VARCHAR(255) NULL', $result->query);
     }
 
     public function testAlterDropColumn(): void
@@ -526,7 +518,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PRIMARY KEY (`order_id`, `product_id`)', $result->query);
+        $this->assertSame('CREATE TABLE `order_items` (`order_id` INTEGER NOT NULL, `product_id` INTEGER NOT NULL, `quantity` INTEGER NOT NULL, PRIMARY KEY (`order_id`, `product_id`))', $result->query);
     }
 
     public function testCreateTableWithCompositePrimaryKey(): void
@@ -540,7 +532,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PRIMARY KEY (`order_id`, `product_id`)', $result->query);
+        $this->assertSame('CREATE TABLE `order_items` (`order_id` INTEGER NOT NULL, `product_id` INTEGER NOT NULL, `quantity` INTEGER NOT NULL, PRIMARY KEY (`order_id`, `product_id`))', $result->query);
     }
 
     public function testCreateTableRejectsMixedColumnAndTablePrimary(): void
@@ -565,7 +557,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('DEFAULT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`name` VARCHAR(255) NULL DEFAULT NULL)', $result->query);
     }
 
     public function testCreateTableWithNumericDefault(): void
@@ -576,7 +568,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('DEFAULT 0.5', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`score` REAL NOT NULL DEFAULT 0.5)', $result->query);
     }
 
     public function testCreateTableWithTimestamps(): void
@@ -588,8 +580,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`created_at`', $result->query);
-        $this->assertStringContainsString('`updated_at`', $result->query);
+        $this->assertSame('CREATE TABLE `posts` (`id` INTEGER AUTOINCREMENT NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, PRIMARY KEY (`id`))', $result->query);
     }
 
     public function testExactCreateTableWithColumnsAndIndexes(): void
@@ -677,7 +668,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('REAL NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`ratio` REAL NOT NULL)', $result->query);
     }
 
     public function testCreateIfNotExists(): void
@@ -701,9 +692,7 @@ class SQLiteTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ADD COLUMN', $result->query);
-        $this->assertStringContainsString('DROP COLUMN `age`', $result->query);
-        $this->assertStringContainsString('RENAME COLUMN `bio` TO `biography`', $result->query);
+        $this->assertSame('ALTER TABLE `users` ADD COLUMN `avatar` VARCHAR(255) NULL, RENAME COLUMN `bio` TO `biography`, DROP COLUMN `age`', $result->query);
     }
 
     public function testSerialColumnMapsToInteger(): void
@@ -713,7 +702,7 @@ class SQLiteTest extends TestCase
             $table->serial('id')->primary();
         });
 
-        $this->assertStringContainsString('`id` INTEGER', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`id` INTEGER AUTOINCREMENT NOT NULL, PRIMARY KEY (`id`))', $result->query);
     }
 
     public function testUserTypeColumnThrowsUnsupported(): void

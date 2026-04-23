@@ -19,7 +19,7 @@ class ApproximateAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('quantiles(0.25, 0.5, 0.75)(`value`)', $result->query);
+        $this->assertSame('SELECT quantiles(0.25, 0.5, 0.75)(`value`) FROM `events`', $result->query);
     }
 
     public function testQuantilesWithAlias(): void
@@ -30,7 +30,7 @@ class ApproximateAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('quantiles(0.25, 0.5, 0.75)(`value`) AS `qs`', $result->query);
+        $this->assertSame('SELECT quantiles(0.25, 0.5, 0.75)(`value`) AS `qs` FROM `events`', $result->query);
     }
 
     public function testQuantilesRejectsEmptyLevels(): void

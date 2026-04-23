@@ -118,7 +118,7 @@ class SQLiteTest extends TestCase
             ->upsert();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ON CONFLICT (`id`) DO UPDATE SET `count` = excluded.`count`', $result->query);
+        $this->assertSame('INSERT INTO `counters` (`id`, `count`) VALUES (?, ?) ON CONFLICT (`id`) DO UPDATE SET `count` = excluded.`count`', $result->query);
     }
 
     public function testInsertOrIgnore(): void
@@ -161,8 +161,7 @@ class SQLiteTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('json_group_array(value) FROM (SELECT value FROM json_each(IFNULL(`tags`, \'[]\')) UNION ALL SELECT value FROM json_each(?))', $result->query);
-        $this->assertStringContainsString('UPDATE `docs` SET', $result->query);
+        $this->assertSame('UPDATE `docs` SET `tags` = json_group_array(value) FROM (SELECT value FROM json_each(IFNULL(`tags`, \'[]\')) UNION ALL SELECT value FROM json_each(?)) WHERE `id` IN (?)', $result->query);
     }
 
     public function testSetJsonPrepend(): void
@@ -174,7 +173,7 @@ class SQLiteTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('json_group_array(value) FROM (SELECT value FROM json_each(?) UNION ALL SELECT value FROM json_each(IFNULL(`tags`, \'[]\')))', $result->query);
+        $this->assertSame('UPDATE `docs` SET `tags` = json_group_array(value) FROM (SELECT value FROM json_each(?) UNION ALL SELECT value FROM json_each(IFNULL(`tags`, \'[]\'))) WHERE `id` IN (?)', $result->query);
     }
 
     public function testSetJsonPrependOrderMatters(): void
@@ -186,7 +185,7 @@ class SQLiteTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('json_each(?) UNION ALL SELECT value FROM json_each(IFNULL(', $result->query);
+        $this->assertSame('UPDATE `t` SET `items` = json_group_array(value) FROM (SELECT value FROM json_each(?) UNION ALL SELECT value FROM json_each(IFNULL(`items`, \'[]\'))) WHERE `id` IN (?)', $result->query);
     }
 
     public function testSetJsonInsert(): void
@@ -198,7 +197,7 @@ class SQLiteTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("json_insert(`tags`, '\$[0]', json(?))", $result->query);
+        $this->assertSame('UPDATE `docs` SET `tags` = json_insert(`tags`, \'$[0]\', json(?)) WHERE `id` IN (?)', $result->query);
     }
 
     public function testSetJsonInsertWithIndex(): void
@@ -210,7 +209,7 @@ class SQLiteTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("json_insert(`items`, '\$[3]', json(?))", $result->query);
+        $this->assertSame('UPDATE `t` SET `items` = json_insert(`items`, \'$[3]\', json(?)) WHERE `id` IN (?)', $result->query);
     }
 
     public function testSetJsonRemove(): void
@@ -222,7 +221,7 @@ class SQLiteTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('json_group_array(value) FROM json_each(`tags`) WHERE value != json(?)', $result->query);
+        $this->assertSame('UPDATE `docs` SET `tags` = (SELECT json_group_array(value) FROM json_each(`tags`) WHERE value != json(?)) WHERE `id` IN (?)', $result->query);
     }
 
     public function testSetJsonIntersect(): void
@@ -234,8 +233,7 @@ class SQLiteTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('json_group_array(value) FROM json_each(IFNULL(`tags`, \'[]\')) WHERE value IN (SELECT value FROM json_each(?))', $result->query);
-        $this->assertStringContainsString('UPDATE `t` SET', $result->query);
+        $this->assertSame('UPDATE `t` SET `tags` = (SELECT json_group_array(value) FROM json_each(IFNULL(`tags`, \'[]\')) WHERE value IN (SELECT value FROM json_each(?))) WHERE `id` IN (?)', $result->query);
     }
 
     public function testSetJsonDiff(): void
@@ -247,7 +245,7 @@ class SQLiteTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('json_group_array(value) FROM json_each(IFNULL(`tags`, \'[]\')) WHERE value NOT IN (SELECT value FROM json_each(?))', $result->query);
+        $this->assertSame('UPDATE `t` SET `tags` = (SELECT json_group_array(value) FROM json_each(IFNULL(`tags`, \'[]\')) WHERE value NOT IN (SELECT value FROM json_each(?))) WHERE `id` IN (?)', $result->query);
         $this->assertContains(\json_encode(['x']), $result->bindings);
     }
 
@@ -260,7 +258,7 @@ class SQLiteTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('json_group_array(DISTINCT value) FROM json_each(IFNULL(`tags`, \'[]\'))', $result->query);
+        $this->assertSame('UPDATE `t` SET `tags` = (SELECT json_group_array(DISTINCT value) FROM json_each(IFNULL(`tags`, \'[]\'))) WHERE `id` IN (?)', $result->query);
     }
 
     public function testUpdateClearsJsonSets(): void
@@ -272,7 +270,7 @@ class SQLiteTest extends TestCase
 
         $result1 = $builder->update();
         $this->assertBindingCount($result1);
-        $this->assertStringContainsString('json_group_array', $result1->query);
+        $this->assertSame('UPDATE `t` SET `tags` = json_group_array(value) FROM (SELECT value FROM json_each(IFNULL(`tags`, \'[]\')) UNION ALL SELECT value FROM json_each(?)) WHERE `id` IN (?)', $result1->query);
 
         $builder->reset();
 
@@ -293,7 +291,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(CASE WHEN status = ? THEN 1 END) AS `active_count`', $result->query);
+        $this->assertSame('SELECT COUNT(CASE WHEN status = ? THEN 1 END) AS `active_count` FROM `orders`', $result->query);
         $this->assertSame(['active'], $result->bindings);
     }
 
@@ -305,7 +303,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(CASE WHEN status = ? THEN 1 END)', $result->query);
+        $this->assertSame('SELECT COUNT(CASE WHEN status = ? THEN 1 END) FROM `orders`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -317,7 +315,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SUM(CASE WHEN status = ? THEN `amount` END) AS `total_active`', $result->query);
+        $this->assertSame('SELECT SUM(CASE WHEN status = ? THEN `amount` END) AS `total_active` FROM `orders`', $result->query);
         $this->assertSame(['active'], $result->bindings);
     }
 
@@ -329,7 +327,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SUM(CASE WHEN status = ? THEN `amount` END)', $result->query);
+        $this->assertSame('SELECT SUM(CASE WHEN status = ? THEN `amount` END) FROM `orders`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -341,7 +339,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('AVG(CASE WHEN region = ? THEN `amount` END) AS `avg_east`', $result->query);
+        $this->assertSame('SELECT AVG(CASE WHEN region = ? THEN `amount` END) AS `avg_east` FROM `orders`', $result->query);
         $this->assertSame(['east'], $result->bindings);
     }
 
@@ -353,7 +351,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('AVG(CASE WHEN region = ? THEN `amount` END)', $result->query);
+        $this->assertSame('SELECT AVG(CASE WHEN region = ? THEN `amount` END) FROM `orders`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -365,7 +363,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('MIN(CASE WHEN category = ? THEN `price` END) AS `min_electronics`', $result->query);
+        $this->assertSame('SELECT MIN(CASE WHEN category = ? THEN `price` END) AS `min_electronics` FROM `products`', $result->query);
         $this->assertSame(['electronics'], $result->bindings);
     }
 
@@ -377,7 +375,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('MIN(CASE WHEN category = ? THEN `price` END)', $result->query);
+        $this->assertSame('SELECT MIN(CASE WHEN category = ? THEN `price` END) FROM `products`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -389,7 +387,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('MAX(CASE WHEN category = ? THEN `price` END) AS `max_electronics`', $result->query);
+        $this->assertSame('SELECT MAX(CASE WHEN category = ? THEN `price` END) AS `max_electronics` FROM `products`', $result->query);
         $this->assertSame(['electronics'], $result->bindings);
     }
 
@@ -401,7 +399,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('MAX(CASE WHEN category = ? THEN `price` END)', $result->query);
+        $this->assertSame('SELECT MAX(CASE WHEN category = ? THEN `price` END) FROM `products`', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -456,8 +454,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?))', $result->query);
-        $this->assertStringContainsString(' AND ', $result->query);
+        $this->assertSame('SELECT * FROM `docs` WHERE (EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?)) AND EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?)))', $result->query);
     }
 
     public function testFilterJsonNotContains(): void
@@ -468,7 +465,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT (EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?)))', $result->query);
+        $this->assertSame('SELECT * FROM `docs` WHERE NOT (EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?)))', $result->query);
     }
 
     public function testFilterJsonOverlaps(): void
@@ -479,8 +476,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?))', $result->query);
-        $this->assertStringContainsString(' OR ', $result->query);
+        $this->assertSame('SELECT * FROM `docs` WHERE (EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?)) OR EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?)))', $result->query);
     }
 
     public function testFilterJsonPathValid(): void
@@ -491,7 +487,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("json_extract(`data`, '$.age') >= ?", $result->query);
+        $this->assertSame('SELECT * FROM `users` WHERE json_extract(`data`, \'$.age\') >= ?', $result->query);
         $this->assertSame(21, $result->bindings[0]);
     }
 
@@ -539,7 +535,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?))', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE (EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?)))', $result->query);
     }
 
     public function testFilterJsonContainsMultipleItems(): void
@@ -552,7 +548,7 @@ class SQLiteTest extends TestCase
 
         $count = substr_count($result->query, 'EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?))');
         $this->assertSame(3, $count);
-        $this->assertStringContainsString(' AND ', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE (EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?)) AND EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?)) AND EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?)))', $result->query);
     }
 
     public function testFilterJsonOverlapsMultipleItems(): void
@@ -565,7 +561,7 @@ class SQLiteTest extends TestCase
 
         $count = substr_count($result->query, 'EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?))');
         $this->assertSame(3, $count);
-        $this->assertStringContainsString(' OR ', $result->query);
+        $this->assertSame('SELECT * FROM `t` WHERE (EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?)) OR EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?)) OR EXISTS (SELECT 1 FROM json_each(`tags`) WHERE json_each.value = json(?)))', $result->query);
     }
 
     public function testResetClearsJsonSets(): void
@@ -726,7 +722,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FOR UPDATE', $result->query);
+        $this->assertSame('SELECT * FROM `t` FOR UPDATE', $result->query);
     }
 
     public function testForShare(): void
@@ -737,7 +733,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FOR SHARE', $result->query);
+        $this->assertSame('SELECT * FROM `t` FOR SHARE', $result->query);
     }
 
     public function testSetJsonAppendBindingValues(): void
@@ -820,7 +816,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(CASE WHEN status = ? AND region = ? THEN 1 END) AS `combo`', $result->query);
+        $this->assertSame('SELECT COUNT(CASE WHEN status = ? AND region = ? THEN 1 END) AS `combo` FROM `orders`', $result->query);
         $this->assertSame(['active', 'east'], $result->bindings);
     }
 
@@ -1071,13 +1067,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WITH `filtered_orders` AS', $result->query);
-        $this->assertStringContainsString('JOIN `customers`', $result->query);
-        $this->assertStringContainsString('WHERE `customers`.`active` IN (?)', $result->query);
-        $this->assertStringContainsString('GROUP BY `customers`.`country`', $result->query);
-        $this->assertStringContainsString('HAVING SUM(`filtered_orders`.`amount`) > ?', $result->query);
-        $this->assertStringContainsString('ORDER BY `total` DESC', $result->query);
-        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertSame('WITH `filtered_orders` AS (SELECT `customer_id`, `amount` FROM `raw_orders` WHERE `amount` > ?) SELECT SUM(`filtered_orders`.`amount`) AS `total` FROM `filtered_orders` JOIN `customers` ON `filtered_orders`.`customer_id` = `customers`.`id` WHERE `customers`.`active` IN (?) GROUP BY `customers`.`country` HAVING SUM(`filtered_orders`.`amount`) > ? ORDER BY `total` DESC LIMIT ?', $result->query);
     }
 
     public function testRecursiveCteWithFilter(): void
@@ -1099,9 +1089,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WITH RECURSIVE `tree` AS', $result->query);
-        $this->assertStringContainsString('UNION ALL', $result->query);
-        $this->assertStringContainsString('WHERE `name` != ?', $result->query);
+        $this->assertSame('WITH RECURSIVE `tree` AS (SELECT `id`, `name`, `parent_id` FROM `categories` WHERE `parent_id` IS NULL UNION ALL SELECT `categories`.`id`, `categories`.`name`, `categories`.`parent_id` FROM `categories` JOIN `tree` ON `categories`.`parent_id` = `tree`.`id`) SELECT * FROM `tree` WHERE `name` != ?', $result->query);
     }
 
     public function testMultipleCTEs(): void
@@ -1125,8 +1113,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WITH `order_sums` AS', $result->query);
-        $this->assertStringContainsString('`active_customers` AS', $result->query);
+        $this->assertSame('WITH `order_sums` AS (SELECT SUM(`total`) AS `order_sum`, `customer_id` FROM `orders` GROUP BY `customer_id`), `active_customers` AS (SELECT `id`, `name` FROM `customers` WHERE `active` IN (?)) SELECT * FROM `order_sums` JOIN `active_customers` ON `order_sums`.`customer_id` = `active_customers`.`id`', $result->query);
     }
 
     public function testWindowFunctionWithJoin(): void
@@ -1139,8 +1126,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ROW_NUMBER() OVER', $result->query);
-        $this->assertStringContainsString('JOIN `products`', $result->query);
+        $this->assertSame('SELECT `products`.`name`, `sales`.`amount`, ROW_NUMBER() OVER (PARTITION BY `products`.`category` ORDER BY `sales`.`amount` ASC) AS `rn` FROM `sales` JOIN `products` ON `sales`.`product_id` = `products`.`id`', $result->query);
     }
 
     public function testWindowFunctionWithGroupBy(): void
@@ -1153,8 +1139,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SUM(amount) OVER', $result->query);
-        $this->assertStringContainsString('GROUP BY', $result->query);
+        $this->assertSame('SELECT `category`, `date`, SUM(amount) OVER (PARTITION BY `category` ORDER BY `date` ASC) AS `running` FROM `sales` GROUP BY `category`, `date`', $result->query);
     }
 
     public function testMultipleWindowFunctions(): void
@@ -1167,8 +1152,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ROW_NUMBER() OVER', $result->query);
-        $this->assertStringContainsString('RANK() OVER', $result->query);
+        $this->assertSame('SELECT `name`, `department`, `salary`, ROW_NUMBER() OVER (PARTITION BY `department` ORDER BY `salary` ASC) AS `rn`, RANK() OVER (PARTITION BY `department` ORDER BY `salary` DESC) AS `rnk` FROM `employees`', $result->query);
     }
 
     public function testNamedWindowDefinition(): void
@@ -1181,8 +1165,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WINDOW `w` AS', $result->query);
-        $this->assertStringContainsString('OVER `w`', $result->query);
+        $this->assertSame('SELECT `category`, `date`, `amount`, SUM(amount) OVER `w` AS `total` FROM `sales` WINDOW `w` AS (PARTITION BY `category` ORDER BY `date` ASC)', $result->query);
     }
 
     public function testJoinAggregateGroupByHaving(): void
@@ -1197,10 +1180,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN `customers`', $result->query);
-        $this->assertStringContainsString('COUNT(*) AS `cnt`', $result->query);
-        $this->assertStringContainsString('GROUP BY `customers`.`country`', $result->query);
-        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt`, SUM(`orders`.`total`) AS `revenue` FROM `orders` JOIN `customers` ON `orders`.`customer_id` = `customers`.`id` GROUP BY `customers`.`country` HAVING COUNT(*) > ?', $result->query);
     }
 
     public function testSelfJoin(): void
@@ -1212,8 +1192,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM `employees` AS `e`', $result->query);
-        $this->assertStringContainsString('LEFT JOIN `employees` AS `m`', $result->query);
+        $this->assertSame('SELECT `e`.`name`, `m`.`name` FROM `employees` AS `e` LEFT JOIN `employees` AS `m` ON `e`.`manager_id` = `m`.`id`', $result->query);
     }
 
     public function testTripleJoin(): void
@@ -1226,9 +1205,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN `customers`', $result->query);
-        $this->assertStringContainsString('JOIN `products`', $result->query);
-        $this->assertStringContainsString('LEFT JOIN `categories`', $result->query);
+        $this->assertSame('SELECT * FROM `orders` JOIN `customers` ON `orders`.`customer_id` = `customers`.`id` JOIN `products` ON `orders`.`product_id` = `products`.`id` LEFT JOIN `categories` ON `products`.`category_id` = `categories`.`id`', $result->query);
     }
 
     public function testLeftJoinWithInnerJoinCombined(): void
@@ -1241,8 +1218,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN `customers`', $result->query);
-        $this->assertStringContainsString('LEFT JOIN `discounts`', $result->query);
+        $this->assertSame('SELECT * FROM `orders` JOIN `customers` ON `orders`.`customer_id` = `customers`.`id` LEFT JOIN `discounts` ON `orders`.`discount_id` = `discounts`.`id` WHERE `customers`.`email` IS NOT NULL', $result->query);
     }
 
     public function testUnionAndUnionAllMixed(): void
@@ -1258,8 +1234,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('UNION SELECT', $result->query);
-        $this->assertStringContainsString('UNION ALL SELECT', $result->query);
+        $this->assertSame('SELECT * FROM `t1` WHERE `year` IN (?) UNION SELECT * FROM `t2` WHERE `year` IN (?) UNION ALL SELECT * FROM `t3` WHERE `year` IN (?)', $result->query);
         $this->assertStringNotContainsString('(SELECT', $result->query);
     }
 
@@ -1314,7 +1289,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WHERE `active` IN (?)', $result->query);
+        $this->assertSame('SELECT (SELECT SUM(`total`) AS `total_spent`, `customer_id` FROM `orders` GROUP BY `customer_id`) AS `spending` FROM `customers` WHERE `active` IN (?)', $result->query);
     }
 
     public function testFromSubqueryWithJoin(): void
@@ -1332,8 +1307,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM (SELECT', $result->query);
-        $this->assertStringContainsString('JOIN `users`', $result->query);
+        $this->assertSame('SELECT * FROM (SELECT COUNT(*) AS `event_count`, `user_id` FROM `events` GROUP BY `user_id`) AS `user_events` JOIN `users` ON `user_events`.`user_id` = `users`.`id` WHERE `event_count` > ?', $result->query);
     }
 
     public function testFilterWhereInSubquery(): void
@@ -1350,7 +1324,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`user_id` IN (SELECT', $result->query);
+        $this->assertSame('SELECT * FROM `orders` WHERE `total` > ? AND `user_id` IN (SELECT `id` FROM `premium_users` WHERE `tier` IN (?))', $result->query);
     }
 
     public function testExistsSubqueryWithFilter(): void
@@ -1367,8 +1341,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('EXISTS (SELECT', $result->query);
-        $this->assertStringContainsString('`active` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `customers` WHERE `active` IN (?) AND EXISTS (SELECT * FROM `orders` WHERE orders.customer_id = customers.id AND `total` > ?)', $result->query);
     }
 
     public function testInsertOrIgnoreVerifySyntax(): void
@@ -1380,7 +1353,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringStartsWith('INSERT OR IGNORE INTO', $result->query);
-        $this->assertStringContainsString('(`id`, `name`, `email`)', $result->query);
+        $this->assertSame('INSERT OR IGNORE INTO `users` (`id`, `name`, `email`) VALUES (?, ?, ?)', $result->query);
     }
 
     public function testUpsertConflictHandling(): void
@@ -1392,9 +1365,7 @@ class SQLiteTest extends TestCase
             ->upsert();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ON CONFLICT (`key`) DO UPDATE SET', $result->query);
-        $this->assertStringContainsString('`value` = excluded.`value`', $result->query);
-        $this->assertStringContainsString('`updated_at` = excluded.`updated_at`', $result->query);
+        $this->assertSame('INSERT INTO `settings` (`key`, `value`, `updated_at`) VALUES (?, ?, ?) ON CONFLICT (`key`) DO UPDATE SET `value` = excluded.`value`, `updated_at` = excluded.`updated_at`', $result->query);
     }
 
     public function testCaseExpressionWithWhere(): void
@@ -1412,8 +1383,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CASE WHEN', $result->query);
-        $this->assertStringContainsString('WHERE `age` > ?', $result->query);
+        $this->assertSame('SELECT CASE WHEN `status` = ? THEN ? WHEN `status` = ? THEN ? ELSE ? END AS `label` FROM `users` WHERE `age` > ?', $result->query);
     }
 
     public function testBeforeBuildCallback(): void
@@ -1429,7 +1399,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertTrue($callbackCalled);
-        $this->assertStringContainsString('`injected` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `users` WHERE `injected` IN (?)', $result->query);
     }
 
     public function testAfterBuildCallback(): void
@@ -1466,8 +1436,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringStartsWith('UPDATE `users` SET', $result->query);
-        $this->assertStringContainsString('`last_login` < ?', $result->query);
-        $this->assertStringContainsString('`role` IN (?)', $result->query);
+        $this->assertSame('UPDATE `users` SET `status` = ? WHERE (`last_login` < ? OR (`role` IN (?) AND `email_verified_at` IS NULL))', $result->query);
     }
 
     public function testDeleteWithSubqueryFilter(): void
@@ -1483,7 +1452,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringStartsWith('DELETE FROM `sessions`', $result->query);
-        $this->assertStringContainsString('`user_id` IN (SELECT', $result->query);
+        $this->assertSame('DELETE FROM `sessions` WHERE `user_id` IN (SELECT `user_id` FROM `blocked_ids`)', $result->query);
     }
 
     public function testNestedLogicalOperatorsDepth3(): void
@@ -1519,8 +1488,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`deleted_at` IS NULL', $result->query);
-        $this->assertStringContainsString('`status` IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM `users` WHERE `deleted_at` IS NULL AND `status` IN (?)', $result->query);
     }
 
     public function testBetweenAndGreaterThanCombined(): void
@@ -1534,8 +1502,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`price` BETWEEN ? AND ?', $result->query);
-        $this->assertStringContainsString('`stock` > ?', $result->query);
+        $this->assertSame('SELECT * FROM `products` WHERE `price` BETWEEN ? AND ? AND `stock` > ?', $result->query);
         $this->assertSame([10, 100, 0], $result->bindings);
     }
 
@@ -1550,7 +1517,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("LIKE ?", $result->query);
+        $this->assertSame('SELECT * FROM `files` WHERE `path` LIKE ? AND `name` LIKE ?', $result->query);
     }
 
     public function testDistinctWithAggregate(): void
@@ -1562,8 +1529,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SELECT DISTINCT', $result->query);
-        $this->assertStringContainsString('COUNT(DISTINCT `customer_id`)', $result->query);
+        $this->assertSame('SELECT DISTINCT COUNT(DISTINCT `customer_id`) AS `unique_customers` FROM `orders`', $result->query);
     }
 
     public function testMultipleOrderByColumns(): void
@@ -1644,7 +1610,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($clonedResult);
 
         $this->assertStringNotContainsString('`age`', $origResult->query);
-        $this->assertStringContainsString('`age` > ?', $clonedResult->query);
+        $this->assertSame('SELECT * FROM `users` WHERE `status` IN (?) AND `age` > ?', $clonedResult->query);
     }
 
     public function testResetAndRebuild(): void
@@ -1699,7 +1665,7 @@ class SQLiteTest extends TestCase
             ->insert();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('VALUES (?, ?), (?, ?), (?, ?)', $result->query);
+        $this->assertSame('INSERT INTO `events` (`name`, `value`) VALUES (?, ?), (?, ?), (?, ?)', $result->query);
     }
 
     public function testGroupByMultipleColumns(): void
@@ -1711,7 +1677,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('GROUP BY `region`, `category`, `year`', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS `cnt` FROM `orders` GROUP BY `region`, `category`, `year`', $result->query);
     }
 
     public function testExplainQuery(): void
@@ -1746,7 +1712,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`id` NOT IN (SELECT', $result->query);
+        $this->assertSame('SELECT * FROM `users` WHERE `id` NOT IN (SELECT `user_id` FROM `blocked`)', $result->query);
     }
 
     public function testInsertSelectFromSubquery(): void
@@ -1762,8 +1728,7 @@ class SQLiteTest extends TestCase
             ->insertSelect();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('INSERT INTO `users`', $result->query);
-        $this->assertStringContainsString('SELECT `name`, `email` FROM `staging`', $result->query);
+        $this->assertSame('INSERT INTO `users` (`name`, `email`) SELECT `name`, `email` FROM `staging` WHERE `imported` IN (?)', $result->query);
     }
 
     public function testLimitOneOffsetZero(): void
@@ -1787,7 +1752,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("strftime('%Y', created_at) AS year", $result->query);
+        $this->assertSame('SELECT strftime(\'%Y\', created_at) AS year FROM `users`', $result->query);
     }
 
     public function testCountWhenWithGroupBy(): void
@@ -1800,9 +1765,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(CASE WHEN status = ? THEN 1 END) AS `active_count`', $result->query);
-        $this->assertStringContainsString('COUNT(CASE WHEN status = ? THEN 1 END) AS `pending_count`', $result->query);
-        $this->assertStringContainsString('GROUP BY `region`', $result->query);
+        $this->assertSame('SELECT COUNT(CASE WHEN status = ? THEN 1 END) AS `active_count`, COUNT(CASE WHEN status = ? THEN 1 END) AS `pending_count` FROM `orders` GROUP BY `region`', $result->query);
     }
 
     public function testNotBetweenFilter(): void
@@ -1813,7 +1776,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`price` NOT BETWEEN ? AND ?', $result->query);
+        $this->assertSame('SELECT * FROM `products` WHERE `price` NOT BETWEEN ? AND ?', $result->query);
         $this->assertSame([10, 50], $result->bindings);
     }
 
@@ -1830,9 +1793,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`price` > ?', $result->query);
-        $this->assertStringContainsString('LIKE ?', $result->query);
-        $this->assertStringContainsString('`sku` IS NOT NULL', $result->query);
+        $this->assertSame('SELECT * FROM `products` WHERE `price` > ? AND `name` LIKE ? AND `description` LIKE ? AND `sku` IS NOT NULL', $result->query);
     }
 
     public function testFromNoneEmitsNoFromClause(): void
@@ -1844,7 +1805,7 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringNotContainsString('FROM', $result->query);
-        $this->assertStringContainsString('SELECT', $result->query);
+        $this->assertSame('SELECT 1 + 1', $result->query);
     }
 
     public function testSelectCastEmitsCastExpression(): void
@@ -1855,8 +1816,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CAST(`price` AS DECIMAL(10, 2))', $result->query);
-        $this->assertStringContainsString('`price_decimal`', $result->query);
+        $this->assertSame('SELECT CAST(`price` AS DECIMAL(10, 2)) AS `price_decimal` FROM `products`', $result->query);
     }
 
     public function testSelectCastRejectsInvalidType(): void
@@ -2003,7 +1963,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WHERE a = ?', $result->query);
+        $this->assertSame('SELECT * FROM `users` WHERE a = ?', $result->query);
         $this->assertSame([1], $result->bindings);
     }
 
@@ -2016,8 +1976,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WHERE', $result->query);
-        $this->assertStringContainsString(' AND a = ?', $result->query);
+        $this->assertSame('SELECT * FROM `users` WHERE `b` IN (?) AND a = ?', $result->query);
         $this->assertContains(1, $result->bindings);
         $this->assertContains(2, $result->bindings);
     }
@@ -2030,7 +1989,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`users`.`id` = `orders`.`user_id`', $result->query);
+        $this->assertSame('SELECT * FROM `users` WHERE `users`.`id` = `orders`.`user_id`', $result->query);
         $this->assertSame([], $result->bindings);
     }
 
@@ -2053,8 +2012,7 @@ class SQLiteTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WHERE', $result->query);
-        $this->assertStringContainsString(' AND `users`.`id` = `orders`.`user_id`', $result->query);
+        $this->assertSame('SELECT * FROM `users` WHERE `status` IN (?) AND `users`.`id` = `orders`.`user_id`', $result->query);
         $this->assertContains('active', $result->bindings);
     }
 

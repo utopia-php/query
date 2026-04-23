@@ -18,7 +18,7 @@ class DistinctOnTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('SELECT DISTINCT ON ("user_id")', $result->query);
+        $this->assertSame('SELECT DISTINCT ON ("user_id") * FROM "events"', $result->query);
     }
 
     public function testDistinctOnMultipleColumnsAreCommaSeparatedAndQuoted(): void
@@ -29,10 +29,7 @@ class DistinctOnTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString(
-            'SELECT DISTINCT ON ("user_id", "session_id")',
-            $result->query,
-        );
+        $this->assertSame('SELECT DISTINCT ON ("user_id", "session_id") * FROM "events"', $result->query);
     }
 
     public function testDistinctOnReplacesPlainSelectKeyword(): void
@@ -44,10 +41,7 @@ class DistinctOnTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString(
-            'SELECT DISTINCT ON ("user_id") "user_id", "event_at" FROM "events"',
-            $result->query,
-        );
+        $this->assertSame('SELECT DISTINCT ON ("user_id") "user_id", "event_at" FROM "events"', $result->query);
         // Only one SELECT keyword — the DISTINCT ON prefix must replace, not prepend.
         $this->assertSame(1, \substr_count($result->query, 'SELECT '));
     }
@@ -72,8 +66,7 @@ class DistinctOnTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('DISTINCT ON ("user_id")', $result->query);
-        $this->assertStringContainsString('ORDER BY', $result->query);
+        $this->assertSame('SELECT DISTINCT ON ("user_id") * FROM "events" ORDER BY "event_at" ASC', $result->query);
     }
 
     public function testDistinctOnDoesNotAddBindings(): void

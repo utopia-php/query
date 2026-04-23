@@ -20,7 +20,7 @@ class ReturningTest extends TestCase
             ->insert();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('RETURNING "id", "name"', $result->query);
+        $this->assertSame('INSERT INTO "users" ("name") VALUES (?) RETURNING "id", "name"', $result->query);
     }
 
     public function testReturningDefaultIsStarWildcard(): void
@@ -32,7 +32,7 @@ class ReturningTest extends TestCase
             ->insert();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('RETURNING *', $result->query);
+        $this->assertSame('INSERT INTO "users" ("name") VALUES (?) RETURNING *', $result->query);
     }
 
     public function testReturningEmptyArrayEmitsNoReturningClause(): void
@@ -59,7 +59,7 @@ class ReturningTest extends TestCase
             ->update();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('RETURNING "id"', $result->query);
+        $this->assertSame('UPDATE "users" SET "name" = ? WHERE "id" IN (?) RETURNING "id"', $result->query);
     }
 
     public function testDeleteReturningEmitsReturningClause(): void
@@ -71,7 +71,7 @@ class ReturningTest extends TestCase
             ->delete();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('RETURNING "id"', $result->query);
+        $this->assertSame('DELETE FROM "users" WHERE "id" IN (?) RETURNING "id"', $result->query);
     }
 
     public function testReturningBindingsUnchanged(): void

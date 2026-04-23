@@ -241,7 +241,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS "cnt" FROM "t" GROUP BY "status" HAVING COUNT(*) > ?', $result->query);
     }
 
     public function testDistinctWrapsWithDoubleQuotes(): void
@@ -372,8 +372,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WHERE raw_condition = 1', $result->query);
-        $this->assertStringContainsString('FROM "t"', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE raw_condition = 1', $result->query);
     }
 
     public function testInsertWrapsWithDoubleQuotes(): void
@@ -437,8 +436,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FOR UPDATE', $result->query);
-        $this->assertStringContainsString('FROM "t"', $result->query);
+        $this->assertSame('SELECT * FROM "t" FOR UPDATE', $result->query);
     }
     //  Spatial feature interface
 
@@ -455,7 +453,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ST_Distance(("coords"::geography), ST_SetSRID(ST_GeomFromText(?), 4326)::geography) < ?', $result->query);
+        $this->assertSame('SELECT * FROM "locations" WHERE ST_Distance(("coords"::geography), ST_SetSRID(ST_GeomFromText(?), 4326)::geography) < ?', $result->query);
         $this->assertSame('POINT(40.7128 -74.006)', $result->bindings[0]);
         $this->assertSame(5000.0, $result->bindings[1]);
     }
@@ -468,7 +466,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ST_Intersects("area", ST_GeomFromText(?, 4326))', $result->query);
+        $this->assertSame('SELECT * FROM "zones" WHERE ST_Intersects("area", ST_GeomFromText(?, 4326))', $result->query);
     }
 
     public function testFilterCovers(): void
@@ -479,7 +477,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ST_Covers("area", ST_GeomFromText(?, 4326))', $result->query);
+        $this->assertSame('SELECT * FROM "zones" WHERE ST_Covers("area", ST_GeomFromText(?, 4326))', $result->query);
     }
 
     public function testFilterCrosses(): void
@@ -490,7 +488,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ST_Crosses', $result->query);
+        $this->assertSame('SELECT * FROM "roads" WHERE ST_Crosses("path", ST_GeomFromText(?, 4326))', $result->query);
     }
     //  VectorSearch feature interface
 
@@ -508,7 +506,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("embedding" <=> ?::vector) ASC', $result->query);
+        $this->assertSame('SELECT * FROM "embeddings" ORDER BY ("embedding" <=> ?::vector) ASC LIMIT ?', $result->query);
         $this->assertSame('[0.1,0.2,0.3]', $result->bindings[0]);
     }
 
@@ -521,7 +519,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("embedding" <-> ?::vector) ASC', $result->query);
+        $this->assertSame('SELECT * FROM "embeddings" ORDER BY ("embedding" <-> ?::vector) ASC LIMIT ?', $result->query);
     }
 
     public function testOrderByVectorDistanceDot(): void
@@ -533,7 +531,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("embedding" <#> ?::vector) ASC', $result->query);
+        $this->assertSame('SELECT * FROM "embeddings" ORDER BY ("embedding" <#> ?::vector) ASC LIMIT ?', $result->query);
     }
 
     public function testVectorFilterCosine(): void
@@ -544,7 +542,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("embedding" <=> ?::vector)', $result->query);
+        $this->assertSame('SELECT * FROM "embeddings" WHERE ("embedding" <=> ?::vector)', $result->query);
     }
 
     public function testVectorFilterEuclidean(): void
@@ -555,7 +553,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("embedding" <-> ?::vector)', $result->query);
+        $this->assertSame('SELECT * FROM "embeddings" WHERE ("embedding" <-> ?::vector)', $result->query);
     }
 
     public function testVectorFilterDot(): void
@@ -566,7 +564,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("embedding" <#> ?::vector)', $result->query);
+        $this->assertSame('SELECT * FROM "embeddings" WHERE ("embedding" <#> ?::vector)', $result->query);
     }
     //  JSON feature interface
 
@@ -583,7 +581,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"tags" @> ?::jsonb', $result->query);
+        $this->assertSame('SELECT * FROM "docs" WHERE "tags" @> ?::jsonb', $result->query);
     }
 
     public function testFilterJsonNotContains(): void
@@ -594,7 +592,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT ("tags" @> ?::jsonb)', $result->query);
+        $this->assertSame('SELECT * FROM "docs" WHERE NOT ("tags" @> ?::jsonb)', $result->query);
     }
 
     public function testFilterJsonOverlaps(): void
@@ -605,7 +603,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"tags" @> ?::jsonb', $result->query);
+        $this->assertSame('SELECT * FROM "docs" WHERE ("tags" @> ?::jsonb OR "tags" @> ?::jsonb)', $result->query);
     }
 
     public function testFilterJsonPath(): void
@@ -616,7 +614,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"metadata\"->>'level' > ?", $result->query);
+        $this->assertSame('SELECT * FROM "users" WHERE "metadata"->>\'level\' > ?', $result->query);
         $this->assertSame(5, $result->bindings[0]);
     }
 
@@ -629,7 +627,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('|| ?::jsonb', $result->query);
+        $this->assertSame('UPDATE "docs" SET "tags" = COALESCE("tags", \'[]\'::jsonb) || ?::jsonb WHERE "id" IN (?)', $result->query);
     }
 
     public function testSetJsonPrepend(): void
@@ -641,7 +639,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('?::jsonb ||', $result->query);
+        $this->assertSame('UPDATE "docs" SET "tags" = ?::jsonb || COALESCE("tags", \'[]\'::jsonb) WHERE "id" IN (?)', $result->query);
     }
 
     public function testSetJsonInsert(): void
@@ -653,7 +651,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('jsonb_insert', $result->query);
+        $this->assertSame('UPDATE "docs" SET "tags" = jsonb_insert("tags", \'{0}\', ?::jsonb) WHERE "id" IN (?)', $result->query);
     }
 
     public function testSetJsonPath(): void
@@ -683,7 +681,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('jsonb_set("data", ?, to_jsonb(?::text)::jsonb, true)', $result->query);
+        $this->assertSame('UPDATE "docs" SET "data" = jsonb_set("data", ?, to_jsonb(?::text)::jsonb, true) WHERE "id" IN (?)', $result->query);
         $this->assertSame('{profile,name}', $result->bindings[0]);
         $this->assertSame('Alice', $result->bindings[1]);
     }
@@ -711,7 +709,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ROW_NUMBER() OVER (PARTITION BY "customer_id" ORDER BY "created_at" ASC) AS "rn"', $result->query);
+        $this->assertSame('SELECT ROW_NUMBER() OVER (PARTITION BY "customer_id" ORDER BY "created_at" ASC) AS "rn" FROM "orders"', $result->query);
     }
 
     public function testSelectWindowRankDesc(): void
@@ -722,7 +720,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('RANK() OVER (ORDER BY "score" DESC) AS "rank"', $result->query);
+        $this->assertSame('SELECT RANK() OVER (ORDER BY "score" DESC) AS "rank" FROM "scores"', $result->query);
     }
     //  CASE integration
 
@@ -740,7 +738,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CASE WHEN "status" = ? THEN ? ELSE ? END AS "label"', $result->query);
+        $this->assertSame('SELECT "id", CASE WHEN "status" = ? THEN ? ELSE ? END AS "label" FROM "users"', $result->query);
         $this->assertSame(['active', 'Active', 'Other'], $result->bindings);
     }
     //  Does NOT implement Hints
@@ -773,7 +771,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT ST_Intersects', $result->query);
+        $this->assertSame('SELECT * FROM "zones" WHERE NOT ST_Intersects("zone", ST_GeomFromText(?, 4326))', $result->query);
         $this->assertSame('POINT(1 2)', $result->bindings[0]);
     }
 
@@ -785,10 +783,10 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT ST_Crosses', $result->query);
+        $this->assertSame('SELECT * FROM "roads" WHERE NOT ST_Crosses("path", ST_GeomFromText(?, 4326))', $result->query);
         /** @var string $binding */
         $binding = $result->bindings[0];
-        $this->assertStringContainsString('LINESTRING', $binding);
+        $this->assertSame('LINESTRING(0 0, 1 1)', $binding);
     }
 
     public function testFilterOverlapsPolygon(): void
@@ -799,10 +797,10 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ST_Overlaps', $result->query);
+        $this->assertSame('SELECT * FROM "maps" WHERE ST_Overlaps("area", ST_GeomFromText(?, 4326))', $result->query);
         /** @var string $binding */
         $binding = $result->bindings[0];
-        $this->assertStringContainsString('POLYGON', $binding);
+        $this->assertSame('POLYGON((0 0, 1 0, 1 1, 0 0))', $binding);
     }
 
     public function testFilterNotOverlaps(): void
@@ -813,7 +811,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT ST_Overlaps', $result->query);
+        $this->assertSame('SELECT * FROM "maps" WHERE NOT ST_Overlaps("area", ST_GeomFromText(?, 4326))', $result->query);
     }
 
     public function testFilterTouches(): void
@@ -824,7 +822,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ST_Touches', $result->query);
+        $this->assertSame('SELECT * FROM "zones" WHERE ST_Touches("zone", ST_GeomFromText(?, 4326))', $result->query);
     }
 
     public function testFilterNotTouches(): void
@@ -835,7 +833,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT ST_Touches', $result->query);
+        $this->assertSame('SELECT * FROM "zones" WHERE NOT ST_Touches("zone", ST_GeomFromText(?, 4326))', $result->query);
     }
 
     public function testFilterCoversUsesSTCovers(): void
@@ -846,7 +844,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ST_Covers', $result->query);
+        $this->assertSame('SELECT * FROM "regions" WHERE ST_Covers("region", ST_GeomFromText(?, 4326))', $result->query);
         $this->assertStringNotContainsString('ST_Contains', $result->query);
     }
 
@@ -858,7 +856,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT ST_Covers', $result->query);
+        $this->assertSame('SELECT * FROM "regions" WHERE NOT ST_Covers("region", ST_GeomFromText(?, 4326))', $result->query);
     }
 
     public function testFilterSpatialEquals(): void
@@ -869,7 +867,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ST_Equals', $result->query);
+        $this->assertSame('SELECT * FROM "geoms" WHERE ST_Equals("geom", ST_GeomFromText(?, 4326))', $result->query);
     }
 
     public function testFilterNotSpatialEquals(): void
@@ -880,7 +878,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT ST_Equals', $result->query);
+        $this->assertSame('SELECT * FROM "geoms" WHERE NOT ST_Equals("geom", ST_GeomFromText(?, 4326))', $result->query);
     }
 
     public function testFilterDistanceGreaterThan(): void
@@ -891,7 +889,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('> ?', $result->query);
+        $this->assertSame('SELECT * FROM "locations" WHERE ST_Distance("loc", ST_GeomFromText(?, 4326)) > ?', $result->query);
         $this->assertSame('POINT(1 2)', $result->bindings[0]);
         $this->assertSame(500.0, $result->bindings[1]);
     }
@@ -904,7 +902,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ST_Distance("loc", ST_GeomFromText(?, 4326)) < ?', $result->query);
+        $this->assertSame('SELECT * FROM "locations" WHERE ST_Distance("loc", ST_GeomFromText(?, 4326)) < ?', $result->query);
         $this->assertSame('POINT(1 2)', $result->bindings[0]);
         $this->assertSame(50.0, $result->bindings[1]);
     }
@@ -918,7 +916,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY', $result->query);
+        $this->assertSame('SELECT * FROM "items" ORDER BY ("embedding" <=> ?::vector) ASC, "name" ASC', $result->query);
         $pos_vector = strpos($result->query, '<=>');
         $pos_name = strpos($result->query, '"name"');
         $this->assertNotFalse($pos_vector);
@@ -935,7 +933,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY', $result->query);
+        $this->assertSame('SELECT * FROM "items" ORDER BY ("emb" <=> ?::vector) ASC LIMIT ?', $result->query);
         $pos_order = strpos($result->query, 'ORDER BY');
         $pos_limit = strpos($result->query, 'LIMIT');
         $this->assertNotFalse($pos_order);
@@ -958,7 +956,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('<=>', $result->query);
+        $this->assertSame('SELECT * FROM "items" ORDER BY ("emb" <=> ?::vector) ASC', $result->query);
     }
 
     public function testVectorFilterCosineBindings(): void
@@ -969,7 +967,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("embedding" <=> ?::vector)', $result->query);
+        $this->assertSame('SELECT * FROM "embeddings" WHERE ("embedding" <=> ?::vector)', $result->query);
         $this->assertSame(json_encode([0.1, 0.2]), $result->bindings[0]);
     }
 
@@ -981,7 +979,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("embedding" <-> ?::vector)', $result->query);
+        $this->assertSame('SELECT * FROM "embeddings" WHERE ("embedding" <-> ?::vector)', $result->query);
         $this->assertSame(json_encode([0.1]), $result->bindings[0]);
     }
 
@@ -993,7 +991,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT ("meta" @> ?::jsonb)', $result->query);
+        $this->assertSame('SELECT * FROM "docs" WHERE NOT ("meta" @> ?::jsonb)', $result->query);
     }
 
     public function testFilterJsonOverlapsArray(): void
@@ -1004,7 +1002,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"tags" @> ?::jsonb', $result->query);
+        $this->assertSame('SELECT * FROM "docs" WHERE ("tags" @> ?::jsonb OR "tags" @> ?::jsonb)', $result->query);
     }
 
     public function testFilterJsonPathComparison(): void
@@ -1015,7 +1013,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"data\"->>'age' >= ?", $result->query);
+        $this->assertSame('SELECT * FROM "users" WHERE "data"->>\'age\' >= ?', $result->query);
         $this->assertSame(21, $result->bindings[0]);
     }
 
@@ -1027,7 +1025,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"meta\"->>'status' = ?", $result->query);
+        $this->assertSame('SELECT * FROM "users" WHERE "meta"->>\'status\' = ?', $result->query);
         $this->assertSame('active', $result->bindings[0]);
     }
 
@@ -1040,7 +1038,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"tags" - ?', $result->query);
+        $this->assertSame('UPDATE "docs" SET "tags" = "tags" - ? WHERE "id" IN (?)', $result->query);
         $this->assertContains(json_encode('old'), $result->bindings);
     }
 
@@ -1053,8 +1051,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('jsonb_agg(elem)', $result->query);
-        $this->assertStringContainsString('elem <@ ?::jsonb', $result->query);
+        $this->assertSame('UPDATE "docs" SET "tags" = (SELECT jsonb_agg(elem) FROM jsonb_array_elements("tags") AS elem WHERE elem <@ ?::jsonb) WHERE "id" IN (?)', $result->query);
     }
 
     public function testSetJsonDiff(): void
@@ -1066,7 +1063,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT elem <@ ?::jsonb', $result->query);
+        $this->assertSame('UPDATE "docs" SET "tags" = (SELECT COALESCE(jsonb_agg(elem), \'[]\'::jsonb) FROM jsonb_array_elements("tags") AS elem WHERE NOT elem <@ ?::jsonb) WHERE "id" IN (?)', $result->query);
     }
 
     public function testSetJsonUnique(): void
@@ -1078,7 +1075,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('jsonb_agg(DISTINCT elem)', $result->query);
+        $this->assertSame('UPDATE "docs" SET "tags" = (SELECT jsonb_agg(DISTINCT elem) FROM jsonb_array_elements("tags") AS elem) WHERE "id" IN (?)', $result->query);
     }
 
     public function testSetJsonAppendBindings(): void
@@ -1090,7 +1087,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('|| ?::jsonb', $result->query);
+        $this->assertSame('UPDATE "docs" SET "tags" = COALESCE("tags", \'[]\'::jsonb) || ?::jsonb WHERE "id" IN (?)', $result->query);
         $this->assertContains(json_encode(['new']), $result->bindings);
     }
 
@@ -1103,7 +1100,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('?::jsonb || COALESCE(', $result->query);
+        $this->assertSame('UPDATE "docs" SET "items" = ?::jsonb || COALESCE("items", \'[]\'::jsonb) WHERE "id" IN (?)', $result->query);
     }
 
     public function testMultipleCTEs(): void
@@ -1118,8 +1115,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WITH "a" AS (', $result->query);
-        $this->assertStringContainsString('), "b" AS (', $result->query);
+        $this->assertSame('WITH "a" AS (SELECT * FROM "x" WHERE "status" IN (?)), "b" AS (SELECT * FROM "y" WHERE "type" IN (?)) SELECT * FROM "a"', $result->query);
     }
 
     public function testCTEWithRecursive(): void
@@ -1132,7 +1128,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WITH RECURSIVE', $result->query);
+        $this->assertSame('WITH RECURSIVE "tree" AS (SELECT * FROM "categories") SELECT * FROM "tree"', $result->query);
     }
 
     public function testCTEBindingOrder(): void
@@ -1163,8 +1159,7 @@ class PostgreSQLTest extends TestCase
             ->fromSelect(['customer_id', 'total'], $source)
             ->insertSelect();
 
-        $this->assertStringContainsString('INSERT INTO "big_orders"', $result->query);
-        $this->assertStringContainsString('SELECT', $result->query);
+        $this->assertSame('INSERT INTO "big_orders" ("customer_id", "total") SELECT "customer_id", "total" FROM "orders" WHERE "total" > ?', $result->query);
         $this->assertContains(100, $result->bindings);
     }
 
@@ -1187,7 +1182,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('UNION ALL', $result->query);
+        $this->assertSame('(SELECT * FROM "a") UNION ALL (SELECT * FROM "b")', $result->query);
     }
 
     public function testIntersect(): void
@@ -1200,7 +1195,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('INTERSECT', $result->query);
+        $this->assertSame('(SELECT * FROM "a") INTERSECT (SELECT * FROM "b")', $result->query);
     }
 
     public function testExcept(): void
@@ -1213,7 +1208,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('EXCEPT', $result->query);
+        $this->assertSame('(SELECT * FROM "a") EXCEPT (SELECT * FROM "b")', $result->query);
     }
 
     public function testUnionWithBindingsOrder(): void
@@ -1239,8 +1234,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LIMIT ?', $result->query);
-        $this->assertStringContainsString('OFFSET ?', $result->query);
+        $this->assertSame('SELECT * FROM "items" LIMIT ? OFFSET ?', $result->query);
         $this->assertSame(10, $result->bindings[0]);
         $this->assertSame(20, $result->bindings[1]);
     }
@@ -1253,7 +1247,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('OFFSET ?', $result->query);
+        $this->assertSame('SELECT * FROM "items" OFFSET ?', $result->query);
         $this->assertSame([5], $result->bindings);
     }
 
@@ -1267,7 +1261,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('> ?', $result->query);
+        $this->assertSame('SELECT * FROM "items" WHERE "_cursor" > ? ORDER BY "id" ASC LIMIT ?', $result->query);
         $this->assertContains(5, $result->bindings);
         $this->assertContains(10, $result->bindings);
     }
@@ -1282,7 +1276,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('< ?', $result->query);
+        $this->assertSame('SELECT * FROM "items" WHERE "_cursor" < ? ORDER BY "id" ASC LIMIT ?', $result->query);
         $this->assertContains(5, $result->bindings);
     }
 
@@ -1294,7 +1288,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('OVER (PARTITION BY "dept")', $result->query);
+        $this->assertSame('SELECT SUM("salary") OVER (PARTITION BY "dept") AS "dept_total" FROM "employees"', $result->query);
     }
 
     public function testSelectWindowNoPartitionNoOrder(): void
@@ -1305,7 +1299,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('OVER ()', $result->query);
+        $this->assertSame('SELECT COUNT(*) OVER () AS "total" FROM "employees"', $result->query);
     }
 
     public function testMultipleWindowFunctions(): void
@@ -1317,8 +1311,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ROW_NUMBER()', $result->query);
-        $this->assertStringContainsString('RANK()', $result->query);
+        $this->assertSame('SELECT ROW_NUMBER() OVER (ORDER BY "id" ASC) AS "rn", RANK() OVER (ORDER BY "score" DESC) AS "rnk" FROM "scores"', $result->query);
     }
 
     public function testWindowFunctionWithDescOrder(): void
@@ -1329,7 +1322,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY "score" DESC', $result->query);
+        $this->assertSame('SELECT RANK() OVER (ORDER BY "score" DESC) AS "rnk" FROM "scores"', $result->query);
     }
 
     public function testCaseMultipleWhens(): void
@@ -1346,7 +1339,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WHEN "status" = ? THEN ?', $result->query);
+        $this->assertSame('SELECT CASE WHEN "status" = ? THEN ? WHEN "status" = ? THEN ? WHEN "status" = ? THEN ? END AS "label" FROM "tickets"', $result->query);
         $this->assertSame(['active', 'Active', 'pending', 'Pending', 'closed', 'Closed'], $result->bindings);
     }
 
@@ -1362,7 +1355,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CASE WHEN "active" = ? THEN ? END AS "lbl"', $result->query);
+        $this->assertSame('SELECT CASE WHEN "active" = ? THEN ? END AS "lbl" FROM "users"', $result->query);
         $this->assertStringNotContainsString('ELSE', $result->query);
     }
 
@@ -1379,8 +1372,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('UPDATE "users" SET', $result->query);
-        $this->assertStringContainsString('CASE WHEN "age" >= ? THEN ? ELSE ? END', $result->query);
+        $this->assertSame('UPDATE "users" SET "category" = CASE WHEN "age" >= ? THEN ? ELSE ? END WHERE "id" IN (?)', $result->query);
         $this->assertSame([18, 'adult', 'minor', 1], $result->bindings);
     }
 
@@ -1391,7 +1383,7 @@ class PostgreSQLTest extends TestCase
             ->filter([Query::equal('name', ['Alice'])])
             ->toRawSql();
 
-        $this->assertStringContainsString("'Alice'", $raw);
+        $this->assertSame('SELECT * FROM "users" WHERE "name" IN (\'Alice\')', $raw);
         $this->assertStringNotContainsString('?', $raw);
     }
 
@@ -1402,7 +1394,7 @@ class PostgreSQLTest extends TestCase
             ->filter([Query::equal('name', ["O'Brien"])])
             ->toRawSql();
 
-        $this->assertStringContainsString("'O''Brien'", $raw);
+        $this->assertSame('SELECT * FROM "users" WHERE "name" IN (\'O\'\'Brien\')', $raw);
     }
 
     public function testBuildWithoutTableThrows(): void
@@ -1445,7 +1437,7 @@ class PostgreSQLTest extends TestCase
             ->insert();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('VALUES (?, ?), (?, ?)', $result->query);
+        $this->assertSame('INSERT INTO "users" ("name", "age") VALUES (?, ?), (?, ?)', $result->query);
         $this->assertSame(['Alice', 30, 'Bob', 25], $result->bindings);
     }
 
@@ -1468,7 +1460,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"s" ~ ?', $result->query);
+        $this->assertSame('SELECT * FROM "items" WHERE "s" ~ ?', $result->query);
         $this->assertSame(['^t'], $result->bindings);
     }
 
@@ -1480,7 +1472,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("to_tsvector(regexp_replace(\"body\", '[^\\w]+', ' ', 'g')) @@ websearch_to_tsquery(?)", $result->query);
+        $this->assertSame("SELECT * FROM \"articles\" WHERE to_tsvector(regexp_replace(\"body\", '[^\\w]+', ' ', 'g')) @@ websearch_to_tsquery(?)", $result->query);
         $this->assertSame(['hello or world'], $result->bindings);
     }
 
@@ -1493,7 +1485,7 @@ class PostgreSQLTest extends TestCase
             ->upsert();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ON CONFLICT ("id") DO UPDATE SET', $result->query);
+        $this->assertSame('INSERT INTO "users" ("id", "name") VALUES (?, ?) ON CONFLICT ("id") DO UPDATE SET "name" = EXCLUDED."name"', $result->query);
     }
 
     public function testUpsertConflictUpdateColumnNotInRowThrows(): void
@@ -1515,7 +1507,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FOR UPDATE', $result->query);
+        $this->assertSame('SELECT * FROM "accounts" FOR UPDATE', $result->query);
     }
 
     public function testForShareLocking(): void
@@ -1526,7 +1518,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FOR SHARE', $result->query);
+        $this->assertSame('SELECT * FROM "accounts" FOR SHARE', $result->query);
     }
 
     public function testBeginCommitRollback(): void
@@ -1567,8 +1559,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('GROUP BY "customer_id"', $result->query);
-        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS "cnt" FROM "orders" GROUP BY "customer_id" HAVING COUNT(*) > ?', $result->query);
         $this->assertContains(5, $result->bindings);
     }
 
@@ -1581,7 +1572,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('GROUP BY "a", "b"', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS "cnt" FROM "sales" GROUP BY "a", "b"', $result->query);
     }
 
     public function testWhenTrue(): void
@@ -1592,7 +1583,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertSame('SELECT * FROM "items" LIMIT ?', $result->query);
         $this->assertContains(5, $result->bindings);
     }
 
@@ -1648,7 +1639,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('1 = 0', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE 1 = 0', $result->query);
     }
 
     public function testEqualWithNullOnly(): void
@@ -1659,7 +1650,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"x" IS NULL', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "x" IS NULL', $result->query);
     }
 
     public function testEqualWithNullAndValues(): void
@@ -1670,7 +1661,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("x" IN (?) OR "x" IS NULL)', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE ("x" IN (?) OR "x" IS NULL)', $result->query);
         $this->assertContains(1, $result->bindings);
     }
 
@@ -1682,7 +1673,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("x" != ? AND "x" IS NOT NULL)', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE ("x" != ? AND "x" IS NOT NULL)', $result->query);
     }
 
     public function testAndWithTwoFilters(): void
@@ -1693,7 +1684,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("age" > ? AND "age" < ?)', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE ("age" > ? AND "age" < ?)', $result->query);
     }
 
     public function testOrWithTwoFilters(): void
@@ -1704,7 +1695,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("role" IN (?) OR "role" IN (?))', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE ("role" IN (?) OR "role" IN (?))', $result->query);
     }
 
     public function testEmptyAndReturnsTrue(): void
@@ -1715,7 +1706,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('1 = 1', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE 1 = 1', $result->query);
     }
 
     public function testEmptyOrReturnsFalse(): void
@@ -1726,7 +1717,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('1 = 0', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE 1 = 0', $result->query);
     }
 
     public function testBetweenFilter(): void
@@ -1737,7 +1728,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"age" BETWEEN ? AND ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "age" BETWEEN ? AND ?', $result->query);
         $this->assertSame([18, 65], $result->bindings);
     }
 
@@ -1749,7 +1740,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"score" NOT BETWEEN ? AND ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "score" NOT BETWEEN ? AND ?', $result->query);
         $this->assertSame([0, 50], $result->bindings);
     }
 
@@ -1761,7 +1752,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("name" IS NOT NULL)', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE ("name" IS NOT NULL)', $result->query);
     }
 
     public function testExistsMultipleAttributes(): void
@@ -1772,7 +1763,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("name" IS NOT NULL AND "email" IS NOT NULL)', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE ("name" IS NOT NULL AND "email" IS NOT NULL)', $result->query);
     }
 
     public function testNotExistsSingleAttribute(): void
@@ -1783,7 +1774,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("name" IS NULL)', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE ("name" IS NULL)', $result->query);
     }
 
     public function testRawFilter(): void
@@ -1794,7 +1785,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('score > ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE score > ?', $result->query);
         $this->assertContains(10, $result->bindings);
     }
 
@@ -1806,7 +1797,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('1 = 1', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE 1 = 1', $result->query);
     }
 
     public function testStartsWithEscapesPercent(): void
@@ -1817,7 +1808,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"val" ILIKE ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "val" ILIKE ?', $result->query);
         $this->assertSame(['100\%%'], $result->bindings);
     }
 
@@ -1829,7 +1820,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"val" ILIKE ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "val" ILIKE ?', $result->query);
         $this->assertSame(['%a\_b'], $result->bindings);
     }
 
@@ -1841,7 +1832,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"path" ILIKE ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "path" ILIKE ?', $result->query);
         $this->assertSame(['%a\\\\b%'], $result->bindings);
     }
 
@@ -1853,7 +1844,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("bio" ILIKE ? OR "bio" ILIKE ?)', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE ("bio" ILIKE ? OR "bio" ILIKE ?)', $result->query);
     }
 
     public function testContainsAllUsesAnd(): void
@@ -1864,7 +1855,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("bio" ILIKE ? AND "bio" ILIKE ?)', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE ("bio" ILIKE ? AND "bio" ILIKE ?)', $result->query);
     }
 
     public function testNotContainsMultipleUsesAnd(): void
@@ -1875,7 +1866,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("bio" NOT ILIKE ? AND "bio" NOT ILIKE ?)', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE ("bio" NOT ILIKE ? AND "bio" NOT ILIKE ?)', $result->query);
     }
 
     public function testDottedIdentifier(): void
@@ -1886,7 +1877,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"users"."name"', $result->query);
+        $this->assertSame('SELECT "users"."name" FROM "t"', $result->query);
     }
 
     public function testMultipleOrderBy(): void
@@ -1898,7 +1889,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY "name" ASC, "age" DESC', $result->query);
+        $this->assertSame('SELECT * FROM "t" ORDER BY "name" ASC, "age" DESC', $result->query);
     }
 
     public function testDistinctWithSelect(): void
@@ -1910,7 +1901,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SELECT DISTINCT "name"', $result->query);
+        $this->assertSame('SELECT DISTINCT "name" FROM "t"', $result->query);
     }
 
     public function testSumWithAlias(): void
@@ -1921,7 +1912,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SUM("amount") AS "total"', $result->query);
+        $this->assertSame('SELECT SUM("amount") AS "total" FROM "t"', $result->query);
     }
 
     public function testMultipleAggregates(): void
@@ -1933,8 +1924,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(*) AS "cnt"', $result->query);
-        $this->assertStringContainsString('SUM("amount") AS "total"', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS "cnt", SUM("amount") AS "total" FROM "t"', $result->query);
     }
 
     public function testCountWithoutAlias(): void
@@ -1945,7 +1935,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(*)', $result->query);
+        $this->assertSame('SELECT COUNT(*) FROM "t"', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -1957,7 +1947,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('RIGHT JOIN "b" ON "a"."id" = "b"."a_id"', $result->query);
+        $this->assertSame('SELECT * FROM "a" RIGHT JOIN "b" ON "a"."id" = "b"."a_id"', $result->query);
     }
 
     public function testCrossJoin(): void
@@ -1968,7 +1958,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CROSS JOIN "b"', $result->query);
+        $this->assertSame('SELECT * FROM "a" CROSS JOIN "b"', $result->query);
         $this->assertStringNotContainsString(' ON ', $result->query);
     }
 
@@ -1990,7 +1980,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"deleted_at" IS NULL', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "deleted_at" IS NULL', $result->query);
     }
 
     public function testIsNotNullFilter(): void
@@ -2001,7 +1991,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"name" IS NOT NULL', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "name" IS NOT NULL', $result->query);
     }
 
     public function testLessThan(): void
@@ -2012,7 +2002,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"age" < ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "age" < ?', $result->query);
         $this->assertSame([30], $result->bindings);
     }
 
@@ -2024,7 +2014,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"age" <= ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "age" <= ?', $result->query);
         $this->assertSame([30], $result->bindings);
     }
 
@@ -2036,7 +2026,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"score" > ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "score" > ?', $result->query);
         $this->assertSame([50], $result->bindings);
     }
 
@@ -2048,7 +2038,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"score" >= ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "score" >= ?', $result->query);
         $this->assertSame([50], $result->bindings);
     }
 
@@ -2062,9 +2052,7 @@ class PostgreSQLTest extends TestCase
             ->delete();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('DELETE FROM "t"', $result->query);
-        $this->assertStringContainsString('ORDER BY "id" ASC', $result->query);
-        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertSame('DELETE FROM "t" WHERE "status" IN (?) ORDER BY "id" ASC LIMIT ?', $result->query);
     }
 
     public function testUpdateWithOrderAndLimit(): void
@@ -2078,9 +2066,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('UPDATE "t" SET', $result->query);
-        $this->assertStringContainsString('ORDER BY "id" ASC', $result->query);
-        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertSame('UPDATE "t" SET "status" = ? WHERE "active" IN (?) ORDER BY "id" ASC LIMIT ?', $result->query);
     }
 
     public function testVectorOrderBindingOrderWithFiltersAndLimit(): void
@@ -2130,7 +2116,7 @@ class PostgreSQLTest extends TestCase
             ->insert();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('RETURNING "id", "name"', $result->query);
+        $this->assertSame('INSERT INTO "users" ("name") VALUES (?) RETURNING "id", "name"', $result->query);
     }
 
     public function testInsertReturningAll(): void
@@ -2142,7 +2128,7 @@ class PostgreSQLTest extends TestCase
             ->insert();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('RETURNING *', $result->query);
+        $this->assertSame('INSERT INTO "users" ("name") VALUES (?) RETURNING *', $result->query);
     }
 
     public function testUpdateReturning(): void
@@ -2155,7 +2141,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('RETURNING "id", "name"', $result->query);
+        $this->assertSame('UPDATE "users" SET "name" = ? WHERE "id" IN (?) RETURNING "id", "name"', $result->query);
     }
 
     public function testDeleteReturning(): void
@@ -2167,7 +2153,7 @@ class PostgreSQLTest extends TestCase
             ->delete();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('RETURNING "id"', $result->query);
+        $this->assertSame('DELETE FROM "users" WHERE "id" IN (?) RETURNING "id"', $result->query);
     }
 
     public function testUpsertReturning(): void
@@ -2180,7 +2166,7 @@ class PostgreSQLTest extends TestCase
             ->upsert();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('RETURNING "id"', $result->query);
+        $this->assertSame('INSERT INTO "users" ("id", "name", "email") VALUES (?, ?, ?) ON CONFLICT ("id") DO UPDATE SET "name" = EXCLUDED."name", "email" = EXCLUDED."email" RETURNING "id"', $result->query);
     }
 
     public function testInsertOrIgnoreReturning(): void
@@ -2191,7 +2177,7 @@ class PostgreSQLTest extends TestCase
             ->returning(['id'])
             ->insertOrIgnore();
 
-        $this->assertStringContainsString('ON CONFLICT DO NOTHING RETURNING "id"', $result->query);
+        $this->assertSame('INSERT INTO "users" ("name") VALUES (?) ON CONFLICT DO NOTHING RETURNING "id"', $result->query);
     }
 
     // Feature 10: LockingOf (PostgreSQL only)
@@ -2204,7 +2190,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FOR UPDATE OF "users"', $result->query);
+        $this->assertSame('SELECT * FROM "users" FOR UPDATE OF "users"', $result->query);
     }
 
     public function testForShareOf(): void
@@ -2215,7 +2201,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FOR SHARE OF "users"', $result->query);
+        $this->assertSame('SELECT * FROM "users" FOR SHARE OF "users"', $result->query);
     }
 
     // Feature 1: Table Aliases (PostgreSQL quotes)
@@ -2227,7 +2213,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM "users" AS "u"', $result->query);
+        $this->assertSame('SELECT * FROM "users" AS "u"', $result->query);
     }
 
     public function testJoinAliasPostgreSQL(): void
@@ -2238,7 +2224,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN "orders" AS "o" ON "u"."id" = "o"."user_id"', $result->query);
+        $this->assertSame('SELECT * FROM "users" AS "u" JOIN "orders" AS "o" ON "u"."id" = "o"."user_id"', $result->query);
     }
 
     // Feature 2: Subqueries (PostgreSQL)
@@ -2304,7 +2290,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FOR UPDATE SKIP LOCKED', $result->query);
+        $this->assertSame('SELECT * FROM "users" FOR UPDATE SKIP LOCKED', $result->query);
     }
 
     public function testForUpdateNoWaitPostgreSQL(): void
@@ -2315,7 +2301,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FOR UPDATE NOWAIT', $result->query);
+        $this->assertSame('SELECT * FROM "users" FOR UPDATE NOWAIT', $result->query);
     }
 
     // Subquery bindings (PostgreSQL)
@@ -2346,7 +2332,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT EXISTS (SELECT', $result->query);
+        $this->assertSame('SELECT * FROM "users" WHERE NOT EXISTS (SELECT "id" FROM "bans")', $result->query);
     }
 
     // Raw clauses (PostgreSQL)
@@ -2359,7 +2345,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY NULLS LAST', $result->query);
+        $this->assertSame('SELECT * FROM "users" ORDER BY NULLS LAST', $result->query);
     }
 
     public function testGroupByRawPostgreSQL(): void
@@ -2371,7 +2357,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('GROUP BY date_trunc(?, "created_at")', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS "cnt" FROM "events" GROUP BY date_trunc(?, "created_at")', $result->query);
         $this->assertSame(['month'], $result->bindings);
     }
 
@@ -2385,7 +2371,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('HAVING SUM("amount") > ?', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS "cnt" FROM "orders" GROUP BY "user_id" HAVING SUM("amount") > ?', $result->query);
     }
 
     public function testWhereRawAppendsFragmentAndBindings(): void
@@ -2396,7 +2382,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WHERE a = ?', $result->query);
+        $this->assertSame('SELECT * FROM "users" WHERE a = ?', $result->query);
         $this->assertSame([1], $result->bindings);
     }
 
@@ -2409,8 +2395,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WHERE', $result->query);
-        $this->assertStringContainsString(' AND a = ?', $result->query);
+        $this->assertSame('SELECT * FROM "users" WHERE "b" IN (?) AND a = ?', $result->query);
         $this->assertContains(1, $result->bindings);
         $this->assertContains(2, $result->bindings);
     }
@@ -2428,8 +2413,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN "orders" ON "users"."id" = "orders"."user_id"', $result->query);
-        $this->assertStringContainsString('orders.amount > ?', $result->query);
+        $this->assertSame('SELECT * FROM "users" JOIN "orders" ON "users"."id" = "orders"."user_id" AND orders.amount > ?', $result->query);
         $this->assertSame([100], $result->bindings);
     }
 
@@ -2442,8 +2426,7 @@ class PostgreSQLTest extends TestCase
             ->set(['name' => 'John'])
             ->insertOrIgnore();
 
-        $this->assertStringContainsString('INSERT INTO', $result->query);
-        $this->assertStringContainsString('ON CONFLICT DO NOTHING', $result->query);
+        $this->assertSame('INSERT INTO "users" ("name") VALUES (?) ON CONFLICT DO NOTHING', $result->query);
     }
 
     // RETURNING with specific columns
@@ -2457,7 +2440,7 @@ class PostgreSQLTest extends TestCase
             ->insert();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('RETURNING "id", "created_at"', $result->query);
+        $this->assertSame('INSERT INTO "users" ("name") VALUES (?) RETURNING "id", "created_at"', $result->query);
     }
 
     // Locking OF combined
@@ -2471,8 +2454,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WHERE', $result->query);
-        $this->assertStringContainsString('FOR UPDATE OF "users"', $result->query);
+        $this->assertSame('SELECT * FROM "users" WHERE "id" IN (?) FOR UPDATE OF "users"', $result->query);
     }
 
     // PostgreSQL rename uses ALTER TABLE
@@ -2486,7 +2468,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM (SELECT "id" FROM "orders") AS "sub"', $result->query);
+        $this->assertSame('SELECT * FROM (SELECT "id" FROM "orders") AS "sub"', $result->query);
     }
 
     // countDistinct without alias
@@ -2499,7 +2481,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(DISTINCT "email")', $result->query);
+        $this->assertSame('SELECT COUNT(DISTINCT "email") FROM "users"', $result->query);
     }
 
     // Multiple EXISTS subqueries
@@ -2516,8 +2498,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('EXISTS (SELECT', $result->query);
-        $this->assertStringContainsString('NOT EXISTS (SELECT', $result->query);
+        $this->assertSame('SELECT * FROM "users" WHERE EXISTS (SELECT "id" FROM "orders") AND NOT EXISTS (SELECT "id" FROM "payments")', $result->query);
     }
 
     // Left join alias PostgreSQL
@@ -2530,7 +2511,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LEFT JOIN "orders" AS "o"', $result->query);
+        $this->assertSame('SELECT * FROM "users" AS "u" LEFT JOIN "orders" AS "o" ON "u"."id" = "o"."user_id"', $result->query);
     }
 
     // Cross join alias PostgreSQL
@@ -2543,7 +2524,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CROSS JOIN "roles" AS "r"', $result->query);
+        $this->assertSame('SELECT * FROM "users" CROSS JOIN "roles" AS "r"', $result->query);
     }
 
     // ForShare locking variants
@@ -2556,7 +2537,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FOR SHARE SKIP LOCKED', $result->query);
+        $this->assertSame('SELECT * FROM "users" FOR SHARE SKIP LOCKED', $result->query);
     }
 
     public function testForShareNoWaitPostgreSQL(): void
@@ -2567,7 +2548,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FOR SHARE NOWAIT', $result->query);
+        $this->assertSame('SELECT * FROM "users" FOR SHARE NOWAIT', $result->query);
     }
 
     // Reset clears new properties (PostgreSQL)
@@ -3481,7 +3462,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('1 = 0', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE 1 = 0', $result->query);
     }
 
     public function testNotSearchEmptyTermReturnsAllMatch(): void
@@ -3492,7 +3473,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('1 = 1', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE 1 = 1', $result->query);
     }
 
     public function testSearchExactTermWrapsInQuotes(): void
@@ -3503,7 +3484,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('websearch_to_tsquery(?)', $result->query);
+        $this->assertSame("SELECT * FROM \"t\" WHERE to_tsvector(regexp_replace(\"body\", '[^\\w]+', ' ', 'g')) @@ websearch_to_tsquery(?)", $result->query);
         $this->assertSame(['"exact phrase"'], $result->bindings);
     }
 
@@ -3528,7 +3509,7 @@ class PostgreSQLTest extends TestCase
             ->upsert();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ON CONFLICT ("id") DO UPDATE SET "count" = "counters"."count" + ?', $result->query);
+        $this->assertSame('INSERT INTO "counters" ("id", "count") VALUES (?, ?) ON CONFLICT ("id") DO UPDATE SET "count" = "counters"."count" + ?', $result->query);
     }
 
     public function testTableSampleBernoulli(): void
@@ -3539,7 +3520,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('TABLESAMPLE BERNOULLI(10)', $result->query);
+        $this->assertSame('SELECT * FROM "users" TABLESAMPLE BERNOULLI(10)', $result->query);
     }
 
     public function testTableSampleSystem(): void
@@ -3550,7 +3531,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('TABLESAMPLE SYSTEM(25)', $result->query);
+        $this->assertSame('SELECT * FROM "users" TABLESAMPLE SYSTEM(25)', $result->query);
     }
 
     public function testImplementsTableSampling(): void
@@ -3608,9 +3589,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('UPDATE "orders" SET "status" = ?', $result->query);
-        $this->assertStringContainsString('FROM "shipments" AS "s"', $result->query);
-        $this->assertStringContainsString('WHERE orders.id = s.order_id', $result->query);
+        $this->assertSame('UPDATE "orders" SET "status" = ? FROM "shipments" AS "s" WHERE orders.id = s.order_id', $result->query);
     }
 
     public function testUpdateFromWithWhereFilter(): void
@@ -3624,9 +3603,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('UPDATE "orders" SET "status" = ?', $result->query);
-        $this->assertStringContainsString('FROM "shipments"', $result->query);
-        $this->assertStringContainsString('AND orders.id = shipments.order_id', $result->query);
+        $this->assertSame('UPDATE "orders" SET "status" = ? FROM "shipments" WHERE "orders"."active" IN (?) AND orders.id = shipments.order_id', $result->query);
     }
 
     public function testUpdateFromWithBindings(): void
@@ -3639,7 +3616,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM "shipments" AS "s"', $result->query);
+        $this->assertSame('UPDATE "orders" SET "status" = ? FROM "shipments" AS "s" WHERE orders.id = s.order_id AND s.region = ?', $result->query);
         $this->assertContains('US', $result->bindings);
     }
 
@@ -3652,7 +3629,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FROM "inventory"', $result->query);
+        $this->assertSame('UPDATE "orders" SET "status" = ? FROM "inventory"', $result->query);
     }
 
     public function testUpdateFromReturning(): void
@@ -3666,7 +3643,7 @@ class PostgreSQLTest extends TestCase
             ->update();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('RETURNING "orders"."id"', $result->query);
+        $this->assertSame('UPDATE "orders" SET "status" = ? FROM "shipments" AS "s" WHERE orders.id = s.order_id RETURNING "orders"."id"', $result->query);
     }
 
     public function testUpdateFromNoAssignmentsThrows(): void
@@ -3687,8 +3664,7 @@ class PostgreSQLTest extends TestCase
             ->delete();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('DELETE FROM "orders" USING "old_orders"', $result->query);
-        $this->assertStringContainsString('WHERE orders.id = old_orders.id', $result->query);
+        $this->assertSame('DELETE FROM "orders" USING "old_orders" WHERE orders.id = old_orders.id', $result->query);
     }
 
     public function testDeleteUsingWithBindings(): void
@@ -3699,7 +3675,7 @@ class PostgreSQLTest extends TestCase
             ->delete();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('USING "expired"', $result->query);
+        $this->assertSame('DELETE FROM "orders" USING "expired" WHERE orders.id = expired.id AND expired.reason = ?', $result->query);
         $this->assertContains('timeout', $result->bindings);
     }
 
@@ -3712,8 +3688,7 @@ class PostgreSQLTest extends TestCase
             ->delete();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('USING "expired"', $result->query);
-        $this->assertStringContainsString('AND orders.id = expired.id', $result->query);
+        $this->assertSame('DELETE FROM "orders" USING "expired" WHERE "orders"."status" IN (?) AND orders.id = expired.id', $result->query);
     }
 
     public function testDeleteUsingReturning(): void
@@ -3725,7 +3700,7 @@ class PostgreSQLTest extends TestCase
             ->delete();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('RETURNING "orders"."id"', $result->query);
+        $this->assertSame('DELETE FROM "orders" USING "expired" WHERE orders.id = expired.id RETURNING "orders"."id"', $result->query);
     }
 
     public function testDeleteUsingWithoutCondition(): void
@@ -3737,8 +3712,7 @@ class PostgreSQLTest extends TestCase
             ->delete();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('DELETE FROM "orders" USING "old_orders"', $result->query);
-        $this->assertStringContainsString('WHERE "status" IN (?)', $result->query);
+        $this->assertSame('DELETE FROM "orders" USING "old_orders" WHERE "status" IN (?)', $result->query);
     }
 
     public function testUpsertSelectReturning(): void
@@ -3755,7 +3729,7 @@ class PostgreSQLTest extends TestCase
             ->upsertSelect();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('RETURNING "id"', $result->query);
+        $this->assertSame('INSERT INTO "users" ("id", "name", "email") SELECT "id", "name", "email" FROM "staging" ON CONFLICT ("id") DO UPDATE SET "name" = EXCLUDED."name", "email" = EXCLUDED."email" RETURNING "id"', $result->query);
     }
 
     public function testCountWhenFilter(): void
@@ -3766,7 +3740,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(*) FILTER (WHERE status = ?) AS "active_count"', $result->query);
+        $this->assertSame('SELECT COUNT(*) FILTER (WHERE status = ?) AS "active_count" FROM "orders"', $result->query);
         $this->assertSame(['active'], $result->bindings);
     }
 
@@ -3778,7 +3752,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COUNT(*) FILTER (WHERE status = ?)', $result->query);
+        $this->assertSame('SELECT COUNT(*) FILTER (WHERE status = ?) FROM "orders"', $result->query);
         $this->assertStringNotContainsString(' AS ', $result->query);
     }
 
@@ -3790,7 +3764,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('SUM("amount") FILTER (WHERE status = ?) AS "active_total"', $result->query);
+        $this->assertSame('SELECT SUM("amount") FILTER (WHERE status = ?) AS "active_total" FROM "orders"', $result->query);
         $this->assertSame(['active'], $result->bindings);
     }
 
@@ -3813,7 +3787,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('AVG("amount") FILTER (WHERE status = ?) AS "avg_active"', $result->query);
+        $this->assertSame('SELECT AVG("amount") FILTER (WHERE status = ?) AS "avg_active" FROM "orders"', $result->query);
     }
 
     public function testAvgWhenWithoutAlias(): void
@@ -3835,7 +3809,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('MIN("amount") FILTER (WHERE status = ?) AS "min_active"', $result->query);
+        $this->assertSame('SELECT MIN("amount") FILTER (WHERE status = ?) AS "min_active" FROM "orders"', $result->query);
     }
 
     public function testMinWhenWithoutAlias(): void
@@ -3857,7 +3831,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('MAX("amount") FILTER (WHERE status = ?) AS "max_active"', $result->query);
+        $this->assertSame('SELECT MAX("amount") FILTER (WHERE status = ?) AS "max_active" FROM "orders"', $result->query);
     }
 
     public function testMaxWhenWithoutAlias(): void
@@ -3886,12 +3860,7 @@ class PostgreSQLTest extends TestCase
             ->executeMerge();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('MERGE INTO "users"', $result->query);
-        $this->assertStringContainsString('USING (', $result->query);
-        $this->assertStringContainsString(') AS "src"', $result->query);
-        $this->assertStringContainsString('ON users.id = src.id', $result->query);
-        $this->assertStringContainsString('WHEN MATCHED THEN UPDATE SET', $result->query);
-        $this->assertStringContainsString('WHEN NOT MATCHED THEN INSERT', $result->query);
+        $this->assertSame('MERGE INTO "users" USING (SELECT "id", "name", "email" FROM "staging") AS "src" ON users.id = src.id WHEN MATCHED THEN UPDATE SET name = src.name, email = src.email WHEN NOT MATCHED THEN INSERT (id, name, email) VALUES (src.id, src.name, src.email)', $result->query);
     }
 
     public function testMergeWithBindings(): void
@@ -3983,8 +3952,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JOIN LATERAL (', $result->query);
-        $this->assertStringContainsString(') AS "latest_orders" ON true', $result->query);
+        $this->assertSame('SELECT * FROM "users" JOIN LATERAL (SELECT "total" FROM "orders" WHERE "total" > ? LIMIT ?) AS "latest_orders" ON true', $result->query);
     }
 
     public function testLeftJoinLateral(): void
@@ -4000,8 +3968,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LEFT JOIN LATERAL (', $result->query);
-        $this->assertStringContainsString(') AS "recent_orders" ON true', $result->query);
+        $this->assertSame('SELECT * FROM "users" LEFT JOIN LATERAL (SELECT "total" FROM "orders" LIMIT ?) AS "recent_orders" ON true', $result->query);
     }
 
     public function testJoinLateralWithType(): void
@@ -4014,7 +3981,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('LEFT JOIN LATERAL', $result->query);
+        $this->assertSame('SELECT * FROM "users" LEFT JOIN LATERAL (SELECT "id" FROM "orders") AS "o" ON true', $result->query);
     }
 
     public function testFullOuterJoin(): void
@@ -4025,7 +3992,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FULL OUTER JOIN "orders" ON "users"."id" = "orders"."user_id"', $result->query);
+        $this->assertSame('SELECT * FROM "users" FULL OUTER JOIN "orders" ON "users"."id" = "orders"."user_id"', $result->query);
     }
 
     public function testFullOuterJoinWithAlias(): void
@@ -4036,7 +4003,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('FULL OUTER JOIN "orders" AS "o"', $result->query);
+        $this->assertSame('SELECT * FROM "users" FULL OUTER JOIN "orders" AS "o" ON "users"."id" = "o"."user_id"', $result->query);
     }
 
     public function testExplainVerbose(): void
@@ -4086,7 +4053,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"metadata\"->>'key' IN (?)", $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "metadata"->>\'key\' IN (?)', $result->query);
     }
 
     public function testObjectFilterNestedNotEqual(): void
@@ -4100,7 +4067,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"metadata\"->>'key' NOT IN", $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "metadata"->>\'key\' NOT IN (?, ?)', $result->query);
     }
 
     public function testObjectFilterNestedLessThan(): void
@@ -4114,7 +4081,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"data\"->>'score' < ?", $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "data"->>\'score\' < ?', $result->query);
     }
 
     public function testObjectFilterNestedLessThanEqual(): void
@@ -4128,7 +4095,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"data\"->>'score' <= ?", $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "data"->>\'score\' <= ?', $result->query);
     }
 
     public function testObjectFilterNestedGreaterThan(): void
@@ -4142,7 +4109,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"data\"->>'score' > ?", $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "data"->>\'score\' > ?', $result->query);
     }
 
     public function testObjectFilterNestedGreaterThanEqual(): void
@@ -4156,7 +4123,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"data\"->>'score' >= ?", $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "data"->>\'score\' >= ?', $result->query);
     }
 
     public function testObjectFilterNestedStartsWith(): void
@@ -4170,7 +4137,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"data\"->>'name' ILIKE ?", $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "data"->>\'name\' ILIKE ?', $result->query);
     }
 
     public function testObjectFilterNestedNotStartsWith(): void
@@ -4184,7 +4151,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"data\"->>'name' NOT ILIKE ?", $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "data"->>\'name\' NOT ILIKE ?', $result->query);
     }
 
     public function testObjectFilterNestedEndsWith(): void
@@ -4198,7 +4165,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"data\"->>'name' ILIKE ?", $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "data"->>\'name\' ILIKE ?', $result->query);
     }
 
     public function testObjectFilterNestedNotEndsWith(): void
@@ -4212,7 +4179,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"data\"->>'name' NOT ILIKE ?", $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "data"->>\'name\' NOT ILIKE ?', $result->query);
     }
 
     public function testObjectFilterNestedContains(): void
@@ -4226,7 +4193,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"data\"->>'name' ILIKE ?", $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "data"->>\'name\' ILIKE ?', $result->query);
     }
 
     public function testObjectFilterNestedNotContains(): void
@@ -4240,7 +4207,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"data\"->>'name' NOT ILIKE ?", $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "data"->>\'name\' NOT ILIKE ?', $result->query);
     }
 
     public function testObjectFilterNestedIsNull(): void
@@ -4254,7 +4221,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"data\"->>'value' IS NULL", $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "data"->>\'value\' IS NULL', $result->query);
     }
 
     public function testObjectFilterNestedIsNotNull(): void
@@ -4268,7 +4235,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"data\"->>'value' IS NOT NULL", $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "data"->>\'value\' IS NOT NULL', $result->query);
     }
 
     public function testObjectFilterTopLevelEqual(): void
@@ -4282,7 +4249,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"metadata" @> ?::jsonb', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE ("metadata" @> ?::jsonb)', $result->query);
     }
 
     public function testObjectFilterTopLevelNotEqual(): void
@@ -4296,7 +4263,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('NOT ("metadata" @> ?::jsonb)', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE (NOT ("metadata" @> ?::jsonb))', $result->query);
     }
 
     public function testObjectFilterTopLevelContains(): void
@@ -4310,7 +4277,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"tags" @> ?::jsonb', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE ("tags" @> ?::jsonb)', $result->query);
     }
 
     public function testObjectFilterTopLevelStartsWith(): void
@@ -4324,7 +4291,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"metadata"::text ILIKE ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "metadata"::text ILIKE ?', $result->query);
     }
 
     public function testObjectFilterTopLevelNotStartsWith(): void
@@ -4338,7 +4305,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"metadata"::text NOT ILIKE ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "metadata"::text NOT ILIKE ?', $result->query);
     }
 
     public function testObjectFilterTopLevelEndsWith(): void
@@ -4352,7 +4319,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"metadata"::text ILIKE ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "metadata"::text ILIKE ?', $result->query);
     }
 
     public function testObjectFilterTopLevelNotEndsWith(): void
@@ -4366,7 +4333,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"metadata"::text NOT ILIKE ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "metadata"::text NOT ILIKE ?', $result->query);
     }
 
     public function testObjectFilterTopLevelIsNull(): void
@@ -4380,7 +4347,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"metadata" IS NULL', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "metadata" IS NULL', $result->query);
     }
 
     public function testObjectFilterTopLevelIsNotNull(): void
@@ -4394,7 +4361,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"metadata" IS NOT NULL', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "metadata" IS NOT NULL', $result->query);
     }
 
     public function testBuildJsonbPathDeepNested(): void
@@ -4408,7 +4375,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("\"data\"->'level1'->'level2'->>'leaf'", $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "data"->\'level1\'->\'level2\'->>\'leaf\' IN (?)', $result->query);
     }
 
     public function testVectorFilterDefault(): void
@@ -4419,7 +4386,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('("embedding" <=> ?::vector)', $result->query);
+        $this->assertSame('SELECT * FROM "embeddings" WHERE ("embedding" <=> ?::vector)', $result->query);
     }
 
     public function testSpatialDistanceEqual(): void
@@ -4430,7 +4397,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('= ?', $result->query);
+        $this->assertSame('SELECT * FROM "locations" WHERE ST_Distance("loc", ST_GeomFromText(?, 4326)) = ?', $result->query);
     }
 
     public function testSpatialDistanceNotEqual(): void
@@ -4441,7 +4408,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('!= ?', $result->query);
+        $this->assertSame('SELECT * FROM "locations" WHERE ST_Distance("loc", ST_GeomFromText(?, 4326)) != ?', $result->query);
     }
 
     public function testResetClearsMergeState(): void
@@ -4514,9 +4481,7 @@ class PostgreSQLTest extends TestCase
             ->fromSelect(['id', 'customer_id'], $sourceWithCte)
             ->insertSelect();
 
-        $this->assertStringContainsString('WITH "pending_orders" AS (', $result->query);
-        $this->assertStringContainsString('INSERT INTO "archived_orders"', $result->query);
-        $this->assertStringContainsString('SELECT "id", "customer_id" FROM "pending_orders"', $result->query);
+        $this->assertSame('INSERT INTO "archived_orders" ("id", "customer_id") WITH "pending_orders" AS (SELECT "id", "customer_id" FROM "orders" WHERE "status" IN (?)) SELECT "id", "customer_id" FROM "pending_orders"', $result->query);
         $this->assertContains('pending', $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -4539,8 +4504,7 @@ class PostgreSQLTest extends TestCase
             ->select(['id', 'name'])
             ->build();
 
-        $this->assertStringContainsString('WITH RECURSIVE "tree" AS (', $result->query);
-        $this->assertStringContainsString('UNION ALL', $result->query);
+        $this->assertSame('WITH RECURSIVE "tree" AS (SELECT "id", "parent_id", "name" FROM "categories" WHERE "parent_id" IS NULL UNION ALL SELECT "categories"."id", "categories"."parent_id", "categories"."name" FROM "categories" JOIN "tree" ON "categories"."parent_id" = "tree"."id") SELECT "id", "name" FROM "tree"', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -4592,10 +4556,7 @@ class PostgreSQLTest extends TestCase
             ->whenNotMatched('INSERT (id, name, email) VALUES (src.id, src.name, src.email)')
             ->executeMerge();
 
-        $this->assertStringContainsString('MERGE INTO "users"', $result->query);
-        $this->assertStringContainsString('WITH "ready_staging" AS (', $result->query);
-        $this->assertStringContainsString('WHEN MATCHED THEN', $result->query);
-        $this->assertStringContainsString('WHEN NOT MATCHED THEN', $result->query);
+        $this->assertSame('MERGE INTO "users" USING (WITH "ready_staging" AS (SELECT "id", "name", "email" FROM "staging" WHERE "status" IN (?)) SELECT "id", "name", "email" FROM "ready_staging") AS "src" ON users.id = src.id WHEN MATCHED THEN UPDATE SET name = src.name, email = src.email WHEN NOT MATCHED THEN INSERT (id, name, email) VALUES (src.id, src.name, src.email)', $result->query);
         $this->assertContains('ready', $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -4610,8 +4571,7 @@ class PostgreSQLTest extends TestCase
             ->filter([Query::greaterThan('orders.total', 100)])
             ->build();
 
-        $this->assertStringContainsString("\"users\".\"metadata\"->>'role' = ?", $result->query);
-        $this->assertStringContainsString('"orders"."total" > ?', $result->query);
+        $this->assertSame('SELECT "users"."id", "orders"."total" FROM "users" JOIN "orders" ON "users"."id" = "orders"."user_id" WHERE "users"."metadata"->>\'role\' = ? AND "orders"."total" > ?', $result->query);
         $this->assertSame(['admin', 100], $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -4626,9 +4586,7 @@ class PostgreSQLTest extends TestCase
             ->having([Query::greaterThan('cnt', 3)])
             ->build();
 
-        $this->assertStringContainsString('"tags" @> ?::jsonb', $result->query);
-        $this->assertStringContainsString('GROUP BY "category"', $result->query);
-        $this->assertStringContainsString('HAVING COUNT(*) > ?', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS "cnt" FROM "products" WHERE "tags" @> ?::jsonb GROUP BY "category" HAVING COUNT(*) > ?', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -4643,9 +4601,7 @@ class PostgreSQLTest extends TestCase
             ->returning(['orders.id', 'orders.status'])
             ->update();
 
-        $this->assertStringContainsString('UPDATE "orders" SET "status" = ?', $result->query);
-        $this->assertStringContainsString('FROM "shipments" AS "s"', $result->query);
-        $this->assertStringContainsString('RETURNING "orders"."id", "orders"."status"', $result->query);
+        $this->assertSame('UPDATE "orders" SET "status" = ? FROM "shipments" AS "s" WHERE "orders"."warehouse" IN (?) AND orders.id = s.order_id AND s.date > ? RETURNING "orders"."id", "orders"."status"', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -4658,8 +4614,7 @@ class PostgreSQLTest extends TestCase
             ->returning(['orders.id'])
             ->delete();
 
-        $this->assertStringContainsString('DELETE FROM "orders" USING "blacklist"', $result->query);
-        $this->assertStringContainsString('RETURNING "orders"."id"', $result->query);
+        $this->assertSame('DELETE FROM "orders" USING "blacklist" WHERE "orders"."created_at" < ? AND orders.user_id = blacklist.user_id RETURNING "orders"."id"', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -4680,9 +4635,7 @@ class PostgreSQLTest extends TestCase
             ->filter([Query::equal('users.active', [true])])
             ->build();
 
-        $this->assertStringContainsString('JOIN LATERAL (', $result->query);
-        $this->assertStringContainsString(') AS "user_orders" ON true', $result->query);
-        $this->assertStringContainsString('"users"."active" IN (?)', $result->query);
+        $this->assertSame('SELECT "users"."name" FROM "users" JOIN LATERAL (SELECT SUM("total") AS "order_total", "user_id" FROM "orders" WHERE "total" > ? GROUP BY "user_id" LIMIT ?) AS "user_orders" ON true WHERE "users"."active" IN (?)', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -4700,8 +4653,7 @@ class PostgreSQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertStringContainsString('FULL OUTER JOIN "departments"', $result->query);
-        $this->assertStringContainsString('("employees"."dept_id" IS NULL OR "departments"."id" IS NULL)', $result->query);
+        $this->assertSame('SELECT "employees"."name", "departments"."name" FROM "employees" FULL OUTER JOIN "departments" ON "employees"."dept_id" = "departments"."id" WHERE ("employees"."dept_id" IS NULL OR "departments"."id" IS NULL)', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -4714,8 +4666,7 @@ class PostgreSQLTest extends TestCase
             ->selectWindow('ROW_NUMBER()', 'rn', ['customer_id'], ['created_at'])
             ->build();
 
-        $this->assertStringContainsString('SELECT DISTINCT', $result->query);
-        $this->assertStringContainsString('ROW_NUMBER() OVER (PARTITION BY "customer_id" ORDER BY "created_at" ASC) AS "rn"', $result->query);
+        $this->assertSame('SELECT DISTINCT "customer_id", ROW_NUMBER() OVER (PARTITION BY "customer_id" ORDER BY "created_at" ASC) AS "rn" FROM "orders"', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -4729,9 +4680,7 @@ class PostgreSQLTest extends TestCase
             ->window('dept_window', ['employees.dept_id'], ['-employees.salary'])
             ->build();
 
-        $this->assertStringContainsString('RANK() OVER "dept_window" AS "salary_rank"', $result->query);
-        $this->assertStringContainsString('WINDOW "dept_window" AS (PARTITION BY "employees"."dept_id" ORDER BY "employees"."salary" DESC)', $result->query);
-        $this->assertStringContainsString('JOIN "departments"', $result->query);
+        $this->assertSame('SELECT "employees"."name", "departments"."name", RANK() OVER "dept_window" AS "salary_rank" FROM "employees" JOIN "departments" ON "employees"."dept_id" = "departments"."id" WINDOW "dept_window" AS (PARTITION BY "employees"."dept_id" ORDER BY "employees"."salary" DESC)', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -4767,7 +4716,7 @@ class PostgreSQLTest extends TestCase
             ->explain(analyze: true, verbose: true, format: 'json');
 
         $this->assertStringStartsWith('EXPLAIN (ANALYZE, VERBOSE, FORMAT JSON)', $result->query);
-        $this->assertStringContainsString('WITH "big_orders" AS (', $result->query);
+        $this->assertSame('EXPLAIN (ANALYZE, VERBOSE, FORMAT JSON) WITH "big_orders" AS (SELECT "user_id", "total" FROM "orders" WHERE "total" > ?) SELECT "users"."name", "big_orders"."total" FROM "users" JOIN "big_orders" ON "users"."id" = "big_orders"."user_id"', $result->query);
         $this->assertTrue($result->readOnly);
         $this->assertBindingCount($result);
     }
@@ -4814,8 +4763,7 @@ class PostgreSQLTest extends TestCase
             ->conflictSetRaw('views', '"stats"."views" + EXCLUDED."views"')
             ->upsert();
 
-        $this->assertStringContainsString('"views" = "stats"."views" + EXCLUDED."views"', $result->query);
-        $this->assertStringContainsString('"updated_at" = EXCLUDED."updated_at"', $result->query);
+        $this->assertSame('INSERT INTO "stats" ("id", "views", "updated_at") VALUES (?, ?, ?) ON CONFLICT ("id") DO UPDATE SET "views" = "stats"."views" + EXCLUDED."views", "updated_at" = EXCLUDED."updated_at"', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -4836,8 +4784,7 @@ class PostgreSQLTest extends TestCase
             ->fromSelect(['id', 'name'], $source)
             ->insertSelect();
 
-        $this->assertStringContainsString('INSERT INTO "users"', $result->query);
-        $this->assertStringContainsString('WITH "ready" AS (', $result->query);
+        $this->assertSame('INSERT INTO "users" ("id", "name") WITH "ready" AS (SELECT "id", "name" FROM "staging" WHERE "status" IN (?)) SELECT "id", "name" FROM "ready"', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -4851,8 +4798,7 @@ class PostgreSQLTest extends TestCase
             ->forUpdate()
             ->build();
 
-        $this->assertStringContainsString('JOIN "users"', $result->query);
-        $this->assertStringContainsString('FOR UPDATE', $result->query);
+        $this->assertSame('SELECT "accounts"."id", "accounts"."balance" FROM "accounts" JOIN "users" ON "accounts"."user_id" = "users"."id" WHERE "users"."active" IN (?) FOR UPDATE', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -4868,8 +4814,7 @@ class PostgreSQLTest extends TestCase
             ->forShare()
             ->build();
 
-        $this->assertStringContainsString('IN (SELECT "id" FROM "vip_users")', $result->query);
-        $this->assertStringContainsString('FOR SHARE', $result->query);
+        $this->assertSame('SELECT * FROM "accounts" WHERE "user_id" IN (SELECT "id" FROM "vip_users") FOR SHARE', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -4973,7 +4918,7 @@ class PostgreSQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertStringContainsString('"name" ILIKE ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "name" ILIKE ? AND "name" ILIKE ?', $result->query);
         $this->assertCount(2, $result->bindings);
         $this->assertSame('John%', $result->bindings[0]);
         $this->assertSame('%Doe%', $result->bindings[1]);
@@ -4990,8 +4935,7 @@ class PostgreSQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertStringContainsString('"slug" ~ ?', $result->query);
-        $this->assertStringContainsString('"status" IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "slug" ~ ? AND "status" IN (?)', $result->query);
         $this->assertSame(['^test-', 'active'], $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -5006,8 +4950,7 @@ class PostgreSQLTest extends TestCase
             ])
             ->build();
 
-        $this->assertStringContainsString('"bio" NOT ILIKE ?', $result->query);
-        $this->assertStringContainsString('"title" ILIKE ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "bio" NOT ILIKE ? AND "title" ILIKE ?', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5173,7 +5116,7 @@ class PostgreSQLTest extends TestCase
             ->fromSelect(['id', 'name'], $source)
             ->insertSelect();
 
-        $this->assertStringContainsString('INSERT INTO "users" ("id", "name") SELECT', $result->query);
+        $this->assertSame('INSERT INTO "users" ("id", "name") SELECT "id", "name" FROM "staging" WHERE "ready" IN (?)', $result->query);
         $this->assertSame([true], $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -5221,7 +5164,7 @@ class PostgreSQLTest extends TestCase
             ->select([])
             ->build();
 
-        $this->assertStringContainsString('FROM "t"', $result->query);
+        $this->assertSame('SELECT  FROM "t"', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5296,9 +5239,7 @@ class PostgreSQLTest extends TestCase
             ->sum('price', 'total')
             ->build();
 
-        $this->assertStringContainsString('SELECT DISTINCT', $result->query);
-        $this->assertStringContainsString('COUNT(*) AS "cnt"', $result->query);
-        $this->assertStringContainsString('SUM("price") AS "total"', $result->query);
+        $this->assertSame('SELECT DISTINCT COUNT(*) AS "cnt", SUM("price") AS "total" FROM "t"', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5365,8 +5306,7 @@ class PostgreSQLTest extends TestCase
             ->filter([Query::equal('colors.active', [true])])
             ->build();
 
-        $this->assertStringContainsString('CROSS JOIN "sizes"', $result->query);
-        $this->assertStringContainsString('"colors"."active" IN (?)', $result->query);
+        $this->assertSame('SELECT "colors"."name", "sizes"."label" FROM "colors" CROSS JOIN "sizes" WHERE "colors"."active" IN (?)', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5395,7 +5335,7 @@ class PostgreSQLTest extends TestCase
             })
             ->build();
 
-        $this->assertStringContainsString('"tenant_id" IN (?)', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "tenant_id" IN (?)', $result->query);
         $this->assertContains(42, $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -5414,7 +5354,7 @@ class PostgreSQLTest extends TestCase
             })
             ->build();
 
-        $this->assertStringContainsString('SELECT * FROM (SELECT "id" FROM "t") AS wrapped', $result->query);
+        $this->assertSame('SELECT * FROM (SELECT "id" FROM "t") AS wrapped', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5431,7 +5371,7 @@ class PostgreSQLTest extends TestCase
         $clonedResult = $cloned->build();
 
         $this->assertSame('SELECT "id", "name" FROM "users"', $originalResult->query);
-        $this->assertStringContainsString('"active" IN (?)', $clonedResult->query);
+        $this->assertSame('SELECT "id", "name" FROM "users" WHERE "active" IN (?)', $clonedResult->query);
         $this->assertBindingCount($originalResult);
         $this->assertBindingCount($clonedResult);
     }
@@ -5550,7 +5490,7 @@ class PostgreSQLTest extends TestCase
             ->filter([Query::notStartsWith('name', 'test')])
             ->build();
 
-        $this->assertStringContainsString('"name" NOT ILIKE ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "name" NOT ILIKE ?', $result->query);
         $this->assertSame(['test%'], $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -5562,7 +5502,7 @@ class PostgreSQLTest extends TestCase
             ->filter([Query::notEndsWith('name', 'test')])
             ->build();
 
-        $this->assertStringContainsString('"name" NOT ILIKE ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "name" NOT ILIKE ?', $result->query);
         $this->assertSame(['%test'], $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -5574,7 +5514,7 @@ class PostgreSQLTest extends TestCase
             ->naturalJoin('b')
             ->build();
 
-        $this->assertStringContainsString('NATURAL JOIN "b"', $result->query);
+        $this->assertSame('SELECT * FROM "a" NATURAL JOIN "b"', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5585,7 +5525,7 @@ class PostgreSQLTest extends TestCase
             ->naturalJoin('b', 'b_alias')
             ->build();
 
-        $this->assertStringContainsString('NATURAL JOIN "b" AS "b_alias"', $result->query);
+        $this->assertSame('SELECT * FROM "a" NATURAL JOIN "b" AS "b_alias"', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5600,7 +5540,7 @@ class PostgreSQLTest extends TestCase
             ->filterWhereNotIn('id', $sub)
             ->build();
 
-        $this->assertStringContainsString('"id" NOT IN (SELECT "user_id" FROM "blocked")', $result->query);
+        $this->assertSame('SELECT * FROM "users" WHERE "id" NOT IN (SELECT "user_id" FROM "blocked")', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5634,7 +5574,7 @@ class PostgreSQLTest extends TestCase
             ->unionAll($other)
             ->build();
 
-        $this->assertStringContainsString('UNION ALL', $result->query);
+        $this->assertSame('(SELECT * FROM "a" WHERE "type" IN (?)) UNION ALL (SELECT * FROM "b" WHERE "type" IN (?))', $result->query);
         $this->assertSame('alpha', $result->bindings[0]);
         $this->assertSame('beta', $result->bindings[1]);
         $this->assertBindingCount($result);
@@ -5649,7 +5589,7 @@ class PostgreSQLTest extends TestCase
             ->exceptAll($other)
             ->build();
 
-        $this->assertStringContainsString('EXCEPT ALL', $result->query);
+        $this->assertSame('(SELECT * FROM "a") EXCEPT ALL (SELECT * FROM "b")', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5662,7 +5602,7 @@ class PostgreSQLTest extends TestCase
             ->intersectAll($other)
             ->build();
 
-        $this->assertStringContainsString('INTERSECT ALL', $result->query);
+        $this->assertSame('(SELECT * FROM "a") INTERSECT ALL (SELECT * FROM "b")', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5676,8 +5616,7 @@ class PostgreSQLTest extends TestCase
             ->conflictSetRaw('name', 'COALESCE("new_row"."name", EXCLUDED."name")')
             ->upsert();
 
-        $this->assertStringContainsString('INSERT INTO "users" AS "new_row"', $result->query);
-        $this->assertStringContainsString('COALESCE("new_row"."name", EXCLUDED."name")', $result->query);
+        $this->assertSame('INSERT INTO "users" AS "new_row" ("id", "name") VALUES (?, ?) ON CONFLICT ("id") DO UPDATE SET "name" = COALESCE("new_row"."name", EXCLUDED."name")', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5699,7 +5638,7 @@ class PostgreSQLTest extends TestCase
             ->select('COALESCE("name", ?) AS display_name', ['Unknown'])
             ->build();
 
-        $this->assertStringContainsString('COALESCE("name", ?) AS display_name', $result->query);
+        $this->assertSame('SELECT COALESCE("name", ?) AS display_name FROM "t"', $result->query);
         $this->assertSame(['Unknown'], $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -5712,7 +5651,7 @@ class PostgreSQLTest extends TestCase
             ->insertColumnExpression('coords', 'ST_GeomFromText(?, 4326)')
             ->insert();
 
-        $this->assertStringContainsString('ST_GeomFromText(?, 4326)', $result->query);
+        $this->assertSame('INSERT INTO "locations" ("name", "coords") VALUES (?, ST_GeomFromText(?, 4326))', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5763,7 +5702,7 @@ class PostgreSQLTest extends TestCase
             ->returning(['id', 'name'])
             ->delete();
 
-        $this->assertStringContainsString('RETURNING "id", "name"', $result->query);
+        $this->assertSame('DELETE FROM "users" WHERE "id" IN (SELECT "id" FROM "inactive_users") RETURNING "id", "name"', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5777,9 +5716,7 @@ class PostgreSQLTest extends TestCase
             ->groupBy(['region'])
             ->build();
 
-        $this->assertStringContainsString('COUNT(*) FILTER (WHERE status = ?) AS "active_count"', $result->query);
-        $this->assertStringContainsString('COUNT(*) FILTER (WHERE status = ?) AS "cancelled_count"', $result->query);
-        $this->assertStringContainsString('SUM("amount") FILTER (WHERE status = ?) AS "active_total"', $result->query);
+        $this->assertSame('SELECT COUNT(*) FILTER (WHERE status = ?) AS "active_count", COUNT(*) FILTER (WHERE status = ?) AS "cancelled_count", SUM("amount") FILTER (WHERE status = ?) AS "active_total" FROM "orders" GROUP BY "region"', $result->query);
         $this->assertSame(['active', 'cancelled', 'active'], $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -5793,9 +5730,7 @@ class PostgreSQLTest extends TestCase
             ->limit(100)
             ->build();
 
-        $this->assertStringContainsString('TABLESAMPLE BERNOULLI(5)', $result->query);
-        $this->assertStringContainsString('"ts" > ?', $result->query);
-        $this->assertStringContainsString('LIMIT ?', $result->query);
+        $this->assertSame('SELECT * FROM "events" TABLESAMPLE BERNOULLI(5) WHERE "ts" > ? LIMIT ?', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5815,9 +5750,7 @@ class PostgreSQLTest extends TestCase
             ->filter([Query::equal('posts.published', [true])])
             ->build();
 
-        $this->assertStringContainsString('LEFT JOIN LATERAL (', $result->query);
-        $this->assertStringContainsString(') AS "recent_comments" ON true', $result->query);
-        $this->assertStringContainsString('"posts"."published" IN (?)', $result->query);
+        $this->assertSame('SELECT "posts"."title" FROM "posts" LEFT JOIN LATERAL (SELECT "body" FROM "comments" WHERE "approved" IN (?) ORDER BY "created_at" DESC LIMIT ?) AS "recent_comments" ON true WHERE "posts"."published" IN (?)', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5828,7 +5761,7 @@ class PostgreSQLTest extends TestCase
             ->fullOuterJoin('b', 'a.key', 'b.key', '!=')
             ->build();
 
-        $this->assertStringContainsString('FULL OUTER JOIN "b" ON "a"."key" != "b"."key"', $result->query);
+        $this->assertSame('SELECT * FROM "a" FULL OUTER JOIN "b" ON "a"."key" != "b"."key"', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5842,8 +5775,7 @@ class PostgreSQLTest extends TestCase
             }, JoinType::Left)
             ->build();
 
-        $this->assertStringContainsString('LEFT JOIN "orders"', $result->query);
-        $this->assertStringContainsString('orders.status = ?', $result->query);
+        $this->assertSame('SELECT * FROM "users" LEFT JOIN "orders" ON "users"."id" = "orders"."user_id" AND orders.status = ?', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5859,10 +5791,7 @@ class PostgreSQLTest extends TestCase
             })
             ->build();
 
-        $this->assertStringContainsString('"users"."id" = "orders"."user_id"', $result->query);
-        $this->assertStringContainsString('"users"."tenant_id" = "orders"."tenant_id"', $result->query);
-        $this->assertStringContainsString('orders.amount > ?', $result->query);
-        $this->assertStringContainsString('orders.status = ?', $result->query);
+        $this->assertSame('SELECT * FROM "users" JOIN "orders" ON "users"."id" = "orders"."user_id" AND "users"."tenant_id" = "orders"."tenant_id" AND orders.amount > ? AND orders.status = ?', $result->query);
         $this->assertSame([100, 'active'], $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -5907,7 +5836,7 @@ class PostgreSQLTest extends TestCase
             ->filter([$query])
             ->build();
 
-        $this->assertStringContainsString('"tags" @> ?::jsonb', $result->query);
+        $this->assertSame('SELECT * FROM "docs" WHERE "tags" @> ?::jsonb', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5921,7 +5850,7 @@ class PostgreSQLTest extends TestCase
             ->filter([$query])
             ->build();
 
-        $this->assertStringContainsString('"tags" @> ?::jsonb', $result->query);
+        $this->assertSame('SELECT * FROM "docs" WHERE ("tags" @> ?::jsonb OR "tags" @> ?::jsonb)', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5935,8 +5864,7 @@ class PostgreSQLTest extends TestCase
             ->filter([$query])
             ->build();
 
-        $this->assertStringContainsString('NOT (', $result->query);
-        $this->assertStringContainsString('"tags" @> ?::jsonb', $result->query);
+        $this->assertSame('SELECT * FROM "docs" WHERE NOT ("tags" @> ?::jsonb)', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5954,7 +5882,7 @@ class PostgreSQLTest extends TestCase
             ->filter([Query::equal('id', [1])])
             ->build();
 
-        $this->assertStringContainsString('(SELECT COUNT(*) AS "cnt" FROM "orders" WHERE "orders"."user_id" IN (?)) AS "order_count"', $result->query);
+        $this->assertSame('SELECT "id", "name", (SELECT COUNT(*) AS "cnt" FROM "orders" WHERE "orders"."user_id" IN (?)) AS "order_count" FROM "users" WHERE "id" IN (?)', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -5965,7 +5893,7 @@ class PostgreSQLTest extends TestCase
             ->filter([Query::raw('score BETWEEN ? AND ?', [10, 90])])
             ->build();
 
-        $this->assertStringContainsString('score BETWEEN ? AND ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE score BETWEEN ? AND ?', $result->query);
         $this->assertSame([10, 90], $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -5979,7 +5907,7 @@ class PostgreSQLTest extends TestCase
             ->limit(25)
             ->build();
 
-        $this->assertStringContainsString('< ?', $result->query);
+        $this->assertSame('SELECT * FROM "t" WHERE "_cursor" < ? ORDER BY "id" DESC LIMIT ?', $result->query);
         $this->assertContains(100, $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -6009,8 +5937,7 @@ class PostgreSQLTest extends TestCase
             ->filter([Query::equal('id', [1])])
             ->update();
 
-        $this->assertStringContainsString('"count" = "count" + ?', $result->query);
-        $this->assertStringContainsString('"updated_at" = NOW()', $result->query);
+        $this->assertSame('UPDATE "t" SET "count" = "count" + ?, "updated_at" = NOW() WHERE "id" IN (?)', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -6102,7 +6029,7 @@ class PostgreSQLTest extends TestCase
             ->filterDistance('coords', [40.7128, -74.0060], '>', 10000.0, true)
             ->build();
 
-        $this->assertStringContainsString('ST_Distance(("coords"::geography), ST_SetSRID(ST_GeomFromText(?), 4326)::geography) > ?', $result->query);
+        $this->assertSame('SELECT * FROM "locations" WHERE ST_Distance(("coords"::geography), ST_SetSRID(ST_GeomFromText(?), 4326)::geography) > ?', $result->query);
         $this->assertSame('POINT(40.7128 -74.006)', $result->bindings[0]);
         $this->assertSame(10000.0, $result->bindings[1]);
         $this->assertBindingCount($result);
@@ -6154,9 +6081,7 @@ class PostgreSQLTest extends TestCase
             ->returning(['id'])
             ->upsertSelect();
 
-        $this->assertStringContainsString('INSERT INTO "users"', $result->query);
-        $this->assertStringContainsString('ON CONFLICT ("id") DO UPDATE SET', $result->query);
-        $this->assertStringContainsString('RETURNING "id"', $result->query);
+        $this->assertSame('INSERT INTO "users" ("id", "name", "email") SELECT "id", "name", "email" FROM "staging" WHERE "status" IN (?) ON CONFLICT ("id") DO UPDATE SET "name" = EXCLUDED."name", "email" = EXCLUDED."email" RETURNING "id"', $result->query);
         $this->assertContains('ready', $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -6183,8 +6108,7 @@ class PostgreSQLTest extends TestCase
             ->addHook($hook2)
             ->build();
 
-        $this->assertStringContainsString('tenant_id = ?', $result->query);
-        $this->assertStringContainsString('deleted = ?', $result->query);
+        $this->assertSame('SELECT * FROM "users" WHERE tenant_id = ? AND deleted = ?', $result->query);
         $this->assertSame([1, false], $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -6199,8 +6123,7 @@ class PostgreSQLTest extends TestCase
             ])
             ->toRawSql();
 
-        $this->assertStringContainsString('1', $raw);
-        $this->assertStringContainsString('0', $raw);
+        $this->assertSame('SELECT * FROM "t" WHERE "active" IN (1) AND "deleted" IN (0)', $raw);
         $this->assertStringNotContainsString('?', $raw);
     }
 
@@ -6217,7 +6140,7 @@ class PostgreSQLTest extends TestCase
             ->filter([Query::greaterThan('total', 500)])
             ->build();
 
-        $this->assertStringContainsString('FROM (SELECT "user_id", "total" FROM "orders" WHERE "total" > ?) AS "big_orders"', $result->query);
+        $this->assertSame('SELECT "user_id" FROM (SELECT "user_id", "total" FROM "orders" WHERE "total" > ?) AS "big_orders" WHERE "total" > ?', $result->query);
         $this->assertSame([100, 500], $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -6233,9 +6156,7 @@ class PostgreSQLTest extends TestCase
             ->havingRaw('SUM("amount") > ? AND COUNT(*) > ?', [1000, 5])
             ->build();
 
-        $this->assertStringContainsString('WHERE "status" IN (?)', $result->query);
-        $this->assertStringContainsString('GROUP BY "user_id"', $result->query);
-        $this->assertStringContainsString('HAVING SUM("amount") > ? AND COUNT(*) > ?', $result->query);
+        $this->assertSame('SELECT COUNT(*) AS "cnt", SUM("amount") AS "total" FROM "orders" WHERE "status" IN (?) GROUP BY "user_id" HAVING SUM("amount") > ? AND COUNT(*) > ?', $result->query);
         $this->assertSame(['active', 1000, 5], $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -6274,7 +6195,7 @@ class PostgreSQLTest extends TestCase
             ->filter([Query::equal('active', [true])])
             ->build();
 
-        $this->assertStringContainsString('CASE WHEN "price" > ? THEN ? WHEN "price" > ? THEN ? ELSE ? END AS "price_tier"', $result->query);
+        $this->assertSame('SELECT "id", "name", CASE WHEN "price" > ? THEN ? WHEN "price" > ? THEN ? ELSE ? END AS "price_tier" FROM "products" WHERE "active" IN (?)', $result->query);
         $this->assertSame([100, 'expensive', 50, 'moderate', 'cheap', true], $result->bindings);
         $this->assertBindingCount($result);
     }
@@ -6291,8 +6212,7 @@ class PostgreSQLTest extends TestCase
             ->whenNotMatched('INSERT (id, name) VALUES (src.id, src.name)')
             ->executeMerge();
 
-        $this->assertStringContainsString('WHEN MATCHED THEN DELETE', $result->query);
-        $this->assertStringContainsString('WHEN NOT MATCHED THEN INSERT', $result->query);
+        $this->assertSame('MERGE INTO "users" USING (SELECT * FROM "staging") AS "src" ON users.id = src.id WHEN MATCHED THEN DELETE WHEN NOT MATCHED THEN INSERT (id, name) VALUES (src.id, src.name)', $result->query);
         $this->assertBindingCount($result);
     }
 
@@ -6305,7 +6225,7 @@ class PostgreSQLTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringNotContainsString('FROM', $result->query);
-        $this->assertStringContainsString('SELECT', $result->query);
+        $this->assertSame('SELECT 1 + 1', $result->query);
     }
 
     public function testSelectCastEmitsCastExpression(): void
@@ -6316,8 +6236,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CAST("price" AS DECIMAL(10, 2))', $result->query);
-        $this->assertStringContainsString('"price_decimal"', $result->query);
+        $this->assertSame('SELECT CAST("price" AS DECIMAL(10, 2)) AS "price_decimal" FROM "products"', $result->query);
     }
 
     public function testSelectCastRejectsInvalidType(): void
@@ -6464,7 +6383,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('"users"."id" = "orders"."user_id"', $result->query);
+        $this->assertSame('SELECT * FROM "users" WHERE "users"."id" = "orders"."user_id"', $result->query);
         $this->assertSame([], $result->bindings);
     }
 
@@ -6487,8 +6406,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('WHERE', $result->query);
-        $this->assertStringContainsString(' AND "users"."id" = "orders"."user_id"', $result->query);
+        $this->assertSame('SELECT * FROM "users" WHERE "status" IN (?) AND "users"."id" = "orders"."user_id"', $result->query);
         $this->assertContains('active', $result->bindings);
     }
 
@@ -6505,7 +6423,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("nextval('seq_user_id')", $result->query);
+        $this->assertSame('SELECT nextval(\'seq_user_id\')', $result->query);
     }
 
     public function testCurrValEmitsSequenceCall(): void
@@ -6516,7 +6434,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("currval('seq_user_id')", $result->query);
+        $this->assertSame('SELECT currval(\'seq_user_id\')', $result->query);
     }
 
     public function testNextValWithAlias(): void
@@ -6527,7 +6445,7 @@ class PostgreSQLTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('nextval(\'seq_user_id\') AS "next_id"', $result->query);
+        $this->assertSame('SELECT nextval(\'seq_user_id\') AS "next_id"', $result->query);
     }
 
     public function testNextValRejectsInvalidName(): void

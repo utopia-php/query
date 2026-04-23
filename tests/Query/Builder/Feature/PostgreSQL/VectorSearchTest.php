@@ -19,7 +19,7 @@ class VectorSearchTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('"embedding" <=> ?::vector', $result->query);
+        $this->assertSame('SELECT * FROM "items" ORDER BY ("embedding" <=> ?::vector) ASC', $result->query);
     }
 
     public function testOrderByVectorDistanceEuclideanUsesL2Operator(): void
@@ -30,7 +30,7 @@ class VectorSearchTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('"embedding" <-> ?::vector', $result->query);
+        $this->assertSame('SELECT * FROM "items" ORDER BY ("embedding" <-> ?::vector) ASC', $result->query);
     }
 
     public function testOrderByVectorDistanceDotUsesInnerProductOperator(): void
@@ -41,7 +41,7 @@ class VectorSearchTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('"embedding" <#> ?::vector', $result->query);
+        $this->assertSame('SELECT * FROM "items" ORDER BY ("embedding" <#> ?::vector) ASC', $result->query);
     }
 
     public function testOrderByVectorDistanceSerializesVectorAsPgvectorLiteral(): void
@@ -74,6 +74,6 @@ class VectorSearchTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('"embedding"', $result->query);
+        $this->assertSame('SELECT * FROM "items" ORDER BY ("embedding" <=> ?::vector) ASC', $result->query);
     }
 }

@@ -21,7 +21,7 @@ class StatisticalAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('STDDEV(`value`) AS `sd`', $result->query);
+        $this->assertSame('SELECT STDDEV(`value`) AS `sd` FROM `scores`', $result->query);
     }
 
     public function testStddevPopAndSampEmitSeparateFunctions(): void
@@ -33,8 +33,7 @@ class StatisticalAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('STDDEV_POP(`v`) AS `sp`', $result->query);
-        $this->assertStringContainsString('STDDEV_SAMP(`v`) AS `ss`', $result->query);
+        $this->assertSame('SELECT STDDEV_POP(`v`) AS `sp`, STDDEV_SAMP(`v`) AS `ss` FROM `scores`', $result->query);
     }
 
     public function testVarianceAndVarPopAndVarSampEmitCorrectFunctions(): void
@@ -47,9 +46,7 @@ class StatisticalAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('VARIANCE(`v`) AS `a`', $result->query);
-        $this->assertStringContainsString('VAR_POP(`v`) AS `b`', $result->query);
-        $this->assertStringContainsString('VAR_SAMP(`v`) AS `c`', $result->query);
+        $this->assertSame('SELECT VARIANCE(`v`) AS `a`, VAR_POP(`v`) AS `b`, VAR_SAMP(`v`) AS `c` FROM `scores`', $result->query);
     }
 
     public function testStddevOnPostgreSQLUsesDoubleQuoting(): void
@@ -60,7 +57,7 @@ class StatisticalAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('STDDEV("value") AS "sd"', $result->query);
+        $this->assertSame('SELECT STDDEV("value") AS "sd" FROM "scores"', $result->query);
     }
 
     public function testStddevOnClickHouseUsesBacktickQuoting(): void
@@ -71,7 +68,7 @@ class StatisticalAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('stddevPop(`value`) AS `sd`', $result->query);
+        $this->assertSame('SELECT stddevPop(`value`) AS `sd` FROM `scores`', $result->query);
     }
 
     public function testVarianceOnClickHouseEmitsVarPop(): void
@@ -82,7 +79,7 @@ class StatisticalAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('varPop(`value`) AS `var`', $result->query);
+        $this->assertSame('SELECT varPop(`value`) AS `var` FROM `scores`', $result->query);
         $this->assertStringNotContainsString('VARIANCE(', $result->query);
     }
 
@@ -117,7 +114,7 @@ class StatisticalAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('STDDEV(`value`)', $result->query);
+        $this->assertSame('SELECT STDDEV(`value`) FROM `scores`', $result->query);
         $this->assertStringNotContainsString('AS ``', $result->query);
     }
 }

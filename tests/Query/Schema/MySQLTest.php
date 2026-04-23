@@ -80,16 +80,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('INT NOT NULL', $result->query);
-        $this->assertStringContainsString('BIGINT NOT NULL', $result->query);
-        $this->assertStringContainsString('DOUBLE NOT NULL', $result->query);
-        $this->assertStringContainsString('TINYINT(1) NOT NULL', $result->query);
-        $this->assertStringContainsString('TEXT NOT NULL', $result->query);
-        $this->assertStringContainsString('DATETIME(3) NOT NULL', $result->query);
-        $this->assertStringContainsString('TIMESTAMP(6) NOT NULL', $result->query);
-        $this->assertStringContainsString('JSON NOT NULL', $result->query);
-        $this->assertStringContainsString('BLOB NOT NULL', $result->query);
-        $this->assertStringContainsString("ENUM('active','inactive') NOT NULL", $result->query);
+        $this->assertSame('CREATE TABLE `test_types` (`int_col` INT NOT NULL, `big_col` BIGINT NOT NULL, `float_col` DOUBLE NOT NULL, `bool_col` TINYINT(1) NOT NULL, `text_col` TEXT NOT NULL, `dt_col` DATETIME(3) NOT NULL, `ts_col` TIMESTAMP(6) NOT NULL, `json_col` JSON NOT NULL, `bin_col` BLOB NOT NULL, `status` ENUM(\'active\',\'inactive\') NOT NULL)', $result->query);
     }
 
     public function testCreateTableWithNullableAndDefault(): void
@@ -104,10 +95,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`bio` TEXT NULL', $result->query);
-        $this->assertStringContainsString("DEFAULT 1", $result->query);
-        $this->assertStringContainsString('DEFAULT 0', $result->query);
-        $this->assertStringContainsString("DEFAULT 'draft'", $result->query);
+        $this->assertSame('CREATE TABLE `posts` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `bio` TEXT NULL, `active` TINYINT(1) NOT NULL DEFAULT 1, `score` INT NOT NULL DEFAULT 0, `status` VARCHAR(255) NOT NULL DEFAULT \'draft\', PRIMARY KEY (`id`))', $result->query);
     }
 
     public function testCreateTableWithUnsigned(): void
@@ -118,7 +106,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('INT UNSIGNED NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`age` INT UNSIGNED NOT NULL)', $result->query);
     }
 
     public function testCreateTableWithTimestamps(): void
@@ -130,8 +118,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`created_at` DATETIME(3) NOT NULL', $result->query);
-        $this->assertStringContainsString('`updated_at` DATETIME(3) NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `posts` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `created_at` DATETIME(3) NOT NULL, `updated_at` DATETIME(3) NOT NULL, PRIMARY KEY (`id`))', $result->query);
     }
 
     public function testCreateTableWithForeignKey(): void
@@ -145,10 +132,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString(
-            'FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE SET NULL',
-            $result->query
-        );
+        $this->assertSame('CREATE TABLE `posts` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, PRIMARY KEY (`id`), FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE SET NULL)', $result->query);
     }
 
     public function testCreateTableWithIndexes(): void
@@ -163,8 +147,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('INDEX `idx_name_email` (`name`, `email`)', $result->query);
-        $this->assertStringContainsString('UNIQUE INDEX `uniq_email` (`email`)', $result->query);
+        $this->assertSame('CREATE TABLE `users` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `name` VARCHAR(255) NOT NULL, `email` VARCHAR(255) NOT NULL, PRIMARY KEY (`id`), INDEX `idx_name_email` (`name`, `email`), UNIQUE INDEX `uniq_email` (`email`))', $result->query);
     }
 
     public function testCreateTableWithSpatialTypes(): void
@@ -178,9 +161,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('POINT SRID 4326 NOT NULL', $result->query);
-        $this->assertStringContainsString('LINESTRING SRID 4326 NOT NULL', $result->query);
-        $this->assertStringContainsString('POLYGON SRID 4326 NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `locations` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `coords` POINT SRID 4326 NOT NULL, `path` LINESTRING SRID 4326 NOT NULL, `area` POLYGON SRID 4326 NOT NULL, PRIMARY KEY (`id`))', $result->query);
     }
 
     public function testCreateTableVectorThrows(): void
@@ -202,7 +183,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("COMMENT 'User display name'", $result->query);
+        $this->assertSame('CREATE TABLE `t` (`name` VARCHAR(255) NOT NULL COMMENT \'User display name\')', $result->query);
     }
     // ALTER TABLE
 
@@ -299,10 +280,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString(
-            'ADD FOREIGN KEY (`dept_id`) REFERENCES `departments` (`id`)',
-            $result->query
-        );
+        $this->assertSame('ALTER TABLE `users` ADD FOREIGN KEY (`dept_id`) REFERENCES `departments` (`id`)', $result->query);
     }
 
     public function testAlterDropForeignKey(): void
@@ -329,9 +307,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ADD COLUMN', $result->query);
-        $this->assertStringContainsString('DROP COLUMN `age`', $result->query);
-        $this->assertStringContainsString('RENAME COLUMN `bio` TO `biography`', $result->query);
+        $this->assertSame('ALTER TABLE `users` ADD COLUMN `avatar` VARCHAR(255) NULL, RENAME COLUMN `bio` TO `biography`, DROP COLUMN `age`', $result->query);
     }
     // DROP TABLE
 
@@ -553,7 +529,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PRIMARY KEY (`order_id`, `product_id`)', $result->query);
+        $this->assertSame('CREATE TABLE `order_items` (`order_id` INT NOT NULL, `product_id` INT NOT NULL, `quantity` INT NOT NULL, PRIMARY KEY (`order_id`, `product_id`))', $result->query);
     }
 
     public function testCreateTableWithCompositePrimaryKey(): void
@@ -567,7 +543,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PRIMARY KEY (`order_id`, `product_id`)', $result->query);
+        $this->assertSame('CREATE TABLE `order_items` (`order_id` INT NOT NULL, `product_id` INT NOT NULL, `quantity` INT NOT NULL, PRIMARY KEY (`order_id`, `product_id`))', $result->query);
     }
 
     public function testCreateTableRejectsMixedColumnAndTablePrimary(): void
@@ -592,7 +568,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('DEFAULT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`name` VARCHAR(255) NULL DEFAULT NULL)', $result->query);
     }
 
     public function testCreateTableWithNumericDefault(): void
@@ -603,7 +579,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('DEFAULT 0.5', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`score` DOUBLE NOT NULL DEFAULT 0.5)', $result->query);
     }
 
     public function testDropIfExists(): void
@@ -634,10 +610,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ADD COLUMN `first_name`', $result->query);
-        $this->assertStringContainsString('ADD COLUMN `last_name`', $result->query);
-        $this->assertStringContainsString('DROP COLUMN `name`', $result->query);
-        $this->assertStringContainsString('ADD INDEX `idx_names`', $result->query);
+        $this->assertSame('ALTER TABLE `users` ADD COLUMN `first_name` VARCHAR(100) NOT NULL, ADD COLUMN `last_name` VARCHAR(100) NOT NULL, DROP COLUMN `name`, ADD INDEX `idx_names` (`first_name`, `last_name`)', $result->query);
     }
 
     public function testCreateTableForeignKeyWithAllActions(): void
@@ -651,8 +624,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ON DELETE CASCADE', $result->query);
-        $this->assertStringContainsString('ON UPDATE RESTRICT', $result->query);
+        $this->assertSame('CREATE TABLE `comments` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, PRIMARY KEY (`id`), FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT)', $result->query);
     }
 
     public function testAddForeignKeyStandaloneNoActions(): void
@@ -680,7 +652,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('TIMESTAMP NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`ts_col` TIMESTAMP NOT NULL)', $result->query);
         $this->assertStringNotContainsString('TIMESTAMP(', $result->query);
     }
 
@@ -692,7 +664,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('DATETIME NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`dt_col` DATETIME NOT NULL)', $result->query);
         $this->assertStringNotContainsString('DATETIME(', $result->query);
     }
 
@@ -713,8 +685,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ADD FOREIGN KEY', $result->query);
-        $this->assertStringContainsString('DROP FOREIGN KEY `fk_old_user`', $result->query);
+        $this->assertSame('ALTER TABLE `orders` ADD FOREIGN KEY (`user_id`) REFERENCES `users` (`id`), DROP FOREIGN KEY `fk_old_user`', $result->query);
     }
 
     public function testTableAutoGeneratedIndexName(): void
@@ -727,7 +698,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('INDEX `idx_first_last`', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`first` VARCHAR(255) NOT NULL, `last` VARCHAR(255) NOT NULL, INDEX `idx_first_last` (`first`, `last`))', $result->query);
     }
 
     public function testTableAutoGeneratedUniqueIndexName(): void
@@ -739,7 +710,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('UNIQUE INDEX `uniq_email`', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`email` VARCHAR(255) NOT NULL, UNIQUE INDEX `uniq_email` (`email`))', $result->query);
     }
 
     public function testExactCreateTableWithColumnsAndIndexes(): void
@@ -921,7 +892,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CREATE TABLE IF NOT EXISTS `users`', $result->query);
+        $this->assertSame('CREATE TABLE IF NOT EXISTS `users` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `name` VARCHAR(255) NOT NULL, PRIMARY KEY (`id`))', $result->query);
     }
 
     public function testCreateTableWithRawColumnDefs(): void
@@ -933,7 +904,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`custom_col` VARCHAR(255) NOT NULL DEFAULT ""', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `custom_col` VARCHAR(255) NOT NULL DEFAULT "", PRIMARY KEY (`id`))', $result->query);
     }
 
     public function testCreateTableWithRawIndexDefs(): void
@@ -946,7 +917,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('INDEX `idx_custom` (`name`(10))', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `name` VARCHAR(255) NOT NULL, PRIMARY KEY (`id`), INDEX `idx_custom` (`name`(10)))', $result->query);
     }
 
     public function testCreateTableWithPartitionByRange(): void
@@ -959,7 +930,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PARTITION BY RANGE(YEAR(created_at))', $result->query);
+        $this->assertSame('CREATE TABLE `events` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `created_at` DATETIME NOT NULL, PRIMARY KEY (`id`)) PARTITION BY RANGE(YEAR(created_at))', $result->query);
     }
 
     public function testCreateTableWithPartitionByList(): void
@@ -972,7 +943,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PARTITION BY LIST(region)', $result->query);
+        $this->assertSame('CREATE TABLE `events` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `region` VARCHAR(255) NOT NULL, PRIMARY KEY (`id`)) PARTITION BY LIST(region)', $result->query);
     }
 
     public function testCreateTableWithPartitionByHash(): void
@@ -984,7 +955,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PARTITION BY HASH(id)', $result->query);
+        $this->assertSame('CREATE TABLE `events` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, PRIMARY KEY (`id`)) PARTITION BY HASH(id)', $result->query);
     }
 
     public function testAlterWithForeignKeyOnDeleteAndUpdate(): void
@@ -998,8 +969,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ON DELETE CASCADE', $result->query);
-        $this->assertStringContainsString('ON UPDATE SET NULL', $result->query);
+        $this->assertSame('ALTER TABLE `orders` ADD FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE SET NULL', $result->query);
     }
 
     public function testCreateIndexWithMethod(): void
@@ -1008,7 +978,7 @@ class MySQLTest extends TestCase
         $result = $schema->createIndex('users', 'idx_email', ['email'], method: 'btree');
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('USING BTREE', $result->query);
+        $this->assertSame('CREATE INDEX `idx_email` ON `users` USING BTREE (`email`)', $result->query);
     }
 
     public function testCompileIndexColumnsWithCollation(): void
@@ -1022,7 +992,7 @@ class MySQLTest extends TestCase
         );
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('COLLATE utf8mb4_bin', $result->query);
+        $this->assertSame('CREATE INDEX `idx_name` ON `users` (`name` COLLATE utf8mb4_bin)', $result->query);
     }
 
     public function testCompileIndexColumnsWithLength(): void
@@ -1036,7 +1006,7 @@ class MySQLTest extends TestCase
         );
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`name`(10)', $result->query);
+        $this->assertSame('CREATE INDEX `idx_name` ON `users` (`name`(10))', $result->query);
     }
 
     public function testCompileIndexColumnsWithOrder(): void
@@ -1050,7 +1020,7 @@ class MySQLTest extends TestCase
         );
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`name` DESC', $result->query);
+        $this->assertSame('CREATE INDEX `idx_name` ON `users` (`name` DESC)', $result->query);
     }
 
     public function testCompileIndexColumnsWithOperatorClass(): void
@@ -1064,7 +1034,7 @@ class MySQLTest extends TestCase
         );
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('gin_trgm_ops', $result->query);
+        $this->assertSame('CREATE INDEX `idx_content` ON `docs` (`content` gin_trgm_ops)', $result->query);
     }
 
     public function testCompileIndexColumnsWithRawColumns(): void
@@ -1078,7 +1048,7 @@ class MySQLTest extends TestCase
         );
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CAST(data AS CHAR(100))', $result->query);
+        $this->assertSame('CREATE INDEX `idx_mixed` ON `docs` (`id`, CAST(data AS CHAR(100)))', $result->query);
     }
 
     public function testRenameIndexSql(): void
@@ -1099,8 +1069,7 @@ class MySQLTest extends TestCase
         $result = $schema->dropDatabase('mydb');
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('DROP DATABASE', $result->query);
-        $this->assertStringContainsString('mydb', $result->query);
+        $this->assertSame('DROP DATABASE `mydb`', $result->query);
     }
 
     public function testAnalyzeTable(): void
@@ -1120,7 +1089,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('JSON NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`metadata` JSON NOT NULL)', $result->query);
     }
 
     public function testTableBinaryColumn(): void
@@ -1131,7 +1100,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('BLOB NOT NULL', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`data` BLOB NOT NULL)', $result->query);
     }
 
     public function testColumnCollation(): void
@@ -1158,7 +1127,7 @@ class MySQLTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ADD UNIQUE INDEX', $result->query);
+        $this->assertSame('ALTER TABLE `users` ADD UNIQUE INDEX `idx_name` (`name`)', $result->query);
     }
 
     public function testIndexValidationInvalidMethod(): void
@@ -1194,7 +1163,7 @@ class MySQLTest extends TestCase
         });
 
         // Expect literal sequence: ENUM('a\\','b''c')  (a + two backslashes)
-        $this->assertStringContainsString("ENUM('a\\\\','b''c')", $result->query);
+        $this->assertSame("CREATE TABLE `items` (`status` ENUM('a\\\\','b''c') NOT NULL)", $result->query);
     }
 
     public function testDefaultValueBackslashEscaping(): void
@@ -1205,7 +1174,7 @@ class MySQLTest extends TestCase
             $table->string('name')->default("a\\' OR 1=1 --");
         });
 
-        $this->assertStringContainsString("DEFAULT 'a\\\\'' OR 1=1 --'", $result->query);
+        $this->assertSame("CREATE TABLE `items` (`name` VARCHAR(255) NOT NULL DEFAULT 'a\\\\'' OR 1=1 --')", $result->query);
     }
 
     public function testCommentBackslashEscaping(): void
@@ -1215,7 +1184,7 @@ class MySQLTest extends TestCase
             $table->string('name')->comment('trailing\\');
         });
 
-        $this->assertStringContainsString("COMMENT 'trailing\\\\'", $result->query);
+        $this->assertSame("CREATE TABLE `items` (`name` VARCHAR(255) NOT NULL COMMENT 'trailing\\\\')", $result->query);
     }
 
     public function testTableCommentBackslashEscaping(): void
@@ -1223,7 +1192,7 @@ class MySQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->commentOnTable('items', 'trailing\\');
 
-        $this->assertStringContainsString("COMMENT = 'trailing\\\\'", $result->query);
+        $this->assertSame("ALTER TABLE `items` COMMENT = 'trailing\\\\'", $result->query);
     }
 
     public function testSerialColumnMapsToIntWithAutoIncrement(): void
@@ -1233,8 +1202,7 @@ class MySQLTest extends TestCase
             $table->serial('id')->primary();
         });
 
-        $this->assertStringContainsString('`id` INT', $result->query);
-        $this->assertStringContainsString('AUTO_INCREMENT', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`id` INT AUTO_INCREMENT NOT NULL, PRIMARY KEY (`id`))', $result->query);
     }
 
     public function testBigSerialColumnMapsToBigIntWithAutoIncrement(): void
@@ -1244,8 +1212,7 @@ class MySQLTest extends TestCase
             $table->bigSerial('id')->primary();
         });
 
-        $this->assertStringContainsString('`id` BIGINT', $result->query);
-        $this->assertStringContainsString('AUTO_INCREMENT', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`id` BIGINT AUTO_INCREMENT NOT NULL, PRIMARY KEY (`id`))', $result->query);
     }
 
     public function testUserTypeColumnThrowsUnsupported(): void

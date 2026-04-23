@@ -24,11 +24,7 @@ class MergeTest extends TestCase
             ->executeMerge();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('MERGE INTO "users"', $result->query);
-        $this->assertStringContainsString('USING (', $result->query);
-        $this->assertStringContainsString(') AS "src"', $result->query);
-        $this->assertStringContainsString('WHEN MATCHED THEN UPDATE SET', $result->query);
-        $this->assertStringContainsString('WHEN NOT MATCHED THEN INSERT', $result->query);
+        $this->assertSame('MERGE INTO "users" USING (SELECT "id", "name" FROM "staging") AS "src" ON users.id = src.id WHEN MATCHED THEN UPDATE SET name = src.name WHEN NOT MATCHED THEN INSERT (id, name) VALUES (src.id, src.name)', $result->query);
     }
 
     public function testMergeQuotesTargetIdentifierForPostgreSQL(): void
@@ -43,7 +39,7 @@ class MergeTest extends TestCase
             ->executeMerge();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('MERGE INTO "order_lines"', $result->query);
+        $this->assertSame('MERGE INTO "order_lines" USING (SELECT * FROM "staging") AS "src" ON order_lines.id = src.id WHEN MATCHED THEN UPDATE SET qty = src.qty', $result->query);
     }
 
     public function testMergePreservesSourceFilterBindingsFirst(): void
@@ -95,7 +91,7 @@ class MergeTest extends TestCase
             ->executeMerge();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('WHEN MATCHED', $result->query);
+        $this->assertSame('MERGE INTO "users" USING (SELECT * FROM "staging") AS "src" ON users.id = src.id WHEN MATCHED THEN UPDATE SET name = src.name', $result->query);
         $this->assertStringNotContainsString('WHEN NOT MATCHED', $result->query);
     }
 }

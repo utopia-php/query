@@ -18,7 +18,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('ARRAY_AGG("name") AS "names"', $result->query);
+        $this->assertSame('SELECT ARRAY_AGG("name") AS "names" FROM "users"', $result->query);
     }
 
     public function testBoolAndBoolOrAndEveryEmitCorrectFunctions(): void
@@ -31,9 +31,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('BOOL_AND("a") AS "ba"', $result->query);
-        $this->assertStringContainsString('BOOL_OR("b") AS "bo"', $result->query);
-        $this->assertStringContainsString('EVERY("c") AS "ev"', $result->query);
+        $this->assertSame('SELECT BOOL_AND("a") AS "ba", BOOL_OR("b") AS "bo", EVERY("c") AS "ev" FROM "t"', $result->query);
     }
 
     public function testPercentileContBindsFractionFirst(): void
@@ -44,10 +42,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString(
-            'PERCENTILE_CONT(?) WITHIN GROUP (ORDER BY "value") AS "median"',
-            $result->query,
-        );
+        $this->assertSame('SELECT PERCENTILE_CONT(?) WITHIN GROUP (ORDER BY "value") AS "median" FROM "scores"', $result->query);
         $this->assertSame([0.5], $result->bindings);
     }
 
@@ -59,10 +54,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString(
-            'PERCENTILE_DISC(?) WITHIN GROUP (ORDER BY "value") AS "p95"',
-            $result->query,
-        );
+        $this->assertSame('SELECT PERCENTILE_DISC(?) WITHIN GROUP (ORDER BY "value") AS "p95" FROM "scores"', $result->query);
         $this->assertSame([0.95], $result->bindings);
     }
 
@@ -74,7 +66,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('ARRAY_AGG("name")', $result->query);
+        $this->assertSame('SELECT ARRAY_AGG("name") FROM "users"', $result->query);
         $this->assertStringNotContainsString('AS ""', $result->query);
     }
 
@@ -86,10 +78,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString(
-            'MODE() WITHIN GROUP (ORDER BY "city")',
-            $result->query,
-        );
+        $this->assertSame('SELECT MODE() WITHIN GROUP (ORDER BY "city") FROM "users"', $result->query);
         $this->assertStringNotContainsString('AS ""', $result->query);
     }
 
@@ -101,10 +90,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString(
-            'MODE() WITHIN GROUP (ORDER BY "city") AS "top_city"',
-            $result->query,
-        );
+        $this->assertSame('SELECT MODE() WITHIN GROUP (ORDER BY "city") AS "top_city" FROM "users"', $result->query);
     }
 
     public function testModeWithQualifiedColumn(): void
@@ -115,10 +101,7 @@ class OrderedSetAggregatesTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString(
-            'MODE() WITHIN GROUP (ORDER BY "users"."city") AS "top_city"',
-            $result->query,
-        );
+        $this->assertSame('SELECT MODE() WITHIN GROUP (ORDER BY "users"."city") AS "top_city" FROM "users"', $result->query);
     }
 
     public function testTwoPercentilesBindFractionsInCallOrder(): void

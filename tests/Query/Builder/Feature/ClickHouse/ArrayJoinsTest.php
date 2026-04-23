@@ -19,7 +19,7 @@ class ArrayJoinsTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('ARRAY JOIN `tags`', $result->query);
+        $this->assertSame('SELECT * FROM `events` ARRAY JOIN `tags`', $result->query);
     }
 
     public function testArrayJoinWithAliasQuotesBothColumnAndAlias(): void
@@ -30,7 +30,7 @@ class ArrayJoinsTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('ARRAY JOIN `tags` AS `tag`', $result->query);
+        $this->assertSame('SELECT * FROM `events` ARRAY JOIN `tags` AS `tag`', $result->query);
     }
 
     public function testLeftArrayJoinPrefixesLeft(): void
@@ -41,7 +41,7 @@ class ArrayJoinsTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('LEFT ARRAY JOIN `tags`', $result->query);
+        $this->assertSame('SELECT * FROM `events` LEFT ARRAY JOIN `tags`', $result->query);
     }
 
     public function testLeftArrayJoinWithAliasFormatsAsClause(): void
@@ -52,7 +52,7 @@ class ArrayJoinsTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('LEFT ARRAY JOIN `tags` AS `tag`', $result->query);
+        $this->assertSame('SELECT * FROM `events` LEFT ARRAY JOIN `tags` AS `tag`', $result->query);
     }
 
     public function testArrayJoinWithEmptyAliasOmitsAsClause(): void
@@ -63,7 +63,7 @@ class ArrayJoinsTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('ARRAY JOIN `tags`', $result->query);
+        $this->assertSame('SELECT * FROM `events` ARRAY JOIN `tags`', $result->query);
         $this->assertStringNotContainsString('AS ``', $result->query);
     }
 

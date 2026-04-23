@@ -128,7 +128,7 @@ class SecurityRegressionTest extends TestCase
 
         // Pre-fix: the trailing backslash could escape the closing quote. After
         // the fix it must appear doubled inside the literal.
-        $this->assertStringContainsString("'bad\\\\'", $plan->query);
+        $this->assertSame("CREATE TABLE `widgets` (`grade` ENUM('A','B','bad\\\\') NOT NULL)", $plan->query);
     }
 
     public function testPostgreSqlCreateCollationRejectsInvalidOptionKey(): void
@@ -159,7 +159,7 @@ class SecurityRegressionTest extends TestCase
             $t->string('body')->default("evil\\");
         });
 
-        $this->assertStringContainsString("'evil\\\\'", $plan->query);
+        $this->assertSame("CREATE TABLE `notes` (`body` VARCHAR(255) NOT NULL DEFAULT 'evil\\\\')", $plan->query);
     }
 
     public function testQueryParseRejectsRawByDefault(): void
@@ -293,7 +293,7 @@ class SecurityRegressionTest extends TestCase
             ->selectCast('c', 'DECIMAL(10, 2)', 'a')
             ->build();
 
-        $this->assertStringContainsString('CAST(`c` AS DECIMAL(10, 2))', $result->query);
+        $this->assertSame('SELECT CAST(`c` AS DECIMAL(10, 2)) AS `a` FROM `t`', $result->query);
     }
 
     public function testExtractFirstBsonKeyRejectsOutOfBoundsDocLength(): void
@@ -336,7 +336,7 @@ class SecurityRegressionTest extends TestCase
     {
         $result = (new MySQLBuilder())->from('users')->build();
 
-        $this->assertStringContainsString('`users`', $result->query);
+        $this->assertSame('SELECT * FROM `users`', $result->query);
     }
 
     public function testJoinOnRejectsInjectionInLeftIdentifier(): void

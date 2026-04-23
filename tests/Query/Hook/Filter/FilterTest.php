@@ -117,7 +117,7 @@ class FilterTest extends TestCase
         );
         $condition = $hook->filter('any_table');
 
-        $this->assertStringContainsString('FROM permissions', $condition->expression);
+        $this->assertSame('id IN (SELECT DISTINCT document_id FROM permissions WHERE role IN (?) AND type = ?)', $condition->expression);
     }
 
     public function testPermissionWithColumns(): void
@@ -240,7 +240,7 @@ class FilterTest extends TestCase
         );
         $condition = $hook->filter('users');
 
-        $this->assertStringContainsString('AND tenant_id IN (?)', $condition->expression);
+        $this->assertSame('id IN (SELECT DISTINCT document_id FROM perms WHERE role IN (?) AND type = ? AND tenant_id IN (?))', $condition->expression);
         $this->assertContains('t1', $condition->bindings);
     }
 

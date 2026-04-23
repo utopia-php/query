@@ -30,7 +30,7 @@ class SpatialTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('ST_Intersects(`area`', $result->query);
+        $this->assertSame('SELECT * FROM `zones` WHERE ST_Intersects(`area`, ST_GeomFromText(?, 4326, \'axis-order=long-lat\'))', $result->query);
     }
 
     public function testFilterIntersectsQuotesIdentifierForPostgreSQL(): void
@@ -41,7 +41,7 @@ class SpatialTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('ST_Intersects("area"', $result->query);
+        $this->assertSame('SELECT * FROM "zones" WHERE ST_Intersects("area", ST_GeomFromText(?, 4326))', $result->query);
     }
 
     public function testFilterNotIntersectsWrapsWithNot(): void
@@ -52,7 +52,7 @@ class SpatialTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('NOT ST_Intersects', $result->query);
+        $this->assertSame('SELECT * FROM `zones` WHERE NOT ST_Intersects(`area`, ST_GeomFromText(?, 4326, \'axis-order=long-lat\'))', $result->query);
     }
 
     public function testFilterCoversProducesStCoversOnPostgreSQL(): void
@@ -63,7 +63,7 @@ class SpatialTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('ST_Covers(', $result->query);
+        $this->assertSame('SELECT * FROM "zones" WHERE ST_Covers("region", ST_GeomFromText(?, 4326))', $result->query);
     }
 
     public function testFilterSpatialEqualsProducesStEquals(): void
@@ -74,7 +74,7 @@ class SpatialTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('ST_Equals(', $result->query);
+        $this->assertSame('SELECT * FROM `zones` WHERE ST_Equals(`area`, ST_GeomFromText(?, 4326, \'axis-order=long-lat\'))', $result->query);
     }
 
     public function testFilterTouchesProducesStTouches(): void
@@ -85,7 +85,7 @@ class SpatialTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('ST_Touches(', $result->query);
+        $this->assertSame('SELECT * FROM `zones` WHERE ST_Touches(`area`, ST_GeomFromText(?, 4326, \'axis-order=long-lat\'))', $result->query);
     }
 
     public function testFilterCrossesLineStringBindingIsLinestringWkt(): void
@@ -97,7 +97,7 @@ class SpatialTest extends TestCase
 
         $this->assertBindingCount($result);
         $this->assertIsString($result->bindings[0]);
-        $this->assertStringContainsString('LINESTRING', $result->bindings[0]);
+        $this->assertSame('LINESTRING(0 0, 1 1)', $result->bindings[0]);
     }
 
     public function testFilterOverlapsChainedAddsAllBindings(): void

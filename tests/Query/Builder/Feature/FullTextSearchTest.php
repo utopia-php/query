@@ -81,7 +81,7 @@ class FullTextSearchTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('1 = 0', $result->query);
+        $this->assertSame('SELECT * FROM `articles` WHERE 1 = 0', $result->query);
         $this->assertSame([], $result->bindings);
     }
 

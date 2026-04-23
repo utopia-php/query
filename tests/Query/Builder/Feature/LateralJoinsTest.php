@@ -23,8 +23,7 @@ class LateralJoinsTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('JOIN LATERAL (', $result->query);
-        $this->assertStringContainsString(') AS "o" ON true', $result->query);
+        $this->assertSame('SELECT * FROM "users" JOIN LATERAL (SELECT "id" FROM "orders") AS "o" ON true', $result->query);
     }
 
     public function testLeftJoinLateralEmitsLeftJoinLateral(): void
@@ -37,7 +36,7 @@ class LateralJoinsTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('LEFT JOIN LATERAL (', $result->query);
+        $this->assertSame('SELECT * FROM "users" LEFT JOIN LATERAL (SELECT "id" FROM "orders") AS "o" ON true', $result->query);
     }
 
     public function testJoinLateralWithLeftTypeEmitsLeftVariant(): void
@@ -50,7 +49,7 @@ class LateralJoinsTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('LEFT JOIN LATERAL', $result->query);
+        $this->assertSame('SELECT * FROM "users" LEFT JOIN LATERAL (SELECT "id" FROM "orders") AS "o" ON true', $result->query);
     }
 
     public function testJoinLateralPreservesSubqueryBindingsInOrder(): void
@@ -78,7 +77,6 @@ class LateralJoinsTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('JOIN LATERAL (', $result->query);
-        $this->assertStringContainsString(') AS `o`', $result->query);
+        $this->assertSame('SELECT * FROM `users` JOIN LATERAL (SELECT `id` FROM `orders`) AS `o` ON true', $result->query);
     }
 }

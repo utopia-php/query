@@ -99,7 +99,7 @@ class CorrectnessRegressionTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('/*+ INDEX(`users` `idx_users_age`) */', $result->query);
+        $this->assertSame('SELECT /*+ INDEX(`users` `idx_users_age`) */ * FROM `users`', $result->query);
     }
 
     public function testSQLiteUnionEmitsBareCompound(): void
@@ -119,7 +119,7 @@ class CorrectnessRegressionTest extends TestCase
 
         $this->assertStringStartsNotWith('(', $result->query);
         $this->assertStringNotContainsString(') UNION (', $result->query);
-        $this->assertStringContainsString(' UNION ', $result->query);
+        $this->assertSame('SELECT `id` FROM `users` UNION SELECT `id` FROM `archived_users`', $result->query);
     }
 
     public function testClickHouseAlterRejectsEmptyAlterations(): void
@@ -145,9 +145,8 @@ class CorrectnessRegressionTest extends TestCase
         $tokens = $tokenizer->tokenize("SELECT 1 # tail\nFROM `users`");
 
         $joined = \implode(' ', \array_map(fn ($t) => $t->value, $tokens));
-        $this->assertStringContainsString('SELECT', $joined);
-        $this->assertStringContainsString('FROM', $joined);
-        $this->assertStringContainsString('`users`', $joined);
+        $this->assertSame('SELECT   1   --  tail 
+ FROM   `users` ', $joined);
     }
 
     public function testStatementCarriesMongoArrayFilters(): void
@@ -255,10 +254,7 @@ class CorrectnessRegressionTest extends TestCase
             ])
             ->build();
 
-        $this->assertStringContainsString('ORDER BY', $plan->query);
-        $this->assertStringContainsString('`name` ASC', $plan->query);
-        $this->assertStringContainsString('`age` DESC', $plan->query);
-        $this->assertStringContainsString('RAND()', $plan->query);
+        $this->assertSame('SELECT * FROM `t` ORDER BY `name` ASC, `age` DESC, RAND()', $plan->query);
     }
 
     public function testResetClearsAliasQualificationState(): void
@@ -357,8 +353,7 @@ class CorrectnessRegressionTest extends TestCase
             ->queries([Query::limit(10), Query::offset(5)])
             ->build();
 
-        $this->assertStringContainsString('LIMIT ?', $plan->query);
-        $this->assertStringContainsString('OFFSET ?', $plan->query);
+        $this->assertSame('SELECT * FROM `t` LIMIT ? OFFSET ?', $plan->query);
     }
 
     public function testOffsetWithoutLimitStillWorksOnPostgreSQL(): void
@@ -368,7 +363,7 @@ class CorrectnessRegressionTest extends TestCase
             ->queries([Query::offset(5)])
             ->build();
 
-        $this->assertStringContainsString('OFFSET ?', $plan->query);
+        $this->assertSame('SELECT * FROM "t" OFFSET ?', $plan->query);
         $this->assertStringNotContainsString('LIMIT ?', $plan->query);
     }
 

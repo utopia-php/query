@@ -27,10 +27,7 @@ class AsofJoinsTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString(
-            'ASOF JOIN `quotes` ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`ts` >= `quotes`.`ts`',
-            $result->query,
-        );
+        $this->assertSame('SELECT * FROM `trades` ASOF JOIN `quotes` ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`ts` >= `quotes`.`ts`', $result->query);
     }
 
     public function testAsofJoinWithAliasUsesAliasInOnClause(): void
@@ -48,10 +45,7 @@ class AsofJoinsTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString(
-            'ASOF JOIN `quotes` AS `q` ON `trades`.`symbol` = `q`.`symbol` AND `trades`.`ts` > `q`.`ts`',
-            $result->query,
-        );
+        $this->assertSame('SELECT * FROM `trades` ASOF JOIN `quotes` AS `q` ON `trades`.`symbol` = `q`.`symbol` AND `trades`.`ts` > `q`.`ts`', $result->query);
     }
 
     public function testAsofJoinSupportsMultipleEquiPairs(): void
@@ -71,10 +65,7 @@ class AsofJoinsTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString(
-            'ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`exchange` = `quotes`.`exchange` AND `trades`.`ts` >= `quotes`.`ts`',
-            $result->query,
-        );
+        $this->assertSame('SELECT * FROM `trades` ASOF JOIN `quotes` ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`exchange` = `quotes`.`exchange` AND `trades`.`ts` >= `quotes`.`ts`', $result->query);
     }
 
     public function testAsofLeftJoinEmitsAsofLeftJoinKeyword(): void
@@ -91,7 +82,7 @@ class AsofJoinsTest extends TestCase
             ->build();
 
         $this->assertBindingCount($result);
-        $this->assertStringContainsString('ASOF LEFT JOIN `quotes`', $result->query);
+        $this->assertSame('SELECT * FROM `trades` ASOF LEFT JOIN `quotes` ON `trades`.`symbol` = `quotes`.`symbol` AND `trades`.`ts` >= `quotes`.`ts`', $result->query);
     }
 
     public function testAsofJoinRejectsEmptyEquiPairs(): void

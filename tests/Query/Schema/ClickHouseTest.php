@@ -33,12 +33,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CREATE TABLE `events`', $result->query);
-        $this->assertStringContainsString('`id` Int64', $result->query);
-        $this->assertStringContainsString('`name` String', $result->query);
-        $this->assertStringContainsString('`created_at` DateTime64(3)', $result->query);
-        $this->assertStringContainsString('ENGINE = MergeTree()', $result->query);
-        $this->assertStringContainsString('ORDER BY (`id`)', $result->query);
+        $this->assertSame('CREATE TABLE `events` (`id` Int64, `name` String, `created_at` DateTime64(3)) ENGINE = MergeTree() ORDER BY (`id`)', $result->query);
     }
 
     public function testCreateTableColumnTypes(): void
@@ -57,15 +52,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`int_col` Int32', $result->query);
-        $this->assertStringContainsString('`uint_col` UInt32', $result->query);
-        $this->assertStringContainsString('`big_col` Int64', $result->query);
-        $this->assertStringContainsString('`ubig_col` UInt64', $result->query);
-        $this->assertStringContainsString('`float_col` Float64', $result->query);
-        $this->assertStringContainsString('`bool_col` UInt8', $result->query);
-        $this->assertStringContainsString('`text_col` String', $result->query);
-        $this->assertStringContainsString('`json_col` String', $result->query);
-        $this->assertStringContainsString('`bin_col` String', $result->query);
+        $this->assertSame('CREATE TABLE `test_types` (`int_col` Int32, `uint_col` UInt32, `big_col` Int64, `ubig_col` UInt64, `float_col` Float64, `bool_col` UInt8, `text_col` String, `json_col` String, `bin_col` String) ENGINE = MergeTree() ORDER BY tuple()', $result->query);
     }
 
     public function testCreateTableNullableWrapping(): void
@@ -76,7 +63,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('Nullable(String)', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`name` Nullable(String)) ENGINE = MergeTree() ORDER BY tuple()', $result->query);
     }
 
     public function testCreateTableWithEnum(): void
@@ -87,7 +74,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("Enum8('active' = 1, 'inactive' = 2)", $result->query);
+        $this->assertSame('CREATE TABLE `t` (`status` Enum8(\'active\' = 1, \'inactive\' = 2)) ENGINE = MergeTree() ORDER BY tuple()', $result->query);
     }
 
     public function testCreateTableWithVector(): void
@@ -98,7 +85,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('Array(Float64)', $result->query);
+        $this->assertSame('CREATE TABLE `embeddings` (`embedding` Array(Float64)) ENGINE = MergeTree() ORDER BY tuple()', $result->query);
     }
 
     public function testCreateTableWithSpatialTypes(): void
@@ -111,9 +98,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('Tuple(Float64, Float64)', $result->query);
-        $this->assertStringContainsString('Array(Tuple(Float64, Float64))', $result->query);
-        $this->assertStringContainsString('Array(Array(Tuple(Float64, Float64)))', $result->query);
+        $this->assertSame('CREATE TABLE `geo` (`coords` Tuple(Float64, Float64), `path` Array(Tuple(Float64, Float64)), `area` Array(Array(Tuple(Float64, Float64)))) ENGINE = MergeTree() ORDER BY tuple()', $result->query);
     }
 
     public function testCreateTableForeignKeyThrows(): void
@@ -137,7 +122,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('INDEX `idx_name` `name` TYPE minmax GRANULARITY 3', $result->query);
+        $this->assertSame('CREATE TABLE `events` (`id` Int64, `name` String, INDEX `idx_name` `name` TYPE minmax GRANULARITY 3) ENGINE = MergeTree() ORDER BY (`id`)', $result->query);
     }
     // ALTER TABLE
 
@@ -281,7 +266,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('DEFAULT 0', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`id` Int64, `count` Int32 DEFAULT 0) ENGINE = MergeTree() ORDER BY (`id`)', $result->query);
     }
 
     public function testCreateTableWithComment(): void
@@ -293,7 +278,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString("COMMENT 'User name'", $result->query);
+        $this->assertSame('CREATE TABLE `t` (`id` Int64, `name` String COMMENT \'User name\') ENGINE = MergeTree() ORDER BY (`id`)', $result->query);
     }
 
     public function testCreateTableMultiplePrimaryKeys(): void
@@ -306,7 +291,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY (`id`, `created_at`)', $result->query);
+        $this->assertSame('CREATE TABLE `events` (`id` Int64, `created_at` DateTime64(3), `name` String) ENGINE = MergeTree() ORDER BY (`id`, `created_at`)', $result->query);
     }
 
     public function testCreateTableWithCompositePrimaryKey(): void
@@ -320,7 +305,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ORDER BY (`id`, `created_at`)', $result->query);
+        $this->assertSame('CREATE TABLE `events` (`id` Int64, `created_at` DateTime64(3), `name` String) ENGINE = MergeTree() ORDER BY (`id`, `created_at`)', $result->query);
     }
 
     public function testCreateTableRejectsMixedColumnAndTablePrimary(): void
@@ -347,9 +332,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ADD COLUMN `score` Float64', $result->query);
-        $this->assertStringContainsString('DROP COLUMN `old_col`', $result->query);
-        $this->assertStringContainsString('RENAME COLUMN `nm` TO `name`', $result->query);
+        $this->assertSame('ALTER TABLE `events` ADD COLUMN `score` Float64, RENAME COLUMN `nm` TO `name`, DROP COLUMN `old_col`', $result->query);
     }
 
     public function testAlterDropIndex(): void
@@ -360,7 +343,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('DROP INDEX `idx_name`', $result->query);
+        $this->assertSame('ALTER TABLE `events` DROP INDEX `idx_name`', $result->query);
     }
 
     public function testCreateTableWithMultipleIndexes(): void
@@ -375,8 +358,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('INDEX `idx_name`', $result->query);
-        $this->assertStringContainsString('INDEX `idx_type`', $result->query);
+        $this->assertSame('CREATE TABLE `events` (`id` Int64, `name` String, `type` String, INDEX `idx_name` `name` TYPE minmax GRANULARITY 3, INDEX `idx_type` `type` TYPE minmax GRANULARITY 3) ENGINE = MergeTree() ORDER BY (`id`)', $result->query);
     }
 
     public function testCreateTableTimestampWithoutPrecision(): void
@@ -388,7 +370,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`ts_col` DateTime', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`id` Int64, `ts_col` DateTime) ENGINE = MergeTree() ORDER BY (`id`)', $result->query);
         $this->assertStringNotContainsString('DateTime64', $result->query);
     }
 
@@ -401,7 +383,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`dt_col` DateTime', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`id` Int64, `dt_col` DateTime) ENGINE = MergeTree() ORDER BY (`id`)', $result->query);
         $this->assertStringNotContainsString('DateTime64', $result->query);
     }
 
@@ -417,7 +399,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         // Composite index wraps in parentheses
-        $this->assertStringContainsString('INDEX `idx_name_type` (`name`, `type`) TYPE minmax GRANULARITY 3', $result->query);
+        $this->assertSame('CREATE TABLE `events` (`id` Int64, `name` String, `type` String, INDEX `idx_name_type` (`name`, `type`) TYPE minmax GRANULARITY 3) ENGINE = MergeTree() ORDER BY (`id`)', $result->query);
     }
 
     public function testAlterForeignKeyStillThrows(): void
@@ -526,9 +508,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('PARTITION BY toYYYYMM(created_at)', $result->query);
-        $this->assertStringContainsString('ENGINE = MergeTree()', $result->query);
-        $this->assertStringContainsString('ORDER BY (`id`)', $result->query);
+        $this->assertSame('CREATE TABLE `events` (`id` Int64, `name` String, `created_at` DateTime64(3)) ENGINE = MergeTree() PARTITION BY toYYYYMM(created_at) ORDER BY (`id`)', $result->query);
     }
 
     public function testCreateTableIfNotExists(): void
@@ -540,7 +520,7 @@ class ClickHouseTest extends TestCase
         }, ifNotExists: true);
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('CREATE TABLE IF NOT EXISTS `events`', $result->query);
+        $this->assertSame('CREATE TABLE IF NOT EXISTS `events` (`id` Int64, `name` String) ENGINE = MergeTree() ORDER BY (`id`)', $result->query);
     }
 
     public function testCompileAutoIncrementReturnsEmpty(): void
@@ -563,7 +543,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`val` UInt32', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`val` UInt32) ENGINE = MergeTree() ORDER BY tuple()', $result->query);
         $this->assertStringNotContainsString('UNSIGNED', $result->query);
     }
 
@@ -572,7 +552,7 @@ class ClickHouseTest extends TestCase
         $schema = new Schema();
         $result = $schema->commentOnTable('events', "User's events");
 
-        $this->assertStringContainsString("'User''s events'", $result->query);
+        $this->assertSame('ALTER TABLE `events` MODIFY COMMENT \'User\'\'s events\'', $result->query);
     }
 
     public function testCommentOnColumnEscapesSingleQuotes(): void
@@ -580,7 +560,7 @@ class ClickHouseTest extends TestCase
         $schema = new Schema();
         $result = $schema->commentOnColumn('events', 'name', "It's a name");
 
-        $this->assertStringContainsString("'It''s a name'", $result->query);
+        $this->assertSame('ALTER TABLE `events` COMMENT COLUMN `name` \'It\'\'s a name\'', $result->query);
     }
 
     public function testDropPartitionEscapesSingleQuotes(): void
@@ -588,7 +568,7 @@ class ClickHouseTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropPartition('events', "test'val");
 
-        $this->assertStringContainsString("'test''val'", $result->query);
+        $this->assertSame('ALTER TABLE `events` DROP PARTITION \'test\'\'val\'', $result->query);
     }
 
     public function testEnumEscapesBackslash(): void
@@ -601,7 +581,7 @@ class ClickHouseTest extends TestCase
         });
 
         // Output literal: 'a\\\'b' (a, 2 backslashes, escaped quote, b)
-        $this->assertStringContainsString("'a\\\\\\'b'", $result->query);
+        $this->assertSame("CREATE TABLE `items` (`status` Enum8('a\\\\\\'b' = 1)) ENGINE = MergeTree() ORDER BY tuple()", $result->query);
     }
 
     public function testCreateMergeTreeWithoutPrimaryKeysEmitsOrderByTuple(): void
@@ -613,8 +593,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ENGINE = MergeTree()', $result->query);
-        $this->assertStringContainsString('ORDER BY tuple()', $result->query);
+        $this->assertSame('CREATE TABLE `events` (`name` String, `count` Int32) ENGINE = MergeTree() ORDER BY tuple()', $result->query);
         $this->assertStringNotContainsString('ORDER BY (', $result->query);
     }
 
@@ -639,8 +618,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ENGINE = ReplacingMergeTree(`version`)', $result->query);
-        $this->assertStringContainsString('ORDER BY (`id`)', $result->query);
+        $this->assertSame('CREATE TABLE `events` (`id` Int64, `version` Int32) ENGINE = ReplacingMergeTree(`version`) ORDER BY (`id`)', $result->query);
     }
 
     public function testCreateSummingMergeTreeEmitsEngineWithColumns(): void
@@ -654,7 +632,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ENGINE = SummingMergeTree(`total`, `count`)', $result->query);
+        $this->assertSame('CREATE TABLE `metrics` (`key` Int32, `total` UInt64, `count` UInt64) ENGINE = SummingMergeTree(`total`, `count`) ORDER BY (`key`)', $result->query);
     }
 
     public function testCreateCollapsingMergeTreeRejectsMissingSignColumn(): void
@@ -679,7 +657,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ENGINE = Memory', $result->query);
+        $this->assertSame('CREATE TABLE `cache` (`id` Int32, `value` String) ENGINE = Memory', $result->query);
         $this->assertStringNotContainsString('ORDER BY', $result->query);
     }
 
@@ -692,7 +670,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('ENGINE = AggregatingMergeTree()', $result->query);
+        $this->assertSame('CREATE TABLE `agg` (`key` Int32) ENGINE = AggregatingMergeTree() ORDER BY (`key`)', $result->query);
     }
 
     public function testCreateReplicatedMergeTreeRejectsMissingArgs(): void
@@ -716,8 +694,7 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('TTL ts + INTERVAL 1 DAY', $result->query);
-        $this->assertStringContainsString('ORDER BY (`id`)', $result->query);
+        $this->assertSame('CREATE TABLE `events` (`id` Int32, `ts` DateTime) ENGINE = MergeTree() ORDER BY (`id`) TTL ts + INTERVAL 1 DAY', $result->query);
     }
 
     public function testTableLevelTTLRejectsSemicolon(): void
@@ -741,6 +718,6 @@ class ClickHouseTest extends TestCase
         });
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('`temporary` String TTL ts + INTERVAL 1 DAY', $result->query);
+        $this->assertSame('CREATE TABLE `events` (`id` Int32, `temporary` String TTL ts + INTERVAL 1 DAY, `ts` DateTime) ENGINE = MergeTree() ORDER BY (`id`)', $result->query);
     }
 }
