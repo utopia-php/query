@@ -1585,7 +1585,7 @@ $result = (new Builder())
 $result = (new Builder())
     ->into('counters')
     ->set(['key' => 'visits', 'value' => 1])
-    ->onConflict(['key'])
+    ->onConflict(['key'], ['value'])
     ->upsert();
 ```
 
