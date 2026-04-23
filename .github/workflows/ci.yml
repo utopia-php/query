@@ -220,7 +220,7 @@ jobs:
           CLASSES_TOTAL: ${{ steps.coverage.outputs.classes_total }}
         run: |
           {
-            echo "## Coverage summary (unit + integration)"
+            echo "## Coverage"
             echo ""
             echo "| Metric | Covered | Ratio |"
             echo "|---|---|---|"
@@ -244,7 +244,7 @@ jobs:
         with:
           header: coverage
           message: |
-            ## 📊 Coverage (unit + integration)
+            ## 📊 Coverage
 
             | Metric | Covered | Ratio |
             |---|---|---|
