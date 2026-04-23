@@ -136,120 +136,19 @@ jobs:
           retention-days: 1
 
   baseline:
-    name: Baseline Coverage (main)
+    name: Fetch Baseline Coverage
     runs-on: ubuntu-latest
-    # If main is broken we still want PR coverage to post. Don't block the coverage job.
-    continue-on-error: true
-
-    services:
-      mysql:
-        image: mysql:8.4
-        ports:
-          - 13306:3306
-        env:
-          MYSQL_ROOT_PASSWORD: test
-          MYSQL_DATABASE: query_test
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-      mariadb:
-        image: mariadb:11
-        ports:
-          - 13307:3306
-        env:
-          MARIADB_ROOT_PASSWORD: test
-          MARIADB_DATABASE: query_test
-        options: >-
-          --health-cmd="mariadb-admin ping -h localhost"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-      postgres:
-        image: pgvector/pgvector:pg16
-        ports:
-          - 15432:5432
-        env:
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: query_test
-        options: >-
-          --health-cmd="pg_isready"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-      clickhouse:
-        image: clickhouse/clickhouse-server:24
-        ports:
-          - 18123:8123
-          - 19000:9000
-        env:
-          CLICKHOUSE_DB: query_test
-        options: >-
-          --health-cmd="wget --spider -q http://localhost:8123/ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-      mongodb:
-        image: mongo:7
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd="mongosh --eval 'db.runCommand({ping:1})'"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
 
     steps:
-      - name: Checkout main
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          ref: ${{ github.event.pull_request.base.ref }}
-
-      - name: Record baseline SHA
-        id: baseline_sha
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
       - name: Restore baseline cache
         id: baseline_cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: coverage/baseline.xml
-          key: coverage-baseline-${{ steps.baseline_sha.outputs.sha }}
+          key: coverage-baseline-${{ github.event.pull_request.base.sha }}
 
-      - name: Set up PHP
-        if: steps.baseline_cache.outputs.cache-hit != 'true'
-        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # 2.37.0
-        with:
-          php-version: '8.4'
-          extensions: pdo, pdo_mysql, pdo_pgsql, mongodb
-          coverage: pcov
-
-      - name: Install dependencies
-        if: steps.baseline_cache.outputs.cache-hit != 'true'
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Create coverage directory
-        if: steps.baseline_cache.outputs.cache-hit != 'true'
-        run: mkdir -p coverage
-
-      - name: Run unit tests with coverage
-        if: steps.baseline_cache.outputs.cache-hit != 'true'
-        run: composer test:coverage
-
-      - name: Run integration tests with coverage
-        if: steps.baseline_cache.outputs.cache-hit != 'true'
-        run: composer test:integration:coverage
-
-      - name: Merge baseline coverage
-        if: steps.baseline_cache.outputs.cache-hit != 'true'
-        run: ./vendor/bin/phpcov merge --clover coverage/baseline.xml coverage
-
-      - name: Upload baseline coverage
+      - name: Upload baseline artifact
+        if: steps.baseline_cache.outputs.cache-hit == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-baseline
