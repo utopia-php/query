@@ -59,11 +59,9 @@ use Utopia\Query\Tokenizer\MySQL as MySQLTokenizer;
  *      testParsedQueryHasNoOrderAttributesField
  *      testParsedQueryHasNoOrderTypesField
  *      testOrderingStillEmittedThroughPendingQueries
- *  - fix(builder): clear filter/attribute/join hooks and transient build state on reset()
- *      testResetClearsFilterHooks
- *      testResetClearsAttributeHooks
- *      testResetClearsJoinFilterHooks
- *      testResetClearsExecutor
+ *  - fix(builder): clear transient alias-qualification state on reset()
+ *      testResetClearsAliasQualificationState
+ *      testResetPreservesUserInstalledHooks
  *  - fix(builder): throw when OFFSET is requested without LIMIT on MySQL-family dialects
  *      testOffsetWithoutLimitThrowsOnMySQL
  *      testOffsetWithLimitStillWorksOnMySQL
@@ -264,26 +262,51 @@ class CorrectnessRegressionTest extends TestCase
         $this->assertStringContainsString('RAND()', $plan->query);
     }
 
-    public function testResetClearsFilterHooks(): void
+    public function testResetClearsAliasQualificationState(): void
     {
+        // prepareAliasQualification() sets $qualify and $aggregationAliases
+        // on each build(). reset() must clear both so the builder is in a
+        // clean state between builds — the values are per-build transient
+        // and not part of the user-facing API surface.
         $builder = new MySQLBuilder();
-        $builder->from('t')->addHook(new class () implements FilterHook {
-            public function filter(string $table): Condition
-            {
-                return new Condition('1 = 1', []);
-            }
-        });
+        $builder
+            ->from('users', 'u')
+            ->queries([
+                Query::join('orders', 'id', 'user_id', '=', 'o'),
+                Query::sum('amount', 'total'),
+            ])
+            ->build();
+
+        $qualify = new \ReflectionProperty(Builder::class, 'qualify');
+        $aggregationAliases = new \ReflectionProperty(Builder::class, 'aggregationAliases');
+
+        $this->assertTrue($qualify->getValue($builder));
+        $this->assertNotSame([], $aggregationAliases->getValue($builder));
+
         $builder->reset();
 
-        $plan = $builder->from('t')->build();
-        // Pre-fix: the hook survives reset() and injects "1 = 1" into the
-        // second build. Post-fix: reset() drops the hook.
-        $this->assertStringNotContainsString('1 = 1', $plan->query);
+        $this->assertFalse($qualify->getValue($builder), 'reset() must clear $qualify.');
+        $this->assertSame([], $aggregationAliases->getValue($builder), 'reset() must clear $aggregationAliases.');
     }
 
-    public function testResetClearsAttributeHooks(): void
+    public function testResetPreservesUserInstalledHooks(): void
     {
-        $hook = new class () implements Attribute {
+        // Hooks and the executor are user-installed infrastructure, orthogonal
+        // to per-query state. They MUST survive reset() — this is the
+        // contract established by testResetPreservesConditionProviders and
+        // testResetPreservesAttributeResolver in MySQLTest.
+        $builder = new MySQLBuilder();
+        $filterHook = new class () implements FilterHook {
+            public int $calls = 0;
+
+            public function filter(string $table): Condition
+            {
+                $this->calls++;
+
+                return new Condition('1 = 1', []);
+            }
+        };
+        $attributeHook = new class () implements Attribute {
             public int $calls = 0;
 
             public function resolve(string $attribute): string
@@ -293,18 +316,7 @@ class CorrectnessRegressionTest extends TestCase
                 return $attribute;
             }
         };
-
-        $builder = new MySQLBuilder();
-        $builder->from('t')->addHook($hook);
-        $builder->reset();
-
-        $builder->from('t')->queries([Query::equal('id', [1])])->build();
-        $this->assertSame(0, $hook->calls, 'Attribute hook must not survive reset().');
-    }
-
-    public function testResetClearsJoinFilterHooks(): void
-    {
-        $hook = new class () implements JoinFilterHook {
+        $joinHook = new class () implements JoinFilterHook {
             public int $calls = 0;
 
             public function filterJoin(string $table, JoinType $joinType): ?JoinHookCondition
@@ -315,27 +327,20 @@ class CorrectnessRegressionTest extends TestCase
             }
         };
 
-        $builder = new MySQLBuilder();
-        $builder->from('users', 'u')->addHook($hook);
+        $builder->from('t')->addHook($filterHook)->addHook($attributeHook)->addHook($joinHook);
         $builder->reset();
 
         $builder
             ->from('users', 'u')
-            ->queries([Query::join('orders', 'id', 'user_id', '=', 'o')])
+            ->queries([
+                Query::equal('id', [1]),
+                Query::join('orders', 'id', 'user_id', '=', 'o'),
+            ])
             ->build();
 
-        $this->assertSame(0, $hook->calls, 'Join filter hook must not survive reset().');
-    }
-
-    public function testResetClearsExecutor(): void
-    {
-        $builder = new MySQLBuilder();
-        $builder->from('t')->setExecutor(fn ($_) => []);
-        $builder->reset();
-
-        $plan = $builder->from('t')->build();
-        $this->expectException(BadMethodCallException::class);
-        $plan->execute();
+        $this->assertGreaterThan(0, $filterHook->calls, 'Filter hook must survive reset().');
+        $this->assertGreaterThan(0, $attributeHook->calls, 'Attribute hook must survive reset().');
+        $this->assertGreaterThan(0, $joinHook->calls, 'Join filter hook must survive reset().');
     }
 
     public function testOffsetWithoutLimitThrowsOnMySQL(): void

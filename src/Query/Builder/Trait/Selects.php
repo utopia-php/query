@@ -440,12 +440,14 @@ trait Selects
         $this->afterBuildCallbacks = [];
         $this->fetchCount = null;
         $this->fetchWithTies = false;
-        $this->filterHooks = [];
-        $this->attributeHooks = [];
-        $this->joinFilterHooks = [];
+        // Transient build state — set by prepareAliasQualification() on every
+        // build(). Clearing them here keeps reset() audit-complete: every
+        // field mutated in build*/compile* paths is reset. Hook arrays and
+        // the executor closure are user-installed infrastructure (see
+        // testResetPreservesAttributeResolver / testResetPreservesConditionProviders)
+        // and intentionally survive reset().
         $this->qualify = false;
         $this->aggregationAliases = [];
-        $this->executor = null;
 
         return $this;
     }
