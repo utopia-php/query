@@ -236,10 +236,10 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
 
         $this->clickhouseStatement(
             'INSERT INTO `' . $table . '` (`key`, `max_value`) '
-            . 'SELECT `key`, maxState(`value`) FROM ('
-            . "  SELECT 1 AS `key`, 10 AS `value` UNION ALL "
-            . '  SELECT 1 AS `key`, 50 AS `value` UNION ALL '
-            . '  SELECT 2 AS `key`, 5 AS `value`'
+            . 'SELECT `key`, maxState(toUInt32(`value`)) FROM ('
+            . '  SELECT toUInt32(1) AS `key`, toUInt32(10) AS `value` UNION ALL '
+            . '  SELECT toUInt32(1) AS `key`, toUInt32(50) AS `value` UNION ALL '
+            . '  SELECT toUInt32(2) AS `key`, toUInt32(5) AS `value`'
             . ') GROUP BY `key`'
         );
 
