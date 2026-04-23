@@ -3,6 +3,8 @@
 namespace Tests\Query\Regression;
 
 use PHPUnit\Framework\TestCase;
+use Utopia\Query\Builder\MySQL as MySQLBuilder;
+use Utopia\Query\Builder\PostgreSQL as PostgreSQLBuilder;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
 use Utopia\Query\Parser\MySQL as MySQLParser;
@@ -185,5 +187,34 @@ class SecurityRegressionTest extends TestCase
                 ['method' => Method::Raw->value, 'values' => ['DROP TABLE users']],
             ],
         ]);
+    }
+
+    public function testSelectWindowRejectsInjectionInsideParens(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid window function');
+
+        (new MySQLBuilder())
+            ->from('t')
+            ->selectWindow('ROW_NUMBER(1); DROP TABLE x;-- )', 'w');
+    }
+
+    public function testSelectWindowRejectsSemicolonInsideArgs(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid window function');
+
+        (new MySQLBuilder())
+            ->from('t')
+            ->selectWindow('SUM(a; DROP TABLE x)', 'w');
+    }
+
+    public function testSelectWindowAcceptsValidArgs(): void
+    {
+        $builder = (new PostgreSQLBuilder())
+            ->from('t')
+            ->selectWindow('SUM("amount")', 'w', ['dept']);
+
+        $this->assertInstanceOf(PostgreSQLBuilder::class, $builder);
     }
 }
