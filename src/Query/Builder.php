@@ -915,23 +915,7 @@ abstract class Builder implements
                 continue;
             }
 
-            $func = match ($method) {
-                Method::Count => 'COUNT',
-                Method::Sum => 'SUM',
-                Method::Avg => 'AVG',
-                Method::Min => 'MIN',
-                Method::Max => 'MAX',
-                Method::Stddev => 'STDDEV',
-                Method::StddevPop => 'STDDEV_POP',
-                Method::StddevSamp => 'STDDEV_SAMP',
-                Method::Variance => 'VARIANCE',
-                Method::VarPop => 'VAR_POP',
-                Method::VarSamp => 'VAR_SAMP',
-                Method::BitAnd => 'BIT_AND',
-                Method::BitOr => 'BIT_OR',
-                Method::BitXor => 'BIT_XOR',
-                default => $method->value,
-            };
+            $func = $method->sqlFunction() ?? $method->value;
             $aliasToExpr[$alias] = $func . '(' . $col . ')';
         }
 
@@ -1466,23 +1450,7 @@ abstract class Builder implements
             return $sql;
         }
 
-        $func = match ($method) {
-            Method::Count => 'COUNT',
-            Method::Sum => 'SUM',
-            Method::Avg => 'AVG',
-            Method::Min => 'MIN',
-            Method::Max => 'MAX',
-            Method::Stddev => 'STDDEV',
-            Method::StddevPop => 'STDDEV_POP',
-            Method::StddevSamp => 'STDDEV_SAMP',
-            Method::Variance => 'VARIANCE',
-            Method::VarPop => 'VAR_POP',
-            Method::VarSamp => 'VAR_SAMP',
-            Method::BitAnd => 'BIT_AND',
-            Method::BitOr => 'BIT_OR',
-            Method::BitXor => 'BIT_XOR',
-            default => throw new ValidationException("Unknown aggregate: {$method->value}"),
-        };
+        $func = $method->sqlFunction() ?? throw new ValidationException("Unknown aggregate: {$method->value}");
         $attr = $query->getAttribute();
         $col = match (true) {
             $attr === '*', $attr === '' => '*',
@@ -2017,24 +1985,7 @@ abstract class Builder implements
         /** @var string $alias */
         $alias = $query->getValue('');
 
-        $funcName = match ($method) {
-            Method::Count => 'COUNT',
-            Method::CountDistinct => 'COUNT',
-            Method::Sum => 'SUM',
-            Method::Avg => 'AVG',
-            Method::Min => 'MIN',
-            Method::Max => 'MAX',
-            Method::Stddev => 'STDDEV',
-            Method::StddevPop => 'STDDEV_POP',
-            Method::StddevSamp => 'STDDEV_SAMP',
-            Method::Variance => 'VARIANCE',
-            Method::VarPop => 'VAR_POP',
-            Method::VarSamp => 'VAR_SAMP',
-            Method::BitAnd => 'BIT_AND',
-            Method::BitOr => 'BIT_OR',
-            Method::BitXor => 'BIT_XOR',
-            default => \strtoupper($method->value),
-        };
+        $funcName = $method->sqlFunction() ?? \strtoupper($method->value);
 
         $arg = ($attr === '*' || $attr === '') ? new Star() : new Column($attr);
         $distinct = $method === Method::CountDistinct;
