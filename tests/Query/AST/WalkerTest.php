@@ -8,6 +8,7 @@ use Utopia\Query\AST\Expression\Exists;
 use Utopia\Query\AST\Expression\In;
 use Utopia\Query\AST\Expression\Subquery;
 use Utopia\Query\AST\Literal;
+use Utopia\Query\AST\OrderByItem;
 use Utopia\Query\AST\Reference\Column;
 use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\Serializer;
@@ -15,6 +16,7 @@ use Utopia\Query\AST\Star;
 use Utopia\Query\AST\Statement\Select;
 use Utopia\Query\AST\Visitor\FilterInjector;
 use Utopia\Query\AST\Walker;
+use Utopia\Query\OrderDirection;
 
 class WalkerTest extends TestCase
 {
@@ -132,5 +134,38 @@ class WalkerTest extends TestCase
             'SELECT * FROM `users` WHERE `id` IN (SELECT `id` FROM `orders` WHERE `tenant_id` = 42) AND `tenant_id` = 42',
             $this->serialize($result),
         );
+    }
+
+    /**
+     * A pure-inspection visitor (one that never swaps out nodes) must return
+     * the exact same Select instance the caller passed in. This guarantees no
+     * Walker allocations for read-only traversals.
+     */
+    public function testWalkReturnsSameInstanceWhenVisitorIsNoOp(): void
+    {
+        $stmt = new Select(
+            columns: [
+                new Column('id'),
+                new Column('name'),
+                new Literal(1),
+            ],
+            from: new Table('users'),
+            where: new Binary(
+                new Column('age'),
+                '>',
+                new Literal(18),
+            ),
+            groupBy: [new Column('country')],
+            orderBy: [new OrderByItem(new Column('created_at'), OrderDirection::Desc)],
+            limit: new Literal(10),
+            offset: new Literal(5),
+        );
+
+        $walker = new Walker();
+        $visitor = new CollectingVisitor();
+        $result = $walker->walk($stmt, $visitor);
+
+        $this->assertSame($stmt, $result);
+        $this->assertNotEmpty($visitor->visited, 'Visitor should have been invoked');
     }
 }
