@@ -137,56 +137,49 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     #[\Override]
     public function countWhen(string $condition, string $alias = '', mixed ...$bindings): static
     {
-        $expr = 'countIf(' . $condition . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, \array_values($bindings));
+        return $this->aggregateFilter('count', null, $condition, $alias, \array_values($bindings));
     }
 
     #[\Override]
     public function sumWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
-        $expr = 'sumIf(' . $this->resolveAndWrap($column) . ', ' . $condition . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, \array_values($bindings));
+        return $this->aggregateFilter('sum', $column, $condition, $alias, \array_values($bindings));
     }
 
     #[\Override]
     public function avgWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
-        $expr = 'avgIf(' . $this->resolveAndWrap($column) . ', ' . $condition . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, \array_values($bindings));
+        return $this->aggregateFilter('avg', $column, $condition, $alias, \array_values($bindings));
     }
 
     #[\Override]
     public function minWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
-        $expr = 'minIf(' . $this->resolveAndWrap($column) . ', ' . $condition . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-
-        return $this->select($expr, \array_values($bindings));
+        return $this->aggregateFilter('min', $column, $condition, $alias, \array_values($bindings));
     }
 
     #[\Override]
     public function maxWhen(string $column, string $condition, string $alias = '', mixed ...$bindings): static
     {
-        $expr = 'maxIf(' . $this->resolveAndWrap($column) . ', ' . $condition . ')';
+        return $this->aggregateFilter('max', $column, $condition, $alias, \array_values($bindings));
+    }
+
+    /**
+     * Emit a conditional aggregate using ClickHouse's `-If` combinator.
+     *
+     * @param  list<mixed>  $bindings
+     */
+    private function aggregateFilter(string $aggregate, ?string $column, string $condition, string $alias, array $bindings): static
+    {
+        $arguments = $column === null
+            ? $condition
+            : $this->resolveAndWrap($column) . ', ' . $condition;
+        $expr = $aggregate . 'If(' . $arguments . ')';
         if ($alias !== '') {
             $expr .= ' AS ' . $this->quote($alias);
         }
 
-        return $this->select($expr, \array_values($bindings));
+        return $this->select($expr, $bindings);
     }
 
     /**
