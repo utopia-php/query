@@ -259,7 +259,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $result = $this->schema->create($table, function (Blueprint $bp) {
             $bp->integer('id')->primary();
             $bp->integer('age');
-            $bp->rawColumn('CHECK ("age" >= 18)');
+            $bp->check('age_min', '"age" >= 18');
         });
 
         $this->postgresStatement($result->query);
@@ -284,7 +284,7 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
             $bp->integer('id')->primary();
             $bp->integer('price');
             $bp->integer('quantity');
-            $bp->rawColumn('"total" INTEGER GENERATED ALWAYS AS ("price" * "quantity") STORED');
+            $bp->integer('total')->generatedAs('"price" * "quantity"')->stored();
         });
 
         $this->postgresStatement($result->query);

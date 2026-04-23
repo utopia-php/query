@@ -262,7 +262,7 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $result = $this->schema->create($table, function (Blueprint $bp) {
             $bp->id();
             $bp->integer('age');
-            $bp->rawColumn('CHECK (`age` >= 0 AND `age` < 150)');
+            $bp->check('age_range', '`age` >= 0 AND `age` < 150');
         });
 
         $this->mysqlStatement($result->query);
@@ -291,7 +291,7 @@ class MySQLIntegrationTest extends IntegrationTestCase
             $bp->id();
             $bp->integer('width');
             $bp->integer('height');
-            $bp->rawColumn('`area` INT GENERATED ALWAYS AS (`width` * `height`) STORED');
+            $bp->integer('area')->generatedAs('`width` * `height`')->stored();
         });
 
         $this->mysqlStatement($result->query);
