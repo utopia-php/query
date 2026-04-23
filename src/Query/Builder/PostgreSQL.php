@@ -35,9 +35,9 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     use Trait\PostgreSQL\LockingOf;
     use Trait\PostgreSQL\Merge;
     use Trait\PostgreSQL\OrderedSetAggregates;
-    use Trait\PostgreSQL\Returning;
     use Trait\PostgreSQL\Sequences;
     use Trait\PostgreSQL\VectorSearch;
+    use Trait\Returning;
 
     protected string $wrapChar = '"';
 
@@ -46,9 +46,6 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     {
         return new PostgreSQLSerializer();
     }
-
-    /** @var list<string> */
-    protected array $returningColumns = [];
 
     /** @var ?array{attribute: string, vector: array<float>, metric: VectorMetric} */
     protected ?array $vectorOrder = null;
@@ -351,24 +348,6 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         $result = parent::upsertSelect();
 
         return $this->appendReturning($result);
-    }
-
-    private function appendReturning(Statement $result): Statement
-    {
-        if (empty($this->returningColumns)) {
-            return $result;
-        }
-
-        $columns = \array_map(
-            fn (string $col): string => $col === '*' ? '*' : $this->resolveAndWrap($col),
-            $this->returningColumns
-        );
-
-        return new Statement(
-            $result->query . ' RETURNING ' . \implode(', ', $columns),
-            $result->bindings,
-            executor: $this->executor,
-        );
     }
 
     #[\Override]
@@ -802,7 +781,7 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         parent::reset();
         $this->jsonSets = [];
         $this->vectorOrder = null;
-        $this->returningColumns = [];
+        $this->resetReturning();
         $this->updateFromTable = '';
         $this->updateFromAlias = '';
         $this->updateFromCondition = '';

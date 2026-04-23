@@ -11,11 +11,8 @@ use Utopia\Query\Schema\ColumnType;
 
 class MariaDB extends MySQL implements Returning, Sequences
 {
-    use Trait\MariaDB\Returning;
     use Trait\MariaDB\Sequences;
-
-    /** @var list<string> */
-    protected array $returningColumns = [];
+    use Trait\Returning;
 
     #[\Override]
     public function insert(): Statement
@@ -71,27 +68,9 @@ class MariaDB extends MySQL implements Returning, Sequences
     public function reset(): static
     {
         parent::reset();
-        $this->returningColumns = [];
+        $this->resetReturning();
 
         return $this;
-    }
-
-    private function appendReturning(Statement $result): Statement
-    {
-        if (empty($this->returningColumns)) {
-            return $result;
-        }
-
-        $columns = \array_map(
-            fn (string $col): string => $col === '*' ? '*' : $this->resolveAndWrap($col),
-            $this->returningColumns
-        );
-
-        return new Statement(
-            $result->query . ' RETURNING ' . \implode(', ', $columns),
-            $result->bindings,
-            executor: $this->executor,
-        );
     }
 
     #[\Override]
