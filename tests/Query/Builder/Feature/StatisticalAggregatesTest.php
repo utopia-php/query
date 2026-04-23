@@ -63,7 +63,18 @@ class StatisticalAggregatesTest extends TestCase
             ->stddev('value', 'sd')
             ->build();
 
-        $this->assertStringContainsString('STDDEV(`value`) AS `sd`', $result->query);
+        $this->assertStringContainsString('stddevPop(`value`) AS `sd`', $result->query);
+    }
+
+    public function testVarianceOnClickHouseEmitsVarPop(): void
+    {
+        $result = (new ClickHouseBuilder())
+            ->from('scores')
+            ->variance('value', 'var')
+            ->build();
+
+        $this->assertStringContainsString('varPop(`value`) AS `var`', $result->query);
+        $this->assertStringNotContainsString('VARIANCE(', $result->query);
     }
 
     public function testStatisticalAggregateDoesNotAddBindings(): void

@@ -189,6 +189,36 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         return $this->select($expr, \array_values($bindings));
     }
 
+    /**
+     * ClickHouse has no bare STDDEV function. Emit stddevPop (population
+     * standard deviation) which matches the ISO SQL standard semantics.
+     */
+    #[\Override]
+    public function stddev(string $attribute, string $alias = ''): static
+    {
+        $expr = 'stddevPop(' . $this->resolveAndWrap($attribute) . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->select($expr);
+    }
+
+    /**
+     * ClickHouse has no bare VARIANCE function. Emit varPop (population
+     * variance) which matches the ISO SQL standard semantics.
+     */
+    #[\Override]
+    public function variance(string $attribute, string $alias = ''): static
+    {
+        $expr = 'varPop(' . $this->resolveAndWrap($attribute) . ')';
+        if ($alias !== '') {
+            $expr .= ' AS ' . $this->quote($alias);
+        }
+
+        return $this->select($expr);
+    }
+
     #[\Override]
     public function groupConcat(string $column, string $separator = ',', string $alias = '', ?array $orderBy = null): static
     {

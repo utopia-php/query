@@ -10797,7 +10797,8 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('STDDEV(`value`) AS `sd`', $result->query);
+        $this->assertStringContainsString('stddevPop(`value`) AS `sd`', $result->query);
+        $this->assertStringNotContainsString('STDDEV(', $result->query);
     }
 
     public function testStddevPopWithAlias(): void
@@ -10830,7 +10831,8 @@ class ClickHouseTest extends TestCase
             ->build();
         $this->assertBindingCount($result);
 
-        $this->assertStringContainsString('VARIANCE(`value`) AS `var`', $result->query);
+        $this->assertStringContainsString('varPop(`value`) AS `var`', $result->query);
+        $this->assertStringNotContainsString('VARIANCE(', $result->query);
     }
 
     public function testVarPopWithAlias(): void
