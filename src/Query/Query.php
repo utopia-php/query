@@ -754,8 +754,6 @@ class Query
         $unions = [];
         $limit = null;
         $offset = null;
-        $orderAttributes = [];
-        $orderTypes = [];
         $cursor = null;
         $cursorDirection = null;
 
@@ -765,24 +763,15 @@ class Query
             }
 
             $method = $query->getMethod();
-            $attribute = $query->getAttribute();
             $values = $query->getValues();
 
             switch (true) {
                 case $method === Method::OrderAsc:
                 case $method === Method::OrderDesc:
                 case $method === Method::OrderRandom:
-                    // OrderRandom has no attribute to qualify, so the guard
-                    // intentionally skips pushing an empty attribute onto
-                    // $orderAttributes while still recording the direction.
-                    if ($attribute !== '') {
-                        $orderAttributes[] = $attribute;
-                    }
-                    $orderTypes[] = match ($method) {
-                        Method::OrderAsc => OrderDirection::Asc,
-                        Method::OrderDesc => OrderDirection::Desc,
-                        Method::OrderRandom => OrderDirection::Random,
-                    };
+                    // Ordering is compiled directly from the pending query list
+                    // in Builder::compileOrderAndLimit; no aggregation needed
+                    // here.
                     break;
 
                 case $method === Method::Limit:
@@ -875,8 +864,6 @@ class Query
             unions: $unions,
             limit: $limit,
             offset: $offset,
-            orderAttributes: $orderAttributes,
-            orderTypes: $orderTypes,
             cursor: $cursor,
             cursorDirection: $cursorDirection,
         );

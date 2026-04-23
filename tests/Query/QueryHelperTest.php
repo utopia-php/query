@@ -6,7 +6,6 @@ use PHPUnit\Framework\TestCase;
 use Utopia\Query\CursorDirection;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
-use Utopia\Query\OrderDirection;
 use Utopia\Query\Query;
 
 class QueryHelperTest extends TestCase
@@ -207,9 +206,6 @@ class QueryHelperTest extends TestCase
         $this->assertEquals(25, $grouped->limit);
         $this->assertEquals(10, $grouped->offset);
 
-        $this->assertEquals(['name', 'age'], $grouped->orderAttributes);
-        $this->assertEquals([OrderDirection::Asc, OrderDirection::Desc], $grouped->orderTypes);
-
         $this->assertEquals('doc123', $grouped->cursor);
         $this->assertSame(CursorDirection::After, $grouped->cursorDirection);
     }
@@ -284,18 +280,8 @@ class QueryHelperTest extends TestCase
         $this->assertEquals([], $grouped->selections);
         $this->assertNull($grouped->limit);
         $this->assertNull($grouped->offset);
-        $this->assertEquals([], $grouped->orderAttributes);
-        $this->assertEquals([], $grouped->orderTypes);
         $this->assertNull($grouped->cursor);
         $this->assertNull($grouped->cursorDirection);
-    }
-
-    public function testGroupByTypeOrderRandom(): void
-    {
-        $queries = [Query::orderRandom()];
-        $grouped = Query::groupByType($queries);
-        $this->assertEquals([OrderDirection::Random], $grouped->orderTypes);
-        $this->assertEquals([], $grouped->orderAttributes);
     }
 
     public function testGroupByTypeSkipsNonQueryInstances(): void
@@ -562,7 +548,6 @@ class QueryHelperTest extends TestCase
         $this->assertCount(1, $grouped->unions);
         $this->assertEquals(10, $grouped->limit);
         $this->assertEquals(5, $grouped->offset);
-        $this->assertEquals(['name'], $grouped->orderAttributes);
     }
 
     public function testGroupByTypeMultipleGroupByMerges(): void

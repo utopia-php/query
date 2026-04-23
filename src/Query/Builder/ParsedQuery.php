@@ -3,7 +3,6 @@
 namespace Utopia\Query\Builder;
 
 use Utopia\Query\CursorDirection;
-use Utopia\Query\OrderDirection;
 use Utopia\Query\Query;
 
 readonly class ParsedQuery
@@ -16,8 +15,6 @@ readonly class ParsedQuery
      * @param  list<Query>  $having
      * @param  list<Query>  $joins
      * @param  list<Query>  $unions
-     * @param  array<string>  $orderAttributes
-     * @param  array<OrderDirection>  $orderTypes
      */
     public function __construct(
         public array $filters = [],
@@ -30,8 +27,6 @@ readonly class ParsedQuery
         public array $unions = [],
         public ?int $limit = null,
         public ?int $offset = null,
-        public array $orderAttributes = [],
-        public array $orderTypes = [],
         public mixed $cursor = null,
         public ?CursorDirection $cursorDirection = null,
     ) {
