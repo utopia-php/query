@@ -154,18 +154,6 @@ abstract class Builder implements
     /** @var array<string, CaseExpression> */
     protected array $caseSets = [];
 
-    /** @var string[] */
-    protected array $conflictKeys = [];
-
-    /** @var string[] */
-    protected array $conflictUpdateColumns = [];
-
-    /** @var array<string, string> */
-    protected array $conflictRawSets = [];
-
-    /** @var array<string, list<mixed>> */
-    protected array $conflictRawSetBindings = [];
-
     /** @var array<string, string> Column-specific expressions for INSERT (e.g. 'location' => 'ST_GeomFromText(?)') */
     protected array $insertColumnExpressions = [];
 
@@ -429,74 +417,21 @@ abstract class Builder implements
 
         $this->prepareAliasQualification($grouped);
 
-        $parts = [];
-        $parts[] = $this->buildSelectClause($grouped);
-
-        $fromClause = $this->buildFromClause();
-        if ($fromClause !== '') {
-            $parts[] = $fromClause;
-        }
-
         $joinFilterWhereClauses = [];
-        $joinsClause = $this->buildJoinsClause($grouped, $joinFilterWhereClauses);
-        if ($joinsClause !== '') {
-            $parts[] = $joinsClause;
-        }
-
-        $afterJoins = $this->buildAfterJoinsClause($grouped);
-        if ($afterJoins !== '') {
-            $parts[] = $afterJoins;
-        }
-
-        $whereClause = $this->buildWhereClause($grouped, $joinFilterWhereClauses);
-        if ($whereClause !== '') {
-            $parts[] = $whereClause;
-        }
-
-        $groupByClause = $this->buildGroupByClause($grouped);
-        if ($groupByClause !== '') {
-            $parts[] = $groupByClause;
-        }
-
-        $afterGroupBy = $this->buildAfterGroupByClause();
-        if ($afterGroupBy !== '') {
-            $parts[] = $afterGroupBy;
-        }
-
-        $havingClause = $this->buildHavingClause($grouped);
-        if ($havingClause !== '') {
-            $parts[] = $havingClause;
-        }
-
-        $windowClause = $this->buildWindowClause();
-        if ($windowClause !== '') {
-            $parts[] = $windowClause;
-        }
-
-        $orderByClause = $this->buildOrderByClause();
-        if ($orderByClause !== '') {
-            $parts[] = $orderByClause;
-        }
-
-        $afterOrderBy = $this->buildAfterOrderByClause();
-        if ($afterOrderBy !== '') {
-            $parts[] = $afterOrderBy;
-        }
-
-        $limitClause = $this->buildLimitClause($grouped);
-        if ($limitClause !== '') {
-            $parts[] = $limitClause;
-        }
-
-        $lockingClause = $this->buildLockingClause();
-        if ($lockingClause !== '') {
-            $parts[] = $lockingClause;
-        }
-
-        $settings = $this->buildSettingsClause();
-        if ($settings !== '') {
-            $parts[] = $settings;
-        }
+        $parts = [$this->buildSelectClause($grouped)];
+        $this->appendIfNotEmpty($parts, $this->buildFromClause());
+        $this->appendIfNotEmpty($parts, $this->buildJoinsClause($grouped, $joinFilterWhereClauses));
+        $this->appendIfNotEmpty($parts, $this->buildAfterJoinsClause($grouped));
+        $this->appendIfNotEmpty($parts, $this->buildWhereClause($grouped, $joinFilterWhereClauses));
+        $this->appendIfNotEmpty($parts, $this->buildGroupByClause($grouped));
+        $this->appendIfNotEmpty($parts, $this->buildAfterGroupByClause());
+        $this->appendIfNotEmpty($parts, $this->buildHavingClause($grouped));
+        $this->appendIfNotEmpty($parts, $this->buildWindowClause());
+        $this->appendIfNotEmpty($parts, $this->buildOrderByClause());
+        $this->appendIfNotEmpty($parts, $this->buildAfterOrderByClause());
+        $this->appendIfNotEmpty($parts, $this->buildLimitClause($grouped));
+        $this->appendIfNotEmpty($parts, $this->buildLockingClause());
+        $this->appendIfNotEmpty($parts, $this->buildSettingsClause());
 
         $sql = \implode(' ', $parts);
 
@@ -514,6 +449,19 @@ abstract class Builder implements
         }
 
         return $result;
+    }
+
+    /**
+     * Append $fragment to $parts only when it is a non-empty string.
+     * Keeps build() free of repetitive `if ($fragment !== '')` guards.
+     *
+     * @param  list<string>  $parts
+     */
+    private function appendIfNotEmpty(array &$parts, string $fragment): void
+    {
+        if ($fragment !== '') {
+            $parts[] = $fragment;
+        }
     }
 
     /**
