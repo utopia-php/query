@@ -113,8 +113,9 @@ class AttributeHookMemoizationTest extends TestCase
         $firstBuildCalls = $hook->calls;
         $this->assertGreaterThan(0, $firstBuildCalls);
 
-        // reset() keeps addHook registrations but must clear the memo so a
-        // fresh build re-resolves attributes rather than returning stale entries.
+        // reset() preserves addHook registrations (user-installed infra) but
+        // must clear the memo so a fresh build re-resolves attributes rather
+        // than returning stale entries.
         $builder->reset();
         $builder
             ->from('users')
