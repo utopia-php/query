@@ -7,6 +7,7 @@ use Utopia\Query\Builder\MySQL as MySQLBuilder;
 use Utopia\Query\Builder\PostgreSQL as PostgreSQLBuilder;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
+use Utopia\Query\Parser\MongoDB as MongoDBParser;
 use Utopia\Query\Parser\MySQL as MySQLParser;
 use Utopia\Query\Parser\PostgreSQL as PostgreSQLParser;
 use Utopia\Query\Query;
@@ -292,5 +293,25 @@ class SecurityRegressionTest extends TestCase
             ->build();
 
         $this->assertStringContainsString('CAST(`c` AS DECIMAL(10, 2))', $result->query);
+    }
+
+    public function testExtractFirstBsonKeyRejectsOutOfBoundsDocLength(): void
+    {
+        // OP_MSG header (16 bytes) + section kind + BSON with bogus doc length
+        $bsonBody = "\x10" . 'find' . "\x00" . \pack('V', 1) . "\x00";
+        $bson = \pack('V', 0x7FFFFFFF) . $bsonBody;
+        $sectionKind = "\x00";
+        $flags = \pack('V', 0);
+        $body = $flags . $sectionKind . $bson;
+        $header = \pack('V', 16 + \strlen($body))
+            . \pack('V', 1)
+            . \pack('V', 0)
+            . \pack('V', 2013);
+        $data = $header . $body;
+
+        $parser = new MongoDBParser();
+        // Malformed packet must not produce a classification — extractFirstBsonKey
+        // must bail on the out-of-bounds docLen instead of scanning past it.
+        $this->assertSame(Type::Unknown, $parser->parse($data));
     }
 }

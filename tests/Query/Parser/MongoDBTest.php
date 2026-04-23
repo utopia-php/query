@@ -400,12 +400,12 @@ class MongoDBTest extends TestCase
 
         $data = $header . $body;
 
-        // hasBsonKey bails (returns false) and extractFirstBsonKey walks
-        // only to the first null — returning 'find', which classifies as Read.
-        // The important guarantee is no crash / out-of-bounds read, so we run
-        // under strict error handling.
+        // Both hasBsonKey and extractFirstBsonKey must reject the out-of-bounds
+        // docLen before scanning keys. With no valid classification available,
+        // the parser returns Unknown. The important guarantee is no crash /
+        // out-of-bounds read, so we run under strict error handling.
         $result = $this->withStrictErrors(fn () => $this->parser->parse($data));
-        $this->assertSame(Type::Read, $result);
+        $this->assertSame(Type::Unknown, $result);
     }
 
     public function testMalformedBsonRegexRunsToEofWithoutCrash(): void

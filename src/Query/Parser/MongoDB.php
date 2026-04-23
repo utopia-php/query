@@ -185,10 +185,24 @@ class MongoDB implements Parser
     {
         $len = \strlen($data);
 
+        if ($bsonOffset + 4 > $len) {
+            return null;
+        }
+
+        $docLen = $this->readUint32($data, $bsonOffset);
+
+        // Reject negative (32-bit PHP signed overflow) or out-of-bounds lengths.
+        // A valid BSON document is at least 5 bytes (length prefix + terminator).
+        if ($docLen < 5 || $bsonOffset + $docLen > $len) {
+            return null;
+        }
+
+        $docEnd = $bsonOffset + $docLen;
+
         // Skip BSON document length (4 bytes)
         $pos = $bsonOffset + 4;
 
-        if ($pos >= $len) {
+        if ($pos >= $docEnd) {
             return null;
         }
 
@@ -200,13 +214,13 @@ class MongoDB implements Parser
 
         $pos++;
 
-        // Read cstring key (null-terminated)
+        // Read cstring key (null-terminated), bounded by the declared doc length.
         $keyStart = $pos;
-        while ($pos < $len && $data[$pos] !== "\x00") {
+        while ($pos < $docEnd && $data[$pos] !== "\x00") {
             $pos++;
         }
 
-        if ($pos >= $len) {
+        if ($pos >= $docEnd) {
             return null;
         }
 
