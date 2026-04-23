@@ -12,7 +12,7 @@ use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\LateralJoins;
 use Utopia\Query\Builder\Feature\Sequences;
 use Utopia\Query\Builder\MariaDB as Builder;
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Compiler;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
@@ -1038,7 +1038,7 @@ class MariaDBTest extends TestCase
         $result = (new Builder())
             ->from('users')
             ->filter([Query::equal('status', ['active'])])
-            ->afterBuild(function (Plan $r) use (&$capturedQuery) {
+            ->afterBuild(function (Statement $r) use (&$capturedQuery) {
                 $capturedQuery = 'executed';
                 return $r;
             })

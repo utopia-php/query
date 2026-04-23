@@ -2,7 +2,7 @@
 
 namespace Utopia\Query\Schema;
 
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\QuotesIdentifiers;
 use Utopia\Query\Schema;
@@ -22,7 +22,7 @@ abstract class SQL extends Schema implements ForeignKeys, Procedures, Triggers
         string $refColumn,
         ?ForeignKeyAction $onDelete = null,
         ?ForeignKeyAction $onUpdate = null,
-    ): Plan {
+    ): Statement {
         $sql = 'ALTER TABLE ' . $this->quote($table)
             . ' ADD CONSTRAINT ' . $this->quote($name)
             . ' FOREIGN KEY (' . $this->quote($column) . ')'
@@ -36,12 +36,12 @@ abstract class SQL extends Schema implements ForeignKeys, Procedures, Triggers
             $sql .= ' ON UPDATE ' . $onUpdate->toSql();
         }
 
-        return new Plan($sql, [], executor: $this->executor);
+        return new Statement($sql, [], executor: $this->executor);
     }
 
-    public function dropForeignKey(string $table, string $name): Plan
+    public function dropForeignKey(string $table, string $name): Statement
     {
-        return new Plan(
+        return new Statement(
             'ALTER TABLE ' . $this->quote($table)
             . ' DROP FOREIGN KEY ' . $this->quote($name),
             [],
@@ -80,7 +80,7 @@ abstract class SQL extends Schema implements ForeignKeys, Procedures, Triggers
      *
      * @param  list<array{0: ParameterDirection, 1: string, 2: string}>  $params
      */
-    public function createProcedure(string $name, array $params, string $body): Plan
+    public function createProcedure(string $name, array $params, string $body): Statement
     {
         $paramList = $this->compileProcedureParams($params);
 
@@ -88,12 +88,12 @@ abstract class SQL extends Schema implements ForeignKeys, Procedures, Triggers
             . '(' . \implode(', ', $paramList) . ')'
             . ' BEGIN ' . $body . ' END';
 
-        return new Plan($sql, [], executor: $this->executor);
+        return new Statement($sql, [], executor: $this->executor);
     }
 
-    public function dropProcedure(string $name): Plan
+    public function dropProcedure(string $name): Statement
     {
-        return new Plan('DROP PROCEDURE ' . $this->quote($name), [], executor: $this->executor);
+        return new Statement('DROP PROCEDURE ' . $this->quote($name), [], executor: $this->executor);
     }
 
     /**
@@ -108,17 +108,17 @@ abstract class SQL extends Schema implements ForeignKeys, Procedures, Triggers
         TriggerTiming $timing,
         TriggerEvent $event,
         string $body,
-    ): Plan {
+    ): Statement {
         $sql = 'CREATE TRIGGER ' . $this->quote($name)
             . ' ' . $timing->value . ' ' . $event->value
             . ' ON ' . $this->quote($table)
             . ' FOR EACH ROW BEGIN ' . $body . ' END';
 
-        return new Plan($sql, [], executor: $this->executor);
+        return new Statement($sql, [], executor: $this->executor);
     }
 
-    public function dropTrigger(string $name): Plan
+    public function dropTrigger(string $name): Statement
     {
-        return new Plan('DROP TRIGGER ' . $this->quote($name), [], executor: $this->executor);
+        return new Statement('DROP TRIGGER ' . $this->quote($name), [], executor: $this->executor);
     }
 }

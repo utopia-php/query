@@ -8,7 +8,7 @@ use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\ColumnPredicate;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\ExistsSubquery;
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Builder\SubSelect;
 use Utopia\Query\Builder\WhereInSubquery;
 use Utopia\Query\Exception\ValidationException;
@@ -332,7 +332,7 @@ trait Selects
     }
 
     /**
-     * @param  \Closure(Plan): (array<mixed>|int)  $executor
+     * @param  \Closure(Statement): (array<mixed>|int)  $executor
      */
     public function setExecutor(\Closure $executor): static
     {
@@ -341,12 +341,12 @@ trait Selects
         return $this;
     }
 
-    public function explain(bool $analyze = false): Plan
+    public function explain(bool $analyze = false): Statement
     {
         $result = $this->build();
         $prefix = $analyze ? 'EXPLAIN ANALYZE ' : 'EXPLAIN ';
 
-        return new Plan($prefix . $result->query, $result->bindings, readOnly: true, executor: $this->executor);
+        return new Statement($prefix . $result->query, $result->bindings, readOnly: true, executor: $this->executor);
     }
 
     /**

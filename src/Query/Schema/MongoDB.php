@@ -4,7 +4,7 @@ namespace Utopia\Query\Schema;
 
 use stdClass;
 use Utopia\Query\Builder;
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Schema;
 
@@ -47,7 +47,7 @@ class MongoDB extends Schema
     /**
      * @param callable(Table): void $definition
      */
-    public function create(string $table, callable $definition, bool $ifNotExists = false): Plan
+    public function create(string $table, callable $definition, bool $ifNotExists = false): Statement
     {
         $blueprint = new Table();
         $definition($blueprint);
@@ -100,7 +100,7 @@ class MongoDB extends Schema
             $command['validator'] = $validator;
         }
 
-        return new Plan(
+        return new Statement(
             \json_encode($command, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             [],
             executor: $this->executor,
@@ -110,7 +110,7 @@ class MongoDB extends Schema
     /**
      * @param callable(Table): void $definition
      */
-    public function alter(string $table, callable $definition): Plan
+    public function alter(string $table, callable $definition): Statement
     {
         $blueprint = new Table();
         $definition($blueprint);
@@ -158,30 +158,30 @@ class MongoDB extends Schema
             $command['validator'] = $validator;
         }
 
-        return new Plan(
+        return new Statement(
             \json_encode($command, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             [],
             executor: $this->executor,
         );
     }
 
-    public function drop(string $table): Plan
+    public function drop(string $table): Statement
     {
-        return new Plan(
+        return new Statement(
             \json_encode(['command' => 'drop', 'collection' => $table], JSON_THROW_ON_ERROR),
             [],
             executor: $this->executor,
         );
     }
 
-    public function dropIfExists(string $table): Plan
+    public function dropIfExists(string $table): Statement
     {
         return $this->drop($table);
     }
 
-    public function rename(string $from, string $to): Plan
+    public function rename(string $from, string $to): Statement
     {
-        return new Plan(
+        return new Statement(
             \json_encode([
                 'command' => 'renameCollection',
                 'from' => $from,
@@ -192,9 +192,9 @@ class MongoDB extends Schema
         );
     }
 
-    public function truncate(string $table): Plan
+    public function truncate(string $table): Statement
     {
-        return new Plan(
+        return new Statement(
             \json_encode([
                 'command' => 'deleteMany',
                 'collection' => $table,
@@ -224,7 +224,7 @@ class MongoDB extends Schema
         array $orders = [],
         array $collations = [],
         array $rawColumns = [],
-    ): Plan {
+    ): Statement {
         $keys = [];
         foreach ($columns as $col) {
             $direction = 1;
@@ -249,16 +249,16 @@ class MongoDB extends Schema
             'index' => $index,
         ];
 
-        return new Plan(
+        return new Statement(
             \json_encode($command, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             [],
             executor: $this->executor,
         );
     }
 
-    public function dropIndex(string $table, string $name): Plan
+    public function dropIndex(string $table, string $name): Statement
     {
-        return new Plan(
+        return new Statement(
             \json_encode([
                 'command' => 'dropIndex',
                 'collection' => $table,
@@ -269,7 +269,7 @@ class MongoDB extends Schema
         );
     }
 
-    public function createView(string $name, Builder $query): Plan
+    public function createView(string $name, Builder $query): Statement
     {
         $result = $query->build();
 
@@ -286,34 +286,34 @@ class MongoDB extends Schema
             'pipeline' => $op['pipeline'] ?? [],
         ];
 
-        return new Plan(
+        return new Statement(
             \json_encode($command, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             $result->bindings,
             executor: $this->executor,
         );
     }
 
-    public function createDatabase(string $name): Plan
+    public function createDatabase(string $name): Statement
     {
-        return new Plan(
+        return new Statement(
             \json_encode(['command' => 'createDatabase', 'database' => $name], JSON_THROW_ON_ERROR),
             [],
             executor: $this->executor,
         );
     }
 
-    public function dropDatabase(string $name): Plan
+    public function dropDatabase(string $name): Statement
     {
-        return new Plan(
+        return new Statement(
             \json_encode(['command' => 'dropDatabase', 'database' => $name], JSON_THROW_ON_ERROR),
             [],
             executor: $this->executor,
         );
     }
 
-    public function analyzeTable(string $table): Plan
+    public function analyzeTable(string $table): Statement
     {
-        return new Plan(
+        return new Statement(
             \json_encode(['command' => 'collStats', 'collection' => $table], JSON_THROW_ON_ERROR),
             [],
             executor: $this->executor,

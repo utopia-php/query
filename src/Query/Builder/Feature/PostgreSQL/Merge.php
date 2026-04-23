@@ -3,7 +3,7 @@
 namespace Utopia\Query\Builder\Feature\PostgreSQL;
 
 use Utopia\Query\Builder;
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 
 interface Merge
 {
@@ -17,5 +17,5 @@ interface Merge
 
     public function whenNotMatched(string $action, mixed ...$bindings): static;
 
-    public function executeMerge(): Plan;
+    public function executeMerge(): Statement;
 }

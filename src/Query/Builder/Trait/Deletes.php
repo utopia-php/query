@@ -2,13 +2,13 @@
 
 namespace Utopia\Query\Builder\Trait;
 
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Query;
 
 trait Deletes
 {
     #[\Override]
-    public function delete(): Plan
+    public function delete(): Statement
     {
         $this->bindings = [];
         $this->validateTable();
@@ -21,6 +21,6 @@ trait Deletes
 
         $this->compileOrderAndLimit($parts, $grouped);
 
-        return new Plan(\implode(' ', $parts), $this->bindings, executor: $this->executor);
+        return new Statement(\implode(' ', $parts), $this->bindings, executor: $this->executor);
     }
 }

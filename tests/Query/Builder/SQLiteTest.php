@@ -8,8 +8,8 @@ use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\Case\Operator;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\Json;
-use Utopia\Query\Builder\Plan;
 use Utopia\Query\Builder\SQLite as Builder;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Compiler;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
@@ -1438,7 +1438,7 @@ class SQLiteTest extends TestCase
         $result = (new Builder())
             ->from('users')
             ->filter([Query::equal('status', ['active'])])
-            ->afterBuild(function (Plan $r) use (&$capturedQuery) {
+            ->afterBuild(function (Statement $r) use (&$capturedQuery) {
                 $capturedQuery = 'executed';
                 return $r;
             })

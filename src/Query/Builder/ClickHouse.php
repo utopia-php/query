@@ -384,7 +384,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     }
 
     #[\Override]
-    public function update(): Plan
+    public function update(): Statement
     {
         $this->bindings = [];
         $this->validateTable();
@@ -407,11 +407,11 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             . ' UPDATE ' . \implode(', ', $assignments)
             . ' ' . \implode(' ', $parts);
 
-        return new Plan($sql, $this->bindings, executor: $this->executor);
+        return new Statement($sql, $this->bindings, executor: $this->executor);
     }
 
     #[\Override]
-    public function delete(): Plan
+    public function delete(): Statement
     {
         $this->bindings = [];
         $this->validateTable();
@@ -427,7 +427,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         $sql = 'ALTER TABLE ' . $this->quote($this->table)
             . ' DELETE ' . \implode(' ', $parts);
 
-        return new Plan($sql, $this->bindings, executor: $this->executor);
+        return new Statement($sql, $this->bindings, executor: $this->executor);
     }
 
     /**
@@ -474,7 +474,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      * ClickHouse clauses that do not carry bindings.
      */
     #[\Override]
-    protected function buildAfterJoinsClause(GroupedQueries $grouped): string
+    protected function buildAfterJoinsClause(ParsedQuery $grouped): string
     {
         $parts = [];
 

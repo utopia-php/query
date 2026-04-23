@@ -3,7 +3,7 @@
 namespace Utopia\Query;
 
 use Closure;
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\Column;
@@ -12,11 +12,11 @@ use Utopia\Query\Schema\Table;
 
 abstract class Schema
 {
-    /** @var (Closure(Plan): (array<mixed>|int))|null */
+    /** @var (Closure(Statement): (array<mixed>|int))|null */
     protected ?Closure $executor = null;
 
     /**
-     * @param  Closure(Plan): (array<mixed>|int)  $executor
+     * @param  Closure(Statement): (array<mixed>|int)  $executor
      */
     public function setExecutor(Closure $executor): static
     {
@@ -34,7 +34,7 @@ abstract class Schema
     /**
      * @param  callable(Table): void  $definition
      */
-    public function createIfNotExists(string $table, callable $definition): Plan
+    public function createIfNotExists(string $table, callable $definition): Statement
     {
         return $this->create($table, $definition, true);
     }
@@ -42,7 +42,7 @@ abstract class Schema
     /**
      * @param  callable(Table): void  $definition
      */
-    public function create(string $table, callable $definition, bool $ifNotExists = false): Plan
+    public function create(string $table, callable $definition, bool $ifNotExists = false): Statement
     {
         $blueprint = new Table();
         $definition($blueprint);
@@ -136,13 +136,13 @@ abstract class Schema
             }
         }
 
-        return new Plan($sql, [], executor: $this->executor);
+        return new Statement($sql, [], executor: $this->executor);
     }
 
     /**
      * @param  callable(Table): void  $definition
      */
-    public function alter(string $table, callable $definition): Plan
+    public function alter(string $table, callable $definition): Statement
     {
         $blueprint = new Table();
         $definition($blueprint);
@@ -202,31 +202,31 @@ abstract class Schema
         $sql = 'ALTER TABLE ' . $this->quote($table)
             . ' ' . \implode(', ', $alterations);
 
-        return new Plan($sql, [], executor: $this->executor);
+        return new Statement($sql, [], executor: $this->executor);
     }
 
-    public function drop(string $table): Plan
+    public function drop(string $table): Statement
     {
-        return new Plan('DROP TABLE ' . $this->quote($table), [], executor: $this->executor);
+        return new Statement('DROP TABLE ' . $this->quote($table), [], executor: $this->executor);
     }
 
-    public function dropIfExists(string $table): Plan
+    public function dropIfExists(string $table): Statement
     {
-        return new Plan('DROP TABLE IF EXISTS ' . $this->quote($table), [], executor: $this->executor);
+        return new Statement('DROP TABLE IF EXISTS ' . $this->quote($table), [], executor: $this->executor);
     }
 
-    public function rename(string $from, string $to): Plan
+    public function rename(string $from, string $to): Statement
     {
-        return new Plan(
+        return new Statement(
             'RENAME TABLE ' . $this->quote($from) . ' TO ' . $this->quote($to),
             [],
             executor: $this->executor,
         );
     }
 
-    public function truncate(string $table): Plan
+    public function truncate(string $table): Statement
     {
-        return new Plan('TRUNCATE TABLE ' . $this->quote($table), [], executor: $this->executor);
+        return new Statement('TRUNCATE TABLE ' . $this->quote($table), [], executor: $this->executor);
     }
 
     /**
@@ -248,7 +248,7 @@ abstract class Schema
         array $orders = [],
         array $collations = [],
         array $rawColumns = [],
-    ): Plan {
+    ): Statement {
         $keyword = match (true) {
             $unique => 'CREATE UNIQUE INDEX',
             $type === 'fulltext' => 'CREATE FULLTEXT INDEX',
@@ -268,37 +268,37 @@ abstract class Schema
 
         $sql .= ' (' . $this->compileIndexColumns($index) . ')';
 
-        return new Plan($sql, [], executor: $this->executor);
+        return new Statement($sql, [], executor: $this->executor);
     }
 
-    public function dropIndex(string $table, string $name): Plan
+    public function dropIndex(string $table, string $name): Statement
     {
-        return new Plan(
+        return new Statement(
             'DROP INDEX ' . $this->quote($name) . ' ON ' . $this->quote($table),
             [],
             executor: $this->executor,
         );
     }
 
-    public function createView(string $name, Builder $query): Plan
+    public function createView(string $name, Builder $query): Statement
     {
         $result = $query->build();
         $sql = 'CREATE VIEW ' . $this->quote($name) . ' AS ' . $result->query;
 
-        return new Plan($sql, $result->bindings, executor: $this->executor);
+        return new Statement($sql, $result->bindings, executor: $this->executor);
     }
 
-    public function createOrReplaceView(string $name, Builder $query): Plan
+    public function createOrReplaceView(string $name, Builder $query): Statement
     {
         $result = $query->build();
         $sql = 'CREATE OR REPLACE VIEW ' . $this->quote($name) . ' AS ' . $result->query;
 
-        return new Plan($sql, $result->bindings, executor: $this->executor);
+        return new Statement($sql, $result->bindings, executor: $this->executor);
     }
 
-    public function dropView(string $name): Plan
+    public function dropView(string $name): Statement
     {
-        return new Plan('DROP VIEW ' . $this->quote($name), [], executor: $this->executor);
+        return new Statement('DROP VIEW ' . $this->quote($name), [], executor: $this->executor);
     }
 
     protected function compileColumnDefinition(Column $column): string
@@ -445,27 +445,27 @@ abstract class Schema
         return \implode(', ', $parts);
     }
 
-    public function renameIndex(string $table, string $from, string $to): Plan
+    public function renameIndex(string $table, string $from, string $to): Statement
     {
-        return new Plan(
+        return new Statement(
             'ALTER TABLE ' . $this->quote($table) . ' RENAME INDEX ' . $this->quote($from) . ' TO ' . $this->quote($to),
             [],
             executor: $this->executor,
         );
     }
 
-    public function createDatabase(string $name): Plan
+    public function createDatabase(string $name): Statement
     {
-        return new Plan('CREATE DATABASE ' . $this->quote($name), [], executor: $this->executor);
+        return new Statement('CREATE DATABASE ' . $this->quote($name), [], executor: $this->executor);
     }
 
-    public function dropDatabase(string $name): Plan
+    public function dropDatabase(string $name): Statement
     {
-        return new Plan('DROP DATABASE ' . $this->quote($name), [], executor: $this->executor);
+        return new Statement('DROP DATABASE ' . $this->quote($name), [], executor: $this->executor);
     }
 
-    public function analyzeTable(string $table): Plan
+    public function analyzeTable(string $table): Statement
     {
-        return new Plan('ANALYZE TABLE ' . $this->quote($table), [], executor: $this->executor);
+        return new Statement('ANALYZE TABLE ' . $this->quote($table), [], executor: $this->executor);
     }
 }

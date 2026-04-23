@@ -3,7 +3,7 @@
 namespace Utopia\Query\Builder\Trait;
 
 use Utopia\Query\Builder;
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\ValidationException;
 
 trait Inserts
@@ -93,28 +93,28 @@ trait Inserts
     }
 
     #[\Override]
-    public function insert(): Plan
+    public function insert(): Statement
     {
         $this->bindings = [];
         [$sql, $bindings] = $this->compileInsertBody();
         $this->addBindings($bindings);
 
-        return new Plan($sql, $this->bindings, executor: $this->executor);
+        return new Statement($sql, $this->bindings, executor: $this->executor);
     }
 
     #[\Override]
-    public function insertDefaultValues(): Plan
+    public function insertDefaultValues(): Statement
     {
         $this->bindings = [];
         $this->validateTable();
 
         $sql = 'INSERT INTO ' . $this->quote($this->table) . ' DEFAULT VALUES';
 
-        return new Plan($sql, $this->bindings, executor: $this->executor);
+        return new Statement($sql, $this->bindings, executor: $this->executor);
     }
 
     #[\Override]
-    public function insertSelect(): Plan
+    public function insertSelect(): Statement
     {
         $this->bindings = [];
         $this->validateTable();
@@ -140,6 +140,6 @@ trait Inserts
 
         $this->addBindings($sourceResult->bindings);
 
-        return new Plan($sql, $this->bindings, executor: $this->executor);
+        return new Statement($sql, $this->bindings, executor: $this->executor);
     }
 }

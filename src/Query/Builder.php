@@ -29,12 +29,12 @@ use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\CteClause;
 use Utopia\Query\Builder\ExistsSubquery;
 use Utopia\Query\Builder\Feature;
-use Utopia\Query\Builder\GroupedQueries;
 use Utopia\Query\Builder\JoinBuilder;
 use Utopia\Query\Builder\JoinType;
 use Utopia\Query\Builder\LateralJoin;
 use Utopia\Query\Builder\LockMode;
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\ParsedQuery;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Builder\SubSelect;
 use Utopia\Query\Builder\UnionClause;
 use Utopia\Query\Builder\WhereInSubquery;
@@ -199,10 +199,10 @@ abstract class Builder implements
     /** @var list<Closure> */
     protected array $beforeBuildCallbacks = [];
 
-    /** @var list<Closure(Plan): Plan> */
+    /** @var list<Closure(Statement): Statement> */
     protected array $afterBuildCallbacks = [];
 
-    /** @var (\Closure(Plan): (array<mixed>|int))|null */
+    /** @var (\Closure(Statement): (array<mixed>|int))|null */
     protected ?\Closure $executor = null;
 
     protected bool $qualify = false;
@@ -261,7 +261,7 @@ abstract class Builder implements
      * Implementations must add any bindings they emit via $this->addBindings()
      * at the moment their fragment is emitted so ordering is preserved.
      */
-    protected function buildAfterJoinsClause(GroupedQueries $grouped): string
+    protected function buildAfterJoinsClause(ParsedQuery $grouped): string
     {
         return '';
     }
@@ -401,13 +401,13 @@ abstract class Builder implements
      * Build an INSERT ... ON CONFLICT/DUPLICATE KEY UPDATE statement.
      * Requires onConflict() to be called first to configure conflict keys and update columns.
      */
-    public function upsert(): Plan
+    public function upsert(): Statement
     {
         return $this->insert();
     }
 
     #[\Override]
-    public function build(): Plan
+    public function build(): Statement
     {
         $this->bindings = [];
 
@@ -501,7 +501,7 @@ abstract class Builder implements
 
         $sql = $ctePrefix . $sql;
 
-        $result = new Plan($sql, $this->bindings, readOnly: true, executor: $this->executor);
+        $result = new Statement($sql, $this->bindings, readOnly: true, executor: $this->executor);
 
         foreach ($this->afterBuildCallbacks as $callback) {
             $result = $callback($result);
@@ -546,7 +546,7 @@ abstract class Builder implements
      * fully qualified — except aggregation aliases, which are captured here
      * so they can be emitted bare.
      */
-    private function prepareAliasQualification(GroupedQueries $grouped): void
+    private function prepareAliasQualification(ParsedQuery $grouped): void
     {
         $this->qualify = false;
         $this->aggregationAliases = [];
@@ -571,7 +571,7 @@ abstract class Builder implements
      * and CASE selects. Always returns a non-empty fragment (falls back
      * to `SELECT *`).
      */
-    private function buildSelectClause(GroupedQueries $grouped): string
+    private function buildSelectClause(ParsedQuery $grouped): string
     {
         $selectParts = [];
 
@@ -674,7 +674,7 @@ abstract class Builder implements
      *
      * @param  list<Condition>  $joinFilterWhereClauses
      */
-    private function buildJoinsClause(GroupedQueries $grouped, array &$joinFilterWhereClauses): string
+    private function buildJoinsClause(ParsedQuery $grouped, array &$joinFilterWhereClauses): string
     {
         $joinParts = [];
 
@@ -758,7 +758,7 @@ abstract class Builder implements
      *
      * @param  list<Condition>  $joinFilterWhereClauses
      */
-    private function buildWhereClause(GroupedQueries $grouped, array $joinFilterWhereClauses): string
+    private function buildWhereClause(ParsedQuery $grouped, array $joinFilterWhereClauses): string
     {
         $whereClauses = [];
 
@@ -822,7 +822,7 @@ abstract class Builder implements
     /**
      * Compile the GROUP BY clause, including any raw group expressions.
      */
-    private function buildGroupByClause(GroupedQueries $grouped): string
+    private function buildGroupByClause(ParsedQuery $grouped): string
     {
         $groupByParts = [];
         if (! empty($grouped->groupBy)) {
@@ -847,7 +847,7 @@ abstract class Builder implements
      * Compile the HAVING clause, resolving aggregation aliases to their
      * underlying expressions so filters against alias names work portably.
      */
-    private function buildHavingClause(GroupedQueries $grouped): string
+    private function buildHavingClause(ParsedQuery $grouped): string
     {
         $aliasToExpr = $this->buildAggregationAliasMap($grouped);
 
@@ -885,7 +885,7 @@ abstract class Builder implements
      *
      * @return array<string, string>
      */
-    private function buildAggregationAliasMap(GroupedQueries $grouped): array
+    private function buildAggregationAliasMap(ParsedQuery $grouped): array
     {
         $aliasToExpr = [];
         foreach ($grouped->aggregations as $agg) {
@@ -999,7 +999,7 @@ abstract class Builder implements
      * Compile the LIMIT / OFFSET / FETCH FIRST pagination tail. Emitted as
      * a single space-joined fragment so bindings are added in document order.
      */
-    private function buildLimitClause(GroupedQueries $grouped): string
+    private function buildLimitClause(ParsedQuery $grouped): string
     {
         $limitParts = [];
 
@@ -1148,7 +1148,7 @@ abstract class Builder implements
     /**
      * @param  array<string>  $parts
      */
-    protected function compileWhereClauses(array &$parts, ?GroupedQueries $grouped = null): void
+    protected function compileWhereClauses(array &$parts, ?ParsedQuery $grouped = null): void
     {
         $grouped ??= Query::groupByType($this->pendingQueries);
         $whereClauses = [];
@@ -1198,7 +1198,7 @@ abstract class Builder implements
     /**
      * @param  array<string>  $parts
      */
-    protected function compileOrderAndLimit(array &$parts, ?GroupedQueries $grouped = null): void
+    protected function compileOrderAndLimit(array &$parts, ?ParsedQuery $grouped = null): void
     {
         $grouped ??= Query::groupByType($this->pendingQueries);
 
@@ -1941,7 +1941,7 @@ abstract class Builder implements
     /**
      * @return Expression[]
      */
-    private function buildAstColumns(GroupedQueries $grouped): array
+    private function buildAstColumns(ParsedQuery $grouped): array
     {
         $columns = [];
 
@@ -2042,7 +2042,7 @@ abstract class Builder implements
     /**
      * @return AstJoinClause[]
      */
-    private function buildAstJoins(GroupedQueries $grouped): array
+    private function buildAstJoins(ParsedQuery $grouped): array
     {
         $joins = [];
 
@@ -2096,7 +2096,7 @@ abstract class Builder implements
         return $joins;
     }
 
-    private function buildAstWhere(GroupedQueries $grouped): ?Expression
+    private function buildAstWhere(ParsedQuery $grouped): ?Expression
     {
         if (empty($grouped->filters)) {
             return null;
@@ -2252,7 +2252,7 @@ abstract class Builder implements
     /**
      * @return Expression[]
      */
-    private function buildAstGroupBy(GroupedQueries $grouped): array
+    private function buildAstGroupBy(ParsedQuery $grouped): array
     {
         $exprs = [];
         foreach ($grouped->groupBy as $col) {
@@ -2261,7 +2261,7 @@ abstract class Builder implements
         return $exprs;
     }
 
-    private function buildAstHaving(GroupedQueries $grouped): ?Expression
+    private function buildAstHaving(ParsedQuery $grouped): ?Expression
     {
         if (empty($grouped->having)) {
             return null;

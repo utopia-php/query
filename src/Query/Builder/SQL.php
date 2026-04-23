@@ -32,7 +32,7 @@ abstract class SQL extends BaseBuilder implements Locking, Transactions, Upsert,
 
     abstract protected function compileConflictClause(): string;
 
-    abstract public function insertOrIgnore(): Plan;
+    abstract public function insertOrIgnore(): Statement;
 
     #[\Override]
     public function compileFilter(Query $query): string

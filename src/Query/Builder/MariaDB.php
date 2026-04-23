@@ -18,31 +18,31 @@ class MariaDB extends MySQL implements Returning, Sequences
     protected array $returningColumns = [];
 
     #[\Override]
-    public function insert(): Plan
+    public function insert(): Statement
     {
         return $this->appendReturning(parent::insert());
     }
 
     #[\Override]
-    public function insertOrIgnore(): Plan
+    public function insertOrIgnore(): Statement
     {
         return $this->appendReturning(parent::insertOrIgnore());
     }
 
     #[\Override]
-    public function update(): Plan
+    public function update(): Statement
     {
         return $this->appendReturning(parent::update());
     }
 
     #[\Override]
-    public function delete(): Plan
+    public function delete(): Statement
     {
         return $this->appendReturning(parent::delete());
     }
 
     #[\Override]
-    public function upsert(): Plan
+    public function upsert(): Statement
     {
         if (! empty($this->returningColumns)) {
             throw new ValidationException(
@@ -55,7 +55,7 @@ class MariaDB extends MySQL implements Returning, Sequences
     }
 
     #[\Override]
-    public function upsertSelect(): Plan
+    public function upsertSelect(): Statement
     {
         if (! empty($this->returningColumns)) {
             throw new ValidationException(
@@ -76,7 +76,7 @@ class MariaDB extends MySQL implements Returning, Sequences
         return $this;
     }
 
-    private function appendReturning(Plan $result): Plan
+    private function appendReturning(Statement $result): Statement
     {
         if (empty($this->returningColumns)) {
             return $result;
@@ -87,7 +87,7 @@ class MariaDB extends MySQL implements Returning, Sequences
             $this->returningColumns
         );
 
-        return new Plan(
+        return new Statement(
             $result->query . ' RETURNING ' . \implode(', ', $columns),
             $result->bindings,
             executor: $this->executor,

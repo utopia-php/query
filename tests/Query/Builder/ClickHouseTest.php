@@ -40,7 +40,7 @@ use Utopia\Query\Builder\Feature\Upsert;
 use Utopia\Query\Builder\Feature\Windows;
 use Utopia\Query\Builder\JoinBuilder;
 use Utopia\Query\Builder\JoinType;
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Compiler;
 use Utopia\Query\Exception;
 use Utopia\Query\Exception\UnsupportedException;
@@ -9271,7 +9271,7 @@ class ClickHouseTest extends TestCase
         $result = (new Builder())
             ->from('events')
             ->filter([Query::equal('status', ['active'])])
-            ->afterBuild(function (Plan $r) use (&$capturedQuery) {
+            ->afterBuild(function (Statement $r) use (&$capturedQuery) {
                 $capturedQuery = 'callback_executed';
                 return $r;
             })

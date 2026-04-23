@@ -2,11 +2,11 @@
 
 namespace Tests\Query;
 
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 
 trait AssertsBindingCount
 {
-    protected function assertBindingCount(Plan $result): void
+    protected function assertBindingCount(Statement $result): void
     {
         $placeholders = $this->countPlaceholders($result->query);
         $this->assertSame(

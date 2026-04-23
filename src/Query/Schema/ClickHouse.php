@@ -3,7 +3,7 @@
 namespace Utopia\Query\Schema;
 
 use Utopia\Query\Builder;
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\QuotesIdentifiers;
@@ -91,9 +91,9 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         return \implode(' ', $parts);
     }
 
-    public function dropIndex(string $table, string $name): Plan
+    public function dropIndex(string $table, string $name): Statement
     {
-        return new Plan(
+        return new Statement(
             'ALTER TABLE ' . $this->quote($table)
             . ' DROP INDEX ' . $this->quote($name),
             [],
@@ -104,7 +104,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
     /**
      * @param  callable(Table): void  $definition
      */
-    public function alter(string $table, callable $definition): Plan
+    public function alter(string $table, callable $definition): Statement
     {
         $blueprint = new Table();
         $definition($blueprint);
@@ -144,13 +144,13 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         $sql = 'ALTER TABLE ' . $this->quote($table)
             . ' ' . \implode(', ', $alterations);
 
-        return new Plan($sql, [], executor: $this->executor);
+        return new Statement($sql, [], executor: $this->executor);
     }
 
     /**
      * @param  callable(Table): void  $definition
      */
-    public function create(string $table, callable $definition, bool $ifNotExists = false): Plan
+    public function create(string $table, callable $definition, bool $ifNotExists = false): Statement
     {
         $blueprint = new Table();
         $definition($blueprint);
@@ -211,7 +211,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $sql .= ' TTL ' . $blueprint->ttl;
         }
 
-        return new Plan($sql, [], executor: $this->executor);
+        return new Statement($sql, [], executor: $this->executor);
     }
 
     /**
@@ -252,12 +252,12 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         };
     }
 
-    public function createView(string $name, Builder $query): Plan
+    public function createView(string $name, Builder $query): Statement
     {
         $result = $query->build();
         $sql = 'CREATE VIEW ' . $this->quote($name) . ' AS ' . $result->query;
 
-        return new Plan($sql, $result->bindings, executor: $this->executor);
+        return new Statement($sql, $result->bindings, executor: $this->executor);
     }
 
     /**
@@ -273,27 +273,27 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         return 'Enum8(' . \implode(', ', $parts) . ')';
     }
 
-    public function commentOnTable(string $table, string $comment): Plan
+    public function commentOnTable(string $table, string $comment): Statement
     {
-        return new Plan(
+        return new Statement(
             'ALTER TABLE ' . $this->quote($table) . " MODIFY COMMENT '" . str_replace(['\\', "'"], ['\\\\', "''"], $comment) . "'",
             [],
             executor: $this->executor,
         );
     }
 
-    public function commentOnColumn(string $table, string $column, string $comment): Plan
+    public function commentOnColumn(string $table, string $column, string $comment): Statement
     {
-        return new Plan(
+        return new Statement(
             'ALTER TABLE ' . $this->quote($table) . ' COMMENT COLUMN ' . $this->quote($column) . " '" . str_replace(['\\', "'"], ['\\\\', "''"], $comment) . "'",
             [],
             executor: $this->executor,
         );
     }
 
-    public function dropPartition(string $table, string $name): Plan
+    public function dropPartition(string $table, string $name): Statement
     {
-        return new Plan(
+        return new Statement(
             'ALTER TABLE ' . $this->quote($table) . " DROP PARTITION '" . str_replace(['\\', "'"], ['\\\\', "''"], $name) . "'",
             [],
             executor: $this->executor,

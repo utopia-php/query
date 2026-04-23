@@ -401,8 +401,8 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
 
         $this->postgresStatement($result->query);
 
-        $partitionPlan = $this->schema->createPartition($table, $partition, "FROM ('2024-01-01') TO ('2025-01-01')");
-        $this->postgresStatement($partitionPlan->query);
+        $partitionStatement = $this->schema->createPartition($table, $partition, "FROM ('2024-01-01') TO ('2025-01-01')");
+        $this->postgresStatement($partitionStatement->query);
 
         $pdo = $this->connectPostgres();
         $insert = $pdo->prepare("INSERT INTO \"{$table}\" (\"id\", \"created_at\") VALUES (1, '2024-06-15')");

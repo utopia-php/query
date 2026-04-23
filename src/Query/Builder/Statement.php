@@ -2,11 +2,11 @@
 
 namespace Utopia\Query\Builder;
 
-readonly class Plan
+readonly class Statement
 {
     /**
      * @param  list<mixed>  $bindings
-     * @param  (\Closure(Plan): (array<mixed>|int))|null  $executor
+     * @param  (\Closure(Statement): (array<mixed>|int))|null  $executor
      */
     public function __construct(
         public string $query,

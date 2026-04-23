@@ -4,7 +4,7 @@ namespace Utopia\Query\Builder\Trait\PostgreSQL;
 
 use Utopia\Query\Builder as BaseBuilder;
 use Utopia\Query\Builder\MergeClause;
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\ValidationException;
 
 trait Merge
@@ -52,7 +52,7 @@ trait Merge
     }
 
     #[\Override]
-    public function executeMerge(): Plan
+    public function executeMerge(): Statement
     {
         if ($this->mergeTarget === '') {
             throw new ValidationException('No merge target specified. Call mergeInto() before executeMerge().');
@@ -83,6 +83,6 @@ trait Merge
             $this->addBindings($clause->bindings);
         }
 
-        return new Plan($sql, $this->bindings, executor: $this->executor);
+        return new Statement($sql, $this->bindings, executor: $this->executor);
     }
 }

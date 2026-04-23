@@ -898,7 +898,7 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $pdo = $this->connectMysql();
         $stmt = $pdo->prepare('INSERT INTO `articles` (`title`, `body`) VALUES (?, ?), (?, ?), (?, ?)');
         $stmt->execute([
-            'Gardening', 'Planting tomatoes in the garden is rewarding',
+            'Gardening', 'Statementting tomatoes in the garden is rewarding',
             'Cooking', 'A great recipe uses fresh tomatoes and basil',
             'Tech', 'Database internals and query optimization',
         ]);

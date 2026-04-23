@@ -4,7 +4,7 @@ namespace Tests\Integration;
 
 use PDO;
 use PHPUnit\Framework\TestCase;
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 
 abstract class IntegrationTestCase extends TestCase
 {
@@ -115,7 +115,7 @@ abstract class IntegrationTestCase extends TestCase
     /**
      * @return list<array<string, mixed>>
      */
-    protected function executeOnSqlite(Plan $result): array
+    protected function executeOnSqlite(Statement $result): array
     {
         $pdo = $this->connectSqlite();
         $stmt = $pdo->prepare($result->query);
@@ -138,7 +138,7 @@ abstract class IntegrationTestCase extends TestCase
     /**
      * @return list<array<string, mixed>>
      */
-    protected function executeOnMongoDB(Plan $result): array
+    protected function executeOnMongoDB(Statement $result): array
     {
         $mongo = $this->connectMongoDB();
 
@@ -153,7 +153,7 @@ abstract class IntegrationTestCase extends TestCase
     /**
      * @return list<array<string, mixed>>
      */
-    protected function executeOnMysql(Plan $result): array
+    protected function executeOnMysql(Statement $result): array
     {
         $pdo = $this->connectMysql();
         $stmt = $pdo->prepare($result->query);
@@ -176,7 +176,7 @@ abstract class IntegrationTestCase extends TestCase
     /**
      * @return list<array<string, mixed>>
      */
-    protected function executeOnMariadb(Plan $result): array
+    protected function executeOnMariadb(Statement $result): array
     {
         $pdo = $this->connectMariadb();
         $stmt = $pdo->prepare($result->query);
@@ -199,7 +199,7 @@ abstract class IntegrationTestCase extends TestCase
     /**
      * @return list<array<string, mixed>>
      */
-    protected function executeOnPostgres(Plan $result): array
+    protected function executeOnPostgres(Statement $result): array
     {
         $pdo = $this->connectPostgres();
         $stmt = $pdo->prepare($result->query);
@@ -222,7 +222,7 @@ abstract class IntegrationTestCase extends TestCase
     /**
      * @return list<array<string, mixed>>
      */
-    protected function executeOnClickhouse(Plan $result): array
+    protected function executeOnClickhouse(Statement $result): array
     {
         $ch = $this->connectClickhouse();
 

@@ -2,7 +2,7 @@
 
 namespace Utopia\Query\Schema\Feature;
 
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Schema\TriggerEvent;
 use Utopia\Query\Schema\TriggerTiming;
 
@@ -14,7 +14,7 @@ interface Triggers
         TriggerTiming $timing,
         TriggerEvent $event,
         string $body,
-    ): Plan;
+    ): Statement;
 
-    public function dropTrigger(string $name): Plan;
+    public function dropTrigger(string $name): Statement;
 }

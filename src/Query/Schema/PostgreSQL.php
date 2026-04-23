@@ -2,7 +2,7 @@
 
 namespace Utopia\Query\Schema;
 
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\Feature\ColumnComments;
@@ -156,7 +156,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
         array $collations = [],
         array $rawColumns = [],
         bool $concurrently = false,
-    ): Plan {
+    ): Statement {
         if ($method !== '' && ! \preg_match('/^[A-Za-z0-9_]+$/', $method)) {
             throw new ValidationException('Invalid index method: ' . $method);
         }
@@ -182,21 +182,21 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
 
         $sql .= ' (' . $this->compileIndexColumns($index) . ')';
 
-        return new Plan($sql, [], executor: $this->executor);
+        return new Statement($sql, [], executor: $this->executor);
     }
 
-    public function dropIndex(string $table, string $name): Plan
+    public function dropIndex(string $table, string $name): Statement
     {
-        return new Plan(
+        return new Statement(
             'DROP INDEX ' . $this->quote($name),
             [],
             executor: $this->executor,
         );
     }
 
-    public function dropForeignKey(string $table, string $name): Plan
+    public function dropForeignKey(string $table, string $name): Statement
     {
-        return new Plan(
+        return new Statement(
             'ALTER TABLE ' . $this->quote($table)
             . ' DROP CONSTRAINT ' . $this->quote($name),
             [],
@@ -216,7 +216,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
      *
      * @throws ValidationException if $body contains a `$$` sequence.
      */
-    public function createProcedure(string $name, array $params, string $body): Plan
+    public function createProcedure(string $name, array $params, string $body): Statement
     {
         $this->assertSafeDollarQuotedBody($body);
 
@@ -226,12 +226,12 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             . '(' . \implode(', ', $paramList) . ')'
             . ' RETURNS VOID LANGUAGE plpgsql AS $$ BEGIN ' . $body . ' END; $$';
 
-        return new Plan($sql, [], executor: $this->executor);
+        return new Statement($sql, [], executor: $this->executor);
     }
 
-    public function dropProcedure(string $name): Plan
+    public function dropProcedure(string $name): Statement
     {
-        return new Plan('DROP FUNCTION ' . $this->quote($name), [], executor: $this->executor);
+        return new Statement('DROP FUNCTION ' . $this->quote($name), [], executor: $this->executor);
     }
 
     /**
@@ -250,7 +250,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
         TriggerTiming $timing,
         TriggerEvent $event,
         string $body,
-    ): Plan {
+    ): Statement {
         $this->assertSafeDollarQuotedBody($body);
 
         $funcName = $name . '_func';
@@ -262,7 +262,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             . ' ON ' . $this->quote($table)
             . ' FOR EACH ROW EXECUTE FUNCTION ' . $this->quote($funcName) . '()';
 
-        return new Plan($sql, [], executor: $this->executor);
+        return new Statement($sql, [], executor: $this->executor);
     }
 
     /**
@@ -281,7 +281,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
     /**
      * @param  callable(Table): void  $definition
      */
-    public function alter(string $table, callable $definition): Plan
+    public function alter(string $table, callable $definition): Statement
     {
         $blueprint = new Table();
         $definition($blueprint);
@@ -351,26 +351,26 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             $statements[] = 'DROP INDEX ' . $this->quote($name);
         }
 
-        return new Plan(\implode('; ', $statements), [], executor: $this->executor);
+        return new Statement(\implode('; ', $statements), [], executor: $this->executor);
     }
 
-    public function rename(string $from, string $to): Plan
+    public function rename(string $from, string $to): Statement
     {
-        return new Plan(
+        return new Statement(
             'ALTER TABLE ' . $this->quote($from) . ' RENAME TO ' . $this->quote($to),
             [],
             executor: $this->executor,
         );
     }
 
-    public function createExtension(string $name): Plan
+    public function createExtension(string $name): Statement
     {
-        return new Plan('CREATE EXTENSION IF NOT EXISTS ' . $this->quote($name), [], executor: $this->executor);
+        return new Statement('CREATE EXTENSION IF NOT EXISTS ' . $this->quote($name), [], executor: $this->executor);
     }
 
-    public function dropExtension(string $name): Plan
+    public function dropExtension(string $name): Statement
     {
-        return new Plan('DROP EXTENSION IF EXISTS ' . $this->quote($name), [], executor: $this->executor);
+        return new Statement('DROP EXTENSION IF EXISTS ' . $this->quote($name), [], executor: $this->executor);
     }
 
     /**
@@ -378,7 +378,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
      *
      * @param  array<string, string>  $options  Key-value pairs (e.g. ['provider' => 'icu', 'locale' => 'und-u-ks-level1'])
      */
-    public function createCollation(string $name, array $options, bool $deterministic = true): Plan
+    public function createCollation(string $name, array $options, bool $deterministic = true): Statement
     {
         $optParts = [];
         foreach ($options as $key => $value) {
@@ -392,12 +392,12 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
         $sql = 'CREATE COLLATION IF NOT EXISTS ' . $this->quote($name)
             . ' (' . \implode(', ', $optParts) . ')';
 
-        return new Plan($sql, [], executor: $this->executor);
+        return new Statement($sql, [], executor: $this->executor);
     }
 
-    public function renameIndex(string $table, string $from, string $to): Plan
+    public function renameIndex(string $table, string $from, string $to): Statement
     {
-        return new Plan(
+        return new Statement(
             'ALTER INDEX ' . $this->quote($from) . ' RENAME TO ' . $this->quote($to),
             [],
             executor: $this->executor,
@@ -407,19 +407,19 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
     /**
      * PostgreSQL uses schemas instead of databases for namespace isolation.
      */
-    public function createDatabase(string $name): Plan
+    public function createDatabase(string $name): Statement
     {
-        return new Plan('CREATE SCHEMA ' . $this->quote($name), [], executor: $this->executor);
+        return new Statement('CREATE SCHEMA ' . $this->quote($name), [], executor: $this->executor);
     }
 
-    public function dropDatabase(string $name): Plan
+    public function dropDatabase(string $name): Statement
     {
-        return new Plan('DROP SCHEMA IF EXISTS ' . $this->quote($name) . ' CASCADE', [], executor: $this->executor);
+        return new Statement('DROP SCHEMA IF EXISTS ' . $this->quote($name) . ' CASCADE', [], executor: $this->executor);
     }
 
-    public function analyzeTable(string $table): Plan
+    public function analyzeTable(string $table): Statement
     {
-        return new Plan('ANALYZE ' . $this->quote($table), [], executor: $this->executor);
+        return new Statement('ANALYZE ' . $this->quote($table), [], executor: $this->executor);
     }
 
     /**
@@ -427,7 +427,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
      *
      * @throws ValidationException if $type or $using contains disallowed characters.
      */
-    public function alterColumnType(string $table, string $column, string $type, string $using = ''): Plan
+    public function alterColumnType(string $table, string $column, string $type, string $using = ''): Statement
     {
         if (! \preg_match('/^[A-Za-z0-9_() ,]+$/', $type)) {
             throw new ValidationException('Invalid column type: ' . $type);
@@ -445,7 +445,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             $sql .= ' USING ' . $using;
         }
 
-        return new Plan($sql, [], executor: $this->executor);
+        return new Statement($sql, [], executor: $this->executor);
     }
 
     /**
@@ -471,62 +471,62 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
         }
     }
 
-    public function dropIndexConcurrently(string $name): Plan
+    public function dropIndexConcurrently(string $name): Statement
     {
-        return new Plan('DROP INDEX CONCURRENTLY ' . $this->quote($name), [], executor: $this->executor);
+        return new Statement('DROP INDEX CONCURRENTLY ' . $this->quote($name), [], executor: $this->executor);
     }
 
-    public function createType(string $name, array $values): Plan
+    public function createType(string $name, array $values): Statement
     {
         $escaped = array_map(fn (string $v): string => "'" . str_replace(['\\', "'"], ['\\\\', "''"], $v) . "'", $values);
 
-        return new Plan(
+        return new Statement(
             'CREATE TYPE ' . $this->quote($name) . ' AS ENUM (' . implode(', ', $escaped) . ')',
             [],
             executor: $this->executor,
         );
     }
 
-    public function dropType(string $name): Plan
+    public function dropType(string $name): Statement
     {
-        return new Plan('DROP TYPE ' . $this->quote($name), [], executor: $this->executor);
+        return new Statement('DROP TYPE ' . $this->quote($name), [], executor: $this->executor);
     }
 
-    public function createSequence(string $name, int $start = 1, int $incrementBy = 1): Plan
+    public function createSequence(string $name, int $start = 1, int $incrementBy = 1): Statement
     {
-        return new Plan(
+        return new Statement(
             'CREATE SEQUENCE ' . $this->quote($name) . ' START ' . $start . ' INCREMENT BY ' . $incrementBy,
             [],
             executor: $this->executor,
         );
     }
 
-    public function dropSequence(string $name): Plan
+    public function dropSequence(string $name): Statement
     {
-        return new Plan('DROP SEQUENCE ' . $this->quote($name), [], executor: $this->executor);
+        return new Statement('DROP SEQUENCE ' . $this->quote($name), [], executor: $this->executor);
     }
 
-    public function nextVal(string $name): Plan
+    public function nextVal(string $name): Statement
     {
-        return new Plan(
+        return new Statement(
             "SELECT nextval('" . str_replace(['\\', "'"], ['\\\\', "''"], $name) . "')",
             [],
             executor: $this->executor,
         );
     }
 
-    public function commentOnTable(string $table, string $comment): Plan
+    public function commentOnTable(string $table, string $comment): Statement
     {
-        return new Plan(
+        return new Statement(
             'COMMENT ON TABLE ' . $this->quote($table) . " IS '" . str_replace(['\\', "'"], ['\\\\', "''"], $comment) . "'",
             [],
             executor: $this->executor,
         );
     }
 
-    public function commentOnColumn(string $table, string $column, string $comment): Plan
+    public function commentOnColumn(string $table, string $column, string $comment): Statement
     {
-        return new Plan(
+        return new Statement(
             'COMMENT ON COLUMN ' . $this->quote($table) . '.' . $this->quote($column) . " IS '" . str_replace(['\\', "'"], ['\\\\', "''"], $comment) . "'",
             [],
             executor: $this->executor,
@@ -536,20 +536,20 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
     /**
      * @throws ValidationException if $expression is too long or contains disallowed sequences.
      */
-    public function createPartition(string $parent, string $name, string $expression): Plan
+    public function createPartition(string $parent, string $name, string $expression): Statement
     {
         $this->assertSafeExpression($expression, 'partition expression');
 
-        return new Plan(
+        return new Statement(
             'CREATE TABLE ' . $this->quote($name) . ' PARTITION OF ' . $this->quote($parent) . ' FOR VALUES ' . $expression,
             [],
             executor: $this->executor,
         );
     }
 
-    public function dropPartition(string $table, string $name): Plan
+    public function dropPartition(string $table, string $name): Statement
     {
-        return new Plan(
+        return new Statement(
             'DROP TABLE ' . $this->quote($name),
             [],
             executor: $this->executor,

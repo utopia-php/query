@@ -3,7 +3,7 @@
 namespace Utopia\Query;
 
 use JsonException;
-use Utopia\Query\Builder\GroupedQueries;
+use Utopia\Query\Builder\ParsedQuery;
 use Utopia\Query\Exception as QueryException;
 use Utopia\Query\Exception\ValidationException;
 
@@ -742,7 +742,7 @@ class Query
      *
      * @param  array<mixed>  $queries
      */
-    public static function groupByType(array $queries): GroupedQueries
+    public static function groupByType(array $queries): ParsedQuery
     {
         $filters = [];
         $selections = [];
@@ -864,7 +864,7 @@ class Query
             }
         }
 
-        return new GroupedQueries(
+        return new ParsedQuery(
             filters: $filters,
             selections: $selections,
             aggregations: $aggregations,

@@ -241,7 +241,7 @@ class MongoDB extends BaseBuilder implements
     }
 
     #[\Override]
-    public function build(): Plan
+    public function build(): Statement
     {
         $this->bindings = [];
 
@@ -267,7 +267,7 @@ class MongoDB extends BaseBuilder implements
     }
 
     #[\Override]
-    public function insert(): Plan
+    public function insert(): Statement
     {
         $this->bindings = [];
         $this->validateTable();
@@ -289,7 +289,7 @@ class MongoDB extends BaseBuilder implements
             'documents' => $documents,
         ];
 
-        return new Plan(
+        return new Statement(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             $this->bindings,
             executor: $this->executor,
@@ -297,7 +297,7 @@ class MongoDB extends BaseBuilder implements
     }
 
     #[\Override]
-    public function update(): Plan
+    public function update(): Statement
     {
         $this->bindings = [];
         $this->validateTable();
@@ -329,7 +329,7 @@ class MongoDB extends BaseBuilder implements
             $operation['options'] = ['arrayFilters' => $this->arrayFilters];
         }
 
-        return new Plan(
+        return new Statement(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             $this->bindings,
             executor: $this->executor,
@@ -337,7 +337,7 @@ class MongoDB extends BaseBuilder implements
     }
 
     #[\Override]
-    public function delete(): Plan
+    public function delete(): Statement
     {
         $this->bindings = [];
         $this->validateTable();
@@ -351,7 +351,7 @@ class MongoDB extends BaseBuilder implements
             'filter' => ! empty($filter) ? $filter : new stdClass(),
         ];
 
-        return new Plan(
+        return new Statement(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             $this->bindings,
             executor: $this->executor,
@@ -359,7 +359,7 @@ class MongoDB extends BaseBuilder implements
     }
 
     #[\Override]
-    public function upsert(): Plan
+    public function upsert(): Statement
     {
         $this->bindings = [];
         $this->validateTable();
@@ -395,7 +395,7 @@ class MongoDB extends BaseBuilder implements
             'options' => ['upsert' => true],
         ];
 
-        return new Plan(
+        return new Statement(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             $this->bindings,
             executor: $this->executor,
@@ -403,7 +403,7 @@ class MongoDB extends BaseBuilder implements
     }
 
     #[\Override]
-    public function insertOrIgnore(): Plan
+    public function insertOrIgnore(): Statement
     {
         // Build the operation descriptor directly instead of round-tripping through
         // insert() + json_decode(): a round-trip would coerce empty stdClass values
@@ -429,7 +429,7 @@ class MongoDB extends BaseBuilder implements
             'options' => ['ordered' => false],
         ];
 
-        return new Plan(
+        return new Statement(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             $this->bindings,
             executor: $this->executor,
@@ -437,12 +437,12 @@ class MongoDB extends BaseBuilder implements
     }
 
     #[\Override]
-    public function upsertSelect(): Plan
+    public function upsertSelect(): Statement
     {
         throw new UnsupportedException('upsertSelect() is not supported in MongoDB builder.');
     }
 
-    private function needsAggregation(GroupedQueries $grouped): bool
+    private function needsAggregation(ParsedQuery $grouped): bool
     {
         if (! empty(Query::getByType($this->pendingQueries, [Method::OrderRandom], false))) {
             return true;
@@ -475,7 +475,7 @@ class MongoDB extends BaseBuilder implements
             || $this->vectorSearchStage !== null;
     }
 
-    private function buildFind(GroupedQueries $grouped): Plan
+    private function buildFind(ParsedQuery $grouped): Statement
     {
         $filter = $this->buildFilter($grouped);
         $projection = $this->buildProjection($grouped);
@@ -510,7 +510,7 @@ class MongoDB extends BaseBuilder implements
             $operation['hint'] = $this->indexHint;
         }
 
-        return new Plan(
+        return new Statement(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             $this->bindings,
             readOnly: true,
@@ -518,7 +518,7 @@ class MongoDB extends BaseBuilder implements
         );
     }
 
-    private function buildAggregate(GroupedQueries $grouped): Plan
+    private function buildAggregate(ParsedQuery $grouped): Statement
     {
         $pipeline = [];
 
@@ -536,7 +536,7 @@ class MongoDB extends BaseBuilder implements
                 $operation['hint'] = $this->indexHint;
             }
 
-            return new Plan(
+            return new Statement(
                 \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
                 $this->bindings,
                 readOnly: true,
@@ -743,7 +743,7 @@ class MongoDB extends BaseBuilder implements
             $operation['hint'] = $this->indexHint;
         }
 
-        return new Plan(
+        return new Statement(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             $this->bindings,
             readOnly: true,
@@ -754,7 +754,7 @@ class MongoDB extends BaseBuilder implements
     /**
      * @return array<string, mixed>
      */
-    private function buildFilter(GroupedQueries $grouped): array
+    private function buildFilter(ParsedQuery $grouped): array
     {
         $conditions = [];
 
@@ -1087,7 +1087,7 @@ class MongoDB extends BaseBuilder implements
     /**
      * @return array<string, int>
      */
-    private function buildProjection(GroupedQueries $grouped): array
+    private function buildProjection(ParsedQuery $grouped): array
     {
         if (empty($grouped->selections)) {
             return [];
@@ -1136,7 +1136,7 @@ class MongoDB extends BaseBuilder implements
     /**
      * @return array<string, mixed>
      */
-    private function buildGroup(GroupedQueries $grouped): array
+    private function buildGroup(ParsedQuery $grouped): array
     {
         $group = [];
 
@@ -1181,7 +1181,7 @@ class MongoDB extends BaseBuilder implements
      *
      * @return array<string, mixed>
      */
-    private function buildProjectFromGroup(GroupedQueries $grouped): array
+    private function buildProjectFromGroup(ParsedQuery $grouped): array
     {
         $project = ['_id' => 0];
 
@@ -1264,7 +1264,7 @@ class MongoDB extends BaseBuilder implements
     /**
      * @return list<array<string, mixed>>
      */
-    private function buildDistinct(GroupedQueries $grouped): array
+    private function buildDistinct(ParsedQuery $grouped): array
     {
         $stages = [];
 
@@ -1298,7 +1298,7 @@ class MongoDB extends BaseBuilder implements
     /**
      * @return array<string, mixed>
      */
-    private function buildHaving(GroupedQueries $grouped): array
+    private function buildHaving(ParsedQuery $grouped): array
     {
         $conditions = [];
 

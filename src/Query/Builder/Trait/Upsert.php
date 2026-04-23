@@ -2,13 +2,13 @@
 
 namespace Utopia\Query\Builder\Trait;
 
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\ValidationException;
 
 trait Upsert
 {
     #[\Override]
-    public function upsert(): Plan
+    public function upsert(): Statement
     {
         $this->bindings = [];
         $this->validateTable();
@@ -60,11 +60,11 @@ trait Upsert
 
         $sql .= ' ' . $this->compileConflictClause();
 
-        return new Plan($sql, $this->bindings, executor: $this->executor);
+        return new Statement($sql, $this->bindings, executor: $this->executor);
     }
 
     #[\Override]
-    public function upsertSelect(): Plan
+    public function upsertSelect(): Statement
     {
         $this->bindings = [];
         $this->validateTable();
@@ -97,6 +97,6 @@ trait Upsert
 
         $sql .= ' ' . $this->compileConflictClause();
 
-        return new Plan($sql, $this->bindings, executor: $this->executor);
+        return new Statement($sql, $this->bindings, executor: $this->executor);
     }
 }

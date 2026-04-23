@@ -2,7 +2,7 @@
 
 namespace Utopia\Query\Builder\Trait;
 
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
 
@@ -21,7 +21,7 @@ trait Updates
     }
 
     #[\Override]
-    public function update(): Plan
+    public function update(): Statement
     {
         $this->bindings = [];
         $this->validateTable();
@@ -40,6 +40,6 @@ trait Updates
 
         $this->compileOrderAndLimit($parts, $grouped);
 
-        return new Plan(\implode(' ', $parts), $this->bindings, executor: $this->executor);
+        return new Statement(\implode(' ', $parts), $this->bindings, executor: $this->executor);
     }
 }

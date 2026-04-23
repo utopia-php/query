@@ -777,7 +777,7 @@ class MongoDBIntegrationTest extends IntegrationTestCase
      * mongot, so `db.runCommand({aggregate, pipeline:[{$search:...}]})` is rejected
      * with "$search is not allowed in this atlas tier". This is as close as we can
      * get to "real" integration coverage without standing up Atlas Local
-     * (`mongodb/mongodb-atlas-local`) — we assert on the shape of the Plan the
+     * (`mongodb/mongodb-atlas-local`) — we assert on the shape of the Statement the
      * Builder produces and skip the actual round-trip.
      */
     public function testAtlasSearchQueryStructure(): void

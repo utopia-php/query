@@ -2,13 +2,13 @@
 
 namespace Utopia\Query\Builder\Feature;
 
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 
 interface Upsert
 {
-    public function upsert(): Plan;
+    public function upsert(): Statement;
 
-    public function insertOrIgnore(): Plan;
+    public function insertOrIgnore(): Statement;
 
-    public function upsertSelect(): Plan;
+    public function upsertSelect(): Statement;
 }

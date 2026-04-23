@@ -28,7 +28,7 @@ use Utopia\Query\Builder\Feature\Windows;
 use Utopia\Query\Builder\JoinBuilder;
 use Utopia\Query\Builder\JoinType;
 use Utopia\Query\Builder\MySQL as Builder;
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Compiler;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
@@ -11932,8 +11932,8 @@ class MySQLTest extends TestCase
     {
         $result = (new Builder())
             ->from('users')
-            ->afterBuild(function (Plan $result) {
-                return new Plan(
+            ->afterBuild(function (Statement $result) {
+                return new Statement(
                     '/* traced */ ' . $result->query,
                     $result->bindings,
                     $result->readOnly
@@ -14389,8 +14389,8 @@ class MySQLTest extends TestCase
         $result = (new Builder())
             ->from('t')
             ->filter([Query::equal('status', ['active'])])
-            ->afterBuild(function (Plan $r) {
-                return new Plan(
+            ->afterBuild(function (Statement $r) {
+                return new Statement(
                     '/* traced */ ' . $r->query,
                     $r->bindings,
                     $r->readOnly,

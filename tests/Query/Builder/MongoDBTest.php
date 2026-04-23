@@ -27,7 +27,7 @@ use Utopia\Query\Builder\Feature\Windows;
 use Utopia\Query\Builder\MongoDB as Builder;
 use Utopia\Query\Builder\MongoDB\Operation;
 use Utopia\Query\Builder\MongoDB\UpdateOperator;
-use Utopia\Query\Builder\Plan;
+use Utopia\Query\Builder\Statement;
 use Utopia\Query\Compiler;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
@@ -2665,12 +2665,12 @@ class MongoDBTest extends TestCase
         $result = (new Builder())
             ->from('users')
             ->select(['name'])
-            ->afterBuild(function (Plan $result) {
+            ->afterBuild(function (Statement $result) {
                 /** @var array<string, mixed> $op */
                 $op = \json_decode($result->query, true);
                 $op['custom_flag'] = true;
 
-                return new Plan(
+                return new Statement(
                     \json_encode($op, JSON_THROW_ON_ERROR),
                     $result->bindings,
                     $result->readOnly

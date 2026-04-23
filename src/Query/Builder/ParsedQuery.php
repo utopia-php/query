@@ -6,7 +6,7 @@ use Utopia\Query\CursorDirection;
 use Utopia\Query\OrderDirection;
 use Utopia\Query\Query;
 
-readonly class GroupedQueries
+readonly class ParsedQuery
 {
     /**
      * @param  list<Query>  $filters

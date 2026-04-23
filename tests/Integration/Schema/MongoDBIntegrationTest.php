@@ -84,13 +84,13 @@ class MongoDBIntegrationTest extends IntegrationTestCase
             $bp->string('city', 64);
         })->query);
 
-        $indexPlan = $this->schema->createIndex(
+        $indexStatement = $this->schema->createIndex(
             $collection,
             'idx_country_city',
             ['country', 'city'],
             orders: ['country' => 'asc', 'city' => 'desc'],
         );
-        $mongo->command($indexPlan->query);
+        $mongo->command($indexStatement->query);
 
         $this->assertSame(
             ['country' => 1, 'city' => -1],
