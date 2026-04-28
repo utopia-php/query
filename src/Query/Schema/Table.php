@@ -4,6 +4,8 @@ namespace Utopia\Query\Schema;
 
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\ClickHouse\Engine;
+use Utopia\Query\Schema\ClickHouse\SkipIndex;
+use Utopia\Query\Schema\ClickHouse\SkipIndexAlgorithm;
 
 class Table
 {
@@ -50,6 +52,12 @@ class Table
     public private(set) array $engineArgs = [];
 
     public private(set) ?string $ttl = null;
+
+    /** @var list<SkipIndex> ClickHouse data-skipping indexes (other dialects ignore) */
+    public private(set) array $skipIndexes = [];
+
+    /** @var array<string, string> Table-level engine SETTINGS (ClickHouse only) */
+    public private(set) array $settings = [];
 
     /**
      * Add a table-level CHECK constraint.
@@ -540,6 +548,89 @@ class Table
         }
 
         $this->ttl = $trimmed;
+
+        return $this;
+    }
+
+    /**
+     * Attach a ClickHouse data-skipping index. Other dialects ignore this.
+     *
+     * Skip indexes accelerate WHERE clauses by letting ClickHouse skip whole
+     * granules during scanning. Choose the algorithm that matches the column
+     * cardinality and predicate type:
+     *
+     * - `MinMax` — numeric ranges, low cardinality
+     * - `Set(N)` — small fixed value sets (N is the set size cap)
+     * - `BloomFilter(p)` — high cardinality string columns with `=` / `IN`
+     *   predicates (p is the false-positive probability, e.g. 0.01)
+     * - `NgramBloomFilter(n, size, hashes, seed)` — `LIKE` / `match` on text
+     * - `TokenBloomFilter(size, hashes, seed)` — token-style search
+     * - `Inverted` — `LIKE`, `match`, `hasToken` (experimental)
+     *
+     * @param  list<string>  $columns
+     * @param  list<string|int|float>  $algorithmArgs  Algorithm-specific arguments
+     *
+     * @throws ValidationException if the index name or columns are invalid.
+     */
+    public function dataSkippingIndex(
+        array $columns,
+        SkipIndexAlgorithm $algorithm,
+        int $granularity = 1,
+        array $algorithmArgs = [],
+        string $name = '',
+    ): static {
+        if ($name === '') {
+            $name = 'skip_' . \implode('_', $columns);
+        }
+
+        $this->skipIndexes[] = new SkipIndex($name, $columns, $algorithm, $algorithmArgs, $granularity);
+
+        return $this;
+    }
+
+    /**
+     * Set table-level engine SETTINGS (ClickHouse only). Other dialects ignore.
+     *
+     * Compiled as `SETTINGS k=v, ...` after the TTL clause. Booleans become
+     * `1` / `0`, ints/floats are stringified, strings are passed through after
+     * a conservative character allow-list check.
+     *
+     * Calling this method replaces previously-set settings.
+     *
+     * @param  array<string, string|int|float|bool>  $settings
+     *
+     * @throws ValidationException if any key is not a valid identifier or any
+     *                             string value contains characters outside the
+     *                             allow-list.
+     */
+    public function settings(array $settings): static
+    {
+        $sanitized = [];
+
+        foreach ($settings as $key => $value) {
+            if (! \preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key)) {
+                throw new ValidationException('Invalid setting name: ' . $key);
+            }
+
+            if (\is_bool($value)) {
+                $sanitized[$key] = $value ? '1' : '0';
+            } elseif (\is_int($value) || \is_float($value)) {
+                $sanitized[$key] = (string) $value;
+            } elseif (\is_string($value)) {
+                if (! \preg_match('/^[A-Za-z0-9_.\-+\/]*$/', $value)) {
+                    throw new ValidationException(
+                        'Invalid setting value for ' . $key . ': must match [A-Za-z0-9_.\\-+/]*'
+                    );
+                }
+                $sanitized[$key] = $value;
+            } else {
+                throw new ValidationException(
+                    'Setting value for ' . $key . ' must be string, int, float, or bool.'
+                );
+            }
+        }
+
+        $this->settings = $sanitized;
 
         return $this;
     }

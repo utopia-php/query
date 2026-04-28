@@ -9,6 +9,7 @@ use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\QuotesIdentifiers;
 use Utopia\Query\Schema;
 use Utopia\Query\Schema\ClickHouse\Engine;
+use Utopia\Query\Schema\ClickHouse\SkipIndex;
 use Utopia\Query\Schema\Feature\ColumnComments;
 use Utopia\Query\Schema\Feature\DropPartition;
 use Utopia\Query\Schema\Feature\TableComments;
@@ -183,6 +184,14 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
                 . ' ' . $expr . ' TYPE minmax GRANULARITY 3';
         }
 
+        foreach ($blueprint->skipIndexes as $skip) {
+            $cols = \array_map(fn (string $c): string => $this->quote($c), $skip->columns);
+            $expr = \count($cols) === 1 ? $cols[0] : '(' . \implode(', ', $cols) . ')';
+            $columnDefs[] = 'INDEX ' . $this->quote($skip->name)
+                . ' ' . $expr . ' TYPE ' . $this->compileSkipAlgorithm($skip)
+                . ' GRANULARITY ' . $skip->granularity;
+        }
+
         if (! empty($blueprint->foreignKeys)) {
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
         }
@@ -211,7 +220,38 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $sql .= ' TTL ' . $blueprint->ttl;
         }
 
+        if (! empty($blueprint->settings)) {
+            $kv = [];
+            foreach ($blueprint->settings as $k => $v) {
+                $kv[] = $k . ' = ' . $v;
+            }
+            $sql .= ' SETTINGS ' . \implode(', ', $kv);
+        }
+
         return new Statement($sql, [], executor: $this->executor);
+    }
+
+    /**
+     * Render a `TYPE <algorithm>(args)` fragment for a data-skipping index.
+     *
+     * String args are emitted as single-quoted SQL literals (with `'` doubled);
+     * numeric args are emitted verbatim. Argument values come from the
+     * application — never from untrusted input.
+     */
+    private function compileSkipAlgorithm(SkipIndex $skip): string
+    {
+        if ($skip->algorithmArgs === []) {
+            return $skip->algorithm->value;
+        }
+
+        $args = \array_map(
+            fn (string|int|float $arg): string => \is_string($arg)
+                ? "'" . \str_replace("'", "''", $arg) . "'"
+                : (string) $arg,
+            $skip->algorithmArgs,
+        );
+
+        return $skip->algorithm->value . '(' . \implode(', ', $args) . ')';
     }
 
     /**

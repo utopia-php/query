@@ -2081,6 +2081,49 @@ $schema->create('events', function (Table $table) {
 
 TTL expressions are emitted verbatim; they must not be empty or contain semicolons. Dialects other than ClickHouse throw `UnsupportedException`.
 
+**Data-skipping indexes** — accelerate WHERE pruning by letting ClickHouse skip whole granules:
+
+```php
+use Utopia\Query\Schema\ClickHouse\SkipIndexAlgorithm;
+
+$schema->create('events', function (Table $table) {
+    $table->bigInteger('id')->primary();
+    $table->string('user_id');
+    $table->string('country');
+    $table->string('text');
+
+    // Default granularity = 1, no algorithm args
+    $table->dataSkippingIndex(['user_id'], SkipIndexAlgorithm::BloomFilter);
+
+    // Set(N) — small fixed value sets
+    $table->dataSkippingIndex(['country'], SkipIndexAlgorithm::Set, granularity: 4, algorithmArgs: [100]);
+
+    // NgramBloomFilter(n, size_bytes, hashes, seed) — text search on `LIKE` / `match`
+    $table->dataSkippingIndex(['text'], SkipIndexAlgorithm::NgramBloomFilter, algorithmArgs: [4, 1024, 3, 0]);
+});
+
+// CREATE TABLE `events` (..., INDEX `skip_user_id` `user_id` TYPE bloom_filter GRANULARITY 1, ...)
+```
+
+The 6 algorithms are `MinMax`, `Set`, `BloomFilter`, `NgramBloomFilter`, `TokenBloomFilter`, `Inverted`. Algorithm-specific arguments are passed via `algorithmArgs` and rendered verbatim — supply them from trusted (developer-controlled) source. Other dialects ignore the call.
+
+**Engine SETTINGS** — emit `SETTINGS k=v` after the TTL clause:
+
+```php
+$schema->create('events', function (Table $table) {
+    $table->bigInteger('id')->primary();
+    $table->settings([
+        'index_granularity' => 8192,
+        'allow_nullable_key' => true, // booleans become 1/0
+    ]);
+});
+
+// CREATE TABLE `events` (...) ENGINE = MergeTree() ORDER BY (`id`)
+//   SETTINGS index_granularity = 8192, allow_nullable_key = 1
+```
+
+Setting names must match `[A-Za-z_][A-Za-z0-9_]*`; string values are restricted to `[A-Za-z0-9_.\-+/]*`. Use ints / floats / booleans for everything else. Other dialects ignore the call.
+
 ### SQLite Schema
 
 ```php

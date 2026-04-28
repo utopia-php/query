@@ -10,6 +10,7 @@ use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\ClickHouse as Schema;
 use Utopia\Query\Schema\ClickHouse\Engine;
+use Utopia\Query\Schema\ClickHouse\SkipIndexAlgorithm;
 use Utopia\Query\Schema\Feature\ColumnComments;
 use Utopia\Query\Schema\Feature\DropPartition;
 use Utopia\Query\Schema\Feature\ForeignKeys;
@@ -719,5 +720,145 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `events` (`id` Int32, `temporary` String TTL ts + INTERVAL 1 DAY, `ts` DateTime) ENGINE = MergeTree() ORDER BY (`id`)', $result->query);
+    }
+
+    // Data-skipping indexes
+
+    public function testDataSkippingIndexBloomFilter(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Table $table) {
+            $table->bigInteger('id')->primary();
+            $table->string('user_id');
+            $table->dataSkippingIndex(['user_id'], SkipIndexAlgorithm::BloomFilter);
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `user_id` String, INDEX `skip_user_id` `user_id` TYPE bloom_filter GRANULARITY 1) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testDataSkippingIndexWithArgs(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Table $table) {
+            $table->bigInteger('id')->primary();
+            $table->string('country');
+            $table->string('text');
+            $table->dataSkippingIndex(['country'], SkipIndexAlgorithm::Set, granularity: 4, algorithmArgs: [100]);
+            $table->dataSkippingIndex(['text'], SkipIndexAlgorithm::NgramBloomFilter, algorithmArgs: [4, 1024, 3, 0]);
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `country` String, `text` String,'
+            . ' INDEX `skip_country` `country` TYPE set(100) GRANULARITY 4,'
+            . ' INDEX `skip_text` `text` TYPE ngrambf_v1(4, 1024, 3, 0) GRANULARITY 1)'
+            . ' ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testDataSkippingIndexCompositeColumns(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Table $table) {
+            $table->bigInteger('id')->primary();
+            $table->string('user_id');
+            $table->string('event');
+            $table->dataSkippingIndex(['user_id', 'event'], SkipIndexAlgorithm::BloomFilter, name: 'idx_user_event');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `user_id` String, `event` String,'
+            . ' INDEX `idx_user_event` (`user_id`, `event`) TYPE bloom_filter GRANULARITY 1)'
+            . ' ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testDataSkippingIndexInvalidGranularityThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->create('events', function (Table $table) {
+            $table->bigInteger('id')->primary();
+            $table->string('user_id');
+            $table->dataSkippingIndex(['user_id'], SkipIndexAlgorithm::BloomFilter, granularity: 0);
+        });
+    }
+
+    public function testDataSkippingIndexEmptyColumnsThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->create('events', function (Table $table) {
+            $table->bigInteger('id')->primary();
+            $table->dataSkippingIndex([], SkipIndexAlgorithm::BloomFilter);
+        });
+    }
+
+    // SETTINGS
+
+    public function testTableSettings(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Table $table) {
+            $table->bigInteger('id')->primary();
+            $table->settings(['index_granularity' => 8192, 'allow_nullable_key' => true]);
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64) ENGINE = MergeTree() ORDER BY (`id`)'
+            . ' SETTINGS index_granularity = 8192, allow_nullable_key = 1',
+            $result->query,
+        );
+    }
+
+    public function testTableSettingsWithTtlOrdering(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Table $table) {
+            $table->bigInteger('id')->primary();
+            $table->datetime('created_at');
+            $table->ttl('`created_at` + INTERVAL 30 DAY');
+            $table->settings(['index_granularity' => 4096]);
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `created_at` DateTime) ENGINE = MergeTree() ORDER BY (`id`)'
+            . ' TTL `created_at` + INTERVAL 30 DAY'
+            . ' SETTINGS index_granularity = 4096',
+            $result->query,
+        );
+    }
+
+    public function testTableSettingsRejectsInvalidKey(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->create('events', function (Table $table) {
+            $table->bigInteger('id')->primary();
+            $table->settings(['1bad-key' => 8192]);
+        });
+    }
+
+    public function testTableSettingsRejectsInvalidValue(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->create('events', function (Table $table) {
+            $table->bigInteger('id')->primary();
+            $table->settings(['ok_key' => "evil'; DROP TABLE x; --"]);
+        });
     }
 }
