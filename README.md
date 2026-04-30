@@ -1750,26 +1750,28 @@ use Utopia\Query\Schema\Table;
 ```php
 $schema = new Schema();
 
-$result = $schema->create('users', function (Table $table) {
-    $table->id();
-    $table->string('name', 255);
-    $table->string('email', 255)->unique();
-    $table->integer('age')->nullable();
-    $table->boolean('active')->default(true);
-    $table->json('metadata');
-    $table->timestamps();
-});
+$result = $schema->table('users')
+    ->id()
+    ->string('name', 255)
+    ->string('email', 255)->unique()
+    ->integer('age')->nullable()
+    ->boolean('active')->default(true)
+    ->json('metadata')
+    ->timestamps()
+    ->create();
 
 $result->query; // CREATE TABLE `users` (...)
 ```
 
+`Schema::table($name)` returns a fluent builder. Column-adding methods (`id`, `string`, `integer`, …) return a `Column` you can chain modifiers on; the column also exposes the table-level builder so you can keep chaining sibling columns or terminal calls without breaking the chain. Terminal methods (`create`, `createIfNotExists`, `alter`, `drop`, `dropIfExists`, `truncate`, `rename`) compile and return a `Statement`.
+
 Use `createIfNotExists()` to add `IF NOT EXISTS`:
 
 ```php
-$result = $schema->createIfNotExists('users', function (Table $table) {
-    $table->id();
-    $table->string('name', 255);
-});
+$result = $schema->table('users')
+    ->id()
+    ->string('name', 255)
+    ->createIfNotExists();
 ```
 
 Available column types: `id`, `string`, `text`, `mediumText`, `longText`, `integer`, `bigInteger`, `serial`, `bigSerial`, `smallSerial`, `float`, `boolean`, `datetime`, `timestamp`, `json`, `binary`, `enum`, `point`, `linestring`, `polygon`, `vector` (PostgreSQL only), `timestamps`.
@@ -1779,35 +1781,38 @@ Column modifiers: `nullable()`, `default($value)`, `unsigned()`, `unique()`, `pr
 **SERIAL types** — auto-incrementing integers. PostgreSQL emits native `SERIAL` / `BIGSERIAL` / `SMALLSERIAL`; MySQL/MariaDB compile to `INT AUTO_INCREMENT` / `BIGINT AUTO_INCREMENT` / `SMALLINT AUTO_INCREMENT`; SQLite maps to `INTEGER`. ClickHouse and MongoDB throw `UnsupportedException`:
 
 ```php
-$result = $schema->create('orders', function (Table $table) {
-    $table->serial('id')->primary();
-    $table->bigSerial('external_id');
-});
+$result = $schema->table('orders')
+    ->serial('id')->primary()
+    ->bigSerial('external_id')
+    ->create();
 ```
 
 ### Altering Tables
 
 ```php
-$result = $schema->alter('users', function (Table $table) {
-    $table->string('phone', 20)->nullable();
-    $table->modifyColumn('name', 'string', 500);
-    $table->renameColumn('email', 'email_address');
-    $table->dropColumn('legacy_field');
-});
+use Utopia\Query\Schema\ColumnType;
+
+$result = $schema->table('users')
+    ->string('phone', 20)->nullable()
+    ->modifyColumn('name', ColumnType::String, 500)
+    ->renameColumn('email', 'email_address')
+    ->dropColumn('legacy_field')
+    ->alter();
 ```
+
+`addColumn(string $name, ColumnType $type, ?int $lengthOrPrecision = null)` and `modifyColumn(...)` take the `ColumnType` enum directly. The `addIndex(...)` overload takes the `IndexType` enum.
 
 ### CHECK Constraints
 
 Typed `CHECK` constraints are supported at both the table and column level on MySQL 8.0.16+, MariaDB, PostgreSQL, and SQLite. ClickHouse throws `UnsupportedException`.
 
 ```php
-$result = $schema->create('people', function (Table $table) {
-    $table->id();
-    $table->integer('age')->check('>= 0');                   // column-level
-    $table->string('email', 255);
-
-    $table->check('age_range', '`age` >= 0 AND `age` < 150'); // table-level
-});
+$result = $schema->table('people')
+    ->id()
+    ->integer('age')->check('>= 0')                           // column-level
+    ->string('email', 255)
+    ->check('age_range', '`age` >= 0 AND `age` < 150')        // table-level
+    ->create();
 ```
 
 Constraint names are validated as standard SQL identifiers; expressions are emitted verbatim and must come from trusted sources — never from untrusted input.
@@ -1817,18 +1822,17 @@ Constraint names are validated as standard SQL identifiers; expressions are emit
 Generated columns compute their value from an expression. Both `STORED` and `VIRTUAL` are supported on MySQL, MariaDB, and SQLite. PostgreSQL supports only `STORED` (calling `virtual()` and compiling for PostgreSQL throws `UnsupportedException`). ClickHouse throws `UnsupportedException` for generated columns.
 
 ```php
-$result = $schema->create('boxes', function (Table $table) {
-    $table->id();
-    $table->integer('width');
-    $table->integer('height');
-    $table->integer('area')
+$result = $schema->table('boxes')
+    ->id()
+    ->integer('width')
+    ->integer('height')
+    ->integer('area')
         ->generatedAs('`width` * `height`')
-        ->stored();
-
-    $table->integer('half_area')
+        ->stored()
+    ->integer('half_area')
         ->generatedAs('(`width` * `height`) / 2')
-        ->virtual();
-});
+        ->virtual()
+    ->create();
 ```
 
 ### Composite Primary Keys
@@ -1836,13 +1840,12 @@ $result = $schema->create('boxes', function (Table $table) {
 Declare a primary key across two or more columns with `Table::primary([...])`. Mixing a column-level `->primary()` with `Table::primary([...])` throws `ValidationException`. MongoDB throws `UnsupportedException`.
 
 ```php
-$result = $schema->create('order_items', function (Table $table) {
-    $table->integer('order_id');
-    $table->integer('product_id');
-    $table->integer('quantity');
-
-    $table->primary(['order_id', 'product_id']);
-});
+$result = $schema->table('order_items')
+    ->integer('order_id')
+    ->integer('product_id')
+    ->integer('quantity')
+    ->primary(['order_id', 'product_id'])
+    ->create();
 ```
 
 ### Indexes
@@ -1893,11 +1896,11 @@ Available on MySQL, PostgreSQL, and ClickHouse:
 
 ```php
 // Define partition strategy in table creation
-$result = $schema->create('events', function (Table $table) {
-    $table->id();
-    $table->datetime('created_at');
-    $table->partitionByRange('created_at');
-});
+$result = $schema->table('events')
+    ->id()
+    ->datetime('created_at')
+    ->partitionByRange('created_at')
+    ->create();
 
 // Create a child partition (MySQL, PostgreSQL)
 $result = $schema->createPartition('events', 'events_2024', "VALUES LESS THAN ('2025-01-01')");
@@ -1909,11 +1912,11 @@ $result = $schema->dropPartition('events', 'events_2024');
 Partition strategies: `partitionByRange($expression)`, `partitionByList($expression)`, `partitionByHash($expression, ?int $partitions = null)`. The optional partition count on `partitionByHash()` emits `PARTITIONS <count>` (MySQL/MariaDB HASH/KEY semantics) and must be `>= 1`:
 
 ```php
-$result = $schema->create('users', function (Table $table) {
-    $table->id();
-    $table->integer('user_id');
-    $table->partitionByHash('`user_id`', 4);
-});
+$result = $schema->table('users')
+    ->id()
+    ->integer('user_id')
+    ->partitionByHash('`user_id`', 4)
+    ->create();
 
 // ... PARTITION BY HASH(`user_id`) PARTITIONS 4
 ```
@@ -1981,10 +1984,10 @@ END;
 // Custom types — reference from a column via Column::userType()
 $result = $schema->createType('mood_type', ['happy', 'sad', 'angry']);
 
-$result = $schema->create('users', function (Table $table) {
-    $table->id();
-    $table->string('mood')->userType('mood_type');
-});
+$result = $schema->table('users')
+    ->id()
+    ->string('mood')->userType('mood_type')
+    ->create();
 
 $result = $schema->dropType('mood_type');
 
@@ -2018,12 +2021,12 @@ use Utopia\Query\Schema\ClickHouse\Engine;
 
 $schema = new Schema();
 
-$result = $schema->create('events', function (Table $table) {
-    $table->string('event_id', 36)->primary();
-    $table->string('event_type', 50);
-    $table->integer('count');
-    $table->datetime('created_at');
-});
+$result = $schema->table('events')
+    ->string('event_id', 36)->primary()
+    ->string('event_type', 50)
+    ->integer('count')
+    ->datetime('created_at')
+    ->create();
 
 // CREATE TABLE `events` (...) ENGINE = MergeTree() ORDER BY (...)
 ```
@@ -2036,32 +2039,32 @@ Supports the `TableComments`, `ColumnComments`, and `DropPartition` interfaces.
 
 ```php
 // Standard MergeTree family
-$schema->create('dedup', function (Table $table) {
-    $table->bigInteger('id')->primary();
-    $table->integer('version');
-    $table->engine(Engine::ReplacingMergeTree, 'version');
-});
+$schema->table('dedup')
+    ->bigInteger('id')->primary()
+    ->integer('version')
+    ->engine(Engine::ReplacingMergeTree, 'version')
+    ->create();
 // ... ENGINE = ReplacingMergeTree(`version`) ORDER BY (`id`)
 
-$schema->create('metrics', function (Table $table) {
-    $table->integer('key')->primary();
-    $table->bigInteger('total')->unsigned();
-    $table->engine(Engine::SummingMergeTree, 'total');
-});
+$schema->table('metrics')
+    ->integer('key')->primary()
+    ->bigInteger('total')->unsigned()
+    ->engine(Engine::SummingMergeTree, 'total')
+    ->create();
 
 // CollapsingMergeTree requires a sign column (throws ValidationException otherwise)
 // ReplicatedMergeTree requires zookeeper_path + replica_name
-$schema->create('replicated', function (Table $table) {
-    $table->integer('id')->primary();
-    $table->engine(Engine::ReplicatedMergeTree, '/clickhouse/tables/events', 'replica_1');
-});
+$schema->table('replicated')
+    ->integer('id')->primary()
+    ->engine(Engine::ReplicatedMergeTree, '/clickhouse/tables/events', 'replica_1')
+    ->create();
 
 // Non-MergeTree engines skip the ORDER BY tuple() fallback entirely
-$schema->create('cache', function (Table $table) {
-    $table->integer('id')->primary();
-    $table->string('value');
-    $table->engine(Engine::Memory);
-});
+$schema->table('cache')
+    ->integer('id')->primary()
+    ->string('value')
+    ->engine(Engine::Memory)
+    ->create();
 // CREATE TABLE `cache` (...) ENGINE = Memory
 ```
 
@@ -2070,13 +2073,15 @@ The 10 variants: `MergeTree`, `ReplacingMergeTree`, `SummingMergeTree`, `Aggrega
 **TTL** — table-level and column-level time-to-live expressions:
 
 ```php
-$schema->create('events', function (Table $table) {
-    $table->integer('id')->primary();
-    $table->datetime('ts');
-    $table->datetime('expires_at')->ttl('now() + INTERVAL 1 HOUR'); // column-level
+$schema->table('events')
+    ->integer('id')->primary()
+    ->datetime('ts')
+    ->datetime('expires_at')->ttl('now() + INTERVAL 1 HOUR') // column-level
+    ->ttl('ts + INTERVAL 1 DAY')                              // table-level
+    ->create();
 
-    $table->ttl('ts + INTERVAL 1 DAY'); // table-level
-});
+// Set the ORDER BY clause explicitly with `->orderBy([...])` if it should
+// differ from the primary key.
 ```
 
 TTL expressions are emitted verbatim; they must not be empty or contain semicolons. Dialects other than ClickHouse throw `UnsupportedException`.
@@ -2102,13 +2107,13 @@ The MongoDB schema generates JSON commands for collection management with BSON t
 ```php
 $schema = new Schema();
 
-$result = $schema->create('users', function (Table $table) {
-    $table->string('name', 255);
-    $table->string('email', 255)->unique();
-    $table->integer('age')->nullable();
-    $table->boolean('active')->default(true);
-    $table->json('metadata');
-});
+$result = $schema->table('users')
+    ->string('name', 255)
+    ->string('email', 255)->unique()
+    ->integer('age')->nullable()
+    ->boolean('active')->default(true)
+    ->json('metadata')
+    ->create();
 
 // Generates a create command with bsonType validators
 ```
@@ -2116,9 +2121,9 @@ $result = $schema->create('users', function (Table $table) {
 **Altering collections:**
 
 ```php
-$result = $schema->alter('users', function (Table $table) {
-    $table->string('phone', 20)->nullable();
-});
+$result = $schema->table('users')
+    ->string('phone', 20)->nullable()
+    ->alter();
 
 // Generates a collMod command to update the validator
 ```
@@ -2133,9 +2138,9 @@ $result = $schema->dropIndex('users', 'idx_email');
 **Collection operations:**
 
 ```php
-$result = $schema->drop('users');
-$result = $schema->rename('old_name', 'new_name');
-$result = $schema->truncate('users');
+$result = $schema->table('users')->drop();
+$result = $schema->table('old_name')->rename('new_name');
+$result = $schema->table('users')->truncate();
 $result = $schema->analyzeTable('users');
 ```
 
