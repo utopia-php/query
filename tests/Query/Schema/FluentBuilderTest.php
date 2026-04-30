@@ -179,13 +179,16 @@ class FluentBuilderTest extends TestCase
 
     public function testColumnForwardsIndexFamily(): void
     {
+        // Each call must hit a fresh Column: index methods return Table, so
+        // chaining a second method off a Column would route through Table.
         $bp = new Table();
-        $bp->string('name')
-            ->index(['name'])
-            ->uniqueIndex(['name'], 'uq_name')
-            ->fulltextIndex(['name'], 'ft_name')
-            ->spatialIndex(['name'], 'sp_name')
-            ->addIndex('custom', ['name'], IndexType::Unique);
+        $col = fn (): Column => $bp->string('name');
+
+        $col()->index(['name']);
+        $col()->uniqueIndex(['name'], 'uq_name');
+        $col()->fulltextIndex(['name'], 'ft_name');
+        $col()->spatialIndex(['name'], 'sp_name');
+        $col()->addIndex('custom', ['name'], IndexType::Unique);
 
         $this->assertCount(5, $bp->indexes);
         $this->assertSame('idx_name', $bp->indexes[0]->name);
@@ -219,7 +222,7 @@ class FluentBuilderTest extends TestCase
     {
         $bp = new Table();
         $fk = $bp->string('name')->addForeignKey('parent_id');
-        $bp->dropForeignKey('fk_old');
+        $bp->string('other')->dropForeignKey('fk_old');
 
         $this->assertSame('parent_id', $fk->column);
         $this->assertCount(1, $bp->foreignKeys);
@@ -843,6 +846,16 @@ class FluentBuilderTest extends TestCase
         $this->assertSame('RENAME TABLE `old` TO `new`', $rename->query);
     }
 
+    public function testColumnForwardsDropAndDropIfExistsTerminals(): void
+    {
+        $schema = new MySQL();
+        $drop = $schema->table('users')->string('name')->drop();
+        $dropIfExists = $schema->table('users')->string('name')->dropIfExists();
+
+        $this->assertSame('DROP TABLE `users`', $drop->query);
+        $this->assertSame('DROP TABLE IF EXISTS `users`', $dropIfExists->query);
+    }
+
     public function testForeignKeyForwardsTruncateAndRenameTerminals(): void
     {
         $schema = new MySQL();
@@ -935,41 +948,42 @@ class FluentBuilderTest extends TestCase
 
     public function testForeignKeyForwardsToEveryTableColumnFactory(): void
     {
+        // Each call must hit a fresh ForeignKey: column factories return Column,
+        // so chaining a second factory off a FK would route through Column instead.
         $bp = new Table();
-        $bp->id()
-            ->integer('user_id')
-            ->foreignKey('user_id')->references('id')->on('users')
-            ->string('s')
-            ->text('t')
-            ->mediumText('mt')
-            ->longText('lt')
-            ->integer('i')
-            ->bigInteger('bi')
-            ->serial('sr')
-            ->bigSerial('bsr')
-            ->smallSerial('ssr')
-            ->float('f')
-            ->boolean('b')
-            ->datetime('dt')
-            ->timestamp('ts')
-            ->json('j')
-            ->binary('bin')
-            ->enum('status', ['draft', 'live'])
-            ->point('p')
-            ->linestring('ls')
-            ->polygon('pg')
-            ->vector('v', 8)
-            ->id('id_col');
+        $bp->integer('user_id');
+        $fk = fn (): ForeignKey => $bp->foreignKey('user_id');
+
+        $fk()->id('id_col');
+        $fk()->string('s');
+        $fk()->text('t');
+        $fk()->mediumText('mt');
+        $fk()->longText('lt');
+        $fk()->integer('i');
+        $fk()->bigInteger('bi');
+        $fk()->serial('sr');
+        $fk()->bigSerial('bsr');
+        $fk()->smallSerial('ssr');
+        $fk()->float('f');
+        $fk()->boolean('b');
+        $fk()->datetime('dt');
+        $fk()->timestamp('ts');
+        $fk()->json('j');
+        $fk()->binary('bin');
+        $enumCol = $fk()->enum('status', ['draft', 'live']);
+        $fk()->point('p');
+        $fk()->linestring('ls');
+        $fk()->polygon('pg');
+        $fk()->vector('v', 8);
 
         $names = \array_column($bp->columns, 'name');
         $this->assertSame(
-            ['id', 'user_id', 's', 't', 'mt', 'lt', 'i', 'bi', 'sr', 'bsr', 'ssr', 'f', 'b', 'dt', 'ts', 'j', 'bin', 'status', 'p', 'ls', 'pg', 'v', 'id_col'],
+            ['user_id', 'id_col', 's', 't', 'mt', 'lt', 'i', 'bi', 'sr', 'bsr', 'ssr', 'f', 'b', 'dt', 'ts', 'j', 'bin', 'status', 'p', 'ls', 'pg', 'v'],
             $names,
         );
 
-        $statusColumn = $bp->columns[17];
-        $this->assertSame(ColumnType::Enum, $statusColumn->type);
-        $this->assertSame(['draft', 'live'], $statusColumn->enumValues);
+        $this->assertSame(ColumnType::Enum, $enumCol->type);
+        $this->assertSame(['draft', 'live'], $enumCol->enumValues);
     }
 
     public function testForeignKeyForwardsTimestamps(): void
@@ -989,27 +1003,23 @@ class FluentBuilderTest extends TestCase
     public function testForeignKeyForwardsAddColumnAndModifyColumn(): void
     {
         $bp = new Table();
-        $bp->id()
-            ->integer('user_id')
-            ->foreignKey('user_id')->references('id')->on('users')
-            ->addColumn('phone', ColumnType::String, 30)
-            ->modifyColumn('email', ColumnType::String, 200);
+        $bp->integer('user_id');
+        $bp->foreignKey('user_id')->addColumn('phone', ColumnType::String, 30);
+        $bp->foreignKey('user_id')->modifyColumn('email', ColumnType::String, 200);
 
-        $this->assertCount(4, $bp->columns);
-        $this->assertSame('phone', $bp->columns[2]->name);
-        $this->assertFalse($bp->columns[2]->isModify);
-        $this->assertSame('email', $bp->columns[3]->name);
-        $this->assertTrue($bp->columns[3]->isModify);
+        $this->assertCount(3, $bp->columns);
+        $this->assertSame('phone', $bp->columns[1]->name);
+        $this->assertFalse($bp->columns[1]->isModify);
+        $this->assertSame('email', $bp->columns[2]->name);
+        $this->assertTrue($bp->columns[2]->isModify);
     }
 
     public function testForeignKeyForwardsRenameColumnAndDropColumn(): void
     {
         $bp = new Table();
-        $bp->id()
-            ->integer('user_id')
-            ->foreignKey('user_id')->references('id')->on('users')
-            ->renameColumn('old', 'new')
-            ->dropColumn('legacy');
+        $bp->integer('user_id');
+        $bp->foreignKey('user_id')->renameColumn('old', 'new');
+        $bp->foreignKey('user_id')->dropColumn('legacy');
 
         $this->assertSame([['from' => 'old', 'to' => 'new']], \array_map(
             fn ($r) => ['from' => $r->from, 'to' => $r->to],
@@ -1021,14 +1031,14 @@ class FluentBuilderTest extends TestCase
     public function testForeignKeyForwardsIndexFamily(): void
     {
         $bp = new Table();
-        $bp->id()
-            ->integer('user_id')
-            ->foreignKey('user_id')->references('id')->on('users')
-            ->index(['user_id'])
-            ->uniqueIndex(['user_id'], 'uq_user')
-            ->fulltextIndex(['user_id'], 'ft_user')
-            ->spatialIndex(['user_id'], 'sp_user')
-            ->addIndex('custom_user', ['user_id'], IndexType::Unique);
+        $bp->integer('user_id');
+        $fk = fn (): ForeignKey => $bp->foreignKey('user_id');
+
+        $fk()->index(['user_id']);
+        $fk()->uniqueIndex(['user_id'], 'uq_user');
+        $fk()->fulltextIndex(['user_id'], 'ft_user');
+        $fk()->spatialIndex(['user_id'], 'sp_user');
+        $fk()->addIndex('custom_user', ['user_id'], IndexType::Unique);
 
         $this->assertCount(5, $bp->indexes);
         $this->assertSame(IndexType::Index, $bp->indexes[0]->type);
@@ -1106,11 +1116,9 @@ class FluentBuilderTest extends TestCase
     public function testForeignKeyForwardsRawColumnAndRawIndex(): void
     {
         $bp = new Table();
-        $bp->id()
-            ->integer('user_id')
-            ->foreignKey('user_id')->references('id')->on('users')
-            ->rawColumn('`extra` JSON NOT NULL')
-            ->rawIndex('FULLTEXT INDEX `ft` (`extra`)');
+        $bp->integer('user_id');
+        $bp->foreignKey('user_id')->rawColumn('`extra` JSON NOT NULL');
+        $bp->foreignKey('user_id')->rawIndex('FULLTEXT INDEX `ft` (`extra`)');
 
         $this->assertSame(['`extra` JSON NOT NULL'], $bp->rawColumnDefs);
         $this->assertSame(['FULLTEXT INDEX `ft` (`extra`)'], $bp->rawIndexDefs);
@@ -1140,12 +1148,10 @@ class FluentBuilderTest extends TestCase
     public function testForeignKeyForwardsEngineAndOrderByAndTtl(): void
     {
         $bp = new Table();
-        $bp->integer('id')
-            ->integer('user_id')
-            ->foreignKey('user_id')->references('id')->on('users')
-            ->engine(Engine::MergeTree)
-            ->orderBy(['id'])
-            ->ttl('id + INTERVAL 1 DAY');
+        $bp->integer('id')->integer('user_id');
+        $bp->foreignKey('user_id')->engine(Engine::MergeTree);
+        $bp->foreignKey('user_id')->orderBy(['id']);
+        $bp->foreignKey('user_id')->ttl('id + INTERVAL 1 DAY');
 
         $this->assertSame(Engine::MergeTree, $bp->engine);
         $this->assertSame(['id'], $bp->orderBy);
