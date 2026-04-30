@@ -861,4 +861,103 @@ class ClickHouseTest extends TestCase
             $table->settings(['ok_key' => "evil'; DROP TABLE x; --"]);
         });
     }
+
+    public function testDataSkippingIndexNoArgAlgorithmRejectsArgs(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('minmax does not accept algorithm arguments.');
+
+        $schema = new Schema();
+        $schema->create('events', function (Table $table) {
+            $table->bigInteger('id')->primary();
+            $table->integer('score');
+            $table->dataSkippingIndex(['score'], SkipIndexAlgorithm::MinMax, algorithmArgs: [3]);
+        });
+    }
+
+    public function testDataSkippingIndexInvertedRejectsArgs(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->create('events', function (Table $table) {
+            $table->bigInteger('id')->primary();
+            $table->string('text');
+            $table->dataSkippingIndex(['text'], SkipIndexAlgorithm::Inverted, algorithmArgs: [42]);
+        });
+    }
+
+    public function testDataSkippingIndexAutoNameSanitisesNonIdentifierColumns(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Table $table) {
+            $table->bigInteger('id')->primary();
+            $table->string('event-type');
+            $table->dataSkippingIndex(['event-type'], SkipIndexAlgorithm::BloomFilter);
+        });
+        $this->assertBindingCount($result);
+
+        // Auto name: skip_event_type (non-identifier chars collapsed to _)
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `event-type` String,'
+            . ' INDEX `skip_event_type` `event-type` TYPE bloom_filter GRANULARITY 1)'
+            . ' ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testDataSkippingIndexFloatArgAvoidsScientificNotation(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Table $table) {
+            $table->bigInteger('id')->primary();
+            $table->string('user_id');
+            // 1e-5 false positive rate: the bug pre-fix is `(string) 1e-5` returning "1.0E-5"
+            $table->dataSkippingIndex(['user_id'], SkipIndexAlgorithm::BloomFilter, algorithmArgs: [1.0e-5]);
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('TYPE bloom_filter(0.00001)', $result->query);
+        // Numeric arg should be fixed-point — no 'E-' or 'E+' anywhere
+        $this->assertDoesNotMatchRegularExpression('/[Ee][+-]\d/', $result->query);
+    }
+
+    public function testAlterAddSkipIndex(): void
+    {
+        $schema = new Schema();
+        $result = $schema->alter('events', function (Table $table) {
+            $table->dataSkippingIndex(['user_id'], SkipIndexAlgorithm::BloomFilter);
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'ALTER TABLE `events` ADD INDEX `skip_user_id` `user_id` TYPE bloom_filter GRANULARITY 1',
+            $result->query,
+        );
+    }
+
+    public function testAlterAddSkipIndexComposite(): void
+    {
+        $schema = new Schema();
+        $result = $schema->alter('events', function (Table $table) {
+            $table->dataSkippingIndex(['user_id', 'event'], SkipIndexAlgorithm::Set, granularity: 4, algorithmArgs: [100], name: 'idx_user_event');
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'ALTER TABLE `events` ADD INDEX `idx_user_event` (`user_id`, `event`) TYPE set(100) GRANULARITY 4',
+            $result->query,
+        );
+    }
+
+    public function testAlterRejectsSettings(): void
+    {
+        $this->expectException(UnsupportedException::class);
+        $this->expectExceptionMessage('SETTINGS');
+
+        $schema = new Schema();
+        $schema->alter('events', function (Table $table) {
+            $table->settings(['index_granularity' => 4096]);
+        });
+    }
 }

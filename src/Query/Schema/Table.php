@@ -580,7 +580,15 @@ class Table
         string $name = '',
     ): static {
         if ($name === '') {
-            $name = 'skip_' . \implode('_', $columns);
+            // Sanitise column names — substring matches like `event-type` or
+            // `ns.col` are valid SQL identifiers when quoted, but the
+            // generated index name must still pass the strict identifier
+            // regex on `SkipIndex`.
+            $sanitised = \array_map(
+                fn (string $c): string => \preg_replace('/[^A-Za-z0-9_]+/', '_', $c) ?? $c,
+                $columns,
+            );
+            $name = 'skip_' . \implode('_', $sanitised);
         }
 
         $this->skipIndexes[] = new SkipIndex($name, $columns, $algorithm, $algorithmArgs, $granularity);

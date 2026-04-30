@@ -130,12 +130,26 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $alterations[] = 'DROP INDEX ' . $this->quote($name);
         }
 
+        foreach ($blueprint->skipIndexes as $skip) {
+            $cols = \array_map(fn (string $c): string => $this->quote($c), $skip->columns);
+            $expr = \count($cols) === 1 ? $cols[0] : '(' . \implode(', ', $cols) . ')';
+            $alterations[] = 'ADD INDEX ' . $this->quote($skip->name)
+                . ' ' . $expr . ' TYPE ' . $this->compileSkipAlgorithm($skip)
+                . ' GRANULARITY ' . $skip->granularity;
+        }
+
         if (! empty($blueprint->foreignKeys)) {
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
         }
 
         if (! empty($blueprint->dropForeignKeys)) {
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
+        }
+
+        if (! empty($blueprint->settings)) {
+            throw new UnsupportedException(
+                'Table SETTINGS can only be set on CREATE TABLE; emit `ALTER TABLE ... MODIFY SETTING` directly to change them.'
+            );
         }
 
         if (empty($alterations)) {
@@ -245,9 +259,14 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         }
 
         $args = \array_map(
-            fn (string|int|float $arg): string => \is_string($arg)
-                ? "'" . \str_replace("'", "''", $arg) . "'"
-                : (string) $arg,
+            fn (string|int|float $arg): string => match (true) {
+                \is_string($arg) => "'" . \str_replace("'", "''", $arg) . "'",
+                // sprintf('%F', ...) avoids scientific notation (e.g. 1.0E-5)
+                // which ClickHouse rejects in index type arguments. Trim
+                // trailing zeros so 0.01 stays "0.010000" → "0.01".
+                \is_float($arg) => \rtrim(\rtrim(\sprintf('%F', $arg), '0'), '.'),
+                default => (string) $arg,
+            },
             $skip->algorithmArgs,
         );
 

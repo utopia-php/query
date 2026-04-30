@@ -29,5 +29,23 @@ readonly class SkipIndex
         if ($granularity < 1) {
             throw new ValidationException('Skip index granularity must be >= 1.');
         }
+        if ($algorithmArgs !== [] && ! self::algorithmAcceptsArgs($algorithm)) {
+            throw new ValidationException(
+                $algorithm->value . ' does not accept algorithm arguments.'
+            );
+        }
+    }
+
+    /**
+     * MinMax and Inverted are emitted without parentheses; passing args to
+     * them would produce DDL that ClickHouse rejects at parse time.
+     */
+    private static function algorithmAcceptsArgs(SkipIndexAlgorithm $algorithm): bool
+    {
+        return match ($algorithm) {
+            SkipIndexAlgorithm::MinMax,
+            SkipIndexAlgorithm::Inverted => false,
+            default => true,
+        };
     }
 }
