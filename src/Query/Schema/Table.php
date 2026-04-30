@@ -7,6 +7,7 @@ use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema;
 use Utopia\Query\Schema\ClickHouse\Engine;
+use Utopia\Query\Schema\ClickHouse\IndexAlgorithm;
 
 class Table
 {
@@ -56,6 +57,9 @@ class Table
     public private(set) array $engineArgs = [];
 
     public private(set) ?string $ttl = null;
+
+    /** @var array<string, string> Table-level engine SETTINGS (ClickHouse only) */
+    public private(set) array $settings = [];
 
     public function __construct(
         private readonly ?Schema $schema = null,
@@ -356,6 +360,7 @@ class Table
      * @param  array<string, int>  $lengths
      * @param  array<string, string>  $orders
      * @param  array<string, string>  $collations
+     * @param  list<string|int|float>  $algorithmArgs  ClickHouse skip-index algorithm args
      */
     public function index(
         array $columns,
@@ -365,11 +370,26 @@ class Table
         array $lengths = [],
         array $orders = [],
         array $collations = [],
+        ?IndexAlgorithm $algorithm = null,
+        array $algorithmArgs = [],
+        ?int $granularity = null,
     ): static {
         if ($name === '') {
-            $name = 'idx_' . \implode('_', $columns);
+            $name = $this->autoIndexName('idx_', $columns);
         }
-        $this->indexes[] = new Index($name, $columns, IndexType::Index, $lengths, $orders, $method, $operatorClass, $collations);
+        $this->indexes[] = new Index(
+            $name,
+            $columns,
+            IndexType::Index,
+            $lengths,
+            $orders,
+            $method,
+            $operatorClass,
+            $collations,
+            algorithm: $algorithm,
+            algorithmArgs: $algorithmArgs,
+            granularity: $granularity,
+        );
 
         return $this;
     }
@@ -388,7 +408,7 @@ class Table
         array $collations = [],
     ): static {
         if ($name === '') {
-            $name = 'uniq_' . \implode('_', $columns);
+            $name = $this->autoIndexName('uniq_', $columns);
         }
         $this->indexes[] = new Index($name, $columns, IndexType::Unique, $lengths, $orders, collations: $collations);
 
@@ -401,7 +421,7 @@ class Table
     public function fulltextIndex(array $columns, string $name = ''): static
     {
         if ($name === '') {
-            $name = 'ft_' . \implode('_', $columns);
+            $name = $this->autoIndexName('ft_', $columns);
         }
         $this->indexes[] = new Index($name, $columns, IndexType::Fulltext);
 
@@ -414,7 +434,7 @@ class Table
     public function spatialIndex(array $columns, string $name = ''): static
     {
         if ($name === '') {
-            $name = 'sp_' . \implode('_', $columns);
+            $name = $this->autoIndexName('sp_', $columns);
         }
         $this->indexes[] = new Index($name, $columns, IndexType::Spatial);
 
@@ -653,6 +673,75 @@ class Table
         }
 
         $this->ttl = $trimmed;
+
+        return $this;
+    }
+
+    /**
+     * Build an auto-generated index name with a prefix, sanitising any
+     * non-identifier characters in the column names so the result is always a
+     * valid SQL identifier.
+     *
+     * @param  string[]  $columns
+     */
+    private function autoIndexName(string $prefix, array $columns): string
+    {
+        $sanitised = \array_map(
+            fn (string $c): string => \preg_replace('/[^A-Za-z0-9_]+/', '_', $c) ?? $c,
+            $columns,
+        );
+
+        return $prefix . \implode('_', $sanitised);
+    }
+
+    /**
+     * Set table-level engine SETTINGS (ClickHouse only). Other dialects ignore.
+     *
+     * Compiled as `SETTINGS k=v, ...` after the TTL clause. Booleans become
+     * `1` / `0`, ints/floats are stringified, strings are passed through after
+     * a conservative character allow-list check.
+     *
+     * Calling this method replaces previously-set settings.
+     *
+     * @param  array<string, string|int|float|bool>  $settings
+     *
+     * @throws ValidationException if any key is not a valid identifier or any
+     *                             string value contains characters outside the
+     *                             allow-list.
+     */
+    public function settings(array $settings): static
+    {
+        $sanitized = [];
+
+        foreach ($settings as $key => $value) {
+            if (! \preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key)) {
+                throw new ValidationException('Invalid setting name: ' . $key);
+            }
+
+            if (\is_bool($value)) {
+                $sanitized[$key] = $value ? '1' : '0';
+            } elseif (\is_int($value)) {
+                $sanitized[$key] = (string) $value;
+            } elseif (\is_float($value)) {
+                // Avoid scientific notation (e.g. 1.0E-5), which ClickHouse
+                // rejects in SETTINGS values; trim trailing zeros for clean
+                // output.
+                $sanitized[$key] = \rtrim(\rtrim(\sprintf('%F', $value), '0'), '.');
+            } elseif (\is_string($value)) {
+                if (! \preg_match('/^[A-Za-z0-9_.\-+\/]+$/', $value)) {
+                    throw new ValidationException(
+                        'Invalid setting value for ' . $key . ': must match [A-Za-z0-9_.\-+/]+'
+                    );
+                }
+                $sanitized[$key] = $value;
+            } else {
+                throw new ValidationException(
+                    'Setting value for ' . $key . ' must be string, int, float, or bool.'
+                );
+            }
+        }
+
+        $this->settings = $sanitized;
 
         return $this;
     }

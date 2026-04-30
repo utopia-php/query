@@ -5,6 +5,7 @@ namespace Utopia\Query\Schema;
 use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\ClickHouse\Engine;
+use Utopia\Query\Schema\ClickHouse\IndexAlgorithm;
 
 class Column
 {
@@ -392,6 +393,7 @@ class Column
      * @param  array<string, int>  $lengths
      * @param  array<string, string>  $orders
      * @param  array<string, string>  $collations
+     * @param  list<string|int|float>  $algorithmArgs  ClickHouse skip-index algorithm args
      */
     public function index(
         array $columns,
@@ -401,8 +403,22 @@ class Column
         array $lengths = [],
         array $orders = [],
         array $collations = [],
+        ?IndexAlgorithm $algorithm = null,
+        array $algorithmArgs = [],
+        ?int $granularity = null,
     ): Table {
-        return $this->table->index($columns, $name, $method, $operatorClass, $lengths, $orders, $collations);
+        return $this->table->index(
+            $columns,
+            $name,
+            $method,
+            $operatorClass,
+            $lengths,
+            $orders,
+            $collations,
+            $algorithm,
+            $algorithmArgs,
+            $granularity,
+        );
     }
 
     /**
@@ -506,6 +522,14 @@ class Column
     public function engine(Engine $engine, string ...$args): Table
     {
         return $this->table->engine($engine, ...$args);
+    }
+
+    /**
+     * @param  array<string, string|int|float|bool>  $settings
+     */
+    public function settings(array $settings): Table
+    {
+        return $this->table->settings($settings);
     }
 
     /**

@@ -10,6 +10,7 @@ use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\ClickHouse as Schema;
 use Utopia\Query\Schema\ClickHouse\Engine;
+use Utopia\Query\Schema\ClickHouse\IndexAlgorithm;
 use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\Feature\ColumnComments;
 use Utopia\Query\Schema\Feature\DropPartition;
@@ -704,5 +705,276 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `events` (`id` Int32, `temporary` String TTL ts + INTERVAL 1 DAY, `ts` DateTime) ENGINE = MergeTree() ORDER BY (`id`)', $result->query);
+    }
+
+    // ClickHouse skip-index algorithm selection
+
+    public function testIndexBloomFilter(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('user_id')
+            ->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter)
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `user_id` String, INDEX `idx_user_id` `user_id` TYPE bloom_filter GRANULARITY 1) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testIndexWithAlgorithmArgs(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('country')
+            ->string('text')
+            ->index(['country'], algorithm: IndexAlgorithm::Set, algorithmArgs: [100], granularity: 4)
+            ->index(['text'], algorithm: IndexAlgorithm::NgramBloomFilter, algorithmArgs: [4, 1024, 3, 0])
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `country` String, `text` String,'
+            . ' INDEX `idx_country` `country` TYPE set(100) GRANULARITY 4,'
+            . ' INDEX `idx_text` `text` TYPE ngrambf_v1(4, 1024, 3, 0) GRANULARITY 1)'
+            . ' ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testIndexCompositeColumnsWithAlgorithm(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('user_id')
+            ->string('event')
+            ->index(['user_id', 'event'], name: 'idx_user_event', algorithm: IndexAlgorithm::BloomFilter)
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `user_id` String, `event` String,'
+            . ' INDEX `idx_user_event` (`user_id`, `event`) TYPE bloom_filter GRANULARITY 1)'
+            . ' ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testIndexInvalidGranularityThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('user_id')
+            ->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter, granularity: 0);
+    }
+
+    public function testIndexEmptyColumnsThrows(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->index([]);
+    }
+
+    public function testIndexNameRegexOnlyEnforcedForClickHouseAlgorithms(): void
+    {
+        // No algorithm → permissive name allowed (other dialects quote names)
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('user_id')
+            ->index(['user_id'], name: 'idx-with-hyphens')
+            ->create();
+        $this->assertBindingCount($result);
+        $this->assertStringContainsString('INDEX `idx-with-hyphens`', $result->query);
+    }
+
+    public function testIndexNameRegexEnforcedWhenAlgorithmIsSet(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid index name: idx-with-hyphens');
+
+        $schema = new Schema();
+        $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('user_id')
+            ->index(['user_id'], name: 'idx-with-hyphens', algorithm: IndexAlgorithm::BloomFilter);
+    }
+
+    // SETTINGS
+
+    public function testTableSettings(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->settings(['index_granularity' => 8192, 'allow_nullable_key' => true])
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64) ENGINE = MergeTree() ORDER BY (`id`)'
+            . ' SETTINGS index_granularity = 8192, allow_nullable_key = 1',
+            $result->query,
+        );
+    }
+
+    public function testTableSettingsWithTtlOrdering(): void
+    {
+        $schema = new Schema();
+        $table = $schema->table('events');
+        $table->bigInteger('id')->primary();
+        $table->datetime('created_at');
+        $result = $table
+            ->ttl('`created_at` + INTERVAL 30 DAY')
+            ->settings(['index_granularity' => 4096])
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `created_at` DateTime) ENGINE = MergeTree() ORDER BY (`id`)'
+            . ' TTL `created_at` + INTERVAL 30 DAY'
+            . ' SETTINGS index_granularity = 4096',
+            $result->query,
+        );
+    }
+
+    public function testTableSettingsRejectsInvalidKey(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->settings(['1bad-key' => 8192]);
+    }
+
+    public function testTableSettingsRejectsInvalidValue(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->settings(['ok_key' => "evil'; DROP TABLE x; --"]);
+    }
+
+    public function testTableSettingsFloatAvoidsScientificNotation(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->settings(['merge_with_ttl_timeout' => 1.0e-5])
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('SETTINGS merge_with_ttl_timeout = 0.00001', $result->query);
+        $this->assertDoesNotMatchRegularExpression('/[Ee][+-]\d/', $result->query);
+    }
+
+    public function testIndexNoArgAlgorithmRejectsArgs(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('minmax does not accept algorithm arguments.');
+
+        $schema = new Schema();
+        $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->integer('score')
+            ->index(['score'], algorithm: IndexAlgorithm::MinMax, algorithmArgs: [3]);
+    }
+
+    public function testIndexInvertedRejectsArgs(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('text')
+            ->index(['text'], algorithm: IndexAlgorithm::Inverted, algorithmArgs: [42]);
+    }
+
+    public function testIndexAutoNameSanitisesNonIdentifierColumns(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('event-type')
+            ->index(['event-type'], algorithm: IndexAlgorithm::BloomFilter)
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `event-type` String,'
+            . ' INDEX `idx_event_type` `event-type` TYPE bloom_filter GRANULARITY 1)'
+            . ' ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testIndexFloatArgAvoidsScientificNotation(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('user_id')
+            ->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter, algorithmArgs: [1.0e-5])
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('TYPE bloom_filter(0.00001)', $result->query);
+        // Numeric arg should be fixed-point — no 'E-' or 'E+' anywhere
+        $this->assertDoesNotMatchRegularExpression('/[Ee][+-]\d/', $result->query);
+    }
+
+    public function testAlterAddIndexWithAlgorithm(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter)
+            ->alter();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'ALTER TABLE `events` ADD INDEX `idx_user_id` `user_id` TYPE bloom_filter GRANULARITY 1',
+            $result->query,
+        );
+    }
+
+    public function testAlterAddIndexComposite(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->index(['user_id', 'event'], name: 'idx_user_event', algorithm: IndexAlgorithm::Set, algorithmArgs: [100], granularity: 4)
+            ->alter();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'ALTER TABLE `events` ADD INDEX `idx_user_event` (`user_id`, `event`) TYPE set(100) GRANULARITY 4',
+            $result->query,
+        );
+    }
+
+    public function testAlterRejectsSettings(): void
+    {
+        $this->expectException(UnsupportedException::class);
+        $this->expectExceptionMessage('SETTINGS');
+
+        $schema = new Schema();
+        $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->settings(['index_granularity' => 4096])
+            ->alter();
     }
 }

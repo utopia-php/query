@@ -2086,6 +2086,50 @@ $schema->table('events')
 
 TTL expressions are emitted verbatim; they must not be empty or contain semicolons. Dialects other than ClickHouse throw `UnsupportedException`.
 
+**Skip-index algorithms** — every ClickHouse index is a data-skipping index that accelerates WHERE pruning by letting the engine skip whole granules. Pick the algorithm that matches the column shape via the `algorithm` argument on `Table::index()`:
+
+```php
+use Utopia\Query\Schema\ClickHouse\IndexAlgorithm;
+
+$schema->table('events')
+    ->bigInteger('id')->primary()
+    ->string('user_id')
+    ->string('country')
+    ->string('text')
+    // BloomFilter — high-cardinality strings with `=` / `IN` predicates
+    ->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter)
+    // Set(N) — small fixed value sets, custom granularity
+    ->index(['country'], algorithm: IndexAlgorithm::Set, algorithmArgs: [100], granularity: 4)
+    // NgramBloomFilter(n, size_bytes, hashes, seed) — text search on `LIKE` / `match`
+    ->index(['text'], algorithm: IndexAlgorithm::NgramBloomFilter, algorithmArgs: [4, 1024, 3, 0])
+    // No algorithm specified → defaults to `TYPE minmax GRANULARITY 3`
+    ->index(['id'])
+    ->create();
+
+// CREATE TABLE `events` (..., INDEX `idx_user_id` `user_id` TYPE bloom_filter GRANULARITY 1, ...)
+```
+
+The 6 algorithms are `MinMax`, `Set`, `BloomFilter`, `NgramBloomFilter`, `TokenBloomFilter`, `Inverted`. Algorithm-specific arguments are passed via `algorithmArgs` and rendered verbatim — supply them from trusted (developer-controlled) source. Other dialects ignore the ClickHouse-only `algorithm` / `algorithmArgs` / `granularity` arguments.
+
+`MinMax` and `Inverted` take no parenthesised arguments in ClickHouse DDL — passing `algorithmArgs` for them throws `ValidationException`. Skip indexes can also be added via `ALTER TABLE … ADD INDEX` by calling `alter()` on the builder.
+
+**Engine SETTINGS** — emit `SETTINGS k=v` after the TTL clause:
+
+```php
+$schema->table('events')
+    ->bigInteger('id')->primary()
+    ->settings([
+        'index_granularity' => 8192,
+        'allow_nullable_key' => true, // booleans become 1/0
+    ])
+    ->create();
+
+// CREATE TABLE `events` (...) ENGINE = MergeTree() ORDER BY (`id`)
+//   SETTINGS index_granularity = 8192, allow_nullable_key = 1
+```
+
+Setting names must match `[A-Za-z_][A-Za-z0-9_]*`; string values are restricted to `[A-Za-z0-9_.\-+/]*`. Use ints / floats / booleans for everything else. Other dialects ignore the call.
+
 ### SQLite Schema
 
 ```php

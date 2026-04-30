@@ -124,12 +124,27 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $alterations[] = 'DROP INDEX ' . $this->quote($name);
         }
 
+        foreach ($table->indexes as $index) {
+            if ($index->type !== IndexType::Index) {
+                throw new UnsupportedException(
+                    'Only data-skipping indexes (index()) are supported in ClickHouse ALTER TABLE.'
+                );
+            }
+            $alterations[] = 'ADD ' . $this->compileSkipIndex($index);
+        }
+
         if (! empty($table->foreignKeys)) {
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
         }
 
         if (! empty($table->dropForeignKeys)) {
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
+        }
+
+        if (! empty($table->settings)) {
+            throw new UnsupportedException(
+                'Table SETTINGS can only be set on CREATE TABLE; emit `ALTER TABLE ... MODIFY SETTING` directly to change them.'
+            );
         }
 
         if (empty($alterations)) {
@@ -165,12 +180,13 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $primaryKeys = \array_map(fn (string $c): string => $this->quote($c), $table->compositePrimaryKey);
         }
 
-        // Indexes (ClickHouse uses INDEX ... TYPE ... GRANULARITY ...)
         foreach ($table->indexes as $index) {
-            $cols = \array_map(fn (string $c): string => $this->quote($c), $index->columns);
-            $expr = \count($cols) === 1 ? $cols[0] : '(' . \implode(', ', $cols) . ')';
-            $columnDefs[] = 'INDEX ' . $this->quote($index->name)
-                . ' ' . $expr . ' TYPE minmax GRANULARITY 3';
+            if ($index->type !== IndexType::Index) {
+                throw new UnsupportedException(
+                    'Only data-skipping indexes (index()) are supported in ClickHouse CREATE TABLE.'
+                );
+            }
+            $columnDefs[] = $this->compileSkipIndex($index);
         }
 
         if (! empty($table->foreignKeys)) {
@@ -205,7 +221,55 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $sql .= ' TTL ' . $table->ttl;
         }
 
+        if (! empty($table->settings)) {
+            $kv = [];
+            foreach ($table->settings as $k => $v) {
+                $kv[] = $k . ' = ' . $v;
+            }
+            $sql .= ' SETTINGS ' . \implode(', ', $kv);
+        }
+
         return new Statement($sql, [], executor: $this->executor);
+    }
+
+    /**
+     * Render a full `INDEX <name> <columns> TYPE <algorithm>[(args)] GRANULARITY <n>`
+     * fragment, used by both CREATE TABLE and ALTER TABLE ADD INDEX.
+     *
+     * Defaults to `TYPE minmax GRANULARITY 3` when no algorithm is set on the
+     * index — matches the ClickHouse default behaviour for callers using the
+     * generic `Table::index()` without picking an algorithm.
+     */
+    private function compileSkipIndex(Index $index): string
+    {
+        $cols = \array_map(fn (string $c): string => $this->quote($c), $index->columns);
+        $expr = \count($cols) === 1 ? $cols[0] : '(' . \implode(', ', $cols) . ')';
+
+        if ($index->algorithm === null) {
+            return 'INDEX ' . $this->quote($index->name) . ' ' . $expr
+                . ' TYPE minmax GRANULARITY ' . ($index->granularity ?? 3);
+        }
+
+        $type = $index->algorithm->value;
+
+        if ($index->algorithmArgs !== []) {
+            $args = \array_map(
+                fn (string|int|float $arg): string => match (true) {
+                    \is_string($arg) => "'" . \str_replace("'", "''", $arg) . "'",
+                    // sprintf('%F', ...) avoids scientific notation (e.g. 1.0E-5)
+                    // which ClickHouse rejects in index type arguments. Trim
+                    // trailing zeros so 0.01 stays "0.010000" → "0.01".
+                    \is_float($arg) => \rtrim(\rtrim(\sprintf('%F', $arg), '0'), '.'),
+                    default => (string) $arg,
+                },
+                $index->algorithmArgs,
+            );
+
+            $type .= '(' . \implode(', ', $args) . ')';
+        }
+
+        return 'INDEX ' . $this->quote($index->name) . ' ' . $expr
+            . ' TYPE ' . $type . ' GRANULARITY ' . ($index->granularity ?? 1);
     }
 
     /**
