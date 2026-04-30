@@ -101,47 +101,42 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         );
     }
 
-    /**
-     * @param  callable(Table): void  $definition
-     */
-    public function alter(string $table, callable $definition): Statement
+    #[\Override]
+    public function compileAlter(Table $table): Statement
     {
-        $blueprint = new Table();
-        $definition($blueprint);
-
         $alterations = [];
 
-        foreach ($blueprint->columns as $column) {
+        foreach ($table->columns as $column) {
             $keyword = $column->isModify ? 'MODIFY COLUMN' : 'ADD COLUMN';
             $alterations[] = $keyword . ' ' . $this->compileColumnDefinition($column);
         }
 
-        foreach ($blueprint->renameColumns as $rename) {
+        foreach ($table->renameColumns as $rename) {
             $alterations[] = 'RENAME COLUMN ' . $this->quote($rename->from)
                 . ' TO ' . $this->quote($rename->to);
         }
 
-        foreach ($blueprint->dropColumns as $col) {
+        foreach ($table->dropColumns as $col) {
             $alterations[] = 'DROP COLUMN ' . $this->quote($col);
         }
 
-        foreach ($blueprint->dropIndexes as $name) {
+        foreach ($table->dropIndexes as $name) {
             $alterations[] = 'DROP INDEX ' . $this->quote($name);
         }
 
-        foreach ($blueprint->indexes as $index) {
+        foreach ($table->indexes as $index) {
             $alterations[] = 'ADD ' . $this->compileSkipIndex($index);
         }
 
-        if (! empty($blueprint->foreignKeys)) {
+        if (! empty($table->foreignKeys)) {
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
         }
 
-        if (! empty($blueprint->dropForeignKeys)) {
+        if (! empty($table->dropForeignKeys)) {
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
         }
 
-        if (! empty($blueprint->settings)) {
+        if (! empty($table->settings)) {
             throw new UnsupportedException(
                 'Table SETTINGS can only be set on CREATE TABLE; emit `ALTER TABLE ... MODIFY SETTING` directly to change them.'
             );
@@ -151,24 +146,19 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             throw new ValidationException('ALTER TABLE requires at least one alteration.');
         }
 
-        $sql = 'ALTER TABLE ' . $this->quote($table)
+        $sql = 'ALTER TABLE ' . $this->quote($table->name)
             . ' ' . \implode(', ', $alterations);
 
         return new Statement($sql, [], executor: $this->executor);
     }
 
-    /**
-     * @param  callable(Table): void  $definition
-     */
-    public function create(string $table, callable $definition, bool $ifNotExists = false): Statement
+    #[\Override]
+    public function compileCreate(Table $table, bool $ifNotExists = false): Statement
     {
-        $blueprint = new Table();
-        $definition($blueprint);
-
         $columnDefs = [];
         $primaryKeys = [];
 
-        foreach ($blueprint->columns as $column) {
+        foreach ($table->columns as $column) {
             $def = $this->compileColumnDefinition($column);
             $columnDefs[] = $def;
 
@@ -177,49 +167,53 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             }
         }
 
-        if (! empty($blueprint->compositePrimaryKey) && ! empty($primaryKeys)) {
+        if (! empty($table->compositePrimaryKey) && ! empty($primaryKeys)) {
             throw new ValidationException('Cannot combine column-level primary() with Table::primary() composite key.');
         }
 
-        if (empty($primaryKeys) && ! empty($blueprint->compositePrimaryKey)) {
-            $primaryKeys = \array_map(fn (string $c): string => $this->quote($c), $blueprint->compositePrimaryKey);
+        if (empty($primaryKeys) && ! empty($table->compositePrimaryKey)) {
+            $primaryKeys = \array_map(fn (string $c): string => $this->quote($c), $table->compositePrimaryKey);
         }
 
-        foreach ($blueprint->indexes as $index) {
+        foreach ($table->indexes as $index) {
             $columnDefs[] = $this->compileSkipIndex($index);
         }
 
-        if (! empty($blueprint->foreignKeys)) {
+        if (! empty($table->foreignKeys)) {
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
         }
 
-        if (! empty($blueprint->checks)) {
+        if (! empty($table->checks)) {
             throw new UnsupportedException('CHECK constraints are not supported in ClickHouse.');
         }
 
-        $engine = $blueprint->engine ?? Engine::MergeTree;
+        $engine = $table->engine ?? Engine::MergeTree;
 
-        $sql = 'CREATE TABLE ' . ($ifNotExists ? 'IF NOT EXISTS ' : '') . $this->quote($table)
+        $sql = 'CREATE TABLE ' . ($ifNotExists ? 'IF NOT EXISTS ' : '') . $this->quote($table->name)
             . ' (' . \implode(', ', $columnDefs) . ')'
-            . ' ENGINE = ' . $this->compileEngine($engine, $blueprint->engineArgs);
+            . ' ENGINE = ' . $this->compileEngine($engine, $table->engineArgs);
 
-        if ($blueprint->partitionType !== null) {
-            $sql .= ' PARTITION BY ' . $blueprint->partitionExpression;
+        if ($table->partitionType !== null) {
+            $sql .= ' PARTITION BY ' . $table->partitionExpression;
         }
 
         if ($engine->requiresOrderBy()) {
-            $sql .= ! empty($primaryKeys)
-                ? ' ORDER BY (' . \implode(', ', $primaryKeys) . ')'
+            $orderBy = ! empty($table->orderBy)
+                ? \array_map(fn (string $c): string => $this->quote($c), $table->orderBy)
+                : $primaryKeys;
+
+            $sql .= ! empty($orderBy)
+                ? ' ORDER BY (' . \implode(', ', $orderBy) . ')'
                 : ' ORDER BY tuple()';
         }
 
-        if ($blueprint->ttl !== null) {
-            $sql .= ' TTL ' . $blueprint->ttl;
+        if ($table->ttl !== null) {
+            $sql .= ' TTL ' . $table->ttl;
         }
 
-        if (! empty($blueprint->settings)) {
+        if (! empty($table->settings)) {
             $kv = [];
-            foreach ($blueprint->settings as $k => $v) {
+            foreach ($table->settings as $k => $v) {
                 $kv[] = $k . ' = ' . $v;
             }
             $sql .= ' SETTINGS ' . \implode(', ', $kv);

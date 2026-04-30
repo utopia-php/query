@@ -44,22 +44,17 @@ class MongoDB extends Schema
         return '';
     }
 
-    /**
-     * @param callable(Table): void $definition
-     */
-    public function create(string $table, callable $definition, bool $ifNotExists = false): Statement
+    #[\Override]
+    public function compileCreate(Table $table, bool $ifNotExists = false): Statement
     {
-        $blueprint = new Table();
-        $definition($blueprint);
-
-        if (! empty($blueprint->compositePrimaryKey)) {
+        if (! empty($table->compositePrimaryKey)) {
             throw new UnsupportedException('Composite primary keys are not supported in MongoDB; documents use "_id" implicitly.');
         }
 
         $properties = [];
         $required = [];
 
-        foreach ($blueprint->columns as $column) {
+        foreach ($table->columns as $column) {
             $bsonType = $this->compileColumnType($column);
 
             $prop = ['bsonType' => $bsonType];
@@ -93,7 +88,7 @@ class MongoDB extends Schema
 
         $command = [
             'command' => 'createCollection',
-            'collection' => $table,
+            'collection' => $table->name,
         ];
 
         if (! empty($validator)) {
@@ -107,22 +102,17 @@ class MongoDB extends Schema
         );
     }
 
-    /**
-     * @param callable(Table): void $definition
-     */
-    public function alter(string $table, callable $definition): Statement
+    #[\Override]
+    public function compileAlter(Table $table): Statement
     {
-        $blueprint = new Table();
-        $definition($blueprint);
-
-        if (! empty($blueprint->dropColumns) || ! empty($blueprint->renameColumns)) {
+        if (! empty($table->dropColumns) || ! empty($table->renameColumns)) {
             throw new UnsupportedException('MongoDB does not support dropping or renaming columns via schema. Use $unset/$rename update operators.');
         }
 
         $properties = [];
         $required = [];
 
-        foreach ($blueprint->columns as $column) {
+        foreach ($table->columns as $column) {
             $bsonType = $this->compileColumnType($column);
             $prop = ['bsonType' => $bsonType];
 
@@ -151,7 +141,7 @@ class MongoDB extends Schema
 
         $command = [
             'command' => 'collMod',
-            'collection' => $table,
+            'collection' => $table->name,
         ];
 
         if (! empty($validator)) {
@@ -165,21 +155,18 @@ class MongoDB extends Schema
         );
     }
 
-    public function drop(string $table): Statement
+    #[\Override]
+    public function compileDrop(string $name, bool $ifExists): Statement
     {
         return new Statement(
-            \json_encode(['command' => 'drop', 'collection' => $table], JSON_THROW_ON_ERROR),
+            \json_encode(['command' => 'drop', 'collection' => $name], JSON_THROW_ON_ERROR),
             [],
             executor: $this->executor,
         );
     }
 
-    public function dropIfExists(string $table): Statement
-    {
-        return $this->drop($table);
-    }
-
-    public function rename(string $from, string $to): Statement
+    #[\Override]
+    public function compileRename(string $from, string $to): Statement
     {
         return new Statement(
             \json_encode([
@@ -192,12 +179,13 @@ class MongoDB extends Schema
         );
     }
 
-    public function truncate(string $table): Statement
+    #[\Override]
+    public function compileTruncate(string $name): Statement
     {
         return new Statement(
             \json_encode([
                 'command' => 'deleteMany',
-                'collection' => $table,
+                'collection' => $name,
                 'filter' => new stdClass(),
             ], JSON_THROW_ON_ERROR),
             [],

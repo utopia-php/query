@@ -22,7 +22,7 @@ use Utopia\Query\Builder\PostgreSQL;
 use Utopia\Query\OrderDirection;
 use Utopia\Query\Query;
 
-class BuilderIntegrationTest extends TestCase
+class BuilderAstTest extends TestCase
 {
     public function testToAstSimpleSelect(): void
     {

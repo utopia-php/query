@@ -18,9 +18,9 @@ use Utopia\Query\Schema\Feature\TableComments;
 use Utopia\Query\Schema\Feature\Triggers;
 use Utopia\Query\Schema\ForeignKeyAction;
 use Utopia\Query\Schema\Index;
+use Utopia\Query\Schema\IndexType;
 use Utopia\Query\Schema\MySQL as Schema;
 use Utopia\Query\Schema\ParameterDirection;
-use Utopia\Query\Schema\Table;
 use Utopia\Query\Schema\TriggerEvent;
 use Utopia\Query\Schema\TriggerTiming;
 
@@ -49,11 +49,11 @@ class MySQLTest extends TestCase
     public function testCreateTableBasic(): void
     {
         $schema = new Schema();
-        $result = $schema->create('users', function (Table $table) {
-            $table->id();
-            $table->string('name', 255);
-            $table->string('email', 255)->unique();
-        });
+        $result = $schema->table('users')
+            ->id()
+            ->string('name', 255)
+            ->string('email', 255)->unique()
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -66,18 +66,18 @@ class MySQLTest extends TestCase
     public function testCreateTableAllColumnTypes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('test_types', function (Table $table) {
-            $table->integer('int_col');
-            $table->bigInteger('big_col');
-            $table->float('float_col');
-            $table->boolean('bool_col');
-            $table->text('text_col');
-            $table->datetime('dt_col', 3);
-            $table->timestamp('ts_col', 6);
-            $table->json('json_col');
-            $table->binary('bin_col');
-            $table->enum('status', ['active', 'inactive']);
-        });
+        $result = $schema->table('test_types')
+            ->integer('int_col')
+            ->bigInteger('big_col')
+            ->float('float_col')
+            ->boolean('bool_col')
+            ->text('text_col')
+            ->datetime('dt_col', 3)
+            ->timestamp('ts_col', 6)
+            ->json('json_col')
+            ->binary('bin_col')
+            ->enum('status', ['active', 'inactive'])
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `test_types` (`int_col` INT NOT NULL, `big_col` BIGINT NOT NULL, `float_col` DOUBLE NOT NULL, `bool_col` TINYINT(1) NOT NULL, `text_col` TEXT NOT NULL, `dt_col` DATETIME(3) NOT NULL, `ts_col` TIMESTAMP(6) NOT NULL, `json_col` JSON NOT NULL, `bin_col` BLOB NOT NULL, `status` ENUM(\'active\',\'inactive\') NOT NULL)', $result->query);
@@ -86,13 +86,13 @@ class MySQLTest extends TestCase
     public function testCreateTableWithNullableAndDefault(): void
     {
         $schema = new Schema();
-        $result = $schema->create('posts', function (Table $table) {
-            $table->id();
-            $table->text('bio')->nullable();
-            $table->boolean('active')->default(true);
-            $table->integer('score')->default(0);
-            $table->string('status')->default('draft');
-        });
+        $result = $schema->table('posts')
+            ->id()
+            ->text('bio')->nullable()
+            ->boolean('active')->default(true)
+            ->integer('score')->default(0)
+            ->string('status')->default('draft')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `posts` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `bio` TEXT NULL, `active` TINYINT(1) NOT NULL DEFAULT 1, `score` INT NOT NULL DEFAULT 0, `status` VARCHAR(255) NOT NULL DEFAULT \'draft\', PRIMARY KEY (`id`))', $result->query);
@@ -101,9 +101,9 @@ class MySQLTest extends TestCase
     public function testCreateTableWithUnsigned(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->integer('age')->unsigned();
-        });
+        $result = $schema->table('t')
+            ->integer('age')->unsigned()
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`age` INT UNSIGNED NOT NULL)', $result->query);
@@ -112,10 +112,10 @@ class MySQLTest extends TestCase
     public function testCreateTableWithTimestamps(): void
     {
         $schema = new Schema();
-        $result = $schema->create('posts', function (Table $table) {
-            $table->id();
-            $table->timestamps();
-        });
+        $result = $schema->table('posts')
+            ->id()
+            ->timestamps()
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `posts` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `created_at` DATETIME(3) NOT NULL, `updated_at` DATETIME(3) NOT NULL, PRIMARY KEY (`id`))', $result->query);
@@ -124,12 +124,12 @@ class MySQLTest extends TestCase
     public function testCreateTableWithForeignKey(): void
     {
         $schema = new Schema();
-        $result = $schema->create('posts', function (Table $table) {
-            $table->id();
-            $table->foreignKey('user_id')
+        $result = $schema->table('posts')
+            ->id()
+            ->foreignKey('user_id')
                 ->references('id')->on('users')
-                ->onDelete(ForeignKeyAction::Cascade)->onUpdate(ForeignKeyAction::SetNull);
-        });
+                ->onDelete(ForeignKeyAction::Cascade)->onUpdate(ForeignKeyAction::SetNull)
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `posts` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, PRIMARY KEY (`id`), FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE SET NULL)', $result->query);
@@ -138,13 +138,13 @@ class MySQLTest extends TestCase
     public function testCreateTableWithIndexes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('users', function (Table $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('email');
-            $table->index(['name', 'email']);
-            $table->uniqueIndex(['email']);
-        });
+        $result = $schema->table('users')
+            ->id()
+            ->string('name')
+            ->string('email')
+            ->index(['name', 'email'])
+            ->uniqueIndex(['email'])
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `users` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `name` VARCHAR(255) NOT NULL, `email` VARCHAR(255) NOT NULL, PRIMARY KEY (`id`), INDEX `idx_name_email` (`name`, `email`), UNIQUE INDEX `uniq_email` (`email`))', $result->query);
@@ -153,12 +153,12 @@ class MySQLTest extends TestCase
     public function testCreateTableWithSpatialTypes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('locations', function (Table $table) {
-            $table->id();
-            $table->point('coords', 4326);
-            $table->linestring('path');
-            $table->polygon('area');
-        });
+        $result = $schema->table('locations')
+            ->id()
+            ->point('coords', 4326)
+            ->linestring('path')
+            ->polygon('area')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `locations` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `coords` POINT SRID 4326 NOT NULL, `path` LINESTRING SRID 4326 NOT NULL, `area` POLYGON SRID 4326 NOT NULL, PRIMARY KEY (`id`))', $result->query);
@@ -170,17 +170,17 @@ class MySQLTest extends TestCase
         $this->expectExceptionMessage('Vector type is not supported in MySQL.');
 
         $schema = new Schema();
-        $schema->create('embeddings', function (Table $table) {
-            $table->vector('embedding', 768);
-        });
+        $schema->table('embeddings')
+            ->vector('embedding', 768)
+            ->create();
     }
 
     public function testCreateTableWithComment(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->string('name')->comment('User display name');
-        });
+        $result = $schema->table('t')
+            ->string('name')->comment('User display name')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`name` VARCHAR(255) NOT NULL COMMENT \'User display name\')', $result->query);
@@ -190,9 +190,9 @@ class MySQLTest extends TestCase
     public function testAlterAddColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->addColumn('avatar_url', 'string', 255)->nullable()->after('email');
-        });
+        $result = $schema->table('users')
+            ->addColumn('avatar_url', ColumnType::String, 255)->nullable()->after('email')
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -204,9 +204,9 @@ class MySQLTest extends TestCase
     public function testAlterModifyColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->modifyColumn('name', 'string', 500);
-        });
+        $result = $schema->table('users')
+            ->modifyColumn('name', ColumnType::String, 500)
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -218,9 +218,9 @@ class MySQLTest extends TestCase
     public function testAlterRenameColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->renameColumn('bio', 'biography');
-        });
+        $result = $schema->table('users')
+            ->renameColumn('bio', 'biography')
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -232,9 +232,9 @@ class MySQLTest extends TestCase
     public function testAlterDropColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->dropColumn('age');
-        });
+        $result = $schema->table('users')
+            ->dropColumn('age')
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -246,9 +246,9 @@ class MySQLTest extends TestCase
     public function testAlterAddIndex(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->addIndex('idx_name', ['name']);
-        });
+        $result = $schema->table('users')
+            ->addIndex('idx_name', ['name'])
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -260,9 +260,9 @@ class MySQLTest extends TestCase
     public function testAlterDropIndex(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->dropIndex('idx_old');
-        });
+        $result = $schema->table('users')
+            ->dropIndex('idx_old')
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -274,10 +274,10 @@ class MySQLTest extends TestCase
     public function testAlterAddForeignKey(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->addForeignKey('dept_id')
-                ->references('id')->on('departments');
-        });
+        $result = $schema->table('users')
+            ->addForeignKey('dept_id')
+                ->references('id')->on('departments')
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame('ALTER TABLE `users` ADD FOREIGN KEY (`dept_id`) REFERENCES `departments` (`id`)', $result->query);
@@ -286,9 +286,9 @@ class MySQLTest extends TestCase
     public function testAlterDropForeignKey(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->dropForeignKey('fk_old');
-        });
+        $result = $schema->table('users')
+            ->dropForeignKey('fk_old')
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -300,11 +300,11 @@ class MySQLTest extends TestCase
     public function testAlterMultipleOperations(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->addColumn('avatar', 'string', 255)->nullable();
-            $table->dropColumn('age');
-            $table->renameColumn('bio', 'biography');
-        });
+        $result = $schema->table('users')
+            ->addColumn('avatar', ColumnType::String, 255)->nullable()
+            ->dropColumn('age')
+            ->renameColumn('bio', 'biography')
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame('ALTER TABLE `users` ADD COLUMN `avatar` VARCHAR(255) NULL, RENAME COLUMN `bio` TO `biography`, DROP COLUMN `age`', $result->query);
@@ -314,7 +314,7 @@ class MySQLTest extends TestCase
     public function testDropTable(): void
     {
         $schema = new Schema();
-        $result = $schema->drop('users');
+        $result = $schema->table('users')->drop();
         $this->assertBindingCount($result);
 
         $this->assertSame('DROP TABLE `users`', $result->query);
@@ -324,7 +324,7 @@ class MySQLTest extends TestCase
     public function testDropTableIfExists(): void
     {
         $schema = new Schema();
-        $result = $schema->dropIfExists('users');
+        $result = $schema->table('users')->dropIfExists();
 
         $this->assertSame('DROP TABLE IF EXISTS `users`', $result->query);
     }
@@ -333,7 +333,7 @@ class MySQLTest extends TestCase
     public function testRenameTable(): void
     {
         $schema = new Schema();
-        $result = $schema->rename('users', 'members');
+        $result = $schema->table('users')->rename('members');
         $this->assertBindingCount($result);
 
         $this->assertSame('RENAME TABLE `users` TO `members`', $result->query);
@@ -343,7 +343,7 @@ class MySQLTest extends TestCase
     public function testTruncateTable(): void
     {
         $schema = new Schema();
-        $result = $schema->truncate('users');
+        $result = $schema->table('users')->truncate();
         $this->assertBindingCount($result);
 
         $this->assertSame('TRUNCATE TABLE `users`', $result->query);
@@ -522,11 +522,11 @@ class MySQLTest extends TestCase
     public function testCreateTableWithMultiplePrimaryKeys(): void
     {
         $schema = new Schema();
-        $result = $schema->create('order_items', function (Table $table) {
-            $table->integer('order_id')->primary();
-            $table->integer('product_id')->primary();
-            $table->integer('quantity');
-        });
+        $result = $schema->table('order_items')
+            ->integer('order_id')->primary()
+            ->integer('product_id')->primary()
+            ->integer('quantity')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `order_items` (`order_id` INT NOT NULL, `product_id` INT NOT NULL, `quantity` INT NOT NULL, PRIMARY KEY (`order_id`, `product_id`))', $result->query);
@@ -535,12 +535,12 @@ class MySQLTest extends TestCase
     public function testCreateTableWithCompositePrimaryKey(): void
     {
         $schema = new Schema();
-        $result = $schema->create('order_items', function (Table $table) {
-            $table->integer('order_id');
-            $table->integer('product_id');
-            $table->integer('quantity');
-            $table->primary(['order_id', 'product_id']);
-        });
+        $result = $schema->table('order_items')
+            ->integer('order_id')
+            ->integer('product_id')
+            ->integer('quantity')
+            ->primary(['order_id', 'product_id'])
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `order_items` (`order_id` INT NOT NULL, `product_id` INT NOT NULL, `quantity` INT NOT NULL, PRIMARY KEY (`order_id`, `product_id`))', $result->query);
@@ -553,19 +553,19 @@ class MySQLTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('Cannot combine column-level primary() with Table::primary() composite key.');
 
-        $schema->create('order_items', function (Table $table) {
-            $table->integer('order_id')->primary();
-            $table->integer('product_id');
-            $table->primary(['order_id', 'product_id']);
-        });
+        $schema->table('order_items')
+            ->integer('order_id')->primary()
+            ->integer('product_id')
+            ->primary(['order_id', 'product_id'])
+            ->create();
     }
 
     public function testCreateTableWithDefaultNull(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->string('name')->nullable()->default(null);
-        });
+        $result = $schema->table('t')
+            ->string('name')->nullable()->default(null)
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`name` VARCHAR(255) NULL DEFAULT NULL)', $result->query);
@@ -574,9 +574,9 @@ class MySQLTest extends TestCase
     public function testCreateTableWithNumericDefault(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->float('score')->default(0.5);
-        });
+        $result = $schema->table('t')
+            ->float('score')->default(0.5)
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`score` DOUBLE NOT NULL DEFAULT 0.5)', $result->query);
@@ -585,7 +585,7 @@ class MySQLTest extends TestCase
     public function testDropIfExists(): void
     {
         $schema = new Schema();
-        $result = $schema->dropIfExists('users');
+        $result = $schema->table('users')->dropIfExists();
 
         $this->assertSame('DROP TABLE IF EXISTS `users`', $result->query);
     }
@@ -602,12 +602,12 @@ class MySQLTest extends TestCase
     public function testAlterMultipleColumnsAndIndexes(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->addColumn('first_name', 'string', 100);
-            $table->addColumn('last_name', 'string', 100);
-            $table->dropColumn('name');
-            $table->addIndex('idx_names', ['first_name', 'last_name']);
-        });
+        $result = $schema->table('users')
+            ->addColumn('first_name', ColumnType::String, 100)
+            ->addColumn('last_name', ColumnType::String, 100)
+            ->dropColumn('name')
+            ->addIndex('idx_names', ['first_name', 'last_name'])
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame('ALTER TABLE `users` ADD COLUMN `first_name` VARCHAR(100) NOT NULL, ADD COLUMN `last_name` VARCHAR(100) NOT NULL, DROP COLUMN `name`, ADD INDEX `idx_names` (`first_name`, `last_name`)', $result->query);
@@ -616,12 +616,12 @@ class MySQLTest extends TestCase
     public function testCreateTableForeignKeyWithAllActions(): void
     {
         $schema = new Schema();
-        $result = $schema->create('comments', function (Table $table) {
-            $table->id();
-            $table->foreignKey('post_id')
+        $result = $schema->table('comments')
+            ->id()
+            ->foreignKey('post_id')
                 ->references('id')->on('posts')
-                ->onDelete(ForeignKeyAction::Cascade)->onUpdate(ForeignKeyAction::Restrict);
-        });
+                ->onDelete(ForeignKeyAction::Cascade)->onUpdate(ForeignKeyAction::Restrict)
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `comments` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, PRIMARY KEY (`id`), FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT)', $result->query);
@@ -647,9 +647,9 @@ class MySQLTest extends TestCase
     public function testCreateTableTimestampWithoutPrecision(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->timestamp('ts_col');
-        });
+        $result = $schema->table('t')
+            ->timestamp('ts_col')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`ts_col` TIMESTAMP NOT NULL)', $result->query);
@@ -659,9 +659,9 @@ class MySQLTest extends TestCase
     public function testCreateTableDatetimeWithoutPrecision(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->datetime('dt_col');
-        });
+        $result = $schema->table('t')
+            ->datetime('dt_col')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`dt_col` DATETIME NOT NULL)', $result->query);
@@ -679,10 +679,10 @@ class MySQLTest extends TestCase
     public function testAlterAddAndDropForeignKey(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('orders', function (Table $table) {
-            $table->addForeignKey('user_id')->references('id')->on('users');
-            $table->dropForeignKey('fk_old_user');
-        });
+        $result = $schema->table('orders')
+            ->addForeignKey('user_id')->references('id')->on('users')
+            ->dropForeignKey('fk_old_user')
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame('ALTER TABLE `orders` ADD FOREIGN KEY (`user_id`) REFERENCES `users` (`id`), DROP FOREIGN KEY `fk_old_user`', $result->query);
@@ -691,11 +691,11 @@ class MySQLTest extends TestCase
     public function testTableAutoGeneratedIndexName(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->string('first');
-            $table->string('last');
-            $table->index(['first', 'last']);
-        });
+        $result = $schema->table('t')
+            ->string('first')
+            ->string('last')
+            ->index(['first', 'last'])
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`first` VARCHAR(255) NOT NULL, `last` VARCHAR(255) NOT NULL, INDEX `idx_first_last` (`first`, `last`))', $result->query);
@@ -704,10 +704,10 @@ class MySQLTest extends TestCase
     public function testTableAutoGeneratedUniqueIndexName(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->string('email');
-            $table->uniqueIndex(['email']);
-        });
+        $result = $schema->table('t')
+            ->string('email')
+            ->uniqueIndex(['email'])
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`email` VARCHAR(255) NOT NULL, UNIQUE INDEX `uniq_email` (`email`))', $result->query);
@@ -716,14 +716,14 @@ class MySQLTest extends TestCase
     public function testExactCreateTableWithColumnsAndIndexes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('products', function (Table $table) {
-            $table->id();
-            $table->string('name', 100);
-            $table->integer('price');
-            $table->boolean('active')->default(true);
-            $table->index(['name']);
-            $table->uniqueIndex(['price']);
-        });
+        $result = $schema->table('products')
+            ->id()
+            ->string('name', 100)
+            ->integer('price')
+            ->boolean('active')->default(true)
+            ->index(['name'])
+            ->uniqueIndex(['price'])
+            ->create();
 
         $this->assertSame(
             'CREATE TABLE `products` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `name` VARCHAR(100) NOT NULL, `price` INT NOT NULL, `active` TINYINT(1) NOT NULL DEFAULT 1, PRIMARY KEY (`id`), INDEX `idx_name` (`name`), UNIQUE INDEX `uniq_price` (`price`))',
@@ -736,10 +736,10 @@ class MySQLTest extends TestCase
     public function testExactAlterTableAddAndDropColumns(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->addColumn('phone', 'string', 20)->nullable();
-            $table->dropColumn('legacy_field');
-        });
+        $result = $schema->table('users')
+            ->addColumn('phone', ColumnType::String, 20)->nullable()
+            ->dropColumn('legacy_field')
+            ->alter();
 
         $this->assertSame(
             'ALTER TABLE `users` ADD COLUMN `phone` VARCHAR(20) NULL, DROP COLUMN `legacy_field`',
@@ -752,13 +752,13 @@ class MySQLTest extends TestCase
     public function testExactCreateTableWithForeignKey(): void
     {
         $schema = new Schema();
-        $result = $schema->create('orders', function (Table $table) {
-            $table->id();
-            $table->integer('customer_id');
-            $table->foreignKey('customer_id')
+        $result = $schema->table('orders')
+            ->id()
+            ->integer('customer_id')
+            ->foreignKey('customer_id')
                 ->references('id')->on('customers')
-                ->onDelete(ForeignKeyAction::Cascade)->onUpdate(ForeignKeyAction::Cascade);
-        });
+                ->onDelete(ForeignKeyAction::Cascade)->onUpdate(ForeignKeyAction::Cascade)
+            ->create();
 
         $this->assertSame(
             'CREATE TABLE `orders` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `customer_id` INT NOT NULL, PRIMARY KEY (`id`), FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE CASCADE ON UPDATE CASCADE)',
@@ -771,7 +771,7 @@ class MySQLTest extends TestCase
     public function testExactDropTable(): void
     {
         $schema = new Schema();
-        $result = $schema->drop('sessions');
+        $result = $schema->table('sessions')->drop();
 
         $this->assertSame('DROP TABLE `sessions`', $result->query);
         $this->assertSame([], $result->bindings);
@@ -886,10 +886,10 @@ class MySQLTest extends TestCase
     public function testCreateIfNotExists(): void
     {
         $schema = new Schema();
-        $result = $schema->createIfNotExists('users', function (Table $table) {
-            $table->id();
-            $table->string('name');
-        });
+        $result = $schema->table('users')
+            ->id()
+            ->string('name')
+            ->createIfNotExists();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE IF NOT EXISTS `users` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `name` VARCHAR(255) NOT NULL, PRIMARY KEY (`id`))', $result->query);
@@ -898,10 +898,10 @@ class MySQLTest extends TestCase
     public function testCreateTableWithRawColumnDefs(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->id();
-            $table->rawColumn('`custom_col` VARCHAR(255) NOT NULL DEFAULT ""');
-        });
+        $result = $schema->table('t')
+            ->id()
+            ->rawColumn('`custom_col` VARCHAR(255) NOT NULL DEFAULT ""')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `custom_col` VARCHAR(255) NOT NULL DEFAULT "", PRIMARY KEY (`id`))', $result->query);
@@ -910,11 +910,11 @@ class MySQLTest extends TestCase
     public function testCreateTableWithRawIndexDefs(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->id();
-            $table->string('name');
-            $table->rawIndex('INDEX `idx_custom` (`name`(10))');
-        });
+        $result = $schema->table('t')
+            ->id()
+            ->string('name')
+            ->rawIndex('INDEX `idx_custom` (`name`(10))')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `name` VARCHAR(255) NOT NULL, PRIMARY KEY (`id`), INDEX `idx_custom` (`name`(10)))', $result->query);
@@ -923,11 +923,11 @@ class MySQLTest extends TestCase
     public function testCreateTableWithPartitionByRange(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Table $table) {
-            $table->id();
-            $table->datetime('created_at');
-            $table->partitionByRange('YEAR(created_at)');
-        });
+        $result = $schema->table('events')
+            ->id()
+            ->datetime('created_at')
+            ->partitionByRange('YEAR(created_at)')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `events` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `created_at` DATETIME NOT NULL, PRIMARY KEY (`id`)) PARTITION BY RANGE(YEAR(created_at))', $result->query);
@@ -936,11 +936,11 @@ class MySQLTest extends TestCase
     public function testCreateTableWithPartitionByList(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Table $table) {
-            $table->id();
-            $table->string('region');
-            $table->partitionByList('region');
-        });
+        $result = $schema->table('events')
+            ->id()
+            ->string('region')
+            ->partitionByList('region')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `events` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `region` VARCHAR(255) NOT NULL, PRIMARY KEY (`id`)) PARTITION BY LIST(region)', $result->query);
@@ -949,10 +949,10 @@ class MySQLTest extends TestCase
     public function testCreateTableWithPartitionByHash(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Table $table) {
-            $table->id();
-            $table->partitionByHash('id');
-        });
+        $result = $schema->table('events')
+            ->id()
+            ->partitionByHash('id')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `events` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, PRIMARY KEY (`id`)) PARTITION BY HASH(id)', $result->query);
@@ -961,12 +961,12 @@ class MySQLTest extends TestCase
     public function testAlterWithForeignKeyOnDeleteAndUpdate(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('orders', function (Table $table) {
-            $table->addForeignKey('user_id')
+        $result = $schema->table('orders')
+            ->addForeignKey('user_id')
                 ->references('id')->on('users')
                 ->onDelete(ForeignKeyAction::Cascade)
-                ->onUpdate(ForeignKeyAction::SetNull);
-        });
+                ->onUpdate(ForeignKeyAction::SetNull)
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame('ALTER TABLE `orders` ADD FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE SET NULL', $result->query);
@@ -1084,9 +1084,9 @@ class MySQLTest extends TestCase
     public function testTableJsonColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->json('metadata');
-        });
+        $result = $schema->table('t')
+            ->json('metadata')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`metadata` JSON NOT NULL)', $result->query);
@@ -1095,9 +1095,9 @@ class MySQLTest extends TestCase
     public function testTableBinaryColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->binary('data');
-        });
+        $result = $schema->table('t')
+            ->binary('data')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`data` BLOB NOT NULL)', $result->query);
@@ -1105,7 +1105,8 @@ class MySQLTest extends TestCase
 
     public function testColumnCollation(): void
     {
-        $col = new Column('name', ColumnType::String, 255);
+        $bp = (new Schema())->table('t');
+        $col = new Column($bp, 'name', ColumnType::String, 255);
         $col->collation('utf8mb4_unicode_ci');
 
         $this->assertSame('utf8mb4_unicode_ci', $col->collation);
@@ -1113,18 +1114,19 @@ class MySQLTest extends TestCase
 
     public function testColumnPrecision(): void
     {
-        $col = new Column('amount', ColumnType::Float, precision: 10);
+        $bp = (new Schema())->table('t');
+        $col = new Column($bp, 'amount', ColumnType::Float, precision: 10);
 
         $this->assertSame(10, $col->precision);
         $this->assertNull($col->length);
     }
 
-    public function testTableAddIndexWithStringType(): void
+    public function testTableAddIndexWithEnumType(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->addIndex('idx_name', ['name'], 'unique');
-        });
+        $result = $schema->table('users')
+            ->addIndex('idx_name', ['name'], IndexType::Unique)
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame('ALTER TABLE `users` ADD UNIQUE INDEX `idx_name` (`name`)', $result->query);
@@ -1157,10 +1159,10 @@ class MySQLTest extends TestCase
     public function testEnumBackslashEscaping(): void
     {
         $schema = new Schema();
-        $result = $schema->create('items', function (Table $table) {
+        $result = $schema->table('items')
             // Input: `a\` and `b'c`. Expect backslash doubled and quote doubled.
-            $table->enum('status', ['a\\', "b'c"]);
-        });
+            ->enum('status', ['a\\', "b'c"])
+            ->create();
 
         // Expect literal sequence: ENUM('a\\','b''c')  (a + two backslashes)
         $this->assertSame("CREATE TABLE `items` (`status` ENUM('a\\\\','b''c') NOT NULL)", $result->query);
@@ -1169,10 +1171,10 @@ class MySQLTest extends TestCase
     public function testDefaultValueBackslashEscaping(): void
     {
         $schema = new Schema();
-        $result = $schema->create('items', function (Table $table) {
+        $result = $schema->table('items')
             // Input: a\' OR 1=1 -- . Expect backslash doubled, quote doubled.
-            $table->string('name')->default("a\\' OR 1=1 --");
-        });
+            ->string('name')->default("a\\' OR 1=1 --")
+            ->create();
 
         $this->assertSame("CREATE TABLE `items` (`name` VARCHAR(255) NOT NULL DEFAULT 'a\\\\'' OR 1=1 --')", $result->query);
     }
@@ -1180,9 +1182,9 @@ class MySQLTest extends TestCase
     public function testCommentBackslashEscaping(): void
     {
         $schema = new Schema();
-        $result = $schema->create('items', function (Table $table) {
-            $table->string('name')->comment('trailing\\');
-        });
+        $result = $schema->table('items')
+            ->string('name')->comment('trailing\\')
+            ->create();
 
         $this->assertSame("CREATE TABLE `items` (`name` VARCHAR(255) NOT NULL COMMENT 'trailing\\\\')", $result->query);
     }
@@ -1198,9 +1200,9 @@ class MySQLTest extends TestCase
     public function testSerialColumnMapsToIntWithAutoIncrement(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->serial('id')->primary();
-        });
+        $result = $schema->table('t')
+            ->serial('id')->primary()
+            ->create();
 
         $this->assertSame('CREATE TABLE `t` (`id` INT AUTO_INCREMENT NOT NULL, PRIMARY KEY (`id`))', $result->query);
     }
@@ -1208,9 +1210,9 @@ class MySQLTest extends TestCase
     public function testBigSerialColumnMapsToBigIntWithAutoIncrement(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->bigSerial('id')->primary();
-        });
+        $result = $schema->table('t')
+            ->bigSerial('id')->primary()
+            ->create();
 
         $this->assertSame('CREATE TABLE `t` (`id` BIGINT AUTO_INCREMENT NOT NULL, PRIMARY KEY (`id`))', $result->query);
     }
@@ -1220,9 +1222,9 @@ class MySQLTest extends TestCase
         $this->expectException(UnsupportedException::class);
 
         $schema = new Schema();
-        $schema->create('t', function (Table $table) {
-            $table->integer('id')->primary();
-            $table->string('mood')->userType('mood_type');
-        });
+        $schema->table('t')
+            ->integer('id')->primary()
+            ->string('mood')->userType('mood_type')
+            ->create();
     }
 }

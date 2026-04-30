@@ -2,7 +2,10 @@
 
 namespace Utopia\Query\Schema;
 
+use Utopia\Query\Builder\Statement;
+use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
+use Utopia\Query\Schema;
 use Utopia\Query\Schema\ClickHouse\Engine;
 use Utopia\Query\Schema\ClickHouse\IndexAlgorithm;
 
@@ -41,6 +44,9 @@ class Table
     /** @var list<string> */
     public private(set) array $compositePrimaryKey = [];
 
+    /** @var list<string> ClickHouse ORDER BY columns; falls back to primary key when empty */
+    public private(set) array $orderBy = [];
+
     public private(set) ?PartitionType $partitionType = null;
     public private(set) string $partitionExpression = '';
     public private(set) ?int $partitionCount = null;
@@ -55,12 +61,58 @@ class Table
     /** @var array<string, string> Table-level engine SETTINGS (ClickHouse only) */
     public private(set) array $settings = [];
 
+    public function __construct(
+        private readonly ?Schema $schema = null,
+        public readonly string $name = '',
+    ) {
+    }
+
+    public function create(bool $ifNotExists = false): Statement
+    {
+        return $this->requireSchema()->compileCreate($this, $ifNotExists);
+    }
+
+    public function createIfNotExists(): Statement
+    {
+        return $this->create(true);
+    }
+
+    public function alter(): Statement
+    {
+        return $this->requireSchema()->compileAlter($this);
+    }
+
+    public function drop(): Statement
+    {
+        return $this->requireSchema()->compileDrop($this->name, false);
+    }
+
+    public function dropIfExists(): Statement
+    {
+        return $this->requireSchema()->compileDrop($this->name, true);
+    }
+
+    public function truncate(): Statement
+    {
+        return $this->requireSchema()->compileTruncate($this->name);
+    }
+
+    public function rename(string $to): Statement
+    {
+        return $this->requireSchema()->compileRename($this->name, $to);
+    }
+
+    private function requireSchema(): Schema
+    {
+        if ($this->schema === null) {
+            throw new UnsupportedException('Cannot compile a Table without a Schema. Use Schema::table($name) to obtain a builder.');
+        }
+
+        return $this->schema;
+    }
+
     /**
      * Add a table-level CHECK constraint.
-     *
-     * The expression is emitted verbatim inside `CHECK (...)` and must come from
-     * trusted (developer-controlled) source — never from untrusted input. The
-     * constraint name is validated as a standard SQL identifier.
      *
      * @throws ValidationException if $name is not a valid identifier.
      */
@@ -99,10 +151,8 @@ class Table
 
     public function id(string $name = 'id'): Column
     {
-        $col = (new Column($name, ColumnType::BigInteger))
-            ->unsigned()
-            ->autoIncrement()
-            ->primary();
+        $col = new Column($this, $name, ColumnType::BigInteger);
+        $col->unsigned()->autoIncrement()->primary();
         $this->columns[] = $col;
 
         return $col;
@@ -110,7 +160,7 @@ class Table
 
     public function string(string $name, int $length = 255): Column
     {
-        $col = new Column($name, ColumnType::String, $length);
+        $col = new Column($this, $name, ColumnType::String, $length);
         $this->columns[] = $col;
 
         return $col;
@@ -118,7 +168,7 @@ class Table
 
     public function text(string $name): Column
     {
-        $col = new Column($name, ColumnType::Text);
+        $col = new Column($this, $name, ColumnType::Text);
         $this->columns[] = $col;
 
         return $col;
@@ -126,7 +176,7 @@ class Table
 
     public function mediumText(string $name): Column
     {
-        $col = new Column($name, ColumnType::MediumText);
+        $col = new Column($this, $name, ColumnType::MediumText);
         $this->columns[] = $col;
 
         return $col;
@@ -134,7 +184,7 @@ class Table
 
     public function longText(string $name): Column
     {
-        $col = new Column($name, ColumnType::LongText);
+        $col = new Column($this, $name, ColumnType::LongText);
         $this->columns[] = $col;
 
         return $col;
@@ -142,7 +192,7 @@ class Table
 
     public function integer(string $name): Column
     {
-        $col = new Column($name, ColumnType::Integer);
+        $col = new Column($this, $name, ColumnType::Integer);
         $this->columns[] = $col;
 
         return $col;
@@ -150,7 +200,7 @@ class Table
 
     public function bigInteger(string $name): Column
     {
-        $col = new Column($name, ColumnType::BigInteger);
+        $col = new Column($this, $name, ColumnType::BigInteger);
         $this->columns[] = $col;
 
         return $col;
@@ -162,7 +212,7 @@ class Table
      */
     public function serial(string $name): Column
     {
-        $col = (new Column($name, ColumnType::Serial))
+        $col = (new Column($this, $name, ColumnType::Serial))
             ->autoIncrement();
         $this->columns[] = $col;
 
@@ -175,7 +225,7 @@ class Table
      */
     public function bigSerial(string $name): Column
     {
-        $col = (new Column($name, ColumnType::BigSerial))
+        $col = (new Column($this, $name, ColumnType::BigSerial))
             ->autoIncrement();
         $this->columns[] = $col;
 
@@ -188,7 +238,7 @@ class Table
      */
     public function smallSerial(string $name): Column
     {
-        $col = (new Column($name, ColumnType::SmallSerial))
+        $col = (new Column($this, $name, ColumnType::SmallSerial))
             ->autoIncrement();
         $this->columns[] = $col;
 
@@ -197,7 +247,7 @@ class Table
 
     public function float(string $name): Column
     {
-        $col = new Column($name, ColumnType::Float);
+        $col = new Column($this, $name, ColumnType::Float);
         $this->columns[] = $col;
 
         return $col;
@@ -205,7 +255,7 @@ class Table
 
     public function boolean(string $name): Column
     {
-        $col = new Column($name, ColumnType::Boolean);
+        $col = new Column($this, $name, ColumnType::Boolean);
         $this->columns[] = $col;
 
         return $col;
@@ -213,7 +263,7 @@ class Table
 
     public function datetime(string $name, int $precision = 0): Column
     {
-        $col = new Column($name, ColumnType::Datetime, precision: $precision);
+        $col = new Column($this, $name, ColumnType::Datetime, precision: $precision);
         $this->columns[] = $col;
 
         return $col;
@@ -221,7 +271,7 @@ class Table
 
     public function timestamp(string $name, int $precision = 0): Column
     {
-        $col = new Column($name, ColumnType::Timestamp, precision: $precision);
+        $col = new Column($this, $name, ColumnType::Timestamp, precision: $precision);
         $this->columns[] = $col;
 
         return $col;
@@ -229,7 +279,7 @@ class Table
 
     public function json(string $name): Column
     {
-        $col = new Column($name, ColumnType::Json);
+        $col = new Column($this, $name, ColumnType::Json);
         $this->columns[] = $col;
 
         return $col;
@@ -237,7 +287,7 @@ class Table
 
     public function binary(string $name): Column
     {
-        $col = new Column($name, ColumnType::Binary);
+        $col = new Column($this, $name, ColumnType::Binary);
         $this->columns[] = $col;
 
         return $col;
@@ -245,10 +295,16 @@ class Table
 
     /**
      * @param  string[]  $values
+     *
+     * @throws ValidationException if the value list is empty.
      */
     public function enum(string $name, array $values): Column
     {
-        $col = (new Column($name, ColumnType::Enum))
+        if ($values === []) {
+            throw new ValidationException('enum() requires at least one allowed value.');
+        }
+
+        $col = (new Column($this, $name, ColumnType::Enum))
             ->enum($values);
         $this->columns[] = $col;
 
@@ -257,7 +313,7 @@ class Table
 
     public function point(string $name, int $srid = 4326): Column
     {
-        $col = (new Column($name, ColumnType::Point))
+        $col = (new Column($this, $name, ColumnType::Point))
             ->srid($srid);
         $this->columns[] = $col;
 
@@ -266,7 +322,7 @@ class Table
 
     public function linestring(string $name, int $srid = 4326): Column
     {
-        $col = (new Column($name, ColumnType::Linestring))
+        $col = (new Column($this, $name, ColumnType::Linestring))
             ->srid($srid);
         $this->columns[] = $col;
 
@@ -275,7 +331,7 @@ class Table
 
     public function polygon(string $name, int $srid = 4326): Column
     {
-        $col = (new Column($name, ColumnType::Polygon))
+        $col = (new Column($this, $name, ColumnType::Polygon))
             ->srid($srid);
         $this->columns[] = $col;
 
@@ -284,17 +340,19 @@ class Table
 
     public function vector(string $name, int $dimensions): Column
     {
-        $col = (new Column($name, ColumnType::Vector))
+        $col = (new Column($this, $name, ColumnType::Vector))
             ->dimensions($dimensions);
         $this->columns[] = $col;
 
         return $col;
     }
 
-    public function timestamps(int $precision = 3): void
+    public function timestamps(int $precision = 3): static
     {
         $this->datetime('created_at', $precision);
         $this->datetime('updated_at', $precision);
+
+        return $this;
     }
 
     /**
@@ -346,74 +404,96 @@ class Table
         array $lengths = [],
         array $orders = [],
         array $collations = [],
-    ): void {
+    ): static {
         if ($name === '') {
             $name = $this->autoIndexName('uniq_', $columns);
         }
         $this->indexes[] = new Index($name, $columns, IndexType::Unique, $lengths, $orders, collations: $collations);
+
+        return $this;
     }
 
     /**
      * @param  string[]  $columns
      */
-    public function fulltextIndex(array $columns, string $name = ''): void
+    public function fulltextIndex(array $columns, string $name = ''): static
     {
         if ($name === '') {
             $name = $this->autoIndexName('ft_', $columns);
         }
         $this->indexes[] = new Index($name, $columns, IndexType::Fulltext);
+
+        return $this;
     }
 
     /**
      * @param  string[]  $columns
      */
-    public function spatialIndex(array $columns, string $name = ''): void
+    public function spatialIndex(array $columns, string $name = ''): static
     {
         if ($name === '') {
             $name = $this->autoIndexName('sp_', $columns);
         }
         $this->indexes[] = new Index($name, $columns, IndexType::Spatial);
+
+        return $this;
     }
 
+    /**
+     * Declare a foreign key. The behaviour is identical for create and alter
+     * contexts — the dialect compiler switches between `FOREIGN KEY (...)` (in
+     * a CREATE TABLE column list) and `ADD FOREIGN KEY (...)` (in an ALTER
+     * TABLE clause) when emitting the statement. {@see addForeignKey()} is
+     * an alias for use in alter chains; both register the same FK exactly once.
+     */
     public function foreignKey(string $column): ForeignKey
     {
-        $fk = new ForeignKey($column);
+        $fk = new ForeignKey($this, $column);
         $this->foreignKeys[] = $fk;
 
         return $fk;
     }
 
-    public function addColumn(string $name, ColumnType|string $type, int|null $lengthOrPrecision = null): Column
+    public function addColumn(string $name, ColumnType $type, ?int $lengthOrPrecision = null): Column
     {
-        if (\is_string($type)) {
-            $type = ColumnType::from($type);
-        }
-        $col = new Column($name, $type, $type === ColumnType::String ? $lengthOrPrecision : null, $type !== ColumnType::String ? $lengthOrPrecision : null);
+        $col = new Column(
+            $this,
+            $name,
+            $type,
+            $type === ColumnType::String ? $lengthOrPrecision : null,
+            $type !== ColumnType::String ? $lengthOrPrecision : null,
+        );
         $this->columns[] = $col;
 
         return $col;
     }
 
-    public function modifyColumn(string $name, ColumnType|string $type, int|null $lengthOrPrecision = null): Column
+    public function modifyColumn(string $name, ColumnType $type, ?int $lengthOrPrecision = null): Column
     {
-        if (\is_string($type)) {
-            $type = ColumnType::from($type);
-        }
-        $col = (new Column($name, $type, $type === ColumnType::String ? $lengthOrPrecision : null, $type !== ColumnType::String ? $lengthOrPrecision : null))
-            ->modify();
+        $col = (new Column(
+            $this,
+            $name,
+            $type,
+            $type === ColumnType::String ? $lengthOrPrecision : null,
+            $type !== ColumnType::String ? $lengthOrPrecision : null,
+        ))->modify();
         $this->columns[] = $col;
 
         return $col;
     }
 
-    public function renameColumn(string $from, string $to): void
+    public function renameColumn(string $from, string $to): static
     {
         $this->renameColumns[] = new RenameColumn($from, $to);
+
+        return $this;
     }
 
-    public function dropColumn(string $name): void
+    public function dropColumn(string $name): static
     {
         $this->dropColumns[] = $name;
+
+        return $this;
     }
 
     /**
@@ -426,36 +506,41 @@ class Table
     public function addIndex(
         string $name,
         array $columns,
-        IndexType|string $type = IndexType::Index,
+        IndexType $type = IndexType::Index,
         array $lengths = [],
         array $orders = [],
         string $method = '',
         string $operatorClass = '',
         array $collations = [],
         array $rawColumns = [],
-    ): void {
-        if (\is_string($type)) {
-            $type = IndexType::from($type);
-        }
+    ): static {
         $this->indexes[] = new Index($name, $columns, $type, $lengths, $orders, $method, $operatorClass, $collations, $rawColumns);
+
+        return $this;
     }
 
-    public function dropIndex(string $name): void
+    public function dropIndex(string $name): static
     {
         $this->dropIndexes[] = $name;
+
+        return $this;
     }
 
+    /**
+     * Alias of {@see foreignKey()}, for symmetry with the other `add*`/`drop*`
+     * alter helpers. Returns the same registered {@see ForeignKey}; calling
+     * both methods for the same column registers the FK twice.
+     */
     public function addForeignKey(string $column): ForeignKey
     {
-        $fk = new ForeignKey($column);
-        $this->foreignKeys[] = $fk;
-
-        return $fk;
+        return $this->foreignKey($column);
     }
 
-    public function dropForeignKey(string $name): void
+    public function dropForeignKey(string $name): static
     {
         $this->dropForeignKeys[] = $name;
+
+        return $this;
     }
 
     /**
@@ -463,9 +548,11 @@ class Table
      *
      * Example: $table->rawColumn('`my_col` VARCHAR(255) NOT NULL DEFAULT ""')
      */
-    public function rawColumn(string $definition): void
+    public function rawColumn(string $definition): static
     {
         $this->rawColumnDefs[] = $definition;
+
+        return $this;
     }
 
     /**
@@ -473,23 +560,29 @@ class Table
      *
      * Example: $table->rawIndex('INDEX `idx_name` (`col1`, `col2`)')
      */
-    public function rawIndex(string $definition): void
+    public function rawIndex(string $definition): static
     {
         $this->rawIndexDefs[] = $definition;
+
+        return $this;
     }
 
-    public function partitionByRange(string $expression): void
+    public function partitionByRange(string $expression): static
     {
         $this->partitionType = PartitionType::Range;
         $this->partitionExpression = $expression;
         $this->partitionCount = null;
+
+        return $this;
     }
 
-    public function partitionByList(string $expression): void
+    public function partitionByList(string $expression): static
     {
         $this->partitionType = PartitionType::List;
         $this->partitionExpression = $expression;
         $this->partitionCount = null;
+
+        return $this;
     }
 
     /**
@@ -540,10 +633,28 @@ class Table
     }
 
     /**
-     * Attach a table-level TTL expression (ClickHouse only).
+     * Set the ClickHouse ORDER BY clause. When unset, ClickHouse falls back to the
+     * primary key columns.
      *
-     * Emitted verbatim as `TTL <expression>` after ORDER BY/PARTITION BY.
-     * Other dialects throw UnsupportedException when compiling the blueprint.
+     * @param  list<string>  $columns
+     *
+     * @throws ValidationException if any column name is not a valid identifier.
+     */
+    public function orderBy(array $columns): static
+    {
+        foreach ($columns as $column) {
+            if (! \preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $column)) {
+                throw new ValidationException('Invalid column name in ORDER BY: ' . $column);
+            }
+        }
+
+        $this->orderBy = $columns;
+
+        return $this;
+    }
+
+    /**
+     * Attach a table-level TTL expression (ClickHouse only).
      *
      * @throws ValidationException if the expression is empty or contains a semicolon.
      */

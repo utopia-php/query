@@ -5,7 +5,6 @@ namespace Tests\Integration\Schema;
 use MongoDB\Driver\Exception\BulkWriteException;
 use Tests\Integration\IntegrationTestCase;
 use Utopia\Query\Schema\MongoDB;
-use Utopia\Query\Schema\Table;
 
 class MongoDBIntegrationTest extends IntegrationTestCase
 {
@@ -23,11 +22,11 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $collection = 'schema_create_' . \uniqid();
         $this->trackMongoCollection($collection);
 
-        $plan = $this->schema->create($collection, function (Table $bp) {
-            $bp->integer('id');
-            $bp->string('name', 100);
-            $bp->integer('age')->nullable();
-        });
+        $plan = $this->schema->table($collection)
+            ->integer('id')
+            ->string('name', 100)
+            ->integer('age')->nullable()
+            ->create();
 
         $mongo = $this->mongoClient;
         $this->assertNotNull($mongo);
@@ -59,10 +58,10 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $mongo = $this->mongoClient;
         $this->assertNotNull($mongo);
 
-        $mongo->command($this->schema->create($collection, function (Table $bp) {
-            $bp->integer('id');
-            $bp->string('email', 255);
-        })->query);
+        $mongo->command($this->schema->table($collection)
+            ->integer('id')
+            ->string('email', 255)
+            ->create()->query);
 
         $mongo->command($this->schema->createIndex($collection, 'idx_email', ['email'])->query);
 
@@ -78,11 +77,11 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $mongo = $this->mongoClient;
         $this->assertNotNull($mongo);
 
-        $mongo->command($this->schema->create($collection, function (Table $bp) {
-            $bp->integer('id');
-            $bp->string('country', 32);
-            $bp->string('city', 64);
-        })->query);
+        $mongo->command($this->schema->table($collection)
+            ->integer('id')
+            ->string('country', 32)
+            ->string('city', 64)
+            ->create()->query);
 
         $indexStatement = $this->schema->createIndex(
             $collection,
@@ -106,10 +105,10 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $mongo = $this->mongoClient;
         $this->assertNotNull($mongo);
 
-        $mongo->command($this->schema->create($collection, function (Table $bp) {
-            $bp->integer('id');
-            $bp->string('email', 255);
-        })->query);
+        $mongo->command($this->schema->table($collection)
+            ->integer('id')
+            ->string('email', 255)
+            ->create()->query);
 
         $mongo->command($this->schema->createIndex($collection, 'idx_email_unique', ['email'], unique: true)->query);
 
@@ -133,13 +132,13 @@ class MongoDBIntegrationTest extends IntegrationTestCase
         $mongo = $this->mongoClient;
         $this->assertNotNull($mongo);
 
-        $mongo->command($this->schema->create($collection, function (Table $bp) {
-            $bp->integer('id');
-        })->query);
+        $mongo->command($this->schema->table($collection)
+            ->integer('id')
+            ->create()->query);
 
         $this->assertContains($collection, $mongo->listCollectionNames());
 
-        $mongo->command($this->schema->drop($collection)->query);
+        $mongo->command($this->schema->table($collection)->drop()->query);
 
         $this->assertNotContains($collection, $mongo->listCollectionNames());
     }

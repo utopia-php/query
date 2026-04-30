@@ -8,19 +8,18 @@ use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\MongoDB as Schema;
-use Utopia\Query\Schema\Table;
 
 class MongoDBTest extends TestCase
 {
     public function testCreateCollection(): void
     {
         $schema = new Schema();
-        $result = $schema->create('users', function (Table $table) {
-            $table->id('id');
-            $table->string('name');
-            $table->string('email');
-            $table->integer('age');
-        });
+        $result = $schema->table('users')
+            ->id('id')
+            ->string('name')
+            ->string('email')
+            ->integer('age')
+            ->create();
 
         $op = $this->decode($result->query);
         $this->assertSame('createCollection', $op['command']);
@@ -41,15 +40,15 @@ class MongoDBTest extends TestCase
     public function testCreateCollectionWithTypes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('posts', function (Table $table) {
-            $table->id('id');
-            $table->string('title');
-            $table->text('body');
-            $table->integer('views');
-            $table->float('rating');
-            $table->boolean('published');
-            $table->datetime('created_at');
-        });
+        $result = $schema->table('posts')
+            ->id('id')
+            ->string('title')
+            ->text('body')
+            ->integer('views')
+            ->float('rating')
+            ->boolean('published')
+            ->datetime('created_at')
+            ->create();
 
         $op = $this->decode($result->query);
         /** @var array<string, mixed> $validator */
@@ -70,10 +69,10 @@ class MongoDBTest extends TestCase
     public function testCreateCollectionWithEnumValidation(): void
     {
         $schema = new Schema();
-        $result = $schema->create('tasks', function (Table $table) {
-            $table->id('id');
-            $table->enum('status', ['pending', 'active', 'completed']);
-        });
+        $result = $schema->table('tasks')
+            ->id('id')
+            ->enum('status', ['pending', 'active', 'completed'])
+            ->create();
 
         $op = $this->decode($result->query);
         /** @var array<string, mixed> $validator */
@@ -90,11 +89,11 @@ class MongoDBTest extends TestCase
     public function testCreateCollectionWithRequired(): void
     {
         $schema = new Schema();
-        $result = $schema->create('users', function (Table $table) {
-            $table->id('id');
-            $table->string('name');
-            $table->string('email')->nullable();
-        });
+        $result = $schema->table('users')
+            ->id('id')
+            ->string('name')
+            ->string('email')->nullable()
+            ->create();
 
         $op = $this->decode($result->query);
         /** @var array<string, mixed> $validator */
@@ -115,17 +114,17 @@ class MongoDBTest extends TestCase
         $this->expectException(UnsupportedException::class);
         $this->expectExceptionMessage('Composite primary keys are not supported in MongoDB');
 
-        $schema->create('order_items', function (Table $table) {
-            $table->integer('order_id');
-            $table->integer('product_id');
-            $table->primary(['order_id', 'product_id']);
-        });
+        $schema->table('order_items')
+            ->integer('order_id')
+            ->integer('product_id')
+            ->primary(['order_id', 'product_id'])
+            ->create();
     }
 
     public function testDrop(): void
     {
         $schema = new Schema();
-        $result = $schema->drop('users');
+        $result = $schema->table('users')->drop();
 
         $op = $this->decode($result->query);
         $this->assertSame('drop', $op['command']);
@@ -135,7 +134,7 @@ class MongoDBTest extends TestCase
     public function testDropIfExists(): void
     {
         $schema = new Schema();
-        $result = $schema->dropIfExists('users');
+        $result = $schema->table('users')->dropIfExists();
 
         $op = $this->decode($result->query);
         $this->assertSame('drop', $op['command']);
@@ -145,7 +144,7 @@ class MongoDBTest extends TestCase
     public function testRename(): void
     {
         $schema = new Schema();
-        $result = $schema->rename('old_users', 'new_users');
+        $result = $schema->table('old_users')->rename('new_users');
 
         $op = $this->decode($result->query);
         $this->assertSame('renameCollection', $op['command']);
@@ -156,7 +155,7 @@ class MongoDBTest extends TestCase
     public function testTruncate(): void
     {
         $schema = new Schema();
-        $result = $schema->truncate('users');
+        $result = $schema->table('users')->truncate();
 
         $op = $this->decode($result->query);
         $this->assertSame('deleteMany', $op['command']);
@@ -238,10 +237,10 @@ class MongoDBTest extends TestCase
     public function testAlter(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->string('phone');
-            $table->boolean('verified');
-        });
+        $result = $schema->table('users')
+            ->string('phone')
+            ->boolean('verified')
+            ->alter();
 
         $op = $this->decode($result->query);
         $this->assertSame('collMod', $op['command']);
@@ -260,9 +259,9 @@ class MongoDBTest extends TestCase
     public function testColumnComment(): void
     {
         $schema = new Schema();
-        $result = $schema->create('users', function (Table $table) {
-            $table->string('name')->comment('The display name');
-        });
+        $result = $schema->table('users')
+            ->string('name')->comment('The display name')
+            ->create();
 
         $op = $this->decode($result->query);
         /** @var array<string, mixed> $validator */
@@ -278,11 +277,11 @@ class MongoDBTest extends TestCase
     public function testAlterWithMultipleColumns(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->string('phone');
-            $table->integer('age');
-            $table->boolean('verified');
-        });
+        $result = $schema->table('users')
+            ->string('phone')
+            ->integer('age')
+            ->boolean('verified')
+            ->alter();
 
         $op = $this->decode($result->query);
         $this->assertSame('collMod', $op['command']);
@@ -305,9 +304,9 @@ class MongoDBTest extends TestCase
     public function testAlterWithColumnComment(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->string('phone')->comment('User phone number');
-        });
+        $result = $schema->table('users')
+            ->string('phone')->comment('User phone number')
+            ->alter();
 
         $op = $this->decode($result->query);
         /** @var array<string, mixed> $validator */
@@ -325,9 +324,9 @@ class MongoDBTest extends TestCase
         $this->expectExceptionMessage('MongoDB does not support dropping or renaming columns via schema');
 
         $schema = new Schema();
-        $schema->alter('users', function (Table $table) {
-            $table->dropColumn('old_field');
-        });
+        $schema->table('users')
+            ->dropColumn('old_field')
+            ->alter();
     }
 
     public function testAlterRenameColumnThrows(): void
@@ -336,9 +335,9 @@ class MongoDBTest extends TestCase
         $this->expectExceptionMessage('MongoDB does not support dropping or renaming columns via schema');
 
         $schema = new Schema();
-        $schema->alter('users', function (Table $table) {
-            $table->renameColumn('old_name', 'new_name');
-        });
+        $schema->table('users')
+            ->renameColumn('old_name', 'new_name')
+            ->alter();
     }
 
     public function testCreateView(): void
@@ -381,15 +380,15 @@ class MongoDBTest extends TestCase
     public function testCreateCollectionWithAllBsonTypes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('all_types', function (Table $table) {
-            $table->json('meta');
-            $table->binary('data');
-            $table->point('location');
-            $table->linestring('path');
-            $table->polygon('area');
-            $table->addColumn('uid', ColumnType::Uuid7);
-            $table->vector('embedding', 768);
-        });
+        $result = $schema->table('all_types')
+            ->json('meta')
+            ->binary('data')
+            ->point('location')
+            ->linestring('path')
+            ->polygon('area')
+            ->addColumn('uid', ColumnType::Uuid7)
+            ->vector('embedding', 768)
+            ->create();
 
         $op = $this->decode($result->query);
         /** @var array<string, mixed> $validator */

@@ -1,12 +1,12 @@
 <?php
 
-namespace Tests\Query;
+namespace Tests\Query\API;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
 
-class VectorQueryTest extends TestCase
+class VectorTest extends TestCase
 {
     public function testVectorDot(): void
     {
