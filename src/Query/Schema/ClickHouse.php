@@ -125,6 +125,11 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         }
 
         foreach ($table->indexes as $index) {
+            if ($index->type !== IndexType::Index) {
+                throw new UnsupportedException(
+                    'Only data-skipping indexes (index()) are supported in ClickHouse ALTER TABLE.'
+                );
+            }
             $alterations[] = 'ADD ' . $this->compileSkipIndex($index);
         }
 
@@ -176,6 +181,11 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         }
 
         foreach ($table->indexes as $index) {
+            if ($index->type !== IndexType::Index) {
+                throw new UnsupportedException(
+                    'Only data-skipping indexes (index()) are supported in ClickHouse CREATE TABLE.'
+                );
+            }
             $columnDefs[] = $this->compileSkipIndex($index);
         }
 
