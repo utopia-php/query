@@ -607,8 +607,13 @@ class Table
 
             if (\is_bool($value)) {
                 $sanitized[$key] = $value ? '1' : '0';
-            } elseif (\is_int($value) || \is_float($value)) {
+            } elseif (\is_int($value)) {
                 $sanitized[$key] = (string) $value;
+            } elseif (\is_float($value)) {
+                // Avoid scientific notation (e.g. 1.0E-5), which ClickHouse
+                // rejects in SETTINGS values; trim trailing zeros for clean
+                // output.
+                $sanitized[$key] = \rtrim(\rtrim(\sprintf('%F', $value), '0'), '.');
             } elseif (\is_string($value)) {
                 if (! \preg_match('/^[A-Za-z0-9_.\-+\/]*$/', $value)) {
                     throw new ValidationException(

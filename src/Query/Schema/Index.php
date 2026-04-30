@@ -32,7 +32,10 @@ readonly class Index
         public array $algorithmArgs = [],
         public int $granularity = 1,
     ) {
-        if (! \preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name)) {
+        // Only ClickHouse data-skipping indexes require an unquoted identifier
+        // for the name; other dialects emit the name backtick-quoted, so
+        // hyphens, dots, and other characters are valid there.
+        if ($algorithm !== null && ! \preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name)) {
             throw new ValidationException('Invalid index name: ' . $name);
         }
         if ($columns === [] && $rawColumns === []) {

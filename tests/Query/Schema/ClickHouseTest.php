@@ -803,6 +803,32 @@ class ClickHouseTest extends TestCase
         });
     }
 
+    public function testIndexNameRegexOnlyEnforcedForClickHouseAlgorithms(): void
+    {
+        // No algorithm → permissive name allowed (other dialects quote names)
+        $schema = new Schema();
+        $result = $schema->create('events', function (Table $table) {
+            $table->bigInteger('id')->primary();
+            $table->string('user_id');
+            $table->index(['user_id'], name: 'idx-with-hyphens');
+        });
+        $this->assertBindingCount($result);
+        $this->assertStringContainsString('INDEX `idx-with-hyphens`', $result->query);
+    }
+
+    public function testIndexNameRegexEnforcedWhenAlgorithmIsSet(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Invalid index name: idx-with-hyphens');
+
+        $schema = new Schema();
+        $schema->create('events', function (Table $table) {
+            $table->bigInteger('id')->primary();
+            $table->string('user_id');
+            $table->index(['user_id'], name: 'idx-with-hyphens', algorithm: IndexAlgorithm::BloomFilter);
+        });
+    }
+
     // SETTINGS
 
     public function testTableSettings(): void
@@ -860,6 +886,19 @@ class ClickHouseTest extends TestCase
             $table->bigInteger('id')->primary();
             $table->settings(['ok_key' => "evil'; DROP TABLE x; --"]);
         });
+    }
+
+    public function testTableSettingsFloatAvoidsScientificNotation(): void
+    {
+        $schema = new Schema();
+        $result = $schema->create('events', function (Table $table) {
+            $table->bigInteger('id')->primary();
+            $table->settings(['merge_with_ttl_timeout' => 1.0e-5]);
+        });
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('SETTINGS merge_with_ttl_timeout = 0.00001', $result->query);
+        $this->assertDoesNotMatchRegularExpression('/[Ee][+-]\d/', $result->query);
     }
 
     public function testIndexNoArgAlgorithmRejectsArgs(): void
