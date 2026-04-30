@@ -712,11 +712,11 @@ class ClickHouseTest extends TestCase
     public function testIndexBloomFilter(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Table $table) {
-            $table->bigInteger('id')->primary();
-            $table->string('user_id');
-            $table->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter);
-        });
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('user_id')
+            ->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter)
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -728,13 +728,13 @@ class ClickHouseTest extends TestCase
     public function testIndexWithAlgorithmArgs(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Table $table) {
-            $table->bigInteger('id')->primary();
-            $table->string('country');
-            $table->string('text');
-            $table->index(['country'], algorithm: IndexAlgorithm::Set, algorithmArgs: [100], granularity: 4);
-            $table->index(['text'], algorithm: IndexAlgorithm::NgramBloomFilter, algorithmArgs: [4, 1024, 3, 0]);
-        });
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('country')
+            ->string('text')
+            ->index(['country'], algorithm: IndexAlgorithm::Set, algorithmArgs: [100], granularity: 4)
+            ->index(['text'], algorithm: IndexAlgorithm::NgramBloomFilter, algorithmArgs: [4, 1024, 3, 0])
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -749,12 +749,12 @@ class ClickHouseTest extends TestCase
     public function testIndexCompositeColumnsWithAlgorithm(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Table $table) {
-            $table->bigInteger('id')->primary();
-            $table->string('user_id');
-            $table->string('event');
-            $table->index(['user_id', 'event'], name: 'idx_user_event', algorithm: IndexAlgorithm::BloomFilter);
-        });
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('user_id')
+            ->string('event')
+            ->index(['user_id', 'event'], name: 'idx_user_event', algorithm: IndexAlgorithm::BloomFilter)
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -770,11 +770,10 @@ class ClickHouseTest extends TestCase
         $this->expectException(ValidationException::class);
 
         $schema = new Schema();
-        $schema->create('events', function (Table $table) {
-            $table->bigInteger('id')->primary();
-            $table->string('user_id');
-            $table->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter, granularity: 0);
-        });
+        $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('user_id')
+            ->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter, granularity: 0);
     }
 
     public function testIndexEmptyColumnsThrows(): void
@@ -782,21 +781,20 @@ class ClickHouseTest extends TestCase
         $this->expectException(ValidationException::class);
 
         $schema = new Schema();
-        $schema->create('events', function (Table $table) {
-            $table->bigInteger('id')->primary();
-            $table->index([]);
-        });
+        $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->index([]);
     }
 
     public function testIndexNameRegexOnlyEnforcedForClickHouseAlgorithms(): void
     {
         // No algorithm → permissive name allowed (other dialects quote names)
         $schema = new Schema();
-        $result = $schema->create('events', function (Table $table) {
-            $table->bigInteger('id')->primary();
-            $table->string('user_id');
-            $table->index(['user_id'], name: 'idx-with-hyphens');
-        });
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('user_id')
+            ->index(['user_id'], name: 'idx-with-hyphens')
+            ->create();
         $this->assertBindingCount($result);
         $this->assertStringContainsString('INDEX `idx-with-hyphens`', $result->query);
     }
@@ -807,11 +805,10 @@ class ClickHouseTest extends TestCase
         $this->expectExceptionMessage('Invalid index name: idx-with-hyphens');
 
         $schema = new Schema();
-        $schema->create('events', function (Table $table) {
-            $table->bigInteger('id')->primary();
-            $table->string('user_id');
-            $table->index(['user_id'], name: 'idx-with-hyphens', algorithm: IndexAlgorithm::BloomFilter);
-        });
+        $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('user_id')
+            ->index(['user_id'], name: 'idx-with-hyphens', algorithm: IndexAlgorithm::BloomFilter);
     }
 
     // SETTINGS
@@ -819,10 +816,10 @@ class ClickHouseTest extends TestCase
     public function testTableSettings(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Table $table) {
-            $table->bigInteger('id')->primary();
-            $table->settings(['index_granularity' => 8192, 'allow_nullable_key' => true]);
-        });
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->settings(['index_granularity' => 8192, 'allow_nullable_key' => true])
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -835,12 +832,12 @@ class ClickHouseTest extends TestCase
     public function testTableSettingsWithTtlOrdering(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Table $table) {
-            $table->bigInteger('id')->primary();
-            $table->datetime('created_at');
-            $table->ttl('`created_at` + INTERVAL 30 DAY');
-            $table->settings(['index_granularity' => 4096]);
-        });
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->datetime('created_at')
+            ->ttl('`created_at` + INTERVAL 30 DAY')
+            ->settings(['index_granularity' => 4096])
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -856,10 +853,9 @@ class ClickHouseTest extends TestCase
         $this->expectException(ValidationException::class);
 
         $schema = new Schema();
-        $schema->create('events', function (Table $table) {
-            $table->bigInteger('id')->primary();
-            $table->settings(['1bad-key' => 8192]);
-        });
+        $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->settings(['1bad-key' => 8192]);
     }
 
     public function testTableSettingsRejectsInvalidValue(): void
@@ -867,19 +863,18 @@ class ClickHouseTest extends TestCase
         $this->expectException(ValidationException::class);
 
         $schema = new Schema();
-        $schema->create('events', function (Table $table) {
-            $table->bigInteger('id')->primary();
-            $table->settings(['ok_key' => "evil'; DROP TABLE x; --"]);
-        });
+        $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->settings(['ok_key' => "evil'; DROP TABLE x; --"]);
     }
 
     public function testTableSettingsFloatAvoidsScientificNotation(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Table $table) {
-            $table->bigInteger('id')->primary();
-            $table->settings(['merge_with_ttl_timeout' => 1.0e-5]);
-        });
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->settings(['merge_with_ttl_timeout' => 1.0e-5])
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('SETTINGS merge_with_ttl_timeout = 0.00001', $result->query);
@@ -892,11 +887,10 @@ class ClickHouseTest extends TestCase
         $this->expectExceptionMessage('minmax does not accept algorithm arguments.');
 
         $schema = new Schema();
-        $schema->create('events', function (Table $table) {
-            $table->bigInteger('id')->primary();
-            $table->integer('score');
-            $table->index(['score'], algorithm: IndexAlgorithm::MinMax, algorithmArgs: [3]);
-        });
+        $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->integer('score')
+            ->index(['score'], algorithm: IndexAlgorithm::MinMax, algorithmArgs: [3]);
     }
 
     public function testIndexInvertedRejectsArgs(): void
@@ -904,21 +898,20 @@ class ClickHouseTest extends TestCase
         $this->expectException(ValidationException::class);
 
         $schema = new Schema();
-        $schema->create('events', function (Table $table) {
-            $table->bigInteger('id')->primary();
-            $table->string('text');
-            $table->index(['text'], algorithm: IndexAlgorithm::Inverted, algorithmArgs: [42]);
-        });
+        $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('text')
+            ->index(['text'], algorithm: IndexAlgorithm::Inverted, algorithmArgs: [42]);
     }
 
     public function testIndexAutoNameSanitisesNonIdentifierColumns(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Table $table) {
-            $table->bigInteger('id')->primary();
-            $table->string('event-type');
-            $table->index(['event-type'], algorithm: IndexAlgorithm::BloomFilter);
-        });
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('event-type')
+            ->index(['event-type'], algorithm: IndexAlgorithm::BloomFilter)
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -932,11 +925,11 @@ class ClickHouseTest extends TestCase
     public function testIndexFloatArgAvoidsScientificNotation(): void
     {
         $schema = new Schema();
-        $result = $schema->create('events', function (Table $table) {
-            $table->bigInteger('id')->primary();
-            $table->string('user_id');
-            $table->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter, algorithmArgs: [1.0e-5]);
-        });
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('user_id')
+            ->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter, algorithmArgs: [1.0e-5])
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertStringContainsString('TYPE bloom_filter(0.00001)', $result->query);
@@ -947,9 +940,9 @@ class ClickHouseTest extends TestCase
     public function testAlterAddIndexWithAlgorithm(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('events', function (Table $table) {
-            $table->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter);
-        });
+        $result = $schema->table('events')
+            ->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter)
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -961,9 +954,9 @@ class ClickHouseTest extends TestCase
     public function testAlterAddIndexComposite(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('events', function (Table $table) {
-            $table->index(['user_id', 'event'], name: 'idx_user_event', algorithm: IndexAlgorithm::Set, algorithmArgs: [100], granularity: 4);
-        });
+        $result = $schema->table('events')
+            ->index(['user_id', 'event'], name: 'idx_user_event', algorithm: IndexAlgorithm::Set, algorithmArgs: [100], granularity: 4)
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -978,8 +971,9 @@ class ClickHouseTest extends TestCase
         $this->expectExceptionMessage('SETTINGS');
 
         $schema = new Schema();
-        $schema->alter('events', function (Table $table) {
-            $table->settings(['index_granularity' => 4096]);
-        });
+        $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->settings(['index_granularity' => 4096])
+            ->alter();
     }
 }
