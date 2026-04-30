@@ -932,4 +932,259 @@ class FluentBuilderTest extends TestCase
         $this->assertStringContainsString('CONSTRAINT `b_positive` CHECK (`b` >= 0)', $stmt->query);
         $this->assertStringContainsString('`raw_col` TEXT', $stmt->query);
     }
+
+    public function testForeignKeyForwardsToEveryTableColumnFactory(): void
+    {
+        $bp = new Table();
+        $bp->id()
+            ->integer('user_id')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->string('s')
+            ->text('t')
+            ->mediumText('mt')
+            ->longText('lt')
+            ->integer('i')
+            ->bigInteger('bi')
+            ->serial('sr')
+            ->bigSerial('bsr')
+            ->smallSerial('ssr')
+            ->float('f')
+            ->boolean('b')
+            ->datetime('dt')
+            ->timestamp('ts')
+            ->json('j')
+            ->binary('bin')
+            ->enum('status', ['draft', 'live'])
+            ->point('p')
+            ->linestring('ls')
+            ->polygon('pg')
+            ->vector('v', 8)
+            ->id('id_col');
+
+        $names = \array_column($bp->columns, 'name');
+        $this->assertSame(
+            ['id', 'user_id', 's', 't', 'mt', 'lt', 'i', 'bi', 'sr', 'bsr', 'ssr', 'f', 'b', 'dt', 'ts', 'j', 'bin', 'status', 'p', 'ls', 'pg', 'v', 'id_col'],
+            $names,
+        );
+
+        $statusColumn = $bp->columns[17];
+        $this->assertSame(ColumnType::Enum, $statusColumn->type);
+        $this->assertSame(['draft', 'live'], $statusColumn->enumValues);
+    }
+
+    public function testForeignKeyForwardsTimestamps(): void
+    {
+        $bp = new Table();
+        $bp->id()
+            ->integer('user_id')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->timestamps(6);
+
+        $this->assertCount(4, $bp->columns);
+        $this->assertSame('created_at', $bp->columns[2]->name);
+        $this->assertSame('updated_at', $bp->columns[3]->name);
+        $this->assertSame(6, $bp->columns[2]->precision);
+    }
+
+    public function testForeignKeyForwardsAddColumnAndModifyColumn(): void
+    {
+        $bp = new Table();
+        $bp->id()
+            ->integer('user_id')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->addColumn('phone', ColumnType::String, 30)
+            ->modifyColumn('email', ColumnType::String, 200);
+
+        $this->assertCount(4, $bp->columns);
+        $this->assertSame('phone', $bp->columns[2]->name);
+        $this->assertFalse($bp->columns[2]->isModify);
+        $this->assertSame('email', $bp->columns[3]->name);
+        $this->assertTrue($bp->columns[3]->isModify);
+    }
+
+    public function testForeignKeyForwardsRenameColumnAndDropColumn(): void
+    {
+        $bp = new Table();
+        $bp->id()
+            ->integer('user_id')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->renameColumn('old', 'new')
+            ->dropColumn('legacy');
+
+        $this->assertSame([['from' => 'old', 'to' => 'new']], \array_map(
+            fn ($r) => ['from' => $r->from, 'to' => $r->to],
+            $bp->renameColumns,
+        ));
+        $this->assertSame(['legacy'], $bp->dropColumns);
+    }
+
+    public function testForeignKeyForwardsIndexFamily(): void
+    {
+        $bp = new Table();
+        $bp->id()
+            ->integer('user_id')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->index(['user_id'])
+            ->uniqueIndex(['user_id'], 'uq_user')
+            ->fulltextIndex(['user_id'], 'ft_user')
+            ->spatialIndex(['user_id'], 'sp_user')
+            ->addIndex('custom_user', ['user_id'], IndexType::Unique);
+
+        $this->assertCount(5, $bp->indexes);
+        $this->assertSame(IndexType::Index, $bp->indexes[0]->type);
+        $this->assertSame(IndexType::Unique, $bp->indexes[1]->type);
+        $this->assertSame(IndexType::Fulltext, $bp->indexes[2]->type);
+        $this->assertSame(IndexType::Spatial, $bp->indexes[3]->type);
+        $this->assertSame('custom_user', $bp->indexes[4]->name);
+    }
+
+    public function testForeignKeyForwardsDropIndex(): void
+    {
+        $bp = new Table();
+        $bp->id()
+            ->integer('user_id')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->dropIndex('idx_old');
+
+        $this->assertSame(['idx_old'], $bp->dropIndexes);
+    }
+
+    public function testForeignKeyForwardsForeignKeyFactories(): void
+    {
+        $bp = new Table();
+        $first = $bp->id()
+            ->integer('user_id')
+            ->integer('parent_id')
+            ->foreignKey('user_id')->references('id')->on('users');
+
+        $second = $first->foreignKey('parent_id');
+        $third = $first->addForeignKey('user_id');
+
+        $this->assertInstanceOf(ForeignKey::class, $second);
+        $this->assertInstanceOf(ForeignKey::class, $third);
+        $this->assertCount(3, $bp->foreignKeys);
+    }
+
+    public function testForeignKeyForwardsDropForeignKey(): void
+    {
+        $bp = new Table();
+        $bp->id()
+            ->integer('user_id')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->dropForeignKey('fk_old');
+
+        $this->assertSame(['fk_old'], $bp->dropForeignKeys);
+    }
+
+    public function testForeignKeyForwardsPrimaryComposite(): void
+    {
+        $bp = new Table();
+        $result = $bp->integer('a')
+            ->integer('b')
+            ->integer('user_id')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->primary(['a', 'b']);
+
+        $this->assertSame($bp, $result);
+        $this->assertSame(['a', 'b'], $bp->compositePrimaryKey);
+    }
+
+    public function testForeignKeyForwardsCheck(): void
+    {
+        $bp = new Table();
+        $result = $bp->integer('age')
+            ->integer('user_id')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->check('age_min', '`age` >= 18');
+
+        $this->assertSame($bp, $result);
+        $this->assertCount(1, $bp->checks);
+        $this->assertSame('age_min', $bp->checks[0]->name);
+        $this->assertSame('`age` >= 18', $bp->checks[0]->expression);
+    }
+
+    public function testForeignKeyForwardsRawColumnAndRawIndex(): void
+    {
+        $bp = new Table();
+        $bp->id()
+            ->integer('user_id')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->rawColumn('`extra` JSON NOT NULL')
+            ->rawIndex('FULLTEXT INDEX `ft` (`extra`)');
+
+        $this->assertSame(['`extra` JSON NOT NULL'], $bp->rawColumnDefs);
+        $this->assertSame(['FULLTEXT INDEX `ft` (`extra`)'], $bp->rawIndexDefs);
+    }
+
+    public function testForeignKeyForwardsPartitionFamily(): void
+    {
+        $a = new Table();
+        $a->integer('id')->integer('user_id')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->partitionByRange('`id`');
+        $this->assertNotNull($a->partitionType);
+
+        $b = new Table();
+        $b->integer('id')->integer('user_id')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->partitionByList('`id`');
+        $this->assertNotNull($b->partitionType);
+
+        $c = new Table();
+        $c->integer('id')->integer('user_id')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->partitionByHash('`id`', 4);
+        $this->assertSame(4, $c->partitionCount);
+    }
+
+    public function testForeignKeyForwardsEngineAndOrderByAndTtl(): void
+    {
+        $bp = new Table();
+        $bp->integer('id')
+            ->integer('user_id')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->engine(Engine::MergeTree)
+            ->orderBy(['id'])
+            ->ttl('id + INTERVAL 1 DAY');
+
+        $this->assertSame(Engine::MergeTree, $bp->engine);
+        $this->assertSame(['id'], $bp->orderBy);
+        $this->assertSame('id + INTERVAL 1 DAY', $bp->ttl);
+    }
+
+    public function testForeignKeyForwardsAllTerminals(): void
+    {
+        $schema = new MySQL();
+
+        $create = $schema->table('orders')
+            ->id()
+            ->integer('user_id')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->create();
+        $this->assertStringContainsString('CREATE TABLE `orders`', $create->query);
+        $this->assertStringNotContainsString('IF NOT EXISTS', $create->query);
+
+        $createIfNotExists = $schema->table('orders')
+            ->id()
+            ->integer('user_id')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->createIfNotExists();
+        $this->assertStringContainsString('CREATE TABLE IF NOT EXISTS `orders`', $createIfNotExists->query);
+
+        $alter = $schema->table('orders')
+            ->integer('user_id')
+            ->addForeignKey('user_id')->references('id')->on('users')
+            ->alter();
+        $this->assertStringContainsString('ALTER TABLE `orders`', $alter->query);
+
+        $drop = $schema->table('orders')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->drop();
+        $this->assertSame('DROP TABLE `orders`', $drop->query);
+
+        $dropIfExists = $schema->table('orders')
+            ->foreignKey('user_id')->references('id')->on('users')
+            ->dropIfExists();
+        $this->assertSame('DROP TABLE IF EXISTS `orders`', $dropIfExists->query);
+    }
 }
