@@ -5,7 +5,6 @@ namespace Tests\Integration\Schema;
 use Tests\Integration\IntegrationTestCase;
 use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\SQLite;
-use Utopia\Query\Schema\Table;
 
 class SQLiteIntegrationTest extends IntegrationTestCase
 {
@@ -21,11 +20,11 @@ class SQLiteIntegrationTest extends IntegrationTestCase
     {
         $table = 'test_basic_' . uniqid();
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('age');
-            $bp->string('name', 100);
-            $bp->float('score');
-        });
+        $result = $this->schema->table($table)
+            ->integer('age')
+            ->string('name', 100)
+            ->float('score')
+            ->create();
 
         $this->sqliteStatement($result->query);
 
@@ -44,10 +43,10 @@ class SQLiteIntegrationTest extends IntegrationTestCase
     {
         $table = 'test_pk_unique_' . uniqid();
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-            $bp->string('email', 255)->unique();
-        });
+        $result = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->string('email', 255)->unique()
+            ->create();
 
         $this->sqliteStatement($result->query);
 
@@ -83,14 +82,14 @@ class SQLiteIntegrationTest extends IntegrationTestCase
     {
         $table = 'test_alter_add_' . uniqid();
 
-        $create = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-        });
+        $create = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->create();
         $this->sqliteStatement($create->query);
 
-        $alter = $this->schema->alter($table, function (Table $bp) {
-            $bp->addColumn('description', ColumnType::Text);
-        });
+        $alter = $this->schema->table($table)
+            ->addColumn('description', ColumnType::Text)
+            ->alter();
         $this->sqliteStatement($alter->query);
 
         $columns = $this->fetchSqliteColumns($table);
@@ -103,10 +102,10 @@ class SQLiteIntegrationTest extends IntegrationTestCase
     {
         $table = 'test_index_' . uniqid();
 
-        $create = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-            $bp->string('email', 255);
-        });
+        $create = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->string('email', 255)
+            ->create();
         $this->sqliteStatement($create->query);
 
         $indexName = 'idx_' . $table . '_email';
@@ -129,12 +128,12 @@ class SQLiteIntegrationTest extends IntegrationTestCase
     {
         $table = 'test_drop_' . uniqid();
 
-        $create = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-        });
+        $create = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->create();
         $this->sqliteStatement($create->query);
 
-        $drop = $this->schema->drop($table);
+        $drop = $this->schema->table($table)->drop();
         $this->sqliteStatement($drop->query);
 
         $pdo = $this->connectSqlite();

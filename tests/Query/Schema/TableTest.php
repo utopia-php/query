@@ -52,7 +52,7 @@ class TableTest extends TestCase
 
         $this->expectException(\Error::class);
         /** @phpstan-ignore-next-line */
-        $bp->columns = [new Column('x', ColumnType::String)];
+        $bp->columns = [new Column($bp, 'x', ColumnType::String)];
     }
 
     public function testColumnsPopulatedById(): void
@@ -79,7 +79,7 @@ class TableTest extends TestCase
     public function testColumnsPopulatedByModifyColumn(): void
     {
         $bp = new Table();
-        $bp->modifyColumn('score', 'integer');
+        $bp->modifyColumn('score', ColumnType::Integer);
 
         $this->assertCount(1, $bp->columns);
         $this->assertTrue($bp->columns[0]->isModify);
@@ -437,7 +437,8 @@ class TableTest extends TestCase
 
     public function testColumnGeneratedAsDefaultsToVirtualOnCompile(): void
     {
-        $col = new Column('area', ColumnType::Integer);
+        $bp = new Table();
+        $col = new Column($bp, 'area', ColumnType::Integer);
         $col->generatedAs('`width` * `height`');
 
         $this->assertSame('`width` * `height`', $col->generatedExpression);
@@ -446,7 +447,8 @@ class TableTest extends TestCase
 
     public function testColumnStoredAndVirtualAreMutuallyExclusive(): void
     {
-        $col = new Column('area', ColumnType::Integer);
+        $bp = new Table();
+        $col = new Column($bp, 'area', ColumnType::Integer);
         $col->generatedAs('`width` * `height`')->stored();
         $this->assertTrue($col->generatedStored);
 

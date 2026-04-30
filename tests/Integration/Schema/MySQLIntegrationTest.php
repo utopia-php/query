@@ -6,7 +6,6 @@ use Tests\Integration\IntegrationTestCase;
 use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\ForeignKeyAction;
 use Utopia\Query\Schema\MySQL;
-use Utopia\Query\Schema\Table;
 
 class MySQLIntegrationTest extends IntegrationTestCase
 {
@@ -23,11 +22,11 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $table = 'test_basic_' . uniqid();
         $this->trackMysqlTable($table);
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('age');
-            $bp->string('name', 100);
-            $bp->boolean('active');
-        });
+        $result = $this->schema->table($table)
+            ->integer('age')
+            ->string('name', 100)
+            ->boolean('active')
+            ->create();
 
         $this->mysqlStatement($result->query);
 
@@ -48,10 +47,10 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $table = 'test_pk_uniq_' . uniqid();
         $this->trackMysqlTable($table);
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-            $bp->string('email', 255)->unique();
-        });
+        $result = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->string('email', 255)->unique()
+            ->create();
 
         $this->mysqlStatement($result->query);
 
@@ -77,10 +76,10 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $table = 'test_autoinc_' . uniqid();
         $this->trackMysqlTable($table);
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->id();
-            $bp->string('label', 50);
-        });
+        $result = $this->schema->table($table)
+            ->id()
+            ->string('label', 50)
+            ->create();
 
         $this->mysqlStatement($result->query);
 
@@ -102,14 +101,14 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $table = 'test_alter_add_' . uniqid();
         $this->trackMysqlTable($table);
 
-        $create = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-        });
+        $create = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->create();
         $this->mysqlStatement($create->query);
 
-        $alter = $this->schema->alter($table, function (Table $bp) {
-            $bp->addColumn('description', ColumnType::Text);
-        });
+        $alter = $this->schema->table($table)
+            ->addColumn('description', ColumnType::Text)
+            ->alter();
         $this->mysqlStatement($alter->query);
 
         $columns = $this->fetchMysqlColumns($table);
@@ -123,15 +122,15 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $table = 'test_alter_drop_' . uniqid();
         $this->trackMysqlTable($table);
 
-        $create = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-            $bp->string('temp', 100);
-        });
+        $create = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->string('temp', 100)
+            ->create();
         $this->mysqlStatement($create->query);
 
-        $alter = $this->schema->alter($table, function (Table $bp) {
-            $bp->dropColumn('temp');
-        });
+        $alter = $this->schema->table($table)
+            ->dropColumn('temp')
+            ->alter();
         $this->mysqlStatement($alter->query);
 
         $columns = $this->fetchMysqlColumns($table);
@@ -145,15 +144,15 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $table = 'test_alter_idx_' . uniqid();
         $this->trackMysqlTable($table);
 
-        $create = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-            $bp->string('email', 255);
-        });
+        $create = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->string('email', 255)
+            ->create();
         $this->mysqlStatement($create->query);
 
-        $alter = $this->schema->alter($table, function (Table $bp) {
-            $bp->addIndex('idx_email', ['email']);
-        });
+        $alter = $this->schema->table($table)
+            ->addIndex('idx_email', ['email'])
+            ->alter();
         $this->mysqlStatement($alter->query);
 
         $pdo = $this->connectMysql();
@@ -174,12 +173,12 @@ class MySQLIntegrationTest extends IntegrationTestCase
     {
         $table = 'test_drop_' . uniqid();
 
-        $create = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-        });
+        $create = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->create();
         $this->mysqlStatement($create->query);
 
-        $drop = $this->schema->drop($table);
+        $drop = $this->schema->table($table)->drop();
         $this->mysqlStatement($drop->query);
 
         $pdo = $this->connectMysql();
@@ -202,19 +201,19 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $this->trackMysqlTable($childTable);
         $this->trackMysqlTable($parentTable);
 
-        $createParent = $this->schema->create($parentTable, function (Table $bp) {
-            $bp->id();
-        });
+        $createParent = $this->schema->table($parentTable)
+            ->id()
+            ->create();
         $this->mysqlStatement($createParent->query);
 
-        $createChild = $this->schema->create($childTable, function (Table $bp) use ($parentTable) {
-            $bp->id();
-            $bp->bigInteger('parent_id')->unsigned();
-            $bp->foreignKey('parent_id')
+        $createChild = $this->schema->table($childTable)
+            ->id()
+            ->bigInteger('parent_id')->unsigned()
+            ->foreignKey('parent_id')
                 ->references('id')
                 ->on($parentTable)
-                ->onDelete(ForeignKeyAction::Cascade);
-        });
+                ->onDelete(ForeignKeyAction::Cascade)
+            ->create();
         $this->mysqlStatement($createChild->query);
 
         $pdo = $this->connectMysql();
@@ -236,11 +235,11 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $table = 'test_null_def_' . uniqid();
         $this->trackMysqlTable($table);
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-            $bp->string('nickname', 100)->nullable()->default('anonymous');
-            $bp->integer('score')->default(0);
-        });
+        $result = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->string('nickname', 100)->nullable()->default('anonymous')
+            ->integer('score')->default(0)
+            ->create();
 
         $this->mysqlStatement($result->query);
 
@@ -259,11 +258,11 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $table = 'test_check_' . uniqid();
         $this->trackMysqlTable($table);
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->id();
-            $bp->integer('age');
-            $bp->check('age_range', '`age` >= 0 AND `age` < 150');
-        });
+        $result = $this->schema->table($table)
+            ->id()
+            ->integer('age')
+            ->check('age_range', '`age` >= 0 AND `age` < 150')
+            ->create();
 
         $this->mysqlStatement($result->query);
 
@@ -288,12 +287,12 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $table = 'test_generated_' . uniqid();
         $this->trackMysqlTable($table);
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->id();
-            $bp->integer('width');
-            $bp->integer('height');
-            $bp->integer('area')->generatedAs('`width` * `height`')->stored();
-        });
+        $result = $this->schema->table($table)
+            ->id()
+            ->integer('width')
+            ->integer('height')
+            ->integer('area')->generatedAs('`width` * `height`')->stored()
+            ->create();
 
         $this->mysqlStatement($result->query);
 
@@ -325,10 +324,10 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $table = 'test_partition_' . uniqid();
         $this->trackMysqlTable($table);
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-            $bp->partitionByHash('`id`');
-        });
+        $result = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->partitionByHash('`id`')
+            ->create();
 
         $this->assertStringContainsString('PARTITION BY HASH(`id`)', $result->query);
         $this->mysqlStatement($result->query);
@@ -351,12 +350,12 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $table = 'test_composite_idx_' . uniqid();
         $this->trackMysqlTable($table);
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->id();
-            $bp->string('first_name', 100);
-            $bp->string('last_name', 100);
-            $bp->addIndex('idx_name', ['last_name', 'first_name']);
-        });
+        $result = $this->schema->table($table)
+            ->id()
+            ->string('first_name', 100)
+            ->string('last_name', 100)
+            ->addIndex('idx_name', ['last_name', 'first_name'])
+            ->create();
 
         $this->mysqlStatement($result->query);
 
@@ -381,12 +380,12 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $table = 'test_fulltext_' . uniqid();
         $this->trackMysqlTable($table);
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->id();
-            $bp->string('title', 200);
-            $bp->text('body');
-            $bp->fulltextIndex(['title', 'body'], 'ft_title_body');
-        });
+        $result = $this->schema->table($table)
+            ->id()
+            ->string('title', 200)
+            ->text('body')
+            ->fulltextIndex(['title', 'body'], 'ft_title_body')
+            ->create();
 
         $this->mysqlStatement($result->query);
 
@@ -408,10 +407,10 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $table = 'test_truncate_' . uniqid();
         $this->trackMysqlTable($table);
 
-        $create = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-            $bp->string('name', 50);
-        });
+        $create = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->string('name', 50)
+            ->create();
         $this->mysqlStatement($create->query);
 
         $pdo = $this->connectMysql();
@@ -419,7 +418,7 @@ class MySQLIntegrationTest extends IntegrationTestCase
         \assert($insertStmt !== false);
         $insertStmt->execute();
 
-        $truncate = $this->schema->truncate($table);
+        $truncate = $this->schema->table($table)->truncate();
         $this->mysqlStatement($truncate->query);
 
         $stmt = $pdo->prepare("SELECT COUNT(*) as cnt FROM `{$table}`");

@@ -130,9 +130,7 @@ class CorrectnessRegressionTest extends TestCase
         $this->expectExceptionMessage('ALTER TABLE requires at least one alteration.');
 
         $schema = new ClickHouseSchema();
-        $schema->alter('events', function (Table $table): void {
-            // intentionally empty — triggers the guard
-        });
+        $schema->table('events')->alter();
     }
 
     public function testMySqlHashCommentReplacementEmitsValidDoubleDash(): void

@@ -6,7 +6,6 @@ use Tests\Integration\IntegrationTestCase;
 use Utopia\Query\Schema\ClickHouse;
 use Utopia\Query\Schema\ClickHouse\Engine;
 use Utopia\Query\Schema\ColumnType;
-use Utopia\Query\Schema\Table;
 
 class ClickHouseIntegrationTest extends IntegrationTestCase
 {
@@ -23,11 +22,11 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $table = 'test_mergetree_' . uniqid();
         $this->trackClickhouseTable($table);
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-            $bp->string('name', 100);
-            $bp->integer('value');
-        });
+        $result = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->string('name', 100)
+            ->integer('value')
+            ->create();
 
         $this->clickhouseStatement($result->query);
 
@@ -52,11 +51,11 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $table = 'test_nullable_' . uniqid();
         $this->trackClickhouseTable($table);
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-            $bp->string('optional_name', 100)->nullable();
-            $bp->integer('optional_count')->nullable();
-        });
+        $result = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->string('optional_name', 100)->nullable()
+            ->integer('optional_count')->nullable()
+            ->create();
 
         $this->clickhouseStatement($result->query);
 
@@ -83,14 +82,14 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $table = 'test_alter_add_' . uniqid();
         $this->trackClickhouseTable($table);
 
-        $create = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-        });
+        $create = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->create();
         $this->clickhouseStatement($create->query);
 
-        $alter = $this->schema->alter($table, function (Table $bp) {
-            $bp->addColumn('description', ColumnType::String, 200);
-        });
+        $alter = $this->schema->table($table)
+            ->addColumn('description', ColumnType::String, 200)
+            ->alter();
         $this->clickhouseStatement($alter->query);
 
         $ch = $this->connectClickhouse();
@@ -106,12 +105,12 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
     {
         $table = 'test_drop_' . uniqid();
 
-        $create = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-        });
+        $create = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->create();
         $this->clickhouseStatement($create->query);
 
-        $drop = $this->schema->drop($table);
+        $drop = $this->schema->table($table)->drop();
         $this->clickhouseStatement($drop->query);
 
         $ch = $this->connectClickhouse();
@@ -127,11 +126,11 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $table = 'test_dt64_' . uniqid();
         $this->trackClickhouseTable($table);
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-            $bp->datetime('created_at', 3);
-            $bp->datetime('updated_at', 6);
-        });
+        $result = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->datetime('created_at', 3)
+            ->datetime('updated_at', 6)
+            ->create();
 
         $this->clickhouseStatement($result->query);
 
@@ -157,12 +156,12 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $table = 'test_replacing_' . uniqid();
         $this->trackClickhouseTable($table);
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->unsigned()->primary();
-            $bp->string('name');
-            $bp->integer('version')->unsigned();
-            $bp->engine(Engine::ReplacingMergeTree, 'version');
-        });
+        $result = $this->schema->table($table)
+            ->integer('id')->unsigned()->primary()
+            ->string('name')
+            ->integer('version')->unsigned()
+            ->engine(Engine::ReplacingMergeTree, 'version')
+            ->create();
 
         $this->clickhouseStatement($result->query);
 
@@ -190,11 +189,11 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $table = 'test_summing_' . uniqid();
         $this->trackClickhouseTable($table);
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('key')->unsigned()->primary();
-            $bp->bigInteger('total')->unsigned();
-            $bp->engine(Engine::SummingMergeTree, 'total');
-        });
+        $result = $this->schema->table($table)
+            ->integer('key')->unsigned()->primary()
+            ->bigInteger('total')->unsigned()
+            ->engine(Engine::SummingMergeTree, 'total')
+            ->create();
 
         $this->clickhouseStatement($result->query);
 
@@ -295,11 +294,11 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $table = 'test_partition_' . uniqid();
         $this->trackClickhouseTable($table);
 
-        $result = $this->schema->create($table, function (Table $bp) {
-            $bp->integer('id')->primary();
-            $bp->datetime('ts');
-            $bp->partitionByHash('toYYYYMM(`ts`)');
-        });
+        $result = $this->schema->table($table)
+            ->integer('id')->primary()
+            ->datetime('ts')
+            ->partitionByHash('toYYYYMM(`ts`)')
+            ->create();
 
         $this->assertStringContainsString('PARTITION BY toYYYYMM(`ts`)', $result->query);
 
