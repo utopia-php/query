@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Query;
+namespace Tests\Query\API;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\CursorDirection;
@@ -8,7 +8,7 @@ use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
 
-class QueryHelperTest extends TestCase
+class HelperTest extends TestCase
 {
     public function testIsMethodValid(): void
     {

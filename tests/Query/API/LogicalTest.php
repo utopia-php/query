@@ -1,12 +1,12 @@
 <?php
 
-namespace Tests\Query;
+namespace Tests\Query\API;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
 
-class LogicalQueryTest extends TestCase
+class LogicalTest extends TestCase
 {
     public function testOr(): void
     {

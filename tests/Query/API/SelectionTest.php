@@ -1,12 +1,12 @@
 <?php
 
-namespace Tests\Query;
+namespace Tests\Query\API;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
 
-class SelectionQueryTest extends TestCase
+class SelectionTest extends TestCase
 {
     public function testSelect(): void
     {
