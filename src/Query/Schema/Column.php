@@ -405,7 +405,7 @@ class Column
         array $collations = [],
         ?IndexAlgorithm $algorithm = null,
         array $algorithmArgs = [],
-        int $granularity = 1,
+        ?int $granularity = null,
     ): Table {
         return $this->table->index(
             $columns,

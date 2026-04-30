@@ -372,7 +372,7 @@ class Table
         array $collations = [],
         ?IndexAlgorithm $algorithm = null,
         array $algorithmArgs = [],
-        int $granularity = 1,
+        ?int $granularity = null,
     ): static {
         if ($name === '') {
             $name = $this->autoIndexName('idx_', $columns);

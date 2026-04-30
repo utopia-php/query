@@ -30,7 +30,7 @@ readonly class Index
         public array $rawColumns = [],
         public ?IndexAlgorithm $algorithm = null,
         public array $algorithmArgs = [],
-        public int $granularity = 1,
+        public ?int $granularity = null,
     ) {
         // Only ClickHouse data-skipping indexes require an unquoted identifier
         // for the name; other dialects emit the name backtick-quoted, so
@@ -52,7 +52,7 @@ readonly class Index
                 throw new ValidationException('Invalid collation: ' . $collation);
             }
         }
-        if ($granularity < 1) {
+        if ($granularity !== null && $granularity < 1) {
             throw new ValidationException('Index granularity must be >= 1.');
         }
         if ($algorithm !== null && $algorithmArgs !== [] && ! self::algorithmAcceptsArgs($algorithm)) {
