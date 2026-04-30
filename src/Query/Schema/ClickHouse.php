@@ -9,7 +9,6 @@ use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\QuotesIdentifiers;
 use Utopia\Query\Schema;
 use Utopia\Query\Schema\ClickHouse\Engine;
-use Utopia\Query\Schema\ClickHouse\SkipIndex;
 use Utopia\Query\Schema\Feature\ColumnComments;
 use Utopia\Query\Schema\Feature\DropPartition;
 use Utopia\Query\Schema\Feature\TableComments;
@@ -130,12 +129,8 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $alterations[] = 'DROP INDEX ' . $this->quote($name);
         }
 
-        foreach ($blueprint->skipIndexes as $skip) {
-            $cols = \array_map(fn (string $c): string => $this->quote($c), $skip->columns);
-            $expr = \count($cols) === 1 ? $cols[0] : '(' . \implode(', ', $cols) . ')';
-            $alterations[] = 'ADD INDEX ' . $this->quote($skip->name)
-                . ' ' . $expr . ' TYPE ' . $this->compileSkipAlgorithm($skip)
-                . ' GRANULARITY ' . $skip->granularity;
+        foreach ($blueprint->indexes as $index) {
+            $alterations[] = 'ADD ' . $this->compileSkipIndex($index);
         }
 
         if (! empty($blueprint->foreignKeys)) {
@@ -190,20 +185,8 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $primaryKeys = \array_map(fn (string $c): string => $this->quote($c), $blueprint->compositePrimaryKey);
         }
 
-        // Indexes (ClickHouse uses INDEX ... TYPE ... GRANULARITY ...)
         foreach ($blueprint->indexes as $index) {
-            $cols = \array_map(fn (string $c): string => $this->quote($c), $index->columns);
-            $expr = \count($cols) === 1 ? $cols[0] : '(' . \implode(', ', $cols) . ')';
-            $columnDefs[] = 'INDEX ' . $this->quote($index->name)
-                . ' ' . $expr . ' TYPE minmax GRANULARITY 3';
-        }
-
-        foreach ($blueprint->skipIndexes as $skip) {
-            $cols = \array_map(fn (string $c): string => $this->quote($c), $skip->columns);
-            $expr = \count($cols) === 1 ? $cols[0] : '(' . \implode(', ', $cols) . ')';
-            $columnDefs[] = 'INDEX ' . $this->quote($skip->name)
-                . ' ' . $expr . ' TYPE ' . $this->compileSkipAlgorithm($skip)
-                . ' GRANULARITY ' . $skip->granularity;
+            $columnDefs[] = $this->compileSkipIndex($index);
         }
 
         if (! empty($blueprint->foreignKeys)) {
@@ -246,31 +229,43 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
     }
 
     /**
-     * Render a `TYPE <algorithm>(args)` fragment for a data-skipping index.
+     * Render a full `INDEX <name> <columns> TYPE <algorithm>[(args)] GRANULARITY <n>`
+     * fragment, used by both CREATE TABLE and ALTER TABLE ADD INDEX.
      *
-     * String args are emitted as single-quoted SQL literals (with `'` doubled);
-     * numeric args are emitted verbatim. Argument values come from the
-     * application — never from untrusted input.
+     * Defaults to `TYPE minmax GRANULARITY 3` when no algorithm is set on the
+     * index — matches the ClickHouse default behaviour for callers using the
+     * generic `Table::index()` without picking an algorithm.
      */
-    private function compileSkipAlgorithm(SkipIndex $skip): string
+    private function compileSkipIndex(Index $index): string
     {
-        if ($skip->algorithmArgs === []) {
-            return $skip->algorithm->value;
+        $cols = \array_map(fn (string $c): string => $this->quote($c), $index->columns);
+        $expr = \count($cols) === 1 ? $cols[0] : '(' . \implode(', ', $cols) . ')';
+
+        if ($index->algorithm === null) {
+            return 'INDEX ' . $this->quote($index->name) . ' ' . $expr
+                . ' TYPE minmax GRANULARITY 3';
         }
 
-        $args = \array_map(
-            fn (string|int|float $arg): string => match (true) {
-                \is_string($arg) => "'" . \str_replace("'", "''", $arg) . "'",
-                // sprintf('%F', ...) avoids scientific notation (e.g. 1.0E-5)
-                // which ClickHouse rejects in index type arguments. Trim
-                // trailing zeros so 0.01 stays "0.010000" → "0.01".
-                \is_float($arg) => \rtrim(\rtrim(\sprintf('%F', $arg), '0'), '.'),
-                default => (string) $arg,
-            },
-            $skip->algorithmArgs,
-        );
+        $type = $index->algorithm->value;
 
-        return $skip->algorithm->value . '(' . \implode(', ', $args) . ')';
+        if ($index->algorithmArgs !== []) {
+            $args = \array_map(
+                fn (string|int|float $arg): string => match (true) {
+                    \is_string($arg) => "'" . \str_replace("'", "''", $arg) . "'",
+                    // sprintf('%F', ...) avoids scientific notation (e.g. 1.0E-5)
+                    // which ClickHouse rejects in index type arguments. Trim
+                    // trailing zeros so 0.01 stays "0.010000" → "0.01".
+                    \is_float($arg) => \rtrim(\rtrim(\sprintf('%F', $arg), '0'), '.'),
+                    default => (string) $arg,
+                },
+                $index->algorithmArgs,
+            );
+
+            $type .= '(' . \implode(', ', $args) . ')';
+        }
+
+        return 'INDEX ' . $this->quote($index->name) . ' ' . $expr
+            . ' TYPE ' . $type . ' GRANULARITY ' . $index->granularity;
     }
 
     /**

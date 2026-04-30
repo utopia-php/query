@@ -3,6 +3,7 @@
 namespace Utopia\Query\Schema;
 
 use Utopia\Query\Exception\ValidationException;
+use Utopia\Query\Schema\ClickHouse\SkipIndexAlgorithm;
 
 readonly class Index
 {
@@ -12,6 +13,10 @@ readonly class Index
      * @param  array<string, string>  $orders
      * @param  array<string, string>  $collations  Column-specific collations (column name => collation)
      * @param  list<string>  $rawColumns  Raw SQL expressions appended to the column list (bypass quoting)
+     * @param  list<string|int|float>  $algorithmArgs  ClickHouse skip-index algorithm args
+     *                                                  (e.g. [3] for set(3),
+     *                                                  [0.01] for bloom_filter(0.01),
+     *                                                  [4, 1024, 3, 0] for ngrambf_v1(n, size_bytes, hashes, seed))
      */
     public function __construct(
         public string $name,
@@ -23,7 +28,16 @@ readonly class Index
         public string $operatorClass = '',
         public array $collations = [],
         public array $rawColumns = [],
+        public ?SkipIndexAlgorithm $algorithm = null,
+        public array $algorithmArgs = [],
+        public int $granularity = 1,
     ) {
+        if (! \preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name)) {
+            throw new ValidationException('Invalid index name: ' . $name);
+        }
+        if ($columns === [] && $rawColumns === []) {
+            throw new ValidationException('Index requires at least one column.');
+        }
         if ($method !== '' && ! \preg_match('/^[A-Za-z0-9_]+$/', $method)) {
             throw new ValidationException('Invalid index method: ' . $method);
         }
@@ -35,5 +49,26 @@ readonly class Index
                 throw new ValidationException('Invalid collation: ' . $collation);
             }
         }
+        if ($granularity < 1) {
+            throw new ValidationException('Index granularity must be >= 1.');
+        }
+        if ($algorithm !== null && $algorithmArgs !== [] && ! self::algorithmAcceptsArgs($algorithm)) {
+            throw new ValidationException(
+                $algorithm->value . ' does not accept algorithm arguments.'
+            );
+        }
+    }
+
+    /**
+     * MinMax and Inverted are emitted without parentheses in ClickHouse DDL;
+     * passing args to them would produce invalid SQL.
+     */
+    private static function algorithmAcceptsArgs(SkipIndexAlgorithm $algorithm): bool
+    {
+        return match ($algorithm) {
+            SkipIndexAlgorithm::MinMax,
+            SkipIndexAlgorithm::Inverted => false,
+            default => true,
+        };
     }
 }

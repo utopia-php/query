@@ -722,53 +722,53 @@ class ClickHouseTest extends TestCase
         $this->assertSame('CREATE TABLE `events` (`id` Int32, `temporary` String TTL ts + INTERVAL 1 DAY, `ts` DateTime) ENGINE = MergeTree() ORDER BY (`id`)', $result->query);
     }
 
-    // Data-skipping indexes
+    // ClickHouse skip-index algorithm selection
 
-    public function testDataSkippingIndexBloomFilter(): void
+    public function testIndexBloomFilter(): void
     {
         $schema = new Schema();
         $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('user_id');
-            $table->dataSkippingIndex(['user_id'], SkipIndexAlgorithm::BloomFilter);
+            $table->index(['user_id'], algorithm: SkipIndexAlgorithm::BloomFilter);
         });
         $this->assertBindingCount($result);
 
         $this->assertSame(
-            'CREATE TABLE `events` (`id` Int64, `user_id` String, INDEX `skip_user_id` `user_id` TYPE bloom_filter GRANULARITY 1) ENGINE = MergeTree() ORDER BY (`id`)',
+            'CREATE TABLE `events` (`id` Int64, `user_id` String, INDEX `idx_user_id` `user_id` TYPE bloom_filter GRANULARITY 1) ENGINE = MergeTree() ORDER BY (`id`)',
             $result->query,
         );
     }
 
-    public function testDataSkippingIndexWithArgs(): void
+    public function testIndexWithAlgorithmArgs(): void
     {
         $schema = new Schema();
         $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('country');
             $table->string('text');
-            $table->dataSkippingIndex(['country'], SkipIndexAlgorithm::Set, granularity: 4, algorithmArgs: [100]);
-            $table->dataSkippingIndex(['text'], SkipIndexAlgorithm::NgramBloomFilter, algorithmArgs: [4, 1024, 3, 0]);
+            $table->index(['country'], algorithm: SkipIndexAlgorithm::Set, algorithmArgs: [100], granularity: 4);
+            $table->index(['text'], algorithm: SkipIndexAlgorithm::NgramBloomFilter, algorithmArgs: [4, 1024, 3, 0]);
         });
         $this->assertBindingCount($result);
 
         $this->assertSame(
             'CREATE TABLE `events` (`id` Int64, `country` String, `text` String,'
-            . ' INDEX `skip_country` `country` TYPE set(100) GRANULARITY 4,'
-            . ' INDEX `skip_text` `text` TYPE ngrambf_v1(4, 1024, 3, 0) GRANULARITY 1)'
+            . ' INDEX `idx_country` `country` TYPE set(100) GRANULARITY 4,'
+            . ' INDEX `idx_text` `text` TYPE ngrambf_v1(4, 1024, 3, 0) GRANULARITY 1)'
             . ' ENGINE = MergeTree() ORDER BY (`id`)',
             $result->query,
         );
     }
 
-    public function testDataSkippingIndexCompositeColumns(): void
+    public function testIndexCompositeColumnsWithAlgorithm(): void
     {
         $schema = new Schema();
         $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('user_id');
             $table->string('event');
-            $table->dataSkippingIndex(['user_id', 'event'], SkipIndexAlgorithm::BloomFilter, name: 'idx_user_event');
+            $table->index(['user_id', 'event'], name: 'idx_user_event', algorithm: SkipIndexAlgorithm::BloomFilter);
         });
         $this->assertBindingCount($result);
 
@@ -780,7 +780,7 @@ class ClickHouseTest extends TestCase
         );
     }
 
-    public function testDataSkippingIndexInvalidGranularityThrows(): void
+    public function testIndexInvalidGranularityThrows(): void
     {
         $this->expectException(ValidationException::class);
 
@@ -788,18 +788,18 @@ class ClickHouseTest extends TestCase
         $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('user_id');
-            $table->dataSkippingIndex(['user_id'], SkipIndexAlgorithm::BloomFilter, granularity: 0);
+            $table->index(['user_id'], algorithm: SkipIndexAlgorithm::BloomFilter, granularity: 0);
         });
     }
 
-    public function testDataSkippingIndexEmptyColumnsThrows(): void
+    public function testIndexEmptyColumnsThrows(): void
     {
         $this->expectException(ValidationException::class);
 
         $schema = new Schema();
         $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
-            $table->dataSkippingIndex([], SkipIndexAlgorithm::BloomFilter);
+            $table->index([]);
         });
     }
 
@@ -862,7 +862,7 @@ class ClickHouseTest extends TestCase
         });
     }
 
-    public function testDataSkippingIndexNoArgAlgorithmRejectsArgs(): void
+    public function testIndexNoArgAlgorithmRejectsArgs(): void
     {
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('minmax does not accept algorithm arguments.');
@@ -871,11 +871,11 @@ class ClickHouseTest extends TestCase
         $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->integer('score');
-            $table->dataSkippingIndex(['score'], SkipIndexAlgorithm::MinMax, algorithmArgs: [3]);
+            $table->index(['score'], algorithm: SkipIndexAlgorithm::MinMax, algorithmArgs: [3]);
         });
     }
 
-    public function testDataSkippingIndexInvertedRejectsArgs(): void
+    public function testIndexInvertedRejectsArgs(): void
     {
         $this->expectException(ValidationException::class);
 
@@ -883,37 +883,35 @@ class ClickHouseTest extends TestCase
         $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('text');
-            $table->dataSkippingIndex(['text'], SkipIndexAlgorithm::Inverted, algorithmArgs: [42]);
+            $table->index(['text'], algorithm: SkipIndexAlgorithm::Inverted, algorithmArgs: [42]);
         });
     }
 
-    public function testDataSkippingIndexAutoNameSanitisesNonIdentifierColumns(): void
+    public function testIndexAutoNameSanitisesNonIdentifierColumns(): void
     {
         $schema = new Schema();
         $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('event-type');
-            $table->dataSkippingIndex(['event-type'], SkipIndexAlgorithm::BloomFilter);
+            $table->index(['event-type'], algorithm: SkipIndexAlgorithm::BloomFilter);
         });
         $this->assertBindingCount($result);
 
-        // Auto name: skip_event_type (non-identifier chars collapsed to _)
         $this->assertSame(
             'CREATE TABLE `events` (`id` Int64, `event-type` String,'
-            . ' INDEX `skip_event_type` `event-type` TYPE bloom_filter GRANULARITY 1)'
+            . ' INDEX `idx_event_type` `event-type` TYPE bloom_filter GRANULARITY 1)'
             . ' ENGINE = MergeTree() ORDER BY (`id`)',
             $result->query,
         );
     }
 
-    public function testDataSkippingIndexFloatArgAvoidsScientificNotation(): void
+    public function testIndexFloatArgAvoidsScientificNotation(): void
     {
         $schema = new Schema();
         $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('user_id');
-            // 1e-5 false positive rate: the bug pre-fix is `(string) 1e-5` returning "1.0E-5"
-            $table->dataSkippingIndex(['user_id'], SkipIndexAlgorithm::BloomFilter, algorithmArgs: [1.0e-5]);
+            $table->index(['user_id'], algorithm: SkipIndexAlgorithm::BloomFilter, algorithmArgs: [1.0e-5]);
         });
         $this->assertBindingCount($result);
 
@@ -922,25 +920,25 @@ class ClickHouseTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/[Ee][+-]\d/', $result->query);
     }
 
-    public function testAlterAddSkipIndex(): void
+    public function testAlterAddIndexWithAlgorithm(): void
     {
         $schema = new Schema();
         $result = $schema->alter('events', function (Table $table) {
-            $table->dataSkippingIndex(['user_id'], SkipIndexAlgorithm::BloomFilter);
+            $table->index(['user_id'], algorithm: SkipIndexAlgorithm::BloomFilter);
         });
         $this->assertBindingCount($result);
 
         $this->assertSame(
-            'ALTER TABLE `events` ADD INDEX `skip_user_id` `user_id` TYPE bloom_filter GRANULARITY 1',
+            'ALTER TABLE `events` ADD INDEX `idx_user_id` `user_id` TYPE bloom_filter GRANULARITY 1',
             $result->query,
         );
     }
 
-    public function testAlterAddSkipIndexComposite(): void
+    public function testAlterAddIndexComposite(): void
     {
         $schema = new Schema();
         $result = $schema->alter('events', function (Table $table) {
-            $table->dataSkippingIndex(['user_id', 'event'], SkipIndexAlgorithm::Set, granularity: 4, algorithmArgs: [100], name: 'idx_user_event');
+            $table->index(['user_id', 'event'], name: 'idx_user_event', algorithm: SkipIndexAlgorithm::Set, algorithmArgs: [100], granularity: 4);
         });
         $this->assertBindingCount($result);
 

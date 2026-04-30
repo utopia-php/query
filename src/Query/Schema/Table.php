@@ -4,7 +4,6 @@ namespace Utopia\Query\Schema;
 
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\ClickHouse\Engine;
-use Utopia\Query\Schema\ClickHouse\SkipIndex;
 use Utopia\Query\Schema\ClickHouse\SkipIndexAlgorithm;
 
 class Table
@@ -52,9 +51,6 @@ class Table
     public private(set) array $engineArgs = [];
 
     public private(set) ?string $ttl = null;
-
-    /** @var list<SkipIndex> ClickHouse data-skipping indexes (other dialects ignore) */
-    public private(set) array $skipIndexes = [];
 
     /** @var array<string, string> Table-level engine SETTINGS (ClickHouse only) */
     public private(set) array $settings = [];
@@ -306,6 +302,7 @@ class Table
      * @param  array<string, int>  $lengths
      * @param  array<string, string>  $orders
      * @param  array<string, string>  $collations
+     * @param  list<string|int|float>  $algorithmArgs  ClickHouse skip-index algorithm args
      */
     public function index(
         array $columns,
@@ -315,11 +312,26 @@ class Table
         array $lengths = [],
         array $orders = [],
         array $collations = [],
+        ?SkipIndexAlgorithm $algorithm = null,
+        array $algorithmArgs = [],
+        int $granularity = 1,
     ): void {
         if ($name === '') {
-            $name = 'idx_' . \implode('_', $columns);
+            $name = $this->autoIndexName('idx_', $columns);
         }
-        $this->indexes[] = new Index($name, $columns, IndexType::Index, $lengths, $orders, $method, $operatorClass, $collations);
+        $this->indexes[] = new Index(
+            $name,
+            $columns,
+            IndexType::Index,
+            $lengths,
+            $orders,
+            $method,
+            $operatorClass,
+            $collations,
+            algorithm: $algorithm,
+            algorithmArgs: $algorithmArgs,
+            granularity: $granularity,
+        );
     }
 
     /**
@@ -336,7 +348,7 @@ class Table
         array $collations = [],
     ): void {
         if ($name === '') {
-            $name = 'uniq_' . \implode('_', $columns);
+            $name = $this->autoIndexName('uniq_', $columns);
         }
         $this->indexes[] = new Index($name, $columns, IndexType::Unique, $lengths, $orders, collations: $collations);
     }
@@ -347,7 +359,7 @@ class Table
     public function fulltextIndex(array $columns, string $name = ''): void
     {
         if ($name === '') {
-            $name = 'ft_' . \implode('_', $columns);
+            $name = $this->autoIndexName('ft_', $columns);
         }
         $this->indexes[] = new Index($name, $columns, IndexType::Fulltext);
     }
@@ -358,7 +370,7 @@ class Table
     public function spatialIndex(array $columns, string $name = ''): void
     {
         if ($name === '') {
-            $name = 'sp_' . \implode('_', $columns);
+            $name = $this->autoIndexName('sp_', $columns);
         }
         $this->indexes[] = new Index($name, $columns, IndexType::Spatial);
     }
@@ -553,47 +565,20 @@ class Table
     }
 
     /**
-     * Attach a ClickHouse data-skipping index. Other dialects ignore this.
+     * Build an auto-generated index name with a prefix, sanitising any
+     * non-identifier characters in the column names so the result is always a
+     * valid SQL identifier.
      *
-     * Skip indexes accelerate WHERE clauses by letting ClickHouse skip whole
-     * granules during scanning. Choose the algorithm that matches the column
-     * cardinality and predicate type:
-     *
-     * - `MinMax` — numeric ranges, low cardinality
-     * - `Set(N)` — small fixed value sets (N is the set size cap)
-     * - `BloomFilter(p)` — high cardinality string columns with `=` / `IN`
-     *   predicates (p is the false-positive probability, e.g. 0.01)
-     * - `NgramBloomFilter(n, size, hashes, seed)` — `LIKE` / `match` on text
-     * - `TokenBloomFilter(size, hashes, seed)` — token-style search
-     * - `Inverted` — `LIKE`, `match`, `hasToken` (experimental)
-     *
-     * @param  list<string>  $columns
-     * @param  list<string|int|float>  $algorithmArgs  Algorithm-specific arguments
-     *
-     * @throws ValidationException if the index name or columns are invalid.
+     * @param  string[]  $columns
      */
-    public function dataSkippingIndex(
-        array $columns,
-        SkipIndexAlgorithm $algorithm,
-        int $granularity = 1,
-        array $algorithmArgs = [],
-        string $name = '',
-    ): static {
-        if ($name === '') {
-            // Sanitise column names — substring matches like `event-type` or
-            // `ns.col` are valid SQL identifiers when quoted, but the
-            // generated index name must still pass the strict identifier
-            // regex on `SkipIndex`.
-            $sanitised = \array_map(
-                fn (string $c): string => \preg_replace('/[^A-Za-z0-9_]+/', '_', $c) ?? $c,
-                $columns,
-            );
-            $name = 'skip_' . \implode('_', $sanitised);
-        }
+    private function autoIndexName(string $prefix, array $columns): string
+    {
+        $sanitised = \array_map(
+            fn (string $c): string => \preg_replace('/[^A-Za-z0-9_]+/', '_', $c) ?? $c,
+            $columns,
+        );
 
-        $this->skipIndexes[] = new SkipIndex($name, $columns, $algorithm, $algorithmArgs, $granularity);
-
-        return $this;
+        return $prefix . \implode('_', $sanitised);
     }
 
     /**

@@ -2081,7 +2081,7 @@ $schema->create('events', function (Table $table) {
 
 TTL expressions are emitted verbatim; they must not be empty or contain semicolons. Dialects other than ClickHouse throw `UnsupportedException`.
 
-**Data-skipping indexes** — accelerate WHERE pruning by letting ClickHouse skip whole granules:
+**Skip-index algorithms** — every ClickHouse index is a data-skipping index that accelerates WHERE pruning by letting the engine skip whole granules. Pick the algorithm that matches the column shape via the `algorithm` argument on `Table::index()`:
 
 ```php
 use Utopia\Query\Schema\ClickHouse\SkipIndexAlgorithm;
@@ -2092,20 +2092,25 @@ $schema->create('events', function (Table $table) {
     $table->string('country');
     $table->string('text');
 
-    // Default granularity = 1, no algorithm args
-    $table->dataSkippingIndex(['user_id'], SkipIndexAlgorithm::BloomFilter);
+    // BloomFilter — high-cardinality strings with `=` / `IN` predicates
+    $table->index(['user_id'], algorithm: SkipIndexAlgorithm::BloomFilter);
 
-    // Set(N) — small fixed value sets
-    $table->dataSkippingIndex(['country'], SkipIndexAlgorithm::Set, granularity: 4, algorithmArgs: [100]);
+    // Set(N) — small fixed value sets, custom granularity
+    $table->index(['country'], algorithm: SkipIndexAlgorithm::Set, algorithmArgs: [100], granularity: 4);
 
     // NgramBloomFilter(n, size_bytes, hashes, seed) — text search on `LIKE` / `match`
-    $table->dataSkippingIndex(['text'], SkipIndexAlgorithm::NgramBloomFilter, algorithmArgs: [4, 1024, 3, 0]);
+    $table->index(['text'], algorithm: SkipIndexAlgorithm::NgramBloomFilter, algorithmArgs: [4, 1024, 3, 0]);
+
+    // No algorithm specified → defaults to `TYPE minmax GRANULARITY 3`
+    $table->index(['id']);
 });
 
-// CREATE TABLE `events` (..., INDEX `skip_user_id` `user_id` TYPE bloom_filter GRANULARITY 1, ...)
+// CREATE TABLE `events` (..., INDEX `idx_user_id` `user_id` TYPE bloom_filter GRANULARITY 1, ...)
 ```
 
-The 6 algorithms are `MinMax`, `Set`, `BloomFilter`, `NgramBloomFilter`, `TokenBloomFilter`, `Inverted`. Algorithm-specific arguments are passed via `algorithmArgs` and rendered verbatim — supply them from trusted (developer-controlled) source. Other dialects ignore the call.
+The 6 algorithms are `MinMax`, `Set`, `BloomFilter`, `NgramBloomFilter`, `TokenBloomFilter`, `Inverted`. Algorithm-specific arguments are passed via `algorithmArgs` and rendered verbatim — supply them from trusted (developer-controlled) source. Other dialects ignore the ClickHouse-only `algorithm` / `algorithmArgs` / `granularity` arguments.
+
+`MinMax` and `Inverted` take no parenthesised arguments in ClickHouse DDL — passing `algorithmArgs` for them throws `ValidationException`. Skip indexes can also be added via `ALTER TABLE … ADD INDEX` by calling `index()` inside an `alter()` callback.
 
 **Engine SETTINGS** — emit `SETTINGS k=v` after the TTL clause:
 
