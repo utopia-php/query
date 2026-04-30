@@ -101,14 +101,9 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         );
     }
 
-    /**
-     * @param  callable(Table): void  $definition
-     */
-    public function alter(string $table, callable $definition): Statement
+    #[\Override]
+    public function compileAlter(Table $blueprint): Statement
     {
-        $blueprint = new Table();
-        $definition($blueprint);
-
         $alterations = [];
 
         foreach ($blueprint->columns as $column) {
@@ -141,20 +136,15 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             throw new ValidationException('ALTER TABLE requires at least one alteration.');
         }
 
-        $sql = 'ALTER TABLE ' . $this->quote($table)
+        $sql = 'ALTER TABLE ' . $this->quote($blueprint->name)
             . ' ' . \implode(', ', $alterations);
 
         return new Statement($sql, [], executor: $this->executor);
     }
 
-    /**
-     * @param  callable(Table): void  $definition
-     */
-    public function create(string $table, callable $definition, bool $ifNotExists = false): Statement
+    #[\Override]
+    public function compileCreate(Table $blueprint, bool $ifNotExists = false): Statement
     {
-        $blueprint = new Table();
-        $definition($blueprint);
-
         $columnDefs = [];
         $primaryKeys = [];
 
@@ -193,7 +183,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
 
         $engine = $blueprint->engine ?? Engine::MergeTree;
 
-        $sql = 'CREATE TABLE ' . ($ifNotExists ? 'IF NOT EXISTS ' : '') . $this->quote($table)
+        $sql = 'CREATE TABLE ' . ($ifNotExists ? 'IF NOT EXISTS ' : '') . $this->quote($blueprint->name)
             . ' (' . \implode(', ', $columnDefs) . ')'
             . ' ENGINE = ' . $this->compileEngine($engine, $blueprint->engineArgs);
 
@@ -202,8 +192,12 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         }
 
         if ($engine->requiresOrderBy()) {
-            $sql .= ! empty($primaryKeys)
-                ? ' ORDER BY (' . \implode(', ', $primaryKeys) . ')'
+            $orderBy = ! empty($blueprint->orderBy)
+                ? \array_map(fn (string $c): string => $this->quote($c), $blueprint->orderBy)
+                : $primaryKeys;
+
+            $sql .= ! empty($orderBy)
+                ? ' ORDER BY (' . \implode(', ', $orderBy) . ')'
                 : ' ORDER BY tuple()';
         }
 

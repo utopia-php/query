@@ -32,21 +32,17 @@ abstract class Schema
     abstract protected function compileAutoIncrement(): string;
 
     /**
-     * @param  callable(Table): void  $definition
+     * Begin a fluent table builder. Terminal methods on the returned {@see Table}
+     * (`create()`, `alter()`, `drop()`, `dropIfExists()`, `truncate()`, `rename()`)
+     * compile and return the final {@see Statement}.
      */
-    public function createIfNotExists(string $table, callable $definition): Statement
+    public function table(string $name): Table
     {
-        return $this->create($table, $definition, true);
+        return new Table($this, $name);
     }
 
-    /**
-     * @param  callable(Table): void  $definition
-     */
-    public function create(string $table, callable $definition, bool $ifNotExists = false): Statement
+    public function compileCreate(Table $blueprint, bool $ifNotExists = false): Statement
     {
-        $blueprint = new Table();
-        $definition($blueprint);
-
         if ($blueprint->ttl !== null) {
             throw new UnsupportedException('TTL is only supported in ClickHouse.');
         }
@@ -126,7 +122,7 @@ abstract class Schema
             $columnDefs[] = $def;
         }
 
-        $sql = 'CREATE TABLE ' . ($ifNotExists ? 'IF NOT EXISTS ' : '') . $this->quote($table)
+        $sql = 'CREATE TABLE ' . ($ifNotExists ? 'IF NOT EXISTS ' : '') . $this->quote($blueprint->name)
             . ' (' . \implode(', ', $columnDefs) . ')';
 
         if ($blueprint->partitionType !== null) {
@@ -139,14 +135,8 @@ abstract class Schema
         return new Statement($sql, [], executor: $this->executor);
     }
 
-    /**
-     * @param  callable(Table): void  $definition
-     */
-    public function alter(string $table, callable $definition): Statement
+    public function compileAlter(Table $blueprint): Statement
     {
-        $blueprint = new Table();
-        $definition($blueprint);
-
         $alterations = [];
 
         foreach ($blueprint->columns as $column) {
@@ -199,23 +189,22 @@ abstract class Schema
             $alterations[] = 'DROP FOREIGN KEY ' . $this->quote($name);
         }
 
-        $sql = 'ALTER TABLE ' . $this->quote($table)
+        $sql = 'ALTER TABLE ' . $this->quote($blueprint->name)
             . ' ' . \implode(', ', $alterations);
 
         return new Statement($sql, [], executor: $this->executor);
     }
 
-    public function drop(string $table): Statement
+    public function compileDrop(string $name, bool $ifExists): Statement
     {
-        return new Statement('DROP TABLE ' . $this->quote($table), [], executor: $this->executor);
+        return new Statement(
+            'DROP TABLE ' . ($ifExists ? 'IF EXISTS ' : '') . $this->quote($name),
+            [],
+            executor: $this->executor,
+        );
     }
 
-    public function dropIfExists(string $table): Statement
-    {
-        return new Statement('DROP TABLE IF EXISTS ' . $this->quote($table), [], executor: $this->executor);
-    }
-
-    public function rename(string $from, string $to): Statement
+    public function compileRename(string $from, string $to): Statement
     {
         return new Statement(
             'RENAME TABLE ' . $this->quote($from) . ' TO ' . $this->quote($to),
@@ -224,9 +213,9 @@ abstract class Schema
         );
     }
 
-    public function truncate(string $table): Statement
+    public function compileTruncate(string $name): Statement
     {
-        return new Statement('TRUNCATE TABLE ' . $this->quote($table), [], executor: $this->executor);
+        return new Statement('TRUNCATE TABLE ' . $this->quote($name), [], executor: $this->executor);
     }
 
     /**

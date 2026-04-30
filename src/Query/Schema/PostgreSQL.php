@@ -278,14 +278,9 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
         }
     }
 
-    /**
-     * @param  callable(Table): void  $definition
-     */
-    public function alter(string $table, callable $definition): Statement
+    #[\Override]
+    public function compileAlter(Table $blueprint): Statement
     {
-        $blueprint = new Table();
-        $definition($blueprint);
-
         $alterations = [];
 
         foreach ($blueprint->columns as $column) {
@@ -328,7 +323,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
         $statements = [];
 
         if (! empty($alterations)) {
-            $statements[] = 'ALTER TABLE ' . $this->quote($table)
+            $statements[] = 'ALTER TABLE ' . $this->quote($blueprint->name)
                 . ' ' . \implode(', ', $alterations);
         }
 
@@ -337,7 +332,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             $keyword = $index->type === IndexType::Unique ? 'CREATE UNIQUE INDEX' : 'CREATE INDEX';
 
             $indexSql = $keyword . ' ' . $this->quote($index->name)
-                . ' ON ' . $this->quote($table);
+                . ' ON ' . $this->quote($blueprint->name);
 
             if ($index->method !== '') {
                 $indexSql .= ' USING ' . \strtoupper($index->method);
@@ -354,7 +349,8 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
         return new Statement(\implode('; ', $statements), [], executor: $this->executor);
     }
 
-    public function rename(string $from, string $to): Statement
+    #[\Override]
+    public function compileRename(string $from, string $to): Statement
     {
         return new Statement(
             'ALTER TABLE ' . $this->quote($from) . ' RENAME TO ' . $this->quote($to),
