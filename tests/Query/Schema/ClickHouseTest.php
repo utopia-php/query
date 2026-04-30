@@ -10,7 +10,7 @@ use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\ClickHouse as Schema;
 use Utopia\Query\Schema\ClickHouse\Engine;
-use Utopia\Query\Schema\ClickHouse\SkipIndexAlgorithm;
+use Utopia\Query\Schema\ClickHouse\IndexAlgorithm;
 use Utopia\Query\Schema\Feature\ColumnComments;
 use Utopia\Query\Schema\Feature\DropPartition;
 use Utopia\Query\Schema\Feature\ForeignKeys;
@@ -730,7 +730,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('user_id');
-            $table->index(['user_id'], algorithm: SkipIndexAlgorithm::BloomFilter);
+            $table->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter);
         });
         $this->assertBindingCount($result);
 
@@ -747,8 +747,8 @@ class ClickHouseTest extends TestCase
             $table->bigInteger('id')->primary();
             $table->string('country');
             $table->string('text');
-            $table->index(['country'], algorithm: SkipIndexAlgorithm::Set, algorithmArgs: [100], granularity: 4);
-            $table->index(['text'], algorithm: SkipIndexAlgorithm::NgramBloomFilter, algorithmArgs: [4, 1024, 3, 0]);
+            $table->index(['country'], algorithm: IndexAlgorithm::Set, algorithmArgs: [100], granularity: 4);
+            $table->index(['text'], algorithm: IndexAlgorithm::NgramBloomFilter, algorithmArgs: [4, 1024, 3, 0]);
         });
         $this->assertBindingCount($result);
 
@@ -768,7 +768,7 @@ class ClickHouseTest extends TestCase
             $table->bigInteger('id')->primary();
             $table->string('user_id');
             $table->string('event');
-            $table->index(['user_id', 'event'], name: 'idx_user_event', algorithm: SkipIndexAlgorithm::BloomFilter);
+            $table->index(['user_id', 'event'], name: 'idx_user_event', algorithm: IndexAlgorithm::BloomFilter);
         });
         $this->assertBindingCount($result);
 
@@ -788,7 +788,7 @@ class ClickHouseTest extends TestCase
         $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('user_id');
-            $table->index(['user_id'], algorithm: SkipIndexAlgorithm::BloomFilter, granularity: 0);
+            $table->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter, granularity: 0);
         });
     }
 
@@ -871,7 +871,7 @@ class ClickHouseTest extends TestCase
         $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->integer('score');
-            $table->index(['score'], algorithm: SkipIndexAlgorithm::MinMax, algorithmArgs: [3]);
+            $table->index(['score'], algorithm: IndexAlgorithm::MinMax, algorithmArgs: [3]);
         });
     }
 
@@ -883,7 +883,7 @@ class ClickHouseTest extends TestCase
         $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('text');
-            $table->index(['text'], algorithm: SkipIndexAlgorithm::Inverted, algorithmArgs: [42]);
+            $table->index(['text'], algorithm: IndexAlgorithm::Inverted, algorithmArgs: [42]);
         });
     }
 
@@ -893,7 +893,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('event-type');
-            $table->index(['event-type'], algorithm: SkipIndexAlgorithm::BloomFilter);
+            $table->index(['event-type'], algorithm: IndexAlgorithm::BloomFilter);
         });
         $this->assertBindingCount($result);
 
@@ -911,7 +911,7 @@ class ClickHouseTest extends TestCase
         $result = $schema->create('events', function (Table $table) {
             $table->bigInteger('id')->primary();
             $table->string('user_id');
-            $table->index(['user_id'], algorithm: SkipIndexAlgorithm::BloomFilter, algorithmArgs: [1.0e-5]);
+            $table->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter, algorithmArgs: [1.0e-5]);
         });
         $this->assertBindingCount($result);
 
@@ -924,7 +924,7 @@ class ClickHouseTest extends TestCase
     {
         $schema = new Schema();
         $result = $schema->alter('events', function (Table $table) {
-            $table->index(['user_id'], algorithm: SkipIndexAlgorithm::BloomFilter);
+            $table->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter);
         });
         $this->assertBindingCount($result);
 
@@ -938,7 +938,7 @@ class ClickHouseTest extends TestCase
     {
         $schema = new Schema();
         $result = $schema->alter('events', function (Table $table) {
-            $table->index(['user_id', 'event'], name: 'idx_user_event', algorithm: SkipIndexAlgorithm::Set, algorithmArgs: [100], granularity: 4);
+            $table->index(['user_id', 'event'], name: 'idx_user_event', algorithm: IndexAlgorithm::Set, algorithmArgs: [100], granularity: 4);
         });
         $this->assertBindingCount($result);
 

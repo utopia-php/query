@@ -2084,7 +2084,7 @@ TTL expressions are emitted verbatim; they must not be empty or contain semicolo
 **Skip-index algorithms** — every ClickHouse index is a data-skipping index that accelerates WHERE pruning by letting the engine skip whole granules. Pick the algorithm that matches the column shape via the `algorithm` argument on `Table::index()`:
 
 ```php
-use Utopia\Query\Schema\ClickHouse\SkipIndexAlgorithm;
+use Utopia\Query\Schema\ClickHouse\IndexAlgorithm;
 
 $schema->create('events', function (Table $table) {
     $table->bigInteger('id')->primary();
@@ -2093,13 +2093,13 @@ $schema->create('events', function (Table $table) {
     $table->string('text');
 
     // BloomFilter — high-cardinality strings with `=` / `IN` predicates
-    $table->index(['user_id'], algorithm: SkipIndexAlgorithm::BloomFilter);
+    $table->index(['user_id'], algorithm: IndexAlgorithm::BloomFilter);
 
     // Set(N) — small fixed value sets, custom granularity
-    $table->index(['country'], algorithm: SkipIndexAlgorithm::Set, algorithmArgs: [100], granularity: 4);
+    $table->index(['country'], algorithm: IndexAlgorithm::Set, algorithmArgs: [100], granularity: 4);
 
     // NgramBloomFilter(n, size_bytes, hashes, seed) — text search on `LIKE` / `match`
-    $table->index(['text'], algorithm: SkipIndexAlgorithm::NgramBloomFilter, algorithmArgs: [4, 1024, 3, 0]);
+    $table->index(['text'], algorithm: IndexAlgorithm::NgramBloomFilter, algorithmArgs: [4, 1024, 3, 0]);
 
     // No algorithm specified → defaults to `TYPE minmax GRANULARITY 3`
     $table->index(['id']);

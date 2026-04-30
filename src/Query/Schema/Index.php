@@ -3,7 +3,7 @@
 namespace Utopia\Query\Schema;
 
 use Utopia\Query\Exception\ValidationException;
-use Utopia\Query\Schema\ClickHouse\SkipIndexAlgorithm;
+use Utopia\Query\Schema\ClickHouse\IndexAlgorithm;
 
 readonly class Index
 {
@@ -28,7 +28,7 @@ readonly class Index
         public string $operatorClass = '',
         public array $collations = [],
         public array $rawColumns = [],
-        public ?SkipIndexAlgorithm $algorithm = null,
+        public ?IndexAlgorithm $algorithm = null,
         public array $algorithmArgs = [],
         public int $granularity = 1,
     ) {
@@ -63,11 +63,11 @@ readonly class Index
      * MinMax and Inverted are emitted without parentheses in ClickHouse DDL;
      * passing args to them would produce invalid SQL.
      */
-    private static function algorithmAcceptsArgs(SkipIndexAlgorithm $algorithm): bool
+    private static function algorithmAcceptsArgs(IndexAlgorithm $algorithm): bool
     {
         return match ($algorithm) {
-            SkipIndexAlgorithm::MinMax,
-            SkipIndexAlgorithm::Inverted => false,
+            IndexAlgorithm::MinMax,
+            IndexAlgorithm::Inverted => false,
             default => true,
         };
     }

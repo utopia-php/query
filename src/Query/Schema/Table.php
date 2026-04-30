@@ -4,7 +4,7 @@ namespace Utopia\Query\Schema;
 
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\ClickHouse\Engine;
-use Utopia\Query\Schema\ClickHouse\SkipIndexAlgorithm;
+use Utopia\Query\Schema\ClickHouse\IndexAlgorithm;
 
 class Table
 {
@@ -312,7 +312,7 @@ class Table
         array $lengths = [],
         array $orders = [],
         array $collations = [],
-        ?SkipIndexAlgorithm $algorithm = null,
+        ?IndexAlgorithm $algorithm = null,
         array $algorithmArgs = [],
         int $granularity = 1,
     ): void {

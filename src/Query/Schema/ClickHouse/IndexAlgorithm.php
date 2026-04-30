@@ -2,7 +2,7 @@
 
 namespace Utopia\Query\Schema\ClickHouse;
 
-enum SkipIndexAlgorithm: string
+enum IndexAlgorithm: string
 {
     case MinMax = 'minmax';
     case Set = 'set';
