@@ -76,10 +76,10 @@ class SQLite extends SQL
      * base compiler would otherwise add.
      */
     #[\Override]
-    public function compileCreate(\Utopia\Query\Schema\Table $blueprint, bool $ifNotExists = false): Statement
+    public function compileCreate(\Utopia\Query\Schema\Table $table, bool $ifNotExists = false): Statement
     {
         $hasInlinePrimary = false;
-        foreach ($blueprint->columns as $column) {
+        foreach ($table->columns as $column) {
             if ($column->isAutoIncrement && $column->isPrimary) {
                 $hasInlinePrimary = true;
                 break;
@@ -87,10 +87,10 @@ class SQLite extends SQL
         }
 
         if (! $hasInlinePrimary) {
-            return parent::compileCreate($blueprint, $ifNotExists);
+            return parent::compileCreate($table, $ifNotExists);
         }
 
-        $statement = parent::compileCreate($blueprint, $ifNotExists);
+        $statement = parent::compileCreate($table, $ifNotExists);
         $sql = \preg_replace(
             '/, PRIMARY KEY \(`[^`]+`\)/',
             '',

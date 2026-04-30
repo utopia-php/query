@@ -102,33 +102,33 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
     }
 
     #[\Override]
-    public function compileAlter(Table $blueprint): Statement
+    public function compileAlter(Table $table): Statement
     {
         $alterations = [];
 
-        foreach ($blueprint->columns as $column) {
+        foreach ($table->columns as $column) {
             $keyword = $column->isModify ? 'MODIFY COLUMN' : 'ADD COLUMN';
             $alterations[] = $keyword . ' ' . $this->compileColumnDefinition($column);
         }
 
-        foreach ($blueprint->renameColumns as $rename) {
+        foreach ($table->renameColumns as $rename) {
             $alterations[] = 'RENAME COLUMN ' . $this->quote($rename->from)
                 . ' TO ' . $this->quote($rename->to);
         }
 
-        foreach ($blueprint->dropColumns as $col) {
+        foreach ($table->dropColumns as $col) {
             $alterations[] = 'DROP COLUMN ' . $this->quote($col);
         }
 
-        foreach ($blueprint->dropIndexes as $name) {
+        foreach ($table->dropIndexes as $name) {
             $alterations[] = 'DROP INDEX ' . $this->quote($name);
         }
 
-        if (! empty($blueprint->foreignKeys)) {
+        if (! empty($table->foreignKeys)) {
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
         }
 
-        if (! empty($blueprint->dropForeignKeys)) {
+        if (! empty($table->dropForeignKeys)) {
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
         }
 
@@ -136,19 +136,19 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             throw new ValidationException('ALTER TABLE requires at least one alteration.');
         }
 
-        $sql = 'ALTER TABLE ' . $this->quote($blueprint->name)
+        $sql = 'ALTER TABLE ' . $this->quote($table->name)
             . ' ' . \implode(', ', $alterations);
 
         return new Statement($sql, [], executor: $this->executor);
     }
 
     #[\Override]
-    public function compileCreate(Table $blueprint, bool $ifNotExists = false): Statement
+    public function compileCreate(Table $table, bool $ifNotExists = false): Statement
     {
         $columnDefs = [];
         $primaryKeys = [];
 
-        foreach ($blueprint->columns as $column) {
+        foreach ($table->columns as $column) {
             $def = $this->compileColumnDefinition($column);
             $columnDefs[] = $def;
 
@@ -157,43 +157,43 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             }
         }
 
-        if (! empty($blueprint->compositePrimaryKey) && ! empty($primaryKeys)) {
+        if (! empty($table->compositePrimaryKey) && ! empty($primaryKeys)) {
             throw new ValidationException('Cannot combine column-level primary() with Table::primary() composite key.');
         }
 
-        if (empty($primaryKeys) && ! empty($blueprint->compositePrimaryKey)) {
-            $primaryKeys = \array_map(fn (string $c): string => $this->quote($c), $blueprint->compositePrimaryKey);
+        if (empty($primaryKeys) && ! empty($table->compositePrimaryKey)) {
+            $primaryKeys = \array_map(fn (string $c): string => $this->quote($c), $table->compositePrimaryKey);
         }
 
         // Indexes (ClickHouse uses INDEX ... TYPE ... GRANULARITY ...)
-        foreach ($blueprint->indexes as $index) {
+        foreach ($table->indexes as $index) {
             $cols = \array_map(fn (string $c): string => $this->quote($c), $index->columns);
             $expr = \count($cols) === 1 ? $cols[0] : '(' . \implode(', ', $cols) . ')';
             $columnDefs[] = 'INDEX ' . $this->quote($index->name)
                 . ' ' . $expr . ' TYPE minmax GRANULARITY 3';
         }
 
-        if (! empty($blueprint->foreignKeys)) {
+        if (! empty($table->foreignKeys)) {
             throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
         }
 
-        if (! empty($blueprint->checks)) {
+        if (! empty($table->checks)) {
             throw new UnsupportedException('CHECK constraints are not supported in ClickHouse.');
         }
 
-        $engine = $blueprint->engine ?? Engine::MergeTree;
+        $engine = $table->engine ?? Engine::MergeTree;
 
-        $sql = 'CREATE TABLE ' . ($ifNotExists ? 'IF NOT EXISTS ' : '') . $this->quote($blueprint->name)
+        $sql = 'CREATE TABLE ' . ($ifNotExists ? 'IF NOT EXISTS ' : '') . $this->quote($table->name)
             . ' (' . \implode(', ', $columnDefs) . ')'
-            . ' ENGINE = ' . $this->compileEngine($engine, $blueprint->engineArgs);
+            . ' ENGINE = ' . $this->compileEngine($engine, $table->engineArgs);
 
-        if ($blueprint->partitionType !== null) {
-            $sql .= ' PARTITION BY ' . $blueprint->partitionExpression;
+        if ($table->partitionType !== null) {
+            $sql .= ' PARTITION BY ' . $table->partitionExpression;
         }
 
         if ($engine->requiresOrderBy()) {
-            $orderBy = ! empty($blueprint->orderBy)
-                ? \array_map(fn (string $c): string => $this->quote($c), $blueprint->orderBy)
+            $orderBy = ! empty($table->orderBy)
+                ? \array_map(fn (string $c): string => $this->quote($c), $table->orderBy)
                 : $primaryKeys;
 
             $sql .= ! empty($orderBy)
@@ -201,8 +201,8 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
                 : ' ORDER BY tuple()';
         }
 
-        if ($blueprint->ttl !== null) {
-            $sql .= ' TTL ' . $blueprint->ttl;
+        if ($table->ttl !== null) {
+            $sql .= ' TTL ' . $table->ttl;
         }
 
         return new Statement($sql, [], executor: $this->executor);

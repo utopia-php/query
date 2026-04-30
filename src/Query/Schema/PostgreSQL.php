@@ -279,11 +279,11 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
     }
 
     #[\Override]
-    public function compileAlter(Table $blueprint): Statement
+    public function compileAlter(Table $table): Statement
     {
         $alterations = [];
 
-        foreach ($blueprint->columns as $column) {
+        foreach ($table->columns as $column) {
             $keyword = $column->isModify ? 'ALTER COLUMN' : 'ADD COLUMN';
             if ($column->isModify) {
                 $def = $keyword . ' ' . $this->quote($column->name)
@@ -294,16 +294,16 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             $alterations[] = $def;
         }
 
-        foreach ($blueprint->renameColumns as $rename) {
+        foreach ($table->renameColumns as $rename) {
             $alterations[] = 'RENAME COLUMN ' . $this->quote($rename->from)
                 . ' TO ' . $this->quote($rename->to);
         }
 
-        foreach ($blueprint->dropColumns as $col) {
+        foreach ($table->dropColumns as $col) {
             $alterations[] = 'DROP COLUMN ' . $this->quote($col);
         }
 
-        foreach ($blueprint->foreignKeys as $fk) {
+        foreach ($table->foreignKeys as $fk) {
             $def = 'ADD FOREIGN KEY (' . $this->quote($fk->column) . ')'
                 . ' REFERENCES ' . $this->quote($fk->refTable)
                 . ' (' . $this->quote($fk->refColumn) . ')';
@@ -316,23 +316,23 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             $alterations[] = $def;
         }
 
-        foreach ($blueprint->dropForeignKeys as $name) {
+        foreach ($table->dropForeignKeys as $name) {
             $alterations[] = 'DROP CONSTRAINT ' . $this->quote($name);
         }
 
         $statements = [];
 
         if (! empty($alterations)) {
-            $statements[] = 'ALTER TABLE ' . $this->quote($blueprint->name)
+            $statements[] = 'ALTER TABLE ' . $this->quote($table->name)
                 . ' ' . \implode(', ', $alterations);
         }
 
         // PostgreSQL indexes are standalone statements, not ALTER TABLE clauses
-        foreach ($blueprint->indexes as $index) {
+        foreach ($table->indexes as $index) {
             $keyword = $index->type === IndexType::Unique ? 'CREATE UNIQUE INDEX' : 'CREATE INDEX';
 
             $indexSql = $keyword . ' ' . $this->quote($index->name)
-                . ' ON ' . $this->quote($blueprint->name);
+                . ' ON ' . $this->quote($table->name);
 
             if ($index->method !== '') {
                 $indexSql .= ' USING ' . \strtoupper($index->method);
@@ -342,7 +342,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             $statements[] = $indexSql;
         }
 
-        foreach ($blueprint->dropIndexes as $name) {
+        foreach ($table->dropIndexes as $name) {
             $statements[] = 'DROP INDEX ' . $this->quote($name);
         }
 

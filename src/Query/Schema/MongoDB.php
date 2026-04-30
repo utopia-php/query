@@ -45,16 +45,16 @@ class MongoDB extends Schema
     }
 
     #[\Override]
-    public function compileCreate(Table $blueprint, bool $ifNotExists = false): Statement
+    public function compileCreate(Table $table, bool $ifNotExists = false): Statement
     {
-        if (! empty($blueprint->compositePrimaryKey)) {
+        if (! empty($table->compositePrimaryKey)) {
             throw new UnsupportedException('Composite primary keys are not supported in MongoDB; documents use "_id" implicitly.');
         }
 
         $properties = [];
         $required = [];
 
-        foreach ($blueprint->columns as $column) {
+        foreach ($table->columns as $column) {
             $bsonType = $this->compileColumnType($column);
 
             $prop = ['bsonType' => $bsonType];
@@ -88,7 +88,7 @@ class MongoDB extends Schema
 
         $command = [
             'command' => 'createCollection',
-            'collection' => $blueprint->name,
+            'collection' => $table->name,
         ];
 
         if (! empty($validator)) {
@@ -103,16 +103,16 @@ class MongoDB extends Schema
     }
 
     #[\Override]
-    public function compileAlter(Table $blueprint): Statement
+    public function compileAlter(Table $table): Statement
     {
-        if (! empty($blueprint->dropColumns) || ! empty($blueprint->renameColumns)) {
+        if (! empty($table->dropColumns) || ! empty($table->renameColumns)) {
             throw new UnsupportedException('MongoDB does not support dropping or renaming columns via schema. Use $unset/$rename update operators.');
         }
 
         $properties = [];
         $required = [];
 
-        foreach ($blueprint->columns as $column) {
+        foreach ($table->columns as $column) {
             $bsonType = $this->compileColumnType($column);
             $prop = ['bsonType' => $bsonType];
 
@@ -141,7 +141,7 @@ class MongoDB extends Schema
 
         $command = [
             'command' => 'collMod',
-            'collection' => $blueprint->name,
+            'collection' => $table->name,
         ];
 
         if (! empty($validator)) {
