@@ -1,13 +1,13 @@
 <?php
 
-namespace Tests\Query;
+namespace Tests\Query\API;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Builder\MySQL;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
 
-class AggregationQueryTest extends TestCase
+class AggregationTest extends TestCase
 {
     public function testCountDefaultAttribute(): void
     {

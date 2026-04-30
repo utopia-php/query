@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Query;
+namespace Tests\Query\API;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Exception;
@@ -8,7 +8,7 @@ use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
 
-class QueryParseTest extends TestCase
+class ParseTest extends TestCase
 {
     public function testParseValidJson(): void
     {

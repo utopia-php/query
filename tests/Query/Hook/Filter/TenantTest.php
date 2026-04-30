@@ -6,7 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Query\Fixture\PermissionFilter as Permission;
 use Utopia\Query\Hook\Filter\Tenant;
 
-class FilterTest extends TestCase
+class TenantTest extends TestCase
 {
     public function testTenantSingleId(): void
     {

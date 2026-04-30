@@ -8,13 +8,13 @@ use Utopia\Query\Builder\SQLite as SQLBuilder;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
+use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\Feature\ForeignKeys;
 use Utopia\Query\Schema\Feature\Procedures;
 use Utopia\Query\Schema\Feature\Triggers;
 use Utopia\Query\Schema\ForeignKeyAction;
 use Utopia\Query\Schema\ParameterDirection;
 use Utopia\Query\Schema\SQLite as Schema;
-use Utopia\Query\Schema\Table;
 use Utopia\Query\Schema\TriggerEvent;
 use Utopia\Query\Schema\TriggerTiming;
 
@@ -40,15 +40,15 @@ class SQLiteTest extends TestCase
     public function testCreateTableBasic(): void
     {
         $schema = new Schema();
-        $result = $schema->create('users', function (Table $table) {
-            $table->id();
-            $table->string('name', 255);
-            $table->string('email', 255)->unique();
-        });
+        $result = $schema->table('users')
+            ->id()
+            ->string('name', 255)
+            ->string('email', 255)->unique()
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame(
-            'CREATE TABLE `users` (`id` INTEGER AUTOINCREMENT NOT NULL, `name` VARCHAR(255) NOT NULL, `email` VARCHAR(255) NOT NULL, PRIMARY KEY (`id`), UNIQUE (`email`))',
+            'CREATE TABLE `users` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` VARCHAR(255) NOT NULL, `email` VARCHAR(255) NOT NULL, UNIQUE (`email`))',
             $result->query
         );
         $this->assertSame([], $result->bindings);
@@ -57,18 +57,18 @@ class SQLiteTest extends TestCase
     public function testCreateTableAllColumnTypes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('test_types', function (Table $table) {
-            $table->integer('int_col');
-            $table->bigInteger('big_col');
-            $table->float('float_col');
-            $table->boolean('bool_col');
-            $table->text('text_col');
-            $table->datetime('dt_col', 3);
-            $table->timestamp('ts_col', 6);
-            $table->json('json_col');
-            $table->binary('bin_col');
-            $table->enum('status', ['active', 'inactive']);
-        });
+        $result = $schema->table('test_types')
+            ->integer('int_col')
+            ->bigInteger('big_col')
+            ->float('float_col')
+            ->boolean('bool_col')
+            ->text('text_col')
+            ->datetime('dt_col', 3)
+            ->timestamp('ts_col', 6)
+            ->json('json_col')
+            ->binary('bin_col')
+            ->enum('status', ['active', 'inactive'])
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `test_types` (`int_col` INTEGER NOT NULL, `big_col` INTEGER NOT NULL, `float_col` REAL NOT NULL, `bool_col` INTEGER NOT NULL, `text_col` TEXT NOT NULL, `dt_col` TEXT NOT NULL, `ts_col` TEXT NOT NULL, `json_col` TEXT NOT NULL, `bin_col` BLOB NOT NULL, `status` TEXT NOT NULL)', $result->query);
@@ -77,9 +77,9 @@ class SQLiteTest extends TestCase
     public function testColumnTypeStringMapsToVarchar(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->string('name', 100);
-        });
+        $result = $schema->table('t')
+            ->string('name', 100)
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`name` VARCHAR(100) NOT NULL)', $result->query);
@@ -88,9 +88,9 @@ class SQLiteTest extends TestCase
     public function testColumnTypeBooleanMapsToInteger(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->boolean('active');
-        });
+        $result = $schema->table('t')
+            ->boolean('active')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`active` INTEGER NOT NULL)', $result->query);
@@ -99,9 +99,9 @@ class SQLiteTest extends TestCase
     public function testColumnTypeDatetimeMapsToText(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->datetime('created_at');
-        });
+        $result = $schema->table('t')
+            ->datetime('created_at')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`created_at` TEXT NOT NULL)', $result->query);
@@ -110,9 +110,9 @@ class SQLiteTest extends TestCase
     public function testColumnTypeTimestampMapsToText(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->timestamp('updated_at');
-        });
+        $result = $schema->table('t')
+            ->timestamp('updated_at')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`updated_at` TEXT NOT NULL)', $result->query);
@@ -121,9 +121,9 @@ class SQLiteTest extends TestCase
     public function testColumnTypeJsonMapsToText(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->json('data');
-        });
+        $result = $schema->table('t')
+            ->json('data')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`data` TEXT NOT NULL)', $result->query);
@@ -132,9 +132,9 @@ class SQLiteTest extends TestCase
     public function testColumnTypeBinaryMapsToBlob(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->binary('content');
-        });
+        $result = $schema->table('t')
+            ->binary('content')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`content` BLOB NOT NULL)', $result->query);
@@ -143,9 +143,9 @@ class SQLiteTest extends TestCase
     public function testColumnTypeEnumMapsToText(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->enum('status', ['a', 'b']);
-        });
+        $result = $schema->table('t')
+            ->enum('status', ['a', 'b'])
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`status` TEXT NOT NULL)', $result->query);
@@ -154,11 +154,11 @@ class SQLiteTest extends TestCase
     public function testColumnTypeSpatialMapsToText(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->point('coords', 4326);
-            $table->linestring('path');
-            $table->polygon('area');
-        });
+        $result = $schema->table('t')
+            ->point('coords', 4326)
+            ->linestring('path')
+            ->polygon('area')
+            ->create();
         $this->assertBindingCount($result);
 
         $count = substr_count($result->query, 'TEXT NOT NULL');
@@ -168,9 +168,9 @@ class SQLiteTest extends TestCase
     public function testColumnTypeUuid7MapsToVarchar36(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->string('uid', 36);
-        });
+        $result = $schema->table('t')
+            ->string('uid', 36)
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`uid` VARCHAR(36) NOT NULL)', $result->query);
@@ -182,29 +182,29 @@ class SQLiteTest extends TestCase
         $this->expectExceptionMessage('Vector type is not supported in SQLite.');
 
         $schema = new Schema();
-        $schema->create('t', function (Table $table) {
-            $table->vector('embedding', 768);
-        });
+        $schema->table('t')
+            ->vector('embedding', 768)
+            ->create();
     }
 
     public function testAutoIncrementUsesAutoincrement(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->id();
-        });
+        $result = $schema->table('t')
+            ->id()
+            ->create();
         $this->assertBindingCount($result);
 
-        $this->assertSame('CREATE TABLE `t` (`id` INTEGER AUTOINCREMENT NOT NULL, PRIMARY KEY (`id`))', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL)', $result->query);
         $this->assertStringNotContainsString('AUTO_INCREMENT', $result->query);
     }
 
     public function testUnsignedIsEmptyString(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->integer('age')->unsigned();
-        });
+        $result = $schema->table('t')
+            ->integer('age')->unsigned()
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertStringNotContainsString('UNSIGNED', $result->query);
@@ -231,7 +231,7 @@ class SQLiteTest extends TestCase
     public function testRenameUsesAlterTable(): void
     {
         $schema = new Schema();
-        $result = $schema->rename('old_table', 'new_table');
+        $result = $schema->table('old_table')->rename('new_table');
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -244,7 +244,7 @@ class SQLiteTest extends TestCase
     public function testTruncateUsesDeleteFrom(): void
     {
         $schema = new Schema();
-        $result = $schema->truncate('users');
+        $result = $schema->table('users')->truncate();
         $this->assertBindingCount($result);
 
         $this->assertSame('DELETE FROM `users`', $result->query);
@@ -273,51 +273,51 @@ class SQLiteTest extends TestCase
     public function testCreateTableWithNullableAndDefault(): void
     {
         $schema = new Schema();
-        $result = $schema->create('posts', function (Table $table) {
-            $table->id();
-            $table->text('bio')->nullable();
-            $table->boolean('active')->default(true);
-            $table->integer('score')->default(0);
-            $table->string('status')->default('draft');
-        });
+        $result = $schema->table('posts')
+            ->id()
+            ->text('bio')->nullable()
+            ->boolean('active')->default(true)
+            ->integer('score')->default(0)
+            ->string('status')->default('draft')
+            ->create();
         $this->assertBindingCount($result);
 
-        $this->assertSame('CREATE TABLE `posts` (`id` INTEGER AUTOINCREMENT NOT NULL, `bio` TEXT NULL, `active` INTEGER NOT NULL DEFAULT 1, `score` INTEGER NOT NULL DEFAULT 0, `status` VARCHAR(255) NOT NULL DEFAULT \'draft\', PRIMARY KEY (`id`))', $result->query);
+        $this->assertSame('CREATE TABLE `posts` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `bio` TEXT NULL, `active` INTEGER NOT NULL DEFAULT 1, `score` INTEGER NOT NULL DEFAULT 0, `status` VARCHAR(255) NOT NULL DEFAULT \'draft\')', $result->query);
     }
 
     public function testCreateTableWithForeignKey(): void
     {
         $schema = new Schema();
-        $result = $schema->create('posts', function (Table $table) {
-            $table->id();
-            $table->foreignKey('user_id')
+        $result = $schema->table('posts')
+            ->id()
+            ->foreignKey('user_id')
                 ->references('id')->on('users')
-                ->onDelete(ForeignKeyAction::Cascade)->onUpdate(ForeignKeyAction::SetNull);
-        });
+                ->onDelete(ForeignKeyAction::Cascade)->onUpdate(ForeignKeyAction::SetNull)
+            ->create();
         $this->assertBindingCount($result);
 
-        $this->assertSame('CREATE TABLE `posts` (`id` INTEGER AUTOINCREMENT NOT NULL, PRIMARY KEY (`id`), FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE SET NULL)', $result->query);
+        $this->assertSame('CREATE TABLE `posts` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE SET NULL)', $result->query);
     }
 
     public function testCreateTableWithIndexes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('users', function (Table $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('email');
-            $table->index(['name', 'email']);
-            $table->uniqueIndex(['email']);
-        });
+        $result = $schema->table('users')
+            ->id()
+            ->string('name')
+            ->string('email')
+            ->index(['name', 'email'])
+            ->uniqueIndex(['email'])
+            ->create();
         $this->assertBindingCount($result);
 
-        $this->assertSame('CREATE TABLE `users` (`id` INTEGER AUTOINCREMENT NOT NULL, `name` VARCHAR(255) NOT NULL, `email` VARCHAR(255) NOT NULL, PRIMARY KEY (`id`), INDEX `idx_name_email` (`name`, `email`), UNIQUE INDEX `uniq_email` (`email`))', $result->query);
+        $this->assertSame('CREATE TABLE `users` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` VARCHAR(255) NOT NULL, `email` VARCHAR(255) NOT NULL, INDEX `idx_name_email` (`name`, `email`), UNIQUE INDEX `uniq_email` (`email`))', $result->query);
     }
 
     public function testDropTable(): void
     {
         $schema = new Schema();
-        $result = $schema->drop('users');
+        $result = $schema->table('users')->drop();
         $this->assertBindingCount($result);
 
         $this->assertSame('DROP TABLE `users`', $result->query);
@@ -327,7 +327,7 @@ class SQLiteTest extends TestCase
     public function testDropTableIfExists(): void
     {
         $schema = new Schema();
-        $result = $schema->dropIfExists('users');
+        $result = $schema->table('users')->dropIfExists();
 
         $this->assertSame('DROP TABLE IF EXISTS `users`', $result->query);
     }
@@ -335,9 +335,9 @@ class SQLiteTest extends TestCase
     public function testAlterAddColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->addColumn('avatar_url', 'string', 255)->nullable();
-        });
+        $result = $schema->table('users')
+            ->addColumn('avatar_url', ColumnType::String, 255)->nullable()
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame('ALTER TABLE `users` ADD COLUMN `avatar_url` VARCHAR(255) NULL', $result->query);
@@ -346,9 +346,9 @@ class SQLiteTest extends TestCase
     public function testAlterDropColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->dropColumn('age');
-        });
+        $result = $schema->table('users')
+            ->dropColumn('age')
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -360,9 +360,9 @@ class SQLiteTest extends TestCase
     public function testAlterRenameColumn(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->renameColumn('bio', 'biography');
-        });
+        $result = $schema->table('users')
+            ->renameColumn('bio', 'biography')
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame(
@@ -511,11 +511,11 @@ class SQLiteTest extends TestCase
     public function testCreateTableWithMultiplePrimaryKeys(): void
     {
         $schema = new Schema();
-        $result = $schema->create('order_items', function (Table $table) {
-            $table->integer('order_id')->primary();
-            $table->integer('product_id')->primary();
-            $table->integer('quantity');
-        });
+        $result = $schema->table('order_items')
+            ->integer('order_id')->primary()
+            ->integer('product_id')->primary()
+            ->integer('quantity')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `order_items` (`order_id` INTEGER NOT NULL, `product_id` INTEGER NOT NULL, `quantity` INTEGER NOT NULL, PRIMARY KEY (`order_id`, `product_id`))', $result->query);
@@ -524,12 +524,12 @@ class SQLiteTest extends TestCase
     public function testCreateTableWithCompositePrimaryKey(): void
     {
         $schema = new Schema();
-        $result = $schema->create('order_items', function (Table $table) {
-            $table->integer('order_id');
-            $table->integer('product_id');
-            $table->integer('quantity');
-            $table->primary(['order_id', 'product_id']);
-        });
+        $result = $schema->table('order_items')
+            ->integer('order_id')
+            ->integer('product_id')
+            ->integer('quantity')
+            ->primary(['order_id', 'product_id'])
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `order_items` (`order_id` INTEGER NOT NULL, `product_id` INTEGER NOT NULL, `quantity` INTEGER NOT NULL, PRIMARY KEY (`order_id`, `product_id`))', $result->query);
@@ -542,19 +542,19 @@ class SQLiteTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('Cannot combine column-level primary() with Table::primary() composite key.');
 
-        $schema->create('order_items', function (Table $table) {
-            $table->integer('order_id')->primary();
-            $table->integer('product_id');
-            $table->primary(['order_id', 'product_id']);
-        });
+        $schema->table('order_items')
+            ->integer('order_id')->primary()
+            ->integer('product_id')
+            ->primary(['order_id', 'product_id'])
+            ->create();
     }
 
     public function testCreateTableWithDefaultNull(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->string('name')->nullable()->default(null);
-        });
+        $result = $schema->table('t')
+            ->string('name')->nullable()->default(null)
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`name` VARCHAR(255) NULL DEFAULT NULL)', $result->query);
@@ -563,9 +563,9 @@ class SQLiteTest extends TestCase
     public function testCreateTableWithNumericDefault(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->float('score')->default(0.5);
-        });
+        $result = $schema->table('t')
+            ->float('score')->default(0.5)
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`score` REAL NOT NULL DEFAULT 0.5)', $result->query);
@@ -574,28 +574,28 @@ class SQLiteTest extends TestCase
     public function testCreateTableWithTimestamps(): void
     {
         $schema = new Schema();
-        $result = $schema->create('posts', function (Table $table) {
-            $table->id();
-            $table->timestamps();
-        });
+        $result = $schema->table('posts')
+            ->id()
+            ->timestamps()
+            ->create();
         $this->assertBindingCount($result);
 
-        $this->assertSame('CREATE TABLE `posts` (`id` INTEGER AUTOINCREMENT NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, PRIMARY KEY (`id`))', $result->query);
+        $this->assertSame('CREATE TABLE `posts` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL)', $result->query);
     }
 
     public function testExactCreateTableWithColumnsAndIndexes(): void
     {
         $schema = new Schema();
-        $result = $schema->create('products', function (Table $table) {
-            $table->id();
-            $table->string('name', 100);
-            $table->integer('price');
-            $table->index(['name']);
-        });
+        $result = $schema->table('products')
+            ->id()
+            ->string('name', 100)
+            ->integer('price')
+            ->index(['name'])
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame(
-            'CREATE TABLE `products` (`id` INTEGER AUTOINCREMENT NOT NULL, `name` VARCHAR(100) NOT NULL, `price` INTEGER NOT NULL, PRIMARY KEY (`id`), INDEX `idx_name` (`name`))',
+            'CREATE TABLE `products` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` VARCHAR(100) NOT NULL, `price` INTEGER NOT NULL, INDEX `idx_name` (`name`))',
             $result->query
         );
         $this->assertSame([], $result->bindings);
@@ -604,7 +604,7 @@ class SQLiteTest extends TestCase
     public function testExactDropTable(): void
     {
         $schema = new Schema();
-        $result = $schema->drop('sessions');
+        $result = $schema->table('sessions')->drop();
 
         $this->assertSame('DROP TABLE `sessions`', $result->query);
         $this->assertSame([], $result->bindings);
@@ -614,7 +614,7 @@ class SQLiteTest extends TestCase
     public function testExactRenameTable(): void
     {
         $schema = new Schema();
-        $result = $schema->rename('old_name', 'new_name');
+        $result = $schema->table('old_name')->rename('new_name');
 
         $this->assertSame('ALTER TABLE `old_name` RENAME TO `new_name`', $result->query);
         $this->assertSame([], $result->bindings);
@@ -624,7 +624,7 @@ class SQLiteTest extends TestCase
     public function testExactTruncateTable(): void
     {
         $schema = new Schema();
-        $result = $schema->truncate('logs');
+        $result = $schema->table('logs')->truncate();
 
         $this->assertSame('DELETE FROM `logs`', $result->query);
         $this->assertSame([], $result->bindings);
@@ -644,16 +644,16 @@ class SQLiteTest extends TestCase
     public function testExactCreateTableWithForeignKey(): void
     {
         $schema = new Schema();
-        $result = $schema->create('orders', function (Table $table) {
-            $table->id();
-            $table->integer('customer_id');
-            $table->foreignKey('customer_id')
+        $result = $schema->table('orders')
+            ->id()
+            ->integer('customer_id')
+            ->foreignKey('customer_id')
                 ->references('id')->on('customers')
-                ->onDelete(ForeignKeyAction::Cascade)->onUpdate(ForeignKeyAction::Cascade);
-        });
+                ->onDelete(ForeignKeyAction::Cascade)->onUpdate(ForeignKeyAction::Cascade)
+            ->create();
 
         $this->assertSame(
-            'CREATE TABLE `orders` (`id` INTEGER AUTOINCREMENT NOT NULL, `customer_id` INTEGER NOT NULL, PRIMARY KEY (`id`), FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE CASCADE ON UPDATE CASCADE)',
+            'CREATE TABLE `orders` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `customer_id` INTEGER NOT NULL, FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE CASCADE ON UPDATE CASCADE)',
             $result->query
         );
         $this->assertSame([], $result->bindings);
@@ -663,9 +663,9 @@ class SQLiteTest extends TestCase
     public function testColumnTypeFloatMapsToReal(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->float('ratio');
-        });
+        $result = $schema->table('t')
+            ->float('ratio')
+            ->create();
         $this->assertBindingCount($result);
 
         $this->assertSame('CREATE TABLE `t` (`ratio` REAL NOT NULL)', $result->query);
@@ -674,9 +674,9 @@ class SQLiteTest extends TestCase
     public function testCreateIfNotExists(): void
     {
         $schema = new Schema();
-        $result = $schema->createIfNotExists('t', function (Table $table) {
-            $table->integer('id')->primary();
-        });
+        $result = $schema->table('t')
+            ->integer('id')->primary()
+            ->createIfNotExists();
         $this->assertBindingCount($result);
 
         $this->assertStringStartsWith('CREATE TABLE IF NOT EXISTS', $result->query);
@@ -685,11 +685,11 @@ class SQLiteTest extends TestCase
     public function testAlterMultipleOperations(): void
     {
         $schema = new Schema();
-        $result = $schema->alter('users', function (Table $table) {
-            $table->addColumn('avatar', 'string', 255)->nullable();
-            $table->dropColumn('age');
-            $table->renameColumn('bio', 'biography');
-        });
+        $result = $schema->table('users')
+            ->addColumn('avatar', ColumnType::String, 255)->nullable()
+            ->dropColumn('age')
+            ->renameColumn('bio', 'biography')
+            ->alter();
         $this->assertBindingCount($result);
 
         $this->assertSame('ALTER TABLE `users` ADD COLUMN `avatar` VARCHAR(255) NULL, RENAME COLUMN `bio` TO `biography`, DROP COLUMN `age`', $result->query);
@@ -698,11 +698,11 @@ class SQLiteTest extends TestCase
     public function testSerialColumnMapsToInteger(): void
     {
         $schema = new Schema();
-        $result = $schema->create('t', function (Table $table) {
-            $table->serial('id')->primary();
-        });
+        $result = $schema->table('t')
+            ->serial('id')->primary()
+            ->create();
 
-        $this->assertSame('CREATE TABLE `t` (`id` INTEGER AUTOINCREMENT NOT NULL, PRIMARY KEY (`id`))', $result->query);
+        $this->assertSame('CREATE TABLE `t` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL)', $result->query);
     }
 
     public function testUserTypeColumnThrowsUnsupported(): void
@@ -710,9 +710,9 @@ class SQLiteTest extends TestCase
         $this->expectException(UnsupportedException::class);
 
         $schema = new Schema();
-        $schema->create('t', function (Table $table) {
-            $table->integer('id')->primary();
-            $table->string('mood')->userType('mood_type');
-        });
+        $schema->table('t')
+            ->integer('id')->primary()
+            ->string('mood')->userType('mood_type')
+            ->create();
     }
 }

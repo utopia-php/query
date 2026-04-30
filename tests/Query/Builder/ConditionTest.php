@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Query;
+namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Builder\Condition;

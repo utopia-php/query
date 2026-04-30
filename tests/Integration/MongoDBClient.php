@@ -74,8 +74,40 @@ class MongoDBClient
             'createIndex' => $this->createIndex($op),
             'dropIndex' => $this->database->selectCollection($collectionName)->dropIndex($indexName),
             'deleteMany' => $this->database->selectCollection($collectionName)->deleteMany($filter),
+            'collMod' => $this->collMod($collectionName, $op),
+            'renameCollection' => $this->renameCollection($op),
             default => throw new \RuntimeException('Unknown MongoDB command: ' . $command),
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $op
+     */
+    private function collMod(string $collection, array $op): void
+    {
+        $command = ['collMod' => $collection];
+        if (isset($op['validator'])) {
+            $command['validator'] = $op['validator'];
+        }
+        $this->database->command($command);
+    }
+
+    /**
+     * @param  array<string, mixed>  $op
+     */
+    private function renameCollection(array $op): void
+    {
+        /** @var string $from */
+        $from = $op['from'] ?? '';
+        /** @var string $to */
+        $to = $op['to'] ?? '';
+
+        $databaseName = $this->database->getDatabaseName();
+
+        $this->database->getManager()->executeCommand('admin', new \MongoDB\Driver\Command([
+            'renameCollection' => $databaseName . '.' . $from,
+            'to' => $databaseName . '.' . $to,
+        ]));
     }
 
     public function dropCollection(string $name): void

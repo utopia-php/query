@@ -32,22 +32,18 @@ abstract class Schema
     abstract protected function compileAutoIncrement(): string;
 
     /**
-     * @param  callable(Table): void  $definition
+     * Begin a fluent table builder. Terminal methods on the returned {@see Table}
+     * (`create()`, `alter()`, `drop()`, `dropIfExists()`, `truncate()`, `rename()`)
+     * compile and return the final {@see Statement}.
      */
-    public function createIfNotExists(string $table, callable $definition): Statement
+    public function table(string $name): Table
     {
-        return $this->create($table, $definition, true);
+        return new Table($this, $name);
     }
 
-    /**
-     * @param  callable(Table): void  $definition
-     */
-    public function create(string $table, callable $definition, bool $ifNotExists = false): Statement
+    public function compileCreate(Table $table, bool $ifNotExists = false): Statement
     {
-        $blueprint = new Table();
-        $definition($blueprint);
-
-        if ($blueprint->ttl !== null) {
+        if ($table->ttl !== null) {
             throw new UnsupportedException('TTL is only supported in ClickHouse.');
         }
 
@@ -55,7 +51,7 @@ abstract class Schema
         $primaryKeys = [];
         $uniqueColumns = [];
 
-        foreach ($blueprint->columns as $column) {
+        foreach ($table->columns as $column) {
             $def = $this->compileColumnDefinition($column);
             $columnDefs[] = $def;
 
@@ -67,21 +63,21 @@ abstract class Schema
             }
         }
 
-        if (! empty($blueprint->compositePrimaryKey) && ! empty($primaryKeys)) {
+        if (! empty($table->compositePrimaryKey) && ! empty($primaryKeys)) {
             throw new ValidationException('Cannot combine column-level primary() with Table::primary() composite key.');
         }
 
         // Raw column definitions (bypass typed Column objects)
-        foreach ($blueprint->rawColumnDefs as $rawDef) {
+        foreach ($table->rawColumnDefs as $rawDef) {
             $columnDefs[] = $rawDef;
         }
 
         // Inline PRIMARY KEY constraint
         if (! empty($primaryKeys)) {
             $columnDefs[] = 'PRIMARY KEY (' . \implode(', ', $primaryKeys) . ')';
-        } elseif (! empty($blueprint->compositePrimaryKey)) {
+        } elseif (! empty($table->compositePrimaryKey)) {
             $columnDefs[] = 'PRIMARY KEY ('
-                . \implode(', ', \array_map(fn (string $c): string => $this->quote($c), $blueprint->compositePrimaryKey))
+                . \implode(', ', \array_map(fn (string $c): string => $this->quote($c), $table->compositePrimaryKey))
                 . ')';
         }
 
@@ -91,12 +87,12 @@ abstract class Schema
         }
 
         // Table-level CHECK constraints
-        foreach ($blueprint->checks as $check) {
+        foreach ($table->checks as $check) {
             $columnDefs[] = 'CONSTRAINT ' . $this->quote($check->name) . ' CHECK (' . $check->expression . ')';
         }
 
         // Indexes
-        foreach ($blueprint->indexes as $index) {
+        foreach ($table->indexes as $index) {
             $keyword = match ($index->type) {
                 IndexType::Unique => 'UNIQUE INDEX',
                 IndexType::Fulltext => 'FULLTEXT INDEX',
@@ -108,12 +104,12 @@ abstract class Schema
         }
 
         // Raw index definitions (bypass typed Index objects)
-        foreach ($blueprint->rawIndexDefs as $rawIdx) {
+        foreach ($table->rawIndexDefs as $rawIdx) {
             $columnDefs[] = $rawIdx;
         }
 
         // Foreign keys
-        foreach ($blueprint->foreignKeys as $fk) {
+        foreach ($table->foreignKeys as $fk) {
             $def = 'FOREIGN KEY (' . $this->quote($fk->column) . ')'
                 . ' REFERENCES ' . $this->quote($fk->refTable)
                 . ' (' . $this->quote($fk->refColumn) . ')';
@@ -126,30 +122,24 @@ abstract class Schema
             $columnDefs[] = $def;
         }
 
-        $sql = 'CREATE TABLE ' . ($ifNotExists ? 'IF NOT EXISTS ' : '') . $this->quote($table)
+        $sql = 'CREATE TABLE ' . ($ifNotExists ? 'IF NOT EXISTS ' : '') . $this->quote($table->name)
             . ' (' . \implode(', ', $columnDefs) . ')';
 
-        if ($blueprint->partitionType !== null) {
-            $sql .= ' PARTITION BY ' . $blueprint->partitionType->value . '(' . $blueprint->partitionExpression . ')';
-            if ($blueprint->partitionCount !== null) {
-                $sql .= ' PARTITIONS ' . $blueprint->partitionCount;
+        if ($table->partitionType !== null) {
+            $sql .= ' PARTITION BY ' . $table->partitionType->value . '(' . $table->partitionExpression . ')';
+            if ($table->partitionCount !== null) {
+                $sql .= ' PARTITIONS ' . $table->partitionCount;
             }
         }
 
         return new Statement($sql, [], executor: $this->executor);
     }
 
-    /**
-     * @param  callable(Table): void  $definition
-     */
-    public function alter(string $table, callable $definition): Statement
+    public function compileAlter(Table $table): Statement
     {
-        $blueprint = new Table();
-        $definition($blueprint);
-
         $alterations = [];
 
-        foreach ($blueprint->columns as $column) {
+        foreach ($table->columns as $column) {
             $keyword = $column->isModify ? 'MODIFY COLUMN' : 'ADD COLUMN';
             $def = $keyword . ' ' . $this->compileColumnDefinition($column);
             if ($column->after !== null) {
@@ -158,16 +148,16 @@ abstract class Schema
             $alterations[] = $def;
         }
 
-        foreach ($blueprint->renameColumns as $rename) {
+        foreach ($table->renameColumns as $rename) {
             $alterations[] = 'RENAME COLUMN ' . $this->quote($rename->from)
                 . ' TO ' . $this->quote($rename->to);
         }
 
-        foreach ($blueprint->dropColumns as $col) {
+        foreach ($table->dropColumns as $col) {
             $alterations[] = 'DROP COLUMN ' . $this->quote($col);
         }
 
-        foreach ($blueprint->indexes as $index) {
+        foreach ($table->indexes as $index) {
             $keyword = match ($index->type) {
                 IndexType::Unique => 'ADD UNIQUE INDEX',
                 IndexType::Fulltext => 'ADD FULLTEXT INDEX',
@@ -178,11 +168,11 @@ abstract class Schema
                 . ' (' . $this->compileIndexColumns($index) . ')';
         }
 
-        foreach ($blueprint->dropIndexes as $name) {
+        foreach ($table->dropIndexes as $name) {
             $alterations[] = 'DROP INDEX ' . $this->quote($name);
         }
 
-        foreach ($blueprint->foreignKeys as $fk) {
+        foreach ($table->foreignKeys as $fk) {
             $def = 'ADD FOREIGN KEY (' . $this->quote($fk->column) . ')'
                 . ' REFERENCES ' . $this->quote($fk->refTable)
                 . ' (' . $this->quote($fk->refColumn) . ')';
@@ -195,27 +185,26 @@ abstract class Schema
             $alterations[] = $def;
         }
 
-        foreach ($blueprint->dropForeignKeys as $name) {
+        foreach ($table->dropForeignKeys as $name) {
             $alterations[] = 'DROP FOREIGN KEY ' . $this->quote($name);
         }
 
-        $sql = 'ALTER TABLE ' . $this->quote($table)
+        $sql = 'ALTER TABLE ' . $this->quote($table->name)
             . ' ' . \implode(', ', $alterations);
 
         return new Statement($sql, [], executor: $this->executor);
     }
 
-    public function drop(string $table): Statement
+    public function compileDrop(string $name, bool $ifExists): Statement
     {
-        return new Statement('DROP TABLE ' . $this->quote($table), [], executor: $this->executor);
+        return new Statement(
+            'DROP TABLE ' . ($ifExists ? 'IF EXISTS ' : '') . $this->quote($name),
+            [],
+            executor: $this->executor,
+        );
     }
 
-    public function dropIfExists(string $table): Statement
-    {
-        return new Statement('DROP TABLE IF EXISTS ' . $this->quote($table), [], executor: $this->executor);
-    }
-
-    public function rename(string $from, string $to): Statement
+    public function compileRename(string $from, string $to): Statement
     {
         return new Statement(
             'RENAME TABLE ' . $this->quote($from) . ' TO ' . $this->quote($to),
@@ -224,9 +213,9 @@ abstract class Schema
         );
     }
 
-    public function truncate(string $table): Statement
+    public function compileTruncate(string $name): Statement
     {
-        return new Statement('TRUNCATE TABLE ' . $this->quote($table), [], executor: $this->executor);
+        return new Statement('TRUNCATE TABLE ' . $this->quote($name), [], executor: $this->executor);
     }
 
     /**

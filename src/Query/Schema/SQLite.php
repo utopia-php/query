@@ -35,6 +35,72 @@ class SQLite extends SQL
         return 'AUTOINCREMENT';
     }
 
+    /**
+     * SQLite requires `AUTOINCREMENT` to be paired with `INTEGER PRIMARY KEY`
+     * inline on the same column declaration. Emit those keywords together and
+     * skip the separate `PRIMARY KEY (col)` clause that the base class adds
+     * at the end of the column list.
+     */
+    #[\Override]
+    protected function compileColumnDefinition(Column $column): string
+    {
+        if (! $column->isAutoIncrement || ! $column->isPrimary) {
+            return parent::compileColumnDefinition($column);
+        }
+
+        $parts = [
+            $this->quote($column->name),
+            $this->compileColumnType($column),
+            'PRIMARY KEY',
+            $this->compileAutoIncrement(),
+        ];
+
+        if (! $column->isNullable) {
+            $parts[] = 'NOT NULL';
+        }
+
+        if ($column->hasDefault) {
+            $parts[] = 'DEFAULT ' . $this->compileDefaultValue($column->default);
+        }
+
+        if ($column->checkExpression !== null) {
+            $parts[] = 'CHECK (' . $column->checkExpression . ')';
+        }
+
+        return \implode(' ', $parts);
+    }
+
+    /**
+     * SQLite emits its primary key inline when paired with `AUTOINCREMENT`, so
+     * suppress the redundant trailing `PRIMARY KEY (col)` constraint that the
+     * base compiler would otherwise add.
+     */
+    #[\Override]
+    public function compileCreate(\Utopia\Query\Schema\Table $table, bool $ifNotExists = false): Statement
+    {
+        $hasInlinePrimary = false;
+        foreach ($table->columns as $column) {
+            if ($column->isAutoIncrement && $column->isPrimary) {
+                $hasInlinePrimary = true;
+                break;
+            }
+        }
+
+        if (! $hasInlinePrimary) {
+            return parent::compileCreate($table, $ifNotExists);
+        }
+
+        $statement = parent::compileCreate($table, $ifNotExists);
+        $sql = \preg_replace(
+            '/, PRIMARY KEY \(`[^`]+`\)/',
+            '',
+            $statement->query,
+            1,
+        );
+
+        return new Statement($sql ?? $statement->query, $statement->bindings, executor: $this->executor);
+    }
+
     protected function compileUnsigned(): string
     {
         return '';
@@ -50,7 +116,8 @@ class SQLite extends SQL
         throw new UnsupportedException('SQLite does not support DROP DATABASE.');
     }
 
-    public function rename(string $from, string $to): Statement
+    #[\Override]
+    public function compileRename(string $from, string $to): Statement
     {
         return new Statement(
             'ALTER TABLE ' . $this->quote($from) . ' RENAME TO ' . $this->quote($to),
@@ -59,9 +126,10 @@ class SQLite extends SQL
         );
     }
 
-    public function truncate(string $table): Statement
+    #[\Override]
+    public function compileTruncate(string $name): Statement
     {
-        return new Statement('DELETE FROM ' . $this->quote($table), [], executor: $this->executor);
+        return new Statement('DELETE FROM ' . $this->quote($name), [], executor: $this->executor);
     }
 
     public function dropIndex(string $table, string $name): Statement
