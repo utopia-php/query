@@ -833,6 +833,78 @@ class FluentBuilderTest extends TestCase
         $bp->engine(Engine::ReplicatedMergeTree, '/path');
     }
 
+    public function testColumnForwardsTruncateAndRenameTerminals(): void
+    {
+        $schema = new MySQL();
+        $truncate = $schema->table('users')->id()->truncate();
+        $rename = $schema->table('old')->id()->rename('new');
+
+        $this->assertSame('TRUNCATE TABLE `users`', $truncate->query);
+        $this->assertSame('RENAME TABLE `old` TO `new`', $rename->query);
+    }
+
+    public function testForeignKeyForwardsTruncateAndRenameTerminals(): void
+    {
+        $schema = new MySQL();
+        $truncate = $schema->table('orders')->foreignKey('user_id')->references('id')->on('users')->truncate();
+        $rename = $schema->table('orders')->foreignKey('user_id')->references('id')->on('users')->rename('orders_v2');
+
+        $this->assertSame('TRUNCATE TABLE `orders`', $truncate->query);
+        $this->assertSame('RENAME TABLE `orders` TO `orders_v2`', $rename->query);
+    }
+
+    public function testAddForeignKeyIsAliasOfForeignKey(): void
+    {
+        $bp = new Table();
+        $a = $bp->addForeignKey('user_id');
+        $b = $bp->foreignKey('parent_id');
+
+        $this->assertCount(2, $bp->foreignKeys);
+        $this->assertSame($a, $bp->foreignKeys[0]);
+        $this->assertSame($b, $bp->foreignKeys[1]);
+    }
+
+    public function testAddForeignKeySharesRegistryWithForeignKey(): void
+    {
+        // Calling both methods for the same column registers the FK twice; the
+        // alias does not deduplicate. Pinning this so callers don't accidentally
+        // double-register.
+        $bp = new Table();
+        $bp->foreignKey('user_id');
+        $bp->addForeignKey('user_id');
+
+        $this->assertCount(2, $bp->foreignKeys);
+    }
+
+    public function testTableEnumRejectsEmptyValueList(): void
+    {
+        $bp = new Table();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('enum() requires at least one allowed value');
+        $bp->enum('status', []);
+    }
+
+    public function testColumnEnumArrayRejectsEmptyValueList(): void
+    {
+        $bp = new Table();
+        $col = $bp->enum('status', ['draft']);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('enum() requires at least one allowed value');
+        $col->enum([]);
+    }
+
+    public function testColumnEnumStringDispatchRejectsMissingValueList(): void
+    {
+        $bp = new Table();
+        $col = $bp->string('label');
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('enum() requires at least one allowed value');
+        $col->enum('status');
+    }
+
     public function testDeepChainOfHeterogeneousMethodsCompiles(): void
     {
         $schema = new MySQL();

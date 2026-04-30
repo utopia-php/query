@@ -353,4 +353,14 @@ class ForeignKey
     {
         return $this->table->dropIfExists();
     }
+
+    public function truncate(): Statement
+    {
+        return $this->table->truncate();
+    }
+
+    public function rename(string $to): Statement
+    {
+        return $this->table->rename($to);
+    }
 }

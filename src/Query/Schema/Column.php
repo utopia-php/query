@@ -143,10 +143,16 @@ class Column
      *
      * @param  string|string[]  $nameOrValues
      * @param  string[]|null    $values
+     *
+     * @throws ValidationException if the value list is empty.
      */
     public function enum(string|array $nameOrValues, ?array $values = null): static|Column
     {
         if (\is_array($nameOrValues)) {
+            if ($nameOrValues === []) {
+                throw new ValidationException('enum() requires at least one allowed value.');
+            }
+
             $this->enumValues = $nameOrValues;
 
             return $this;
@@ -533,5 +539,15 @@ class Column
     public function dropIfExists(): Statement
     {
         return $this->table->dropIfExists();
+    }
+
+    public function truncate(): Statement
+    {
+        return $this->table->truncate();
+    }
+
+    public function rename(string $to): Statement
+    {
+        return $this->table->rename($to);
     }
 }
