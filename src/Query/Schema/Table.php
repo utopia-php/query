@@ -730,8 +730,9 @@ class Table
             } elseif (\is_string($value)) {
                 if (! \preg_match('/^[A-Za-z0-9_.\-+\/]+$/', $value)) {
                     throw new ValidationException(
-                        'Invalid setting value for ' . $key . ': must match [A-Za-z0-9_.\.\-+/]+'
+                        'Invalid setting value for ' . $key . ': must match [A-Za-z0-9_.\-+/]+'
                     );
+                }
                 $sanitized[$key] = $value;
             } else {
                 throw new ValidationException(
