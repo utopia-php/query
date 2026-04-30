@@ -373,7 +373,7 @@ class Table
         ?IndexAlgorithm $algorithm = null,
         array $algorithmArgs = [],
         int $granularity = 1,
-    ): void {
+    ): static {
         if ($name === '') {
             $name = $this->autoIndexName('idx_', $columns);
         }
@@ -390,6 +390,8 @@ class Table
             algorithmArgs: $algorithmArgs,
             granularity: $granularity,
         );
+
+        return $this;
     }
 
     /**
