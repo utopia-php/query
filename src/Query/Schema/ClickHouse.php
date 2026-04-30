@@ -247,7 +247,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
 
         if ($index->algorithm === null) {
             return 'INDEX ' . $this->quote($index->name) . ' ' . $expr
-                . ' TYPE minmax GRANULARITY ' . $index->granularity;
+                . ' TYPE minmax GRANULARITY 3';
         }
 
         $type = $index->algorithm->value;

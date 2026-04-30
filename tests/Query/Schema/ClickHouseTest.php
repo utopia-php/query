@@ -832,9 +832,10 @@ class ClickHouseTest extends TestCase
     public function testTableSettingsWithTtlOrdering(): void
     {
         $schema = new Schema();
-        $result = $schema->table('events')
-            ->bigInteger('id')->primary()
-            ->datetime('created_at')
+        $table = $schema->table('events');
+        $table->bigInteger('id')->primary();
+        $table->datetime('created_at');
+        $result = $table
             ->ttl('`created_at` + INTERVAL 30 DAY')
             ->settings(['index_granularity' => 4096])
             ->create();
