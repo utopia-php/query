@@ -18,12 +18,10 @@ class MongoDB extends Table
         return new Column\MongoDB($this, $name, $type, $length, $precision);
     }
 
-    /**
-     * @return Column\MongoDB
-     */
-    public function vector(string $name, int $dimensions): Column
+    public function vector(string $name, int $dimensions): Column\MongoDB
     {
-        $col = $this->newColumn($name, ColumnType::Vector)->dimensions($dimensions);
+        $col = $this->newColumn($name, ColumnType::Vector);
+        $col->dimensions($dimensions);
         $this->columns[] = $col;
 
         return $col;

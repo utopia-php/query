@@ -293,7 +293,7 @@ class MongoDB extends Schema implements Views, Databases, AnalyzeTable
     public function dropView(string $name): Statement
     {
         return new Statement(
-            \json_encode(['command' => 'drop', 'view' => $name], JSON_THROW_ON_ERROR),
+            \json_encode(['command' => 'drop', 'collection' => $name], JSON_THROW_ON_ERROR),
             [],
             executor: $this->executor,
         );

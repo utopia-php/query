@@ -22,12 +22,10 @@ class ClickHouse extends Table
         return new Column\ClickHouse($this, $name, $type, $length, $precision);
     }
 
-    /**
-     * @return Column\ClickHouse
-     */
-    public function vector(string $name, int $dimensions): Column
+    public function vector(string $name, int $dimensions): Column\ClickHouse
     {
-        $col = $this->newColumn($name, ColumnType::Vector)->dimensions($dimensions);
+        $col = $this->newColumn($name, ColumnType::Vector);
+        $col->dimensions($dimensions);
         $this->columns[] = $col;
 
         return $col;

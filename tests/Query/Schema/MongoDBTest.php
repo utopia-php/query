@@ -363,6 +363,17 @@ class MongoDBTest extends TestCase
         $this->assertNotEmpty($pipeline);
     }
 
+    public function testDropView(): void
+    {
+        $schema = new Schema();
+        $result = $schema->dropView('active_users');
+
+        $op = $this->decode($result->query);
+        $this->assertSame('drop', $op['command']);
+        $this->assertSame('active_users', $op['collection']);
+        $this->assertArrayNotHasKey('view', $op);
+    }
+
     public function testCreateCollectionWithAllBsonTypes(): void
     {
         $schema = new Schema();
