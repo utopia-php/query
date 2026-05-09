@@ -5,6 +5,6 @@ composer.phar
 coverage
 coverage.xml
 .DS_Store
-.claude/worktrees/
+.claude/
 .phpunit.cache/
 coverage/
