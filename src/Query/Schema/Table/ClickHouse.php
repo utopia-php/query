@@ -6,7 +6,6 @@ use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\ClickHouse\Engine;
 use Utopia\Query\Schema\Column;
 use Utopia\Query\Schema\ColumnType;
-use Utopia\Query\Schema\PartitionType;
 use Utopia\Query\Schema\Table;
 
 class ClickHouse extends Table
@@ -310,9 +309,7 @@ class ClickHouse extends Table
      */
     public function partitionBy(string $expression): static
     {
-        $this->partitionType = PartitionType::Range;
         $this->partitionExpression = $expression;
-        $this->partitionCount = null;
 
         return $this;
     }

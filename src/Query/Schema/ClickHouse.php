@@ -212,7 +212,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             . ' (' . \implode(', ', $columnDefs) . ')'
             . ' ENGINE = ' . $this->compileEngine($engine, $table->engineArgs);
 
-        if ($table->partitionType !== null) {
+        if ($table->partitionExpression !== '') {
             $sql .= ' PARTITION BY ' . $table->partitionExpression;
         }
 
