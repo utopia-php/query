@@ -134,9 +134,6 @@ class ForwarderTest extends TestCase
         $fk = $col->foreignKey('user_id');
         $this->assertInstanceOf(ForeignKey\SQLite::class, $fk);
 
-        $this->assertInstanceOf(ForeignKey\SQLite::class, $col->addForeignKey('order_id'));
-        $this->assertSame($table, $col->dropForeignKey('fk_old'));
-
         // Dual-purpose primary/check from the dialect Column class.
         $this->assertSame($col, $col->primary());
         $this->assertTrue($col->isPrimary);
@@ -150,6 +147,20 @@ class ForwarderTest extends TestCase
 
         $this->assertSame($table, $second->check('age_min', '`age` >= 18'));
         $this->assertCount(1, $table->checks);
+    }
+
+    public function testSQLiteHasNoAlterForeignKeyMethods(): void
+    {
+        $table = (new SQLite())->table('orders');
+        $col = $table->integer('user_id');
+        $fk = $table->foreignKey('user_id');
+
+        $this->assertFalse(\method_exists($table, 'addForeignKey'));
+        $this->assertFalse(\method_exists($table, 'dropForeignKey'));
+        $this->assertFalse(\method_exists($col, 'addForeignKey'));
+        $this->assertFalse(\method_exists($col, 'dropForeignKey'));
+        $this->assertFalse(\method_exists($fk, 'addForeignKey'));
+        $this->assertFalse(\method_exists($fk, 'dropForeignKey'));
     }
 
     public function testSQLiteForeignKeyForwarderTableLevelMethods(): void

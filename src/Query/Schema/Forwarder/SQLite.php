@@ -9,6 +9,10 @@ use Utopia\Query\Schema\Table;
 /**
  * Forwarders that delegate SQLite-specific calls back to the parent Table.
  * Used by {@see Column\SQLite} and {@see ForeignKey\SQLite}.
+ *
+ * Note: SQLite ALTER TABLE does not support FK add/drop, so only the inline
+ * `foreignKey()` (used at CREATE time) is forwarded — `addForeignKey()` and
+ * `dropForeignKey()` are intentionally omitted.
  */
 trait SQLite
 {
@@ -16,15 +20,4 @@ trait SQLite
     {
         return $this->table->foreignKey($column);
     }
-
-    public function addForeignKey(string $column): ForeignKey\SQLite
-    {
-        return $this->table->addForeignKey($column);
-    }
-
-    public function dropForeignKey(string $name): Table\SQLite
-    {
-        return $this->table->dropForeignKey($name);
-    }
-
 }

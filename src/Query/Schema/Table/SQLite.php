@@ -14,8 +14,8 @@ class SQLite extends Table
 {
     use Trait\Checks;
     use Trait\CompositePrimary;
-    /** @use Trait\ForeignKeys<ForeignKey\SQLite> */
-    use Trait\ForeignKeys;
+    /** @use Trait\InlineForeignKey<ForeignKey\SQLite> */
+    use Trait\InlineForeignKey;
 
     #[\Override]
     protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null): Column\SQLite

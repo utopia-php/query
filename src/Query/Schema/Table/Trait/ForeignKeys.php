@@ -5,26 +5,19 @@ namespace Utopia\Query\Schema\Table\Trait;
 use Utopia\Query\Schema\ForeignKey;
 
 /**
+ * Foreign-key ALTER operations. Only dialects whose `ALTER TABLE` supports
+ * adding and dropping FK constraints (MySQL, PostgreSQL) should mix this in.
+ * SQLite must NOT use this trait — its ALTER TABLE rejects constraint changes.
+ *
+ * Composes {@see InlineForeignKey} so the using class also gets `foreignKey()`
+ * for inline create-time declarations.
+ *
  * @template TForeignKey of ForeignKey
  */
 trait ForeignKeys
 {
-    /**
-     * Declare a foreign key. The behaviour is identical for create and alter
-     * contexts — the dialect compiler switches between `FOREIGN KEY (...)` (in
-     * a CREATE TABLE column list) and `ADD FOREIGN KEY (...)` (in an ALTER
-     * TABLE clause) when emitting the statement. {@see addForeignKey()} is
-     * an alias for use in alter chains; both register the same FK exactly once.
-     *
-     * @return TForeignKey
-     */
-    public function foreignKey(string $column): ForeignKey
-    {
-        $fk = $this->newForeignKey($column);
-        $this->foreignKeys[] = $fk;
-
-        return $fk;
-    }
+    /** @use InlineForeignKey<TForeignKey> */
+    use InlineForeignKey;
 
     /**
      * Alias of {@see foreignKey()}, for symmetry with the other `add*`/`drop*`
