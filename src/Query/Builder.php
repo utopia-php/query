@@ -390,15 +390,6 @@ abstract class Builder implements
         }
     }
 
-    /**
-     * Build an INSERT ... ON CONFLICT/DUPLICATE KEY UPDATE statement.
-     * Requires onConflict() to be called first to configure conflict keys and update columns.
-     */
-    public function upsert(): Statement
-    {
-        throw new UnsupportedException('UPSERT is not supported by this dialect.');
-    }
-
     #[\Override]
     public function build(): Statement
     {

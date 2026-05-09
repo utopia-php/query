@@ -4,7 +4,7 @@ namespace Utopia\Query\Builder\Feature;
 
 use Utopia\Query\Builder\Statement;
 
-interface Upsert
+interface InsertOrIgnore
 {
-    public function upsert(): Statement;
+    public function insertOrIgnore(): Statement;
 }

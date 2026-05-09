@@ -3,21 +3,41 @@
 namespace Utopia\Query\Builder;
 
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
+use Utopia\Query\Builder\Feature\FullTextSearch;
 use Utopia\Query\Builder\Feature\GroupByModifiers;
 use Utopia\Query\Builder\Feature\Hints;
+use Utopia\Query\Builder\Feature\InsertOrIgnore;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\LateralJoins;
+use Utopia\Query\Builder\Feature\Spatial;
 use Utopia\Query\Builder\Feature\StringAggregates;
+use Utopia\Query\Builder\Feature\Upsert;
+use Utopia\Query\Builder\Feature\UpsertSelect;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
 
-class MySQL extends SQL implements Json, Hints, ConditionalAggregates, LateralJoins, StringAggregates, GroupByModifiers
+class MySQL extends SQL implements
+    Json,
+    Hints,
+    ConditionalAggregates,
+    LateralJoins,
+    StringAggregates,
+    GroupByModifiers,
+    Spatial,
+    FullTextSearch,
+    Upsert,
+    UpsertSelect,
+    InsertOrIgnore
 {
     use Trait\ConditionalAggregates;
+    use Trait\FullTextSearch;
     use Trait\GroupByModifiers;
     use Trait\Hints;
     use Trait\LateralJoins;
+    use Trait\Spatial;
     use Trait\StringAggregates;
+    use Trait\Upsert;
+    use Trait\UpsertSelect;
 
     protected string $updateJoinTable = '';
 

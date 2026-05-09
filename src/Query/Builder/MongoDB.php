@@ -5,6 +5,7 @@ namespace Utopia\Query\Builder;
 use stdClass;
 use Utopia\Query\Builder as BaseBuilder;
 use Utopia\Query\Builder\Feature\FullTextSearch;
+use Utopia\Query\Builder\Feature\InsertOrIgnore;
 use Utopia\Query\Builder\Feature\MongoDB\ArrayPushModifiers;
 use Utopia\Query\Builder\Feature\MongoDB\AtlasSearch;
 use Utopia\Query\Builder\Feature\MongoDB\ConditionalArrayUpdates;
@@ -22,6 +23,7 @@ use Utopia\Query\Query;
 
 class MongoDB extends BaseBuilder implements
     Upsert,
+    InsertOrIgnore,
     FullTextSearch,
     TableSampling,
     FieldUpdates,
@@ -358,7 +360,6 @@ class MongoDB extends BaseBuilder implements
         );
     }
 
-    #[\Override]
     public function upsert(): Statement
     {
         $this->bindings = [];
@@ -434,12 +435,6 @@ class MongoDB extends BaseBuilder implements
             $this->bindings,
             executor: $this->executor,
         );
-    }
-
-    #[\Override]
-    public function upsertSelect(): Statement
-    {
-        throw new UnsupportedException('upsertSelect() is not supported in MongoDB builder.');
     }
 
     private function needsAggregation(ParsedQuery $grouped): bool
