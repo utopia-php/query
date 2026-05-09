@@ -303,6 +303,29 @@ class PostgreSQL extends SQL implements
     }
 
     /**
+     * Drop a trigger and its backing PL/pgSQL function. PostgreSQL requires
+     * the table name (`DROP TRIGGER name ON table`); the function created by
+     * {@see createTrigger()} is dropped at the same time so callers don't need
+     * a separate {@see dropFunction()} call.
+     *
+     * @throws ValidationException if $table is null.
+     */
+    #[\Override]
+    public function dropTrigger(string $name, ?string $table = null): Statement
+    {
+        if ($table === null) {
+            throw new ValidationException('PostgreSQL dropTrigger() requires the table name.');
+        }
+
+        $funcName = $name . '_func';
+
+        $sql = 'DROP TRIGGER ' . $this->quote($name) . ' ON ' . $this->quote($table)
+            . '; DROP FUNCTION ' . $this->quote($funcName);
+
+        return new Statement($sql, [], executor: $this->executor);
+    }
+
+    /**
      * Reject bodies that would break out of the surrounding `$$ ... $$`
      * dollar-quoted string.
      *

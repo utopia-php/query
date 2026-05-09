@@ -29,7 +29,7 @@ trait Triggers
         return new Statement($sql, [], executor: $this->executor);
     }
 
-    public function dropTrigger(string $name): Statement
+    public function dropTrigger(string $name, ?string $table = null): Statement
     {
         return new Statement('DROP TRIGGER ' . $this->quote($name), [], executor: $this->executor);
     }

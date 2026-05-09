@@ -515,9 +515,22 @@ class PostgreSQLTest extends TestCase
     {
         $schema = new Schema();
 
-        $result = $schema->dropTrigger('trg_old');
+        $result = $schema->dropTrigger('trg_old', 'users');
 
-        $this->assertSame('DROP TRIGGER "trg_old"', $result->query);
+        $this->assertSame(
+            'DROP TRIGGER "trg_old" ON "users"; DROP FUNCTION "trg_old_func"',
+            $result->query,
+        );
+    }
+
+    public function testDropTriggerWithoutTableThrows(): void
+    {
+        $schema = new Schema();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('PostgreSQL dropTrigger() requires the table name.');
+
+        $schema->dropTrigger('trg_old');
     }
 
     public function testAlterWithUniqueIndex(): void

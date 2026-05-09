@@ -16,5 +16,8 @@ interface Triggers
         string $body,
     ): Statement;
 
-    public function dropTrigger(string $name): Statement;
+    /**
+     * Drop a trigger. PostgreSQL requires $table; MySQL/SQLite ignore it.
+     */
+    public function dropTrigger(string $name, ?string $table = null): Statement;
 }
