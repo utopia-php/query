@@ -164,17 +164,6 @@ class MySQLTest extends TestCase
         $this->assertSame('CREATE TABLE `locations` (`id` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL, `coords` POINT SRID 4326 NOT NULL, `path` LINESTRING SRID 4326 NOT NULL, `area` POLYGON SRID 4326 NOT NULL, PRIMARY KEY (`id`))', $result->query);
     }
 
-    public function testCreateTableVectorThrows(): void
-    {
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('Vector type is not supported in MySQL.');
-
-        $schema = new Schema();
-        $schema->table('embeddings')
-            ->vector('embedding', 768)
-            ->create();
-    }
-
     public function testCreateTableWithComment(): void
     {
         $schema = new Schema();

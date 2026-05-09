@@ -5,16 +5,53 @@ namespace Utopia\Query\Schema;
 use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
+use Utopia\Query\Schema\Feature\AnalyzeTable;
 use Utopia\Query\Schema\Feature\ColumnComments;
 use Utopia\Query\Schema\Feature\CreatePartition;
+use Utopia\Query\Schema\Feature\Databases;
 use Utopia\Query\Schema\Feature\DropPartition;
+use Utopia\Query\Schema\Feature\ForeignKeys;
+use Utopia\Query\Schema\Feature\Partitioning;
+use Utopia\Query\Schema\Feature\Procedures;
+use Utopia\Query\Schema\Feature\RenameIndex;
+use Utopia\Query\Schema\Feature\ReplaceView;
 use Utopia\Query\Schema\Feature\Sequences;
 use Utopia\Query\Schema\Feature\TableComments;
+use Utopia\Query\Schema\Feature\Triggers;
 use Utopia\Query\Schema\Feature\Types;
+use Utopia\Query\Schema\Feature\Views;
 
-class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnComments, CreatePartition, DropPartition
+class PostgreSQL extends SQL implements
+    ForeignKeys,
+    Procedures,
+    Triggers,
+    Types,
+    Sequences,
+    TableComments,
+    ColumnComments,
+    CreatePartition,
+    DropPartition,
+    Views,
+    ReplaceView,
+    Databases,
+    RenameIndex,
+    AnalyzeTable,
+    Partitioning
 {
+    use Trait\ForeignKeys;
+    use Trait\Partitioning;
+    use Trait\Procedures;
+    use Trait\ReplaceView;
+    use Trait\Triggers;
+    use Trait\Views;
+
     protected string $wrapChar = '"';
+
+    #[\Override]
+    public function table(string $name): Table\PostgreSQL
+    {
+        return new Table\PostgreSQL($this, $name);
+    }
 
     protected function compileColumnType(Column $column): string
     {

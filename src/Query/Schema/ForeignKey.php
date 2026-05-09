@@ -3,17 +3,16 @@
 namespace Utopia\Query\Schema;
 
 use Utopia\Query\Builder\Statement;
-use Utopia\Query\Schema\ClickHouse\Engine;
 
 class ForeignKey
 {
-    public private(set) string $refTable = '';
+    public protected(set) string $refTable = '';
 
-    public private(set) string $refColumn = '';
+    public protected(set) string $refColumn = '';
 
-    public private(set) ?ForeignKeyAction $onDelete = null;
+    public protected(set) ?ForeignKeyAction $onDelete = null;
 
-    public private(set) ?ForeignKeyAction $onUpdate = null;
+    public protected(set) ?ForeignKeyAction $onUpdate = null;
 
     public function __construct(
         public readonly Table $table,
@@ -152,11 +151,6 @@ class ForeignKey
         return $this->table->polygon($name, $srid);
     }
 
-    public function vector(string $name, int $dimensions): Column
-    {
-        return $this->table->vector($name, $dimensions);
-    }
-
     public function timestamps(int $precision = 3): Table
     {
         return $this->table->timestamps($precision);
@@ -218,22 +212,6 @@ class ForeignKey
 
     /**
      * @param  string[]  $columns
-     */
-    public function fulltextIndex(array $columns, string $name = ''): Table
-    {
-        return $this->table->fulltextIndex($columns, $name);
-    }
-
-    /**
-     * @param  string[]  $columns
-     */
-    public function spatialIndex(array $columns, string $name = ''): Table
-    {
-        return $this->table->spatialIndex($columns, $name);
-    }
-
-    /**
-     * @param  string[]  $columns
      * @param  array<string, int>  $lengths
      * @param  array<string, string>  $orders
      * @param  array<string, string>  $collations
@@ -258,34 +236,6 @@ class ForeignKey
         return $this->table->dropIndex($name);
     }
 
-    public function foreignKey(string $column): ForeignKey
-    {
-        return $this->table->foreignKey($column);
-    }
-
-    public function addForeignKey(string $column): ForeignKey
-    {
-        return $this->table->addForeignKey($column);
-    }
-
-    public function dropForeignKey(string $name): Table
-    {
-        return $this->table->dropForeignKey($name);
-    }
-
-    /**
-     * @param  list<string>  $columns
-     */
-    public function primary(array $columns): Table
-    {
-        return $this->table->primary($columns);
-    }
-
-    public function check(string $name, string $expression): Table
-    {
-        return $this->table->check($name, $expression);
-    }
-
     public function rawColumn(string $definition): Table
     {
         return $this->table->rawColumn($definition);
@@ -294,39 +244,6 @@ class ForeignKey
     public function rawIndex(string $definition): Table
     {
         return $this->table->rawIndex($definition);
-    }
-
-    public function partitionByRange(string $expression): Table
-    {
-        return $this->table->partitionByRange($expression);
-    }
-
-    public function partitionByList(string $expression): Table
-    {
-        return $this->table->partitionByList($expression);
-    }
-
-    public function partitionByHash(string $expression, ?int $partitions = null): Table
-    {
-        return $this->table->partitionByHash($expression, $partitions);
-    }
-
-    public function engine(Engine $engine, string ...$args): Table
-    {
-        return $this->table->engine($engine, ...$args);
-    }
-
-    /**
-     * @param  list<string>  $columns
-     */
-    public function orderBy(array $columns): Table
-    {
-        return $this->table->orderBy($columns);
-    }
-
-    public function ttl(string $expression): Table
-    {
-        return $this->table->ttl($expression);
     }
 
     public function create(bool $ifNotExists = false): Statement

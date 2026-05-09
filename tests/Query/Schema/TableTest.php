@@ -10,7 +10,7 @@ use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\ForeignKey;
 use Utopia\Query\Schema\Index;
 use Utopia\Query\Schema\RenameColumn;
-use Utopia\Query\Schema\Table;
+use Utopia\Query\Schema\Table\PostgreSQL as Table;
 
 class TableTest extends TestCase
 {

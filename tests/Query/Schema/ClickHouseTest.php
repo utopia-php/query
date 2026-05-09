@@ -101,17 +101,6 @@ class ClickHouseTest extends TestCase
         $this->assertSame('CREATE TABLE `geo` (`coords` Tuple(Float64, Float64), `path` Array(Tuple(Float64, Float64)), `area` Array(Array(Tuple(Float64, Float64)))) ENGINE = MergeTree() ORDER BY tuple()', $result->query);
     }
 
-    public function testCreateTableForeignKeyThrows(): void
-    {
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('Foreign keys are not supported in ClickHouse');
-
-        $schema = new Schema();
-        $schema->table('t')
-            ->foreignKey('user_id')->references('id')->on('users')
-            ->create();
-    }
-
     public function testCreateTableWithIndex(): void
     {
         $schema = new Schema();
@@ -167,17 +156,6 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertSame('ALTER TABLE `events` DROP COLUMN `old_col`', $result->query);
-    }
-
-    public function testAlterForeignKeyThrows(): void
-    {
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('Foreign keys are not supported in ClickHouse');
-
-        $schema = new Schema();
-        $schema->table('events')
-            ->addForeignKey('user_id')->references('id')->on('users')
-            ->alter();
     }
 
     public function testDropTable(): void
@@ -394,16 +372,6 @@ class ClickHouseTest extends TestCase
         $this->assertSame('CREATE TABLE `events` (`id` Int64, `name` String, `type` String, INDEX `idx_name_type` (`name`, `type`) TYPE minmax GRANULARITY 3) ENGINE = MergeTree() ORDER BY (`id`)', $result->query);
     }
 
-    public function testAlterForeignKeyStillThrows(): void
-    {
-        $this->expectException(UnsupportedException::class);
-
-        $schema = new Schema();
-        $schema->table('events')
-            ->dropForeignKey('fk_old')
-            ->alter();
-    }
-
     public function testExactCreateTableWithEngine(): void
     {
         $schema = new Schema();
@@ -496,7 +464,7 @@ class ClickHouseTest extends TestCase
             ->bigInteger('id')->primary()
             ->string('name')
             ->datetime('created_at', 3)
-            ->partitionByRange('toYYYYMM(created_at)')
+            ->partitionBy('toYYYYMM(created_at)')
             ->create();
         $this->assertBindingCount($result);
 

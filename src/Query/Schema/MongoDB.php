@@ -7,9 +7,18 @@ use Utopia\Query\Builder;
 use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Schema;
+use Utopia\Query\Schema\Feature\AnalyzeTable;
+use Utopia\Query\Schema\Feature\Databases;
+use Utopia\Query\Schema\Feature\Views;
 
-class MongoDB extends Schema
+class MongoDB extends Schema implements Views, Databases, AnalyzeTable
 {
+    #[\Override]
+    public function table(string $name): Table\MongoDB
+    {
+        return new Table\MongoDB($this, $name);
+    }
+
     protected function quote(string $identifier): string
     {
         return $identifier;
@@ -277,6 +286,15 @@ class MongoDB extends Schema
         return new Statement(
             \json_encode($command, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
             $result->bindings,
+            executor: $this->executor,
+        );
+    }
+
+    public function dropView(string $name): Statement
+    {
+        return new Statement(
+            \json_encode(['command' => 'drop', 'view' => $name], JSON_THROW_ON_ERROR),
+            [],
             executor: $this->executor,
         );
     }

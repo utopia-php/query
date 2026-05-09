@@ -4,9 +4,20 @@ namespace Utopia\Query\Schema;
 
 use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\UnsupportedException;
+use Utopia\Query\Schema\Feature\ForeignKeys;
+use Utopia\Query\Schema\Feature\Views;
 
-class SQLite extends SQL
+class SQLite extends SQL implements ForeignKeys, Views
 {
+    use Trait\ForeignKeys;
+    use Trait\Views;
+
+    #[\Override]
+    public function table(string $name): Table\SQLite
+    {
+        return new Table\SQLite($this, $name);
+    }
+
     protected function compileColumnType(Column $column): string
     {
         if ($column->userTypeName !== null) {
@@ -106,16 +117,6 @@ class SQLite extends SQL
         return '';
     }
 
-    public function createDatabase(string $name): Statement
-    {
-        throw new UnsupportedException('SQLite does not support CREATE DATABASE.');
-    }
-
-    public function dropDatabase(string $name): Statement
-    {
-        throw new UnsupportedException('SQLite does not support DROP DATABASE.');
-    }
-
     #[\Override]
     public function compileRename(string $from, string $to): Statement
     {
@@ -135,10 +136,5 @@ class SQLite extends SQL
     public function dropIndex(string $table, string $name): Statement
     {
         return new Statement('DROP INDEX ' . $this->quote($name), [], executor: $this->executor);
-    }
-
-    public function renameIndex(string $table, string $from, string $to): Statement
-    {
-        throw new UnsupportedException('SQLite does not support renaming indexes directly.');
     }
 }

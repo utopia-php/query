@@ -297,7 +297,7 @@ class ClickHouseIntegrationTest extends IntegrationTestCase
         $result = $this->schema->table($table)
             ->integer('id')->primary()
             ->datetime('ts')
-            ->partitionByHash('toYYYYMM(`ts`)')
+            ->partitionBy('toYYYYMM(`ts`)')
             ->create();
 
         $this->assertStringContainsString('PARTITION BY toYYYYMM(`ts`)', $result->query);
