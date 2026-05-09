@@ -6,8 +6,12 @@ use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\ClickHouse\Engine;
 use Utopia\Query\Schema\Column;
 use Utopia\Query\Schema\ColumnType;
+use Utopia\Query\Schema\ForeignKey;
 use Utopia\Query\Schema\Table;
 
+/**
+ * @extends Table<Column\ClickHouse, ForeignKey>
+ */
 class ClickHouse extends Table
 {
     use Trait\CompositePrimary;
@@ -16,163 +20,6 @@ class ClickHouse extends Table
     protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null): Column\ClickHouse
     {
         return new Column\ClickHouse($this, $name, $type, $length, $precision);
-    }
-
-    #[\Override]
-    public function id(string $name = 'id'): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::id($name);
-    }
-
-    #[\Override]
-    public function string(string $name, int $length = 255): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::string($name, $length);
-    }
-
-    #[\Override]
-    public function text(string $name): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::text($name);
-    }
-
-    #[\Override]
-    public function mediumText(string $name): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::mediumText($name);
-    }
-
-    #[\Override]
-    public function longText(string $name): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::longText($name);
-    }
-
-    #[\Override]
-    public function integer(string $name): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::integer($name);
-    }
-
-    #[\Override]
-    public function bigInteger(string $name): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::bigInteger($name);
-    }
-
-    #[\Override]
-    public function serial(string $name): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::serial($name);
-    }
-
-    #[\Override]
-    public function bigSerial(string $name): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::bigSerial($name);
-    }
-
-    #[\Override]
-    public function smallSerial(string $name): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::smallSerial($name);
-    }
-
-    #[\Override]
-    public function float(string $name): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::float($name);
-    }
-
-    #[\Override]
-    public function boolean(string $name): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::boolean($name);
-    }
-
-    #[\Override]
-    public function datetime(string $name, int $precision = 0): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::datetime($name, $precision);
-    }
-
-    #[\Override]
-    public function timestamp(string $name, int $precision = 0): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::timestamp($name, $precision);
-    }
-
-    #[\Override]
-    public function json(string $name): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::json($name);
-    }
-
-    #[\Override]
-    public function binary(string $name): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::binary($name);
-    }
-
-    /**
-     * @param  string[]  $values
-     */
-    #[\Override]
-    public function enum(string $name, array $values): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::enum($name, $values);
-    }
-
-    #[\Override]
-    public function point(string $name, int $srid = 4326): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::point($name, $srid);
-    }
-
-    #[\Override]
-    public function linestring(string $name, int $srid = 4326): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::linestring($name, $srid);
-    }
-
-    #[\Override]
-    public function polygon(string $name, int $srid = 4326): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::polygon($name, $srid);
-    }
-
-    #[\Override]
-    public function addColumn(string $name, ColumnType $type, ?int $lengthOrPrecision = null): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::addColumn($name, $type, $lengthOrPrecision);
-    }
-
-    #[\Override]
-    public function modifyColumn(string $name, ColumnType $type, ?int $lengthOrPrecision = null): Column\ClickHouse
-    {
-        /** @var Column\ClickHouse */
-        return parent::modifyColumn($name, $type, $lengthOrPrecision);
     }
 
     /**

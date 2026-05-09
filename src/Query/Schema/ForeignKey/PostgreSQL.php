@@ -2,12 +2,13 @@
 
 namespace Utopia\Query\Schema\ForeignKey;
 
+use Utopia\Query\Schema\Column;
 use Utopia\Query\Schema\ForeignKey;
 use Utopia\Query\Schema\Forwarder;
 use Utopia\Query\Schema\Table;
 
 /**
- * @property Table\PostgreSQL $table
+ * @extends ForeignKey<Column\PostgreSQL, Table\PostgreSQL>
  */
 class PostgreSQL extends ForeignKey
 {

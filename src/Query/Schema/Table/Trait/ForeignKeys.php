@@ -4,6 +4,9 @@ namespace Utopia\Query\Schema\Table\Trait;
 
 use Utopia\Query\Schema\ForeignKey;
 
+/**
+ * @template TForeignKey of ForeignKey
+ */
 trait ForeignKeys
 {
     /**
@@ -12,6 +15,8 @@ trait ForeignKeys
      * a CREATE TABLE column list) and `ADD FOREIGN KEY (...)` (in an ALTER
      * TABLE clause) when emitting the statement. {@see addForeignKey()} is
      * an alias for use in alter chains; both register the same FK exactly once.
+     *
+     * @return TForeignKey
      */
     public function foreignKey(string $column): ForeignKey
     {
@@ -25,6 +30,8 @@ trait ForeignKeys
      * Alias of {@see foreignKey()}, for symmetry with the other `add*`/`drop*`
      * alter helpers. Returns the same registered {@see ForeignKey}; calling
      * both methods for the same column registers the FK twice.
+     *
+     * @return TForeignKey
      */
     public function addForeignKey(string $column): ForeignKey
     {

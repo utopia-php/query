@@ -6,6 +6,9 @@ use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\ClickHouse\IndexAlgorithm;
 
+/**
+ * @template TTable of Table = Table
+ */
 class Column
 {
     public protected(set) bool $isNullable = false;
@@ -51,6 +54,9 @@ class Column
 
     public protected(set) ?string $userTypeName = null;
 
+    /**
+     * @param  TTable  $table
+     */
     public function __construct(
         public Table $table,
         public string $name,
@@ -363,6 +369,7 @@ class Column
         return $this->table->polygon($name, $srid);
     }
 
+    /** @return TTable */
     public function timestamps(int $precision = 3): Table
     {
         return $this->table->timestamps($precision);
@@ -380,11 +387,13 @@ class Column
         return $this->table->modifyColumn($name, $type, $lengthOrPrecision);
     }
 
+    /** @return TTable */
     public function renameColumn(string $from, string $to): Table
     {
         return $this->table->renameColumn($from, $to);
     }
 
+    /** @return TTable */
     public function dropColumn(string $name): Table
     {
         return $this->table->dropColumn($name);
@@ -396,6 +405,7 @@ class Column
      * @param  array<string, string>  $orders
      * @param  array<string, string>  $collations
      * @param  list<string|int|float>  $algorithmArgs  ClickHouse skip-index algorithm args
+     * @return TTable
      */
     public function index(
         array $columns,
@@ -428,6 +438,7 @@ class Column
      * @param  array<string, int>  $lengths
      * @param  array<string, string>  $orders
      * @param  array<string, string>  $collations
+     * @return TTable
      */
     public function uniqueIndex(
         array $columns,
@@ -445,6 +456,7 @@ class Column
      * @param  array<string, string>  $orders
      * @param  array<string, string>  $collations
      * @param  list<string>  $rawColumns
+     * @return TTable
      */
     public function addIndex(
         string $name,
@@ -460,16 +472,19 @@ class Column
         return $this->table->addIndex($name, $columns, $type, $lengths, $orders, $method, $operatorClass, $collations, $rawColumns);
     }
 
+    /** @return TTable */
     public function dropIndex(string $name): Table
     {
         return $this->table->dropIndex($name);
     }
 
+    /** @return TTable */
     public function rawColumn(string $definition): Table
     {
         return $this->table->rawColumn($definition);
     }
 
+    /** @return TTable */
     public function rawIndex(string $definition): Table
     {
         return $this->table->rawIndex($definition);

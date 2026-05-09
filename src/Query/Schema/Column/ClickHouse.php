@@ -7,7 +7,7 @@ use Utopia\Query\Schema\Forwarder;
 use Utopia\Query\Schema\Table;
 
 /**
- * @property Table\ClickHouse $table
+ * @extends Column<Table\ClickHouse>
  */
 class ClickHouse extends Column
 {

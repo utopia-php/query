@@ -2,12 +2,13 @@
 
 namespace Utopia\Query\Schema\ForeignKey;
 
+use Utopia\Query\Schema\Column;
 use Utopia\Query\Schema\ForeignKey;
 use Utopia\Query\Schema\Forwarder;
 use Utopia\Query\Schema\Table;
 
 /**
- * @property Table\SQLite $table
+ * @extends ForeignKey<Column\SQLite, Table\SQLite>
  */
 class SQLite extends ForeignKey
 {

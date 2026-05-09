@@ -8,15 +8,19 @@ use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema;
 use Utopia\Query\Schema\ClickHouse\Engine;
 
+/**
+ * @template TColumn of Column = Column
+ * @template TForeignKey of ForeignKey = ForeignKey
+ */
 class Table
 {
-    /** @var list<Column> */
+    /** @var list<TColumn> */
     public protected(set) array $columns = [];
 
     /** @var list<Index> */
     public protected(set) array $indexes = [];
 
-    /** @var list<ForeignKey> */
+    /** @var list<TForeignKey> */
     public protected(set) array $foreignKeys = [];
 
     /** @var list<string> */
@@ -113,9 +117,12 @@ class Table
     /**
      * Construct a Column instance. Dialect Table subclasses override to
      * construct their dialect-specific {@see Column} subclass.
+     *
+     * @return TColumn
      */
     protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null): Column
     {
+        /** @var TColumn */
         return new Column($this, $name, $type, $length, $precision);
     }
 
@@ -123,21 +130,28 @@ class Table
      * Construct a ForeignKey instance. Dialect Table subclasses that support
      * foreign keys override to construct their dialect-specific
      * {@see ForeignKey} subclass.
+     *
+     * @return TForeignKey
      */
     protected function newForeignKey(string $column): ForeignKey
     {
+        /** @var TForeignKey */
         return new ForeignKey($this, $column);
     }
 
+    /** @return TColumn */
     public function id(string $name = 'id'): Column
     {
         $col = $this->newColumn($name, ColumnType::BigInteger);
-        $col->unsigned()->autoIncrement()->primary();
+        $col->unsigned();
+        $col->autoIncrement();
+        $col->primary();
         $this->columns[] = $col;
 
         return $col;
     }
 
+    /** @return TColumn */
     public function string(string $name, int $length = 255): Column
     {
         $col = $this->newColumn($name, ColumnType::String, $length);
@@ -146,6 +160,7 @@ class Table
         return $col;
     }
 
+    /** @return TColumn */
     public function text(string $name): Column
     {
         $col = $this->newColumn($name, ColumnType::Text);
@@ -154,6 +169,7 @@ class Table
         return $col;
     }
 
+    /** @return TColumn */
     public function mediumText(string $name): Column
     {
         $col = $this->newColumn($name, ColumnType::MediumText);
@@ -162,6 +178,7 @@ class Table
         return $col;
     }
 
+    /** @return TColumn */
     public function longText(string $name): Column
     {
         $col = $this->newColumn($name, ColumnType::LongText);
@@ -170,6 +187,7 @@ class Table
         return $col;
     }
 
+    /** @return TColumn */
     public function integer(string $name): Column
     {
         $col = $this->newColumn($name, ColumnType::Integer);
@@ -178,6 +196,7 @@ class Table
         return $col;
     }
 
+    /** @return TColumn */
     public function bigInteger(string $name): Column
     {
         $col = $this->newColumn($name, ColumnType::BigInteger);
@@ -189,10 +208,13 @@ class Table
     /**
      * Auto-incrementing integer column (PostgreSQL SERIAL; INT AUTO_INCREMENT
      * on MySQL; INTEGER on SQLite). Not exposed on ClickHouse/MongoDB.
+     *
+     * @return TColumn
      */
     public function serial(string $name): Column
     {
-        $col = $this->newColumn($name, ColumnType::Serial)->autoIncrement();
+        $col = $this->newColumn($name, ColumnType::Serial);
+        $col->autoIncrement();
         $this->columns[] = $col;
 
         return $col;
@@ -202,10 +224,13 @@ class Table
      * Auto-incrementing big integer column (PostgreSQL BIGSERIAL;
      * BIGINT AUTO_INCREMENT on MySQL; INTEGER on SQLite). Not exposed on
      * ClickHouse/MongoDB.
+     *
+     * @return TColumn
      */
     public function bigSerial(string $name): Column
     {
-        $col = $this->newColumn($name, ColumnType::BigSerial)->autoIncrement();
+        $col = $this->newColumn($name, ColumnType::BigSerial);
+        $col->autoIncrement();
         $this->columns[] = $col;
 
         return $col;
@@ -215,15 +240,19 @@ class Table
      * Auto-incrementing small integer column (PostgreSQL SMALLSERIAL;
      * SMALLINT AUTO_INCREMENT on MySQL; INTEGER on SQLite). Not exposed on
      * ClickHouse/MongoDB.
+     *
+     * @return TColumn
      */
     public function smallSerial(string $name): Column
     {
-        $col = $this->newColumn($name, ColumnType::SmallSerial)->autoIncrement();
+        $col = $this->newColumn($name, ColumnType::SmallSerial);
+        $col->autoIncrement();
         $this->columns[] = $col;
 
         return $col;
     }
 
+    /** @return TColumn */
     public function float(string $name): Column
     {
         $col = $this->newColumn($name, ColumnType::Float);
@@ -232,6 +261,7 @@ class Table
         return $col;
     }
 
+    /** @return TColumn */
     public function boolean(string $name): Column
     {
         $col = $this->newColumn($name, ColumnType::Boolean);
@@ -240,6 +270,7 @@ class Table
         return $col;
     }
 
+    /** @return TColumn */
     public function datetime(string $name, int $precision = 0): Column
     {
         $col = $this->newColumn($name, ColumnType::Datetime, precision: $precision);
@@ -248,6 +279,7 @@ class Table
         return $col;
     }
 
+    /** @return TColumn */
     public function timestamp(string $name, int $precision = 0): Column
     {
         $col = $this->newColumn($name, ColumnType::Timestamp, precision: $precision);
@@ -256,6 +288,7 @@ class Table
         return $col;
     }
 
+    /** @return TColumn */
     public function json(string $name): Column
     {
         $col = $this->newColumn($name, ColumnType::Json);
@@ -264,6 +297,7 @@ class Table
         return $col;
     }
 
+    /** @return TColumn */
     public function binary(string $name): Column
     {
         $col = $this->newColumn($name, ColumnType::Binary);
@@ -274,6 +308,7 @@ class Table
 
     /**
      * @param  string[]  $values
+     * @return TColumn
      *
      * @throws ValidationException if the value list is empty.
      */
@@ -283,31 +318,38 @@ class Table
             throw new ValidationException('enum() requires at least one allowed value.');
         }
 
-        $col = $this->newColumn($name, ColumnType::Enum)->enum($values);
+        $col = $this->newColumn($name, ColumnType::Enum);
+        $col->enum($values);
         $this->columns[] = $col;
 
         return $col;
     }
 
+    /** @return TColumn */
     public function point(string $name, int $srid = 4326): Column
     {
-        $col = $this->newColumn($name, ColumnType::Point)->srid($srid);
+        $col = $this->newColumn($name, ColumnType::Point);
+        $col->srid($srid);
         $this->columns[] = $col;
 
         return $col;
     }
 
+    /** @return TColumn */
     public function linestring(string $name, int $srid = 4326): Column
     {
-        $col = $this->newColumn($name, ColumnType::Linestring)->srid($srid);
+        $col = $this->newColumn($name, ColumnType::Linestring);
+        $col->srid($srid);
         $this->columns[] = $col;
 
         return $col;
     }
 
+    /** @return TColumn */
     public function polygon(string $name, int $srid = 4326): Column
     {
-        $col = $this->newColumn($name, ColumnType::Polygon)->srid($srid);
+        $col = $this->newColumn($name, ColumnType::Polygon);
+        $col->srid($srid);
         $this->columns[] = $col;
 
         return $col;
@@ -381,6 +423,7 @@ class Table
         return $this;
     }
 
+    /** @return TColumn */
     public function addColumn(string $name, ColumnType $type, ?int $lengthOrPrecision = null): Column
     {
         $col = $this->newColumn(
@@ -394,6 +437,7 @@ class Table
         return $col;
     }
 
+    /** @return TColumn */
     public function modifyColumn(string $name, ColumnType $type, ?int $lengthOrPrecision = null): Column
     {
         $col = $this->newColumn(
@@ -401,7 +445,8 @@ class Table
             $type,
             $type === ColumnType::String ? $lengthOrPrecision : null,
             $type !== ColumnType::String ? $lengthOrPrecision : null,
-        )->modify();
+        );
+        $col->modify();
         $this->columns[] = $col;
 
         return $col;

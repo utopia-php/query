@@ -7,7 +7,7 @@ use Utopia\Query\Schema\Forwarder;
 use Utopia\Query\Schema\Table;
 
 /**
- * @property Table\SQLite $table
+ * @extends Column<Table\SQLite>
  */
 class SQLite extends Column
 {

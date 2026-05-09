@@ -7,7 +7,7 @@ use Utopia\Query\Schema\Forwarder;
 use Utopia\Query\Schema\Table;
 
 /**
- * @property Table\MySQL $table
+ * @extends Column<Table\MySQL>
  */
 class MySQL extends Column
 {
