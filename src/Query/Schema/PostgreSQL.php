@@ -588,4 +588,19 @@ class PostgreSQL extends SQL implements
             executor: $this->executor,
         );
     }
+
+    /**
+     * PostgreSQL accepts `PARTITION BY {RANGE|LIST|HASH} (expr)` but not the
+     * `PARTITIONS N` count modifier — that is MySQL-only. Override the shared
+     * trait to omit the count.
+     */
+    #[\Override]
+    public function compileCreatePartitioning(Table $table): string
+    {
+        if ($table->partitionType === null) {
+            return '';
+        }
+
+        return 'PARTITION BY ' . $table->partitionType->value . '(' . $table->partitionExpression . ')';
+    }
 }
