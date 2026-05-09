@@ -9,18 +9,12 @@ use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\ColumnType;
-use Utopia\Query\Schema\Feature\ForeignKeys;
 use Utopia\Query\Schema\ForeignKeyAction;
 use Utopia\Query\Schema\SQLite as Schema;
 
 class SQLiteTest extends TestCase
 {
     use AssertsBindingCount;
-
-    public function testImplementsForeignKeys(): void
-    {
-        $this->assertInstanceOf(ForeignKeys::class, new Schema());
-    }
 
     public function testCreateTableBasic(): void
     {
@@ -353,45 +347,6 @@ class SQLiteTest extends TestCase
         $result = $schema->dropView('active_users');
 
         $this->assertSame('DROP VIEW `active_users`', $result->query);
-    }
-
-    public function testAddForeignKeyStandalone(): void
-    {
-        $schema = new Schema();
-        $result = $schema->addForeignKey(
-            'orders',
-            'fk_user',
-            'user_id',
-            'users',
-            'id',
-            onDelete: ForeignKeyAction::Cascade,
-            onUpdate: ForeignKeyAction::SetNull
-        );
-
-        $this->assertSame(
-            'ALTER TABLE `orders` ADD CONSTRAINT `fk_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE SET NULL',
-            $result->query
-        );
-    }
-
-    public function testAddForeignKeyNoActions(): void
-    {
-        $schema = new Schema();
-        $result = $schema->addForeignKey('orders', 'fk_user', 'user_id', 'users', 'id');
-
-        $this->assertStringNotContainsString('ON DELETE', $result->query);
-        $this->assertStringNotContainsString('ON UPDATE', $result->query);
-    }
-
-    public function testDropForeignKeyStandalone(): void
-    {
-        $schema = new Schema();
-        $result = $schema->dropForeignKey('orders', 'fk_user');
-
-        $this->assertSame(
-            'ALTER TABLE `orders` DROP FOREIGN KEY `fk_user`',
-            $result->query
-        );
     }
 
     public function testCreateTableWithMultiplePrimaryKeys(): void

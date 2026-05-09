@@ -4,12 +4,10 @@ namespace Utopia\Query\Schema;
 
 use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\UnsupportedException;
-use Utopia\Query\Schema\Feature\ForeignKeys;
 use Utopia\Query\Schema\Feature\Views;
 
-class SQLite extends SQL implements ForeignKeys, Views
+class SQLite extends SQL implements Views
 {
-    use Trait\ForeignKeys;
     use Trait\Views;
 
     #[\Override]
