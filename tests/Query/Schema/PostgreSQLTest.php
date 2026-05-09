@@ -198,7 +198,7 @@ class PostgreSQLTest extends TestCase
         $schema = new Schema();
         $result = $schema->dropProcedure('update_stats');
 
-        $this->assertSame('DROP FUNCTION "update_stats"', $result->query);
+        $this->assertSame('DROP FUNCTION "update_stats"()', $result->query);
     }
 
     public function testCreateTriggerUsesExecuteFunction(): void
@@ -518,7 +518,7 @@ class PostgreSQLTest extends TestCase
         $result = $schema->dropTrigger('trg_old', 'users');
 
         $this->assertSame(
-            'DROP TRIGGER "trg_old" ON "users"; DROP FUNCTION "trg_old_func"',
+            'DROP TRIGGER "trg_old" ON "users"; DROP FUNCTION "trg_old_func"()',
             $result->query,
         );
     }

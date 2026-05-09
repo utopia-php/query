@@ -268,7 +268,7 @@ class PostgreSQL extends SQL implements
 
     public function dropProcedure(string $name): Statement
     {
-        return new Statement('DROP FUNCTION ' . $this->quote($name), [], executor: $this->executor);
+        return new Statement('DROP FUNCTION ' . $this->quote($name) . '()', [], executor: $this->executor);
     }
 
     /**
@@ -320,7 +320,7 @@ class PostgreSQL extends SQL implements
         $funcName = $name . '_func';
 
         $sql = 'DROP TRIGGER ' . $this->quote($name) . ' ON ' . $this->quote($table)
-            . '; DROP FUNCTION ' . $this->quote($funcName);
+            . '; DROP FUNCTION ' . $this->quote($funcName) . '()';
 
         return new Statement($sql, [], executor: $this->executor);
     }
