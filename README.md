@@ -2033,7 +2033,7 @@ $result = $schema->table('events')
 
 ClickHouse uses `Nullable(type)` wrapping for nullable columns, `Enum8(...)` for enums, `Tuple(Float64, Float64)` for points, and `TYPE minmax GRANULARITY 3` for indexes. Foreign keys, stored procedures, triggers, generated columns, and CHECK constraints throw `UnsupportedException`.
 
-Supports the `TableComments`, `ColumnComments`, and `DropPartition` interfaces.
+Supports the `TableComments`, `ColumnComments`, `DropPartition`, `Views`, `Databases`, and `OLAP` interfaces.
 
 **Engine selection** — choose from 10 variants of the `Engine` enum:
 
@@ -2129,6 +2129,73 @@ $schema->table('events')
 ```
 
 Setting names must match `[A-Za-z_][A-Za-z0-9_]*`; string values are restricted to `[A-Za-z0-9_.\-+/]*`. Use ints / floats / booleans for everything else. Other dialects ignore the call.
+
+**LowCardinality** — wrap a column type in `LowCardinality(...)` for compact dictionary-encoded storage on string columns with a small number of distinct values (status enums, type discriminators, country codes, category labels):
+
+```php
+$schema->table('events')
+    ->bigInteger('id')->primary()
+    ->string('status')->lowCardinality()
+    ->string('country')->lowCardinality()->nullable()
+    ->create();
+
+// CREATE TABLE `events` (`id` Int64, `status` LowCardinality(String),
+//   `country` Nullable(LowCardinality(String))) ENGINE = MergeTree() ORDER BY (`id`)
+```
+
+`Nullable` is applied outside `LowCardinality` to match ClickHouse's required wrapping order. The `lowCardinality()` method is only available on the ClickHouse builder — callers on other dialects (`MySQL`, `PostgreSQL`, `SQLite`, `MongoDB`) cannot reach this method at all.
+
+**FixedString(N)** — fixed-length string column. Use for ISO codes, hash digests, and other values whose byte length is known and constant:
+
+```php
+$schema->table('locations')
+    ->bigInteger('id')->primary()
+    ->fixedString('country_code', 2)   // ISO 3166-1 alpha-2
+    ->fixedString('currency_code', 3)  // ISO 4217
+    ->fixedString('digest', 32)        // raw MD5
+    ->create();
+
+// CREATE TABLE `locations` (`id` Int64, `country_code` FixedString(2),
+//   `currency_code` FixedString(3), `digest` FixedString(32))
+//   ENGINE = MergeTree() ORDER BY (`id`)
+```
+
+Length must be at least 1. The `fixedString()` method is only available on the ClickHouse builder — the type has no portable mapping.
+
+**Column-level CODEC** — append one or more compression codecs to a column. Multiple `codec()` calls accumulate and emit `CODEC(c1, c2, ...)`:
+
+```php
+$schema->table('metrics')
+    ->bigInteger('id')->primary()
+    ->datetime('ts', 3)->codec('Delta(4)')->codec('LZ4')   // monotonic timestamps
+    ->bigInteger('value')->codec('T64')->codec('LZ4')      // integer column
+    ->string('payload')->codec('ZSTD(3)')                  // text column
+    ->create();
+
+// CREATE TABLE `metrics` (`id` Int64,
+//   `ts` DateTime64(3) CODEC(Delta(4), LZ4),
+//   `value` Int64 CODEC(T64, LZ4),
+//   `payload` String CODEC(ZSTD(3))) ENGINE = MergeTree() ORDER BY (`id`)
+```
+
+Each codec string is emitted verbatim; supply codec arguments inline (`'Delta(4)'`, `'ZSTD(3)'`). Codec strings must not be empty or contain a semicolon. The `codec()` method is only available on the ClickHouse builder.
+
+**SAMPLE BY** — declare a sampling expression for approximate-query support (`SELECT ... SAMPLE k`). Emitted after `ORDER BY` and before `TTL` / `SETTINGS`:
+
+```php
+$schema->table('events')
+    ->bigInteger('id')->primary()
+    ->bigInteger('user_id')->unsigned()
+    ->sampleBy('user_id')
+    ->create();
+
+// CREATE TABLE `events` (`id` Int64, `user_id` UInt64) ENGINE = MergeTree()
+//   ORDER BY (`id`) SAMPLE BY user_id
+```
+
+The expression is emitted verbatim and must not be empty or contain a semicolon. `SAMPLE BY` only applies to engines that take an `ORDER BY` clause (the MergeTree family); using it with `Memory`, `Log`, `TinyLog`, or `StripeLog` throws `UnsupportedException`. The `sampleBy()` method is only available on the ClickHouse builder.
+
+These OLAP-shaped modifiers are exposed on the ClickHouse dialect via the `Feature\OLAP` marker interface. Dialect-specific Column/Table subclasses surface the methods only when the underlying dialect implements the feature — so calling `->lowCardinality()` or `->sampleBy()` on a `MySQL`, `PostgreSQL`, `SQLite`, or `MongoDB` builder fails at the type level, with no runtime branch needed.
 
 ### SQLite Schema
 
