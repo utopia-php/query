@@ -19,16 +19,54 @@ class ClickHouse extends Table
     /** ClickHouse SAMPLE BY expression. Emitted after ORDER BY when set. */
     public protected(set) ?string $sampleBy = null;
 
+    /** Raw ORDER BY expression. Emitted verbatim when set; takes precedence over {@see $orderBy}. */
+    public protected(set) ?string $orderByRaw = null;
+
     #[\Override]
-    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null): Column\ClickHouse
+    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null, ?int $scale = null): Column\ClickHouse
     {
-        return new Column\ClickHouse($this, $name, $type, $length, $precision);
+        return new Column\ClickHouse($this, $name, $type, $length, $precision, $scale);
     }
 
     public function vector(string $name, int $dimensions): Column\ClickHouse
     {
         $col = $this->newColumn($name, ColumnType::Vector);
         $col->dimensions($dimensions);
+        $this->columns[] = $col;
+
+        return $col;
+    }
+
+    /**
+     * Add an `Array(T)` column.
+     *
+     * The element type is taken from {@see ColumnType} and recursed back
+     * through the standard column-type compiler, so `array('tags',
+     * ColumnType::String)` emits `Array(String)`, `array('values',
+     * ColumnType::BigInteger)->unsigned()` emits `Array(UInt64)`, etc.
+     * Pair with `nullable()` and `lowCardinality()` exactly as with scalar
+     * columns; ClickHouse's required wrapping order is applied by the compiler.
+     */
+    public function array(string $name, ColumnType $element): Column\ClickHouse
+    {
+        $col = $this->newColumn($name, ColumnType::Array);
+        $col->asArray($element);
+        $this->columns[] = $col;
+
+        return $col;
+    }
+
+    /**
+     * Add a `Tuple(t1, t2, ...)` column over the given element types.
+     *
+     * @param  list<ColumnType>  $elements
+     *
+     * @throws ValidationException if the element list is empty.
+     */
+    public function tuple(string $name, array $elements): Column\ClickHouse
+    {
+        $col = $this->newColumn($name, ColumnType::Tuple);
+        $col->asTuple($elements);
         $this->columns[] = $col;
 
         return $col;
@@ -99,6 +137,36 @@ class ClickHouse extends Table
         }
 
         $this->orderBy = $columns;
+
+        return $this;
+    }
+
+    /**
+     * Set the ORDER BY clause to a raw expression emitted verbatim.
+     *
+     * Mirrors {@see partitionBy()} — accepts the full parenthesised tuple,
+     * including function calls (`toDate(ts)`, `cityHash64(user_id)`) that are
+     * common in MergeTree ORDER BY clauses for sparse-index cardinality
+     * control. The expression is emitted unquoted and must come from a trusted
+     * (developer-controlled) source.
+     *
+     * Takes precedence over {@see orderBy()} when both are set.
+     *
+     * @throws ValidationException if the expression is empty or contains ";".
+     */
+    public function orderByRaw(string $expression): static
+    {
+        $trimmed = \trim($expression);
+
+        if ($trimmed === '') {
+            throw new ValidationException('Raw ORDER BY expression must not be empty.');
+        }
+
+        if (\str_contains($trimmed, ';')) {
+            throw new ValidationException('Raw ORDER BY expression must not contain ";".');
+        }
+
+        $this->orderByRaw = $trimmed;
 
         return $this;
     }

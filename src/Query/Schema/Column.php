@@ -17,6 +17,13 @@ class Column
 
     public protected(set) bool $hasDefault = false;
 
+    /**
+     * Raw default expression emitted verbatim after `DEFAULT` (e.g. `now()`,
+     * `generateUUIDv4()`, `gen_random_uuid()`). Distinct from {@see $default},
+     * which is rendered as a quoted literal.
+     */
+    public protected(set) ?string $defaultRaw = null;
+
     public protected(set) bool $isUnsigned = false;
 
     public protected(set) bool $isUnique = false;
@@ -63,6 +70,7 @@ class Column
         public ColumnType $type,
         public ?int $length = null,
         public ?int $precision = null,
+        public ?int $scale = null,
     ) {
     }
 
@@ -77,6 +85,33 @@ class Column
     {
         $this->default = $value;
         $this->hasDefault = true;
+
+        return $this;
+    }
+
+    /**
+     * Set a raw default expression rendered verbatim after `DEFAULT`.
+     *
+     * Use for dialect-specific server-generated defaults that {@see default()}
+     * would otherwise quote: `now()`, `CURRENT_TIMESTAMP`, `gen_random_uuid()`,
+     * `generateUUIDv4()`, etc. The expression is emitted unquoted and must come
+     * from a trusted (developer-controlled) source.
+     *
+     * @throws ValidationException if the expression is empty or contains ";".
+     */
+    public function defaultRaw(string $expression): static
+    {
+        $trimmed = \trim($expression);
+
+        if ($trimmed === '') {
+            throw new ValidationException('Raw default expression must not be empty.');
+        }
+
+        if (\str_contains($trimmed, ';')) {
+            throw new ValidationException('Raw default expression must not contain ";".');
+        }
+
+        $this->defaultRaw = $trimmed;
 
         return $this;
     }
@@ -285,6 +320,18 @@ class Column
         return $this->table->longText($name);
     }
 
+    public function tinyInteger(string $name): static
+    {
+        /** @var static */
+        return $this->table->tinyInteger($name);
+    }
+
+    public function smallInteger(string $name): static
+    {
+        /** @var static */
+        return $this->table->smallInteger($name);
+    }
+
     public function integer(string $name): static
     {
         /** @var static */
@@ -295,6 +342,18 @@ class Column
     {
         /** @var static */
         return $this->table->bigInteger($name);
+    }
+
+    public function decimal(string $name, int $precision = 10, int $scale = 0): static
+    {
+        /** @var static */
+        return $this->table->decimal($name, $precision, $scale);
+    }
+
+    public function uuid(string $name): static
+    {
+        /** @var static */
+        return $this->table->uuid($name);
     }
 
     public function serial(string $name): static

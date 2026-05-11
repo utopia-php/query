@@ -58,10 +58,12 @@ class MySQL extends SQL implements
             ColumnType::Text => 'TEXT',
             ColumnType::MediumText => 'MEDIUMTEXT',
             ColumnType::LongText => 'LONGTEXT',
+            ColumnType::TinyInteger => 'TINYINT',
+            ColumnType::SmallInteger, ColumnType::SmallSerial => 'SMALLINT',
             ColumnType::Integer, ColumnType::Serial => 'INT',
             ColumnType::BigInteger, ColumnType::Id, ColumnType::BigSerial => 'BIGINT',
-            ColumnType::SmallSerial => 'SMALLINT',
             ColumnType::Float, ColumnType::Double => 'DOUBLE',
+            ColumnType::Decimal => 'DECIMAL(' . ($column->precision ?? 10) . ', ' . ($column->scale ?? 0) . ')',
             ColumnType::Boolean => 'TINYINT(1)',
             ColumnType::Datetime => $column->precision ? 'DATETIME(' . $column->precision . ')' : 'DATETIME',
             ColumnType::Timestamp => $column->precision ? 'TIMESTAMP(' . $column->precision . ')' : 'TIMESTAMP',
@@ -71,8 +73,10 @@ class MySQL extends SQL implements
             ColumnType::Point => 'POINT' . ($column->srid !== null ? ' SRID ' . $column->srid : ''),
             ColumnType::Linestring => 'LINESTRING' . ($column->srid !== null ? ' SRID ' . $column->srid : ''),
             ColumnType::Polygon => 'POLYGON' . ($column->srid !== null ? ' SRID ' . $column->srid : ''),
+            ColumnType::Uuid => 'CHAR(36)',
             ColumnType::Uuid7 => 'VARCHAR(36)',
             ColumnType::Vector => throw new UnsupportedException('Vector type is not supported in MySQL.'),
+            ColumnType::Array, ColumnType::Tuple => throw new UnsupportedException('Array/Tuple column types are not supported in MySQL.'),
         };
     }
 

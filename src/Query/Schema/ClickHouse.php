@@ -46,13 +46,52 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             return $type;
         }
 
+        if ($column instanceof Column\ClickHouse && $column->arrayElementType !== null) {
+            if ($column->isLowCardinality) {
+                throw new UnsupportedException('LowCardinality is not supported inside Array(...). Wrap the element type instead.');
+            }
+
+            $inner = $this->compileNestedElementType($column->arrayElementType, $column);
+            $type = 'Array(' . $inner . ')';
+
+            if ($column->isNullable) {
+                $type = 'Nullable(' . $type . ')';
+            }
+
+            return $type;
+        }
+
+        if ($column instanceof Column\ClickHouse && $column->tupleElementTypes !== []) {
+            if ($column->isLowCardinality) {
+                throw new UnsupportedException('LowCardinality is not supported on Tuple(...) columns.');
+            }
+
+            $inner = \implode(
+                ', ',
+                \array_map(
+                    fn (ColumnType $element): string => $this->compileNestedElementType($element, $column),
+                    $column->tupleElementTypes,
+                ),
+            );
+            $type = 'Tuple(' . $inner . ')';
+
+            if ($column->isNullable) {
+                $type = 'Nullable(' . $type . ')';
+            }
+
+            return $type;
+        }
+
         $type = match ($column->type) {
             ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'String',
             ColumnType::Text => 'String',
             ColumnType::MediumText, ColumnType::LongText => 'String',
+            ColumnType::TinyInteger => $column->isUnsigned ? 'UInt8' : 'Int8',
+            ColumnType::SmallInteger => $column->isUnsigned ? 'UInt16' : 'Int16',
             ColumnType::Integer => $column->isUnsigned ? 'UInt32' : 'Int32',
             ColumnType::BigInteger, ColumnType::Id => $column->isUnsigned ? 'UInt64' : 'Int64',
             ColumnType::Float, ColumnType::Double => 'Float64',
+            ColumnType::Decimal => 'Decimal(' . ($column->precision ?? 10) . ', ' . ($column->scale ?? 0) . ')',
             ColumnType::Boolean => 'UInt8',
             ColumnType::Datetime => $column->precision ? 'DateTime64(' . $column->precision . ')' : 'DateTime',
             ColumnType::Timestamp => $column->precision ? 'DateTime64(' . $column->precision . ')' : 'DateTime',
@@ -62,9 +101,13 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             ColumnType::Point => 'Tuple(Float64, Float64)',
             ColumnType::Linestring => 'Array(Tuple(Float64, Float64))',
             ColumnType::Polygon => 'Array(Array(Tuple(Float64, Float64)))',
+            ColumnType::Uuid => 'UUID',
             ColumnType::Uuid7 => 'FixedString(36)',
             ColumnType::Vector => 'Array(Float64)',
             ColumnType::Serial, ColumnType::BigSerial, ColumnType::SmallSerial => throw new UnsupportedException('SERIAL types are not supported in ClickHouse.'),
+            ColumnType::Array, ColumnType::Tuple => throw new UnsupportedException(
+                'Array/Tuple columns must be declared via Table\\ClickHouse::array() or ::tuple().'
+            ),
         };
 
         if ($column instanceof Column\ClickHouse && $column->isLowCardinality) {
@@ -103,7 +146,9 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $this->compileColumnType($column),
         ];
 
-        if ($column->hasDefault) {
+        if ($column->defaultRaw !== null) {
+            $parts[] = 'DEFAULT ' . $column->defaultRaw;
+        } elseif ($column->hasDefault) {
             $parts[] = 'DEFAULT ' . $this->compileDefaultValue($column->default);
         }
 
@@ -243,13 +288,17 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         }
 
         if ($engine->requiresOrderBy()) {
-            $orderBy = ! empty($table->orderBy)
-                ? \array_map(fn (string $c): string => $this->quote($c), $table->orderBy)
-                : $primaryKeys;
+            if ($table instanceof Table\ClickHouse && $table->orderByRaw !== null) {
+                $sql .= ' ORDER BY ' . $table->orderByRaw;
+            } else {
+                $orderBy = ! empty($table->orderBy)
+                    ? \array_map(fn (string $c): string => $this->quote($c), $table->orderBy)
+                    : $primaryKeys;
 
-            $sql .= ! empty($orderBy)
-                ? ' ORDER BY (' . \implode(', ', $orderBy) . ')'
-                : ' ORDER BY tuple()';
+                $sql .= ! empty($orderBy)
+                    ? ' ORDER BY (' . \implode(', ', $orderBy) . ')'
+                    : ' ORDER BY tuple()';
+            }
         }
 
         if ($table instanceof Table\ClickHouse && $table->sampleBy !== null) {
@@ -351,6 +400,46 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             Engine::Log,
             Engine::TinyLog,
             Engine::StripeLog => $engine->value,
+        };
+    }
+
+    /**
+     * Compile an element type for use inside `Array(T)` or `Tuple(...)`.
+     *
+     * Element types come from the {@see ColumnType} enum directly, so they
+     * lack the per-column state (precision, unsigned flag, etc.) that
+     * {@see compileColumnType()} relies on. This helper falls back to the
+     * parent column's `isUnsigned` flag for integer elements and to the
+     * parent's `precision` for `Decimal` elements so callers can spell common
+     * shapes (`Array(UInt64)`, `Array(Decimal(18, 3))`) without leaking the
+     * inner-type complexity into the public API.
+     */
+    private function compileNestedElementType(ColumnType $element, Column $parent): string
+    {
+        return match ($element) {
+            ColumnType::String, ColumnType::Varchar, ColumnType::Relationship,
+            ColumnType::Text, ColumnType::MediumText, ColumnType::LongText,
+            ColumnType::Json, ColumnType::Object, ColumnType::Binary => 'String',
+            ColumnType::TinyInteger => $parent->isUnsigned ? 'UInt8' : 'Int8',
+            ColumnType::SmallInteger => $parent->isUnsigned ? 'UInt16' : 'Int16',
+            ColumnType::Integer => $parent->isUnsigned ? 'UInt32' : 'Int32',
+            ColumnType::BigInteger, ColumnType::Id => $parent->isUnsigned ? 'UInt64' : 'Int64',
+            ColumnType::Float, ColumnType::Double => 'Float64',
+            ColumnType::Decimal => 'Decimal(' . ($parent->precision ?? 10) . ', ' . ($parent->scale ?? 0) . ')',
+            ColumnType::Boolean => 'UInt8',
+            ColumnType::Datetime, ColumnType::Timestamp => $parent->precision
+                ? 'DateTime64(' . $parent->precision . ')'
+                : 'DateTime',
+            ColumnType::Uuid => 'UUID',
+            ColumnType::Uuid7 => 'FixedString(36)',
+            ColumnType::Point => 'Tuple(Float64, Float64)',
+            ColumnType::Linestring => 'Array(Tuple(Float64, Float64))',
+            ColumnType::Polygon => 'Array(Array(Tuple(Float64, Float64)))',
+            ColumnType::Vector => 'Array(Float64)',
+            ColumnType::Enum, ColumnType::Serial, ColumnType::BigSerial,
+            ColumnType::SmallSerial, ColumnType::Array, ColumnType::Tuple => throw new UnsupportedException(
+                'Nested element type ' . $element->value . ' is not supported inside Array/Tuple.'
+            ),
         };
     }
 

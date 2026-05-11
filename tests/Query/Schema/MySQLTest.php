@@ -1216,4 +1216,88 @@ class MySQLTest extends TestCase
             ->string('mood')->userType('mood_type')
             ->create();
     }
+
+    public function testTinyIntegerColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('t')
+            ->tinyInteger('flag')
+            ->tinyInteger('depth')->unsigned()
+            ->create();
+
+        $this->assertSame(
+            'CREATE TABLE `t` (`flag` TINYINT NOT NULL, `depth` TINYINT UNSIGNED NOT NULL)',
+            $result->query,
+        );
+    }
+
+    public function testSmallIntegerColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('t')
+            ->smallInteger('year')
+            ->smallInteger('count')->unsigned()
+            ->create();
+
+        $this->assertSame(
+            'CREATE TABLE `t` (`year` SMALLINT NOT NULL, `count` SMALLINT UNSIGNED NOT NULL)',
+            $result->query,
+        );
+    }
+
+    public function testDecimalColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('orders')
+            ->decimal('amount', precision: 18, scale: 3)
+            ->decimal('rate', precision: 5, scale: 4)->nullable()
+            ->create();
+
+        $this->assertSame(
+            'CREATE TABLE `orders` (`amount` DECIMAL(18, 3) NOT NULL, `rate` DECIMAL(5, 4) NULL)',
+            $result->query,
+        );
+    }
+
+    public function testDecimalRejectsNegativeScale(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('t')->decimal('bad', precision: 10, scale: -1);
+    }
+
+    public function testDecimalRejectsScaleGreaterThanPrecision(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('t')->decimal('bad', precision: 5, scale: 6);
+    }
+
+    public function testUuidColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('t')
+            ->uuid('id')->primary()
+            ->create();
+
+        $this->assertSame(
+            'CREATE TABLE `t` (`id` CHAR(36) NOT NULL, PRIMARY KEY (`id`))',
+            $result->query,
+        );
+    }
+
+    public function testUuidColumnWithDefaultRaw(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('t')
+            ->uuid('id')->defaultRaw('UUID()')->primary()
+            ->create();
+
+        $this->assertSame(
+            'CREATE TABLE `t` (`id` CHAR(36) NOT NULL DEFAULT UUID(), PRIMARY KEY (`id`))',
+            $result->query,
+        );
+    }
 }

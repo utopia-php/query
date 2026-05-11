@@ -20,9 +20,9 @@ class PostgreSQL extends Table
     use Trait\StandardPartitioning;
 
     #[\Override]
-    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null): Column\PostgreSQL
+    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null, ?int $scale = null): Column\PostgreSQL
     {
-        return new Column\PostgreSQL($this, $name, $type, $length, $precision);
+        return new Column\PostgreSQL($this, $name, $type, $length, $precision, $scale);
     }
 
     #[\Override]

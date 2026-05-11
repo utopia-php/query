@@ -1164,6 +1164,268 @@ class ClickHouseTest extends TestCase
             ->create();
     }
 
+    public function testCreateTableUuidColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->uuid('event_id')->primary()
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`event_id` UUID) ENGINE = MergeTree() ORDER BY (`event_id`)',
+            $result->query,
+        );
+    }
+
+    public function testCreateTableUuidColumnWithDefaultRaw(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->uuid('event_id')->defaultRaw('generateUUIDv4()')->primary()
+            ->datetime('ts', 3)
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`event_id` UUID DEFAULT generateUUIDv4(), `ts` DateTime64(3))'
+            . ' ENGINE = MergeTree() ORDER BY (`event_id`)',
+            $result->query,
+        );
+    }
+
+    public function testCreateTableUuidNullable(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('t')
+            ->uuid('id')->nullable()
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `t` (`id` Nullable(UUID)) ENGINE = MergeTree() ORDER BY tuple()',
+            $result->query,
+        );
+    }
+
+    public function testDefaultRawRejectsEmpty(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('t')->uuid('id')->defaultRaw('');
+    }
+
+    public function testDefaultRawRejectsSemicolon(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('t')->uuid('id')->defaultRaw('generateUUIDv4();');
+    }
+
+    public function testDefaultRawTakesPrecedenceOverDefault(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('t')
+            ->uuid('id')->default('00000000-0000-0000-0000-000000000000')->defaultRaw('generateUUIDv4()')
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertStringContainsString('DEFAULT generateUUIDv4()', $result->query);
+        $this->assertStringNotContainsString("DEFAULT '00000000", $result->query);
+    }
+
+    public function testCreateTableTinyIntegerColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->tinyInteger('signed_depth')
+            ->tinyInteger('unsigned_depth')->unsigned()
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`signed_depth` Int8, `unsigned_depth` UInt8) ENGINE = MergeTree() ORDER BY tuple()',
+            $result->query,
+        );
+    }
+
+    public function testCreateTableSmallIntegerColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->smallInteger('signed_year')
+            ->smallInteger('unsigned_year')->unsigned()
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`signed_year` Int16, `unsigned_year` UInt16) ENGINE = MergeTree() ORDER BY tuple()',
+            $result->query,
+        );
+    }
+
+    public function testCreateTableDecimalColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('orders')
+            ->bigInteger('id')->primary()
+            ->decimal('amount', precision: 18, scale: 3)
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `orders` (`id` Int64, `amount` Decimal(18, 3)) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testCreateTableDecimalNullable(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('orders')
+            ->bigInteger('id')->primary()
+            ->decimal('amount', precision: 18, scale: 3)->nullable()
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `orders` (`id` Int64, `amount` Nullable(Decimal(18, 3))) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testCreateTableArrayColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->array('tags', ColumnType::String)
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `tags` Array(String)) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testCreateTableArrayUnsignedInteger(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->array('counts', ColumnType::BigInteger)->unsigned()
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `counts` Array(UInt64)) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testCreateTableArrayNullable(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->array('tags', ColumnType::String)->nullable()
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `tags` Nullable(Array(String))) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testArrayRejectsLowCardinalityWrap(): void
+    {
+        $this->expectException(UnsupportedException::class);
+
+        $schema = new Schema();
+        $schema->table('events')
+            ->array('tags', ColumnType::String)->lowCardinality()
+            ->create();
+    }
+
+    public function testCreateTableTupleColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->tuple('point', [ColumnType::Float, ColumnType::Float])
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `point` Tuple(Float64, Float64)) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testTupleRejectsEmptyElementList(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('events')->tuple('bad', []);
+    }
+
+    public function testCreateTableOrderByRaw(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->string('tenant')
+            ->bigInteger('id')
+            ->datetime('ts')
+            ->orderByRaw('(`tenant`, toDate(`ts`), `id`)')
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`tenant` String, `id` Int64, `ts` DateTime)'
+            . ' ENGINE = MergeTree() ORDER BY (`tenant`, toDate(`ts`), `id`)',
+            $result->query,
+        );
+    }
+
+    public function testOrderByRawTakesPrecedenceOverOrderBy(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')
+            ->datetime('ts')
+            ->orderBy(['id'])
+            ->orderByRaw('(toDate(`ts`), `id`)')
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `ts` DateTime)'
+            . ' ENGINE = MergeTree() ORDER BY (toDate(`ts`), `id`)',
+            $result->query,
+        );
+    }
+
+    public function testOrderByRawRejectsEmpty(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('events')->orderByRaw('');
+    }
+
+    public function testOrderByRawRejectsSemicolon(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('events')->orderByRaw('(`id`);');
+    }
+
     public function testRawColumnHonouredInCreateTable(): void
     {
         $schema = new Schema();

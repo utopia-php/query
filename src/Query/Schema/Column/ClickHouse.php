@@ -4,6 +4,7 @@ namespace Utopia\Query\Schema\Column;
 
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\Column;
+use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\Forwarder;
 use Utopia\Query\Schema\Table;
 
@@ -21,6 +22,12 @@ class ClickHouse extends Column
 
     /** @var list<string> Column-level CODEC clauses, e.g. ['Delta(4)', 'LZ4'] */
     public protected(set) array $codecs = [];
+
+    /** Element type when the column is emitted as `Array(T)`; null otherwise. */
+    public protected(set) ?ColumnType $arrayElementType = null;
+
+    /** @var list<ColumnType> Element types when the column is emitted as `Tuple(...)`. */
+    public protected(set) array $tupleElementTypes = [];
 
     /**
      * Mark the column as `FixedString(N)`.
@@ -46,6 +53,44 @@ class ClickHouse extends Column
     public function isFixedString(): bool
     {
         return $this->fixedStringLength !== null;
+    }
+
+    /**
+     * Mark the column as `Array(T)` wrapping the given element type.
+     */
+    public function asArray(ColumnType $element): static
+    {
+        $this->arrayElementType = $element;
+
+        return $this;
+    }
+
+    public function isArray(): bool
+    {
+        return $this->arrayElementType !== null;
+    }
+
+    /**
+     * Mark the column as `Tuple(t1, t2, ...)` over the given element types.
+     *
+     * @param  list<ColumnType>  $elements
+     *
+     * @throws ValidationException if the element list is empty.
+     */
+    public function asTuple(array $elements): static
+    {
+        if ($elements === []) {
+            throw new ValidationException('Tuple() requires at least one element type.');
+        }
+
+        $this->tupleElementTypes = $elements;
+
+        return $this;
+    }
+
+    public function isTuple(): bool
+    {
+        return $this->tupleElementTypes !== [];
     }
 
     /**

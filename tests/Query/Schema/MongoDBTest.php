@@ -374,6 +374,28 @@ class MongoDBTest extends TestCase
         $this->assertArrayNotHasKey('view', $op);
     }
 
+    public function testCreateCollectionWithDecimalAndUuid(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('payments')
+            ->uuid('id')
+            ->tinyInteger('priority')
+            ->decimal('amount', precision: 18, scale: 3)
+            ->create();
+
+        $op = $this->decode($result->query);
+        /** @var array<string, mixed> $validator */
+        $validator = $op['validator'];
+        /** @var array<string, mixed> $jsonSchema */
+        $jsonSchema = $validator['$jsonSchema'];
+        /** @var array<string, array<string, mixed>> $props */
+        $props = $jsonSchema['properties'];
+
+        $this->assertSame('string', $props['id']['bsonType']);
+        $this->assertSame('int', $props['priority']['bsonType']);
+        $this->assertSame('decimal', $props['amount']['bsonType']);
+    }
+
     public function testCreateCollectionWithAllBsonTypes(): void
     {
         $schema = new Schema();

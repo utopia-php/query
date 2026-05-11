@@ -1300,4 +1300,70 @@ class PostgreSQLTest extends TestCase
         $col = new Column($bp, 'mood', ColumnType::String);
         $col->userType('bad; DROP TABLE users');
     }
+
+    public function testTinyIntegerColumnMapsToSmallInt(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('t')
+            ->tinyInteger('depth')
+            ->create();
+
+        $this->assertSame(
+            'CREATE TABLE "t" ("depth" SMALLINT NOT NULL)',
+            $result->query,
+        );
+    }
+
+    public function testSmallIntegerColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('t')
+            ->smallInteger('year')
+            ->create();
+
+        $this->assertSame(
+            'CREATE TABLE "t" ("year" SMALLINT NOT NULL)',
+            $result->query,
+        );
+    }
+
+    public function testDecimalColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('orders')
+            ->decimal('amount', precision: 18, scale: 3)
+            ->decimal('rate', precision: 5, scale: 4)->nullable()
+            ->create();
+
+        $this->assertSame(
+            'CREATE TABLE "orders" ("amount" DECIMAL(18, 3) NOT NULL, "rate" DECIMAL(5, 4) NULL)',
+            $result->query,
+        );
+    }
+
+    public function testUuidColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('t')
+            ->uuid('id')->primary()
+            ->create();
+
+        $this->assertSame(
+            'CREATE TABLE "t" ("id" UUID NOT NULL, PRIMARY KEY ("id"))',
+            $result->query,
+        );
+    }
+
+    public function testUuidColumnWithDefaultRaw(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('t')
+            ->uuid('id')->defaultRaw('gen_random_uuid()')->primary()
+            ->create();
+
+        $this->assertSame(
+            'CREATE TABLE "t" ("id" UUID NOT NULL DEFAULT gen_random_uuid(), PRIMARY KEY ("id"))',
+            $result->query,
+        );
+    }
 }

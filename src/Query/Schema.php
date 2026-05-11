@@ -308,7 +308,9 @@ abstract class Schema
             $parts[] = 'NULL';
         }
 
-        if ($column->hasDefault) {
+        if ($column->defaultRaw !== null) {
+            $parts[] = 'DEFAULT ' . $column->defaultRaw;
+        } elseif ($column->hasDefault) {
             $parts[] = 'DEFAULT ' . $this->compileDefaultValue($column->default);
         }
 

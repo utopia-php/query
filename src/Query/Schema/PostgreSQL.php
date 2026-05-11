@@ -62,9 +62,11 @@ class PostgreSQL extends SQL implements
         return match ($column->type) {
             ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'VARCHAR(' . ($column->length ?? 255) . ')',
             ColumnType::Text, ColumnType::MediumText, ColumnType::LongText => 'TEXT',
+            ColumnType::TinyInteger, ColumnType::SmallInteger => 'SMALLINT',
             ColumnType::Integer => 'INTEGER',
             ColumnType::BigInteger, ColumnType::Id => 'BIGINT',
             ColumnType::Float, ColumnType::Double => 'DOUBLE PRECISION',
+            ColumnType::Decimal => 'DECIMAL(' . ($column->precision ?? 10) . ', ' . ($column->scale ?? 0) . ')',
             ColumnType::Boolean => 'BOOLEAN',
             ColumnType::Datetime => $column->precision ? 'TIMESTAMP(' . $column->precision . ')' : 'TIMESTAMP',
             ColumnType::Timestamp => $column->precision ? 'TIMESTAMP(' . $column->precision . ') WITHOUT TIME ZONE' : 'TIMESTAMP WITHOUT TIME ZONE',
@@ -74,11 +76,13 @@ class PostgreSQL extends SQL implements
             ColumnType::Point => 'GEOMETRY(POINT' . ($column->srid !== null ? ', ' . $column->srid : '') . ')',
             ColumnType::Linestring => 'GEOMETRY(LINESTRING' . ($column->srid !== null ? ', ' . $column->srid : '') . ')',
             ColumnType::Polygon => 'GEOMETRY(POLYGON' . ($column->srid !== null ? ', ' . $column->srid : '') . ')',
+            ColumnType::Uuid => 'UUID',
             ColumnType::Uuid7 => 'VARCHAR(36)',
             ColumnType::Vector => 'VECTOR(' . ($column->dimensions ?? 0) . ')',
             ColumnType::Serial => 'SERIAL',
             ColumnType::BigSerial => 'BIGSERIAL',
             ColumnType::SmallSerial => 'SMALLSERIAL',
+            ColumnType::Array, ColumnType::Tuple => throw new UnsupportedException('Array/Tuple column types are not supported in PostgreSQL.'),
         };
     }
 
@@ -136,7 +140,9 @@ class PostgreSQL extends SQL implements
             $parts[] = 'NULL';
         }
 
-        if ($column->hasDefault) {
+        if ($column->defaultRaw !== null) {
+            $parts[] = 'DEFAULT ' . $column->defaultRaw;
+        } elseif ($column->hasDefault) {
             $parts[] = 'DEFAULT ' . $this->compileDefaultValue($column->default);
         }
 

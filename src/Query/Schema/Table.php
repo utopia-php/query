@@ -120,10 +120,10 @@ class Table
      *
      * @return TColumn
      */
-    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null): Column
+    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null, ?int $scale = null): Column
     {
         /** @var TColumn */
-        return new Column($this, $name, $type, $length, $precision);
+        return new Column($this, $name, $type, $length, $precision, $scale);
     }
 
     /**
@@ -188,6 +188,24 @@ class Table
     }
 
     /** @return TColumn */
+    public function tinyInteger(string $name): Column
+    {
+        $col = $this->newColumn($name, ColumnType::TinyInteger);
+        $this->columns[] = $col;
+
+        return $col;
+    }
+
+    /** @return TColumn */
+    public function smallInteger(string $name): Column
+    {
+        $col = $this->newColumn($name, ColumnType::SmallInteger);
+        $this->columns[] = $col;
+
+        return $col;
+    }
+
+    /** @return TColumn */
     public function integer(string $name): Column
     {
         $col = $this->newColumn($name, ColumnType::Integer);
@@ -200,6 +218,56 @@ class Table
     public function bigInteger(string $name): Column
     {
         $col = $this->newColumn($name, ColumnType::BigInteger);
+        $this->columns[] = $col;
+
+        return $col;
+    }
+
+    /**
+     * Add a fixed-point `DECIMAL(precision, scale)` column.
+     *
+     * Default precision/scale matches MySQL's documented defaults (10, 0). For
+     * monetary values prefer an explicit precision and scale, e.g.
+     * `decimal('amount', precision: 18, scale: 3)`.
+     *
+     * @throws ValidationException if precision is less than 1 or scale is negative.
+     *
+     * @return TColumn
+     */
+    public function decimal(string $name, int $precision = 10, int $scale = 0): Column
+    {
+        if ($precision < 1) {
+            throw new ValidationException('DECIMAL precision must be at least 1.');
+        }
+
+        if ($scale < 0) {
+            throw new ValidationException('DECIMAL scale must not be negative.');
+        }
+
+        if ($scale > $precision) {
+            throw new ValidationException('DECIMAL scale must not exceed precision.');
+        }
+
+        $col = $this->newColumn($name, ColumnType::Decimal, precision: $precision, scale: $scale);
+        $this->columns[] = $col;
+
+        return $col;
+    }
+
+    /**
+     * Add a UUID column. Compiled to the dialect's native UUID type when one
+     * exists (`UUID` on ClickHouse and PostgreSQL) and to a 36-character
+     * string column otherwise (`CHAR(36)` on MySQL, `TEXT` on SQLite, `string`
+     * on MongoDB).
+     *
+     * Pair with {@see Column::defaultRaw()} for server-generated defaults such
+     * as `generateUUIDv4()` (ClickHouse) or `gen_random_uuid()` (PostgreSQL).
+     *
+     * @return TColumn
+     */
+    public function uuid(string $name): Column
+    {
+        $col = $this->newColumn($name, ColumnType::Uuid);
         $this->columns[] = $col;
 
         return $col;

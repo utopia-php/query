@@ -33,9 +33,11 @@ class MongoDB extends Schema implements Views, Databases, AnalyzeTable
         return match ($column->type) {
             ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'string',
             ColumnType::Text, ColumnType::MediumText, ColumnType::LongText => 'string',
+            ColumnType::TinyInteger, ColumnType::SmallInteger,
             ColumnType::Integer, ColumnType::BigInteger, ColumnType::Id,
             ColumnType::Serial, ColumnType::BigSerial, ColumnType::SmallSerial => 'int',
             ColumnType::Float, ColumnType::Double => 'double',
+            ColumnType::Decimal => 'decimal',
             ColumnType::Boolean => 'bool',
             ColumnType::Datetime, ColumnType::Timestamp => 'date',
             ColumnType::Json, ColumnType::Object => 'object',
@@ -43,8 +45,9 @@ class MongoDB extends Schema implements Views, Databases, AnalyzeTable
             ColumnType::Enum => 'string',
             ColumnType::Point => 'object',
             ColumnType::Linestring, ColumnType::Polygon => 'object',
-            ColumnType::Uuid7 => 'string',
-            ColumnType::Vector => 'array',
+            ColumnType::Uuid, ColumnType::Uuid7 => 'string',
+            ColumnType::Vector, ColumnType::Array => 'array',
+            ColumnType::Tuple => 'array',
         };
     }
 
