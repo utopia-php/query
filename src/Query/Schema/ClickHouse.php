@@ -211,6 +211,10 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $primaryKeys = \array_map(fn (string $c): string => $this->quote($c), $table->compositePrimaryKey);
         }
 
+        foreach ($table->rawColumnDefs as $rawDef) {
+            $columnDefs[] = $rawDef;
+        }
+
         foreach ($table->indexes as $index) {
             if ($index->type !== IndexType::Index) {
                 throw new UnsupportedException(

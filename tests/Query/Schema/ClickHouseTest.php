@@ -1163,4 +1163,21 @@ class ClickHouseTest extends TestCase
             ->sampleBy('id')
             ->create();
     }
+
+    public function testRawColumnHonouredInCreateTable(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->rawColumn('`meta.key` Array(String)')
+            ->rawColumn('`meta.value` Array(String)')
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `meta.key` Array(String), `meta.value` Array(String))'
+            . ' ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
 }
