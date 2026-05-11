@@ -2033,7 +2033,7 @@ $result = $schema->table('events')
 
 ClickHouse uses `Nullable(type)` wrapping for nullable columns, `Enum8(...)` for enums, `Tuple(Float64, Float64)` for points, and `TYPE minmax GRANULARITY 3` for indexes. Foreign keys, stored procedures, triggers, generated columns, and CHECK constraints throw `UnsupportedException`.
 
-Supports the `TableComments`, `ColumnComments`, `DropPartition`, `Views`, `Databases`, and `OLAP` interfaces.
+Supports the `TableComments`, `ColumnComments`, `DropPartition`, `Views`, and `Databases` interfaces.
 
 **Engine selection** — choose from 10 variants of the `Engine` enum:
 
@@ -2195,7 +2195,7 @@ $schema->table('events')
 
 The expression is emitted verbatim and must not be empty or contain a semicolon. `SAMPLE BY` only applies to engines that take an `ORDER BY` clause (the MergeTree family); using it with `Memory`, `Log`, `TinyLog`, or `StripeLog` throws `UnsupportedException`. The `sampleBy()` method is only available on the ClickHouse builder.
 
-These OLAP-shaped modifiers are exposed on the ClickHouse dialect via the `Feature\OLAP` marker interface. Dialect-specific Column/Table subclasses surface the methods only when the underlying dialect implements the feature — so calling `->lowCardinality()` or `->sampleBy()` on a `MySQL`, `PostgreSQL`, `SQLite`, or `MongoDB` builder fails at the type level, with no runtime branch needed.
+These OLAP-shaped modifiers live on the ClickHouse-specific `Column\ClickHouse` and `Table\ClickHouse` builders. Because the methods only exist on the dialect's own builder subclasses, calling `->lowCardinality()` or `->sampleBy()` on a `MySQL`, `PostgreSQL`, `SQLite`, or `MongoDB` builder fails at the type level, with no runtime branch needed.
 
 ### SQLite Schema
 

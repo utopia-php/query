@@ -11,11 +11,10 @@ use Utopia\Query\Schema\ClickHouse\Engine;
 use Utopia\Query\Schema\Feature\ColumnComments;
 use Utopia\Query\Schema\Feature\Databases;
 use Utopia\Query\Schema\Feature\DropPartition;
-use Utopia\Query\Schema\Feature\OLAP;
 use Utopia\Query\Schema\Feature\TableComments;
 use Utopia\Query\Schema\Feature\Views;
 
-class ClickHouse extends Schema implements TableComments, ColumnComments, DropPartition, Views, Databases, OLAP
+class ClickHouse extends Schema implements TableComments, ColumnComments, DropPartition, Views, Databases
 {
     use QuotesIdentifiers;
     use Trait\Databases;
