@@ -36,7 +36,6 @@ class SQLite extends SQL implements Views
             ColumnType::Point, ColumnType::Linestring, ColumnType::Polygon => 'TEXT',
             ColumnType::Uuid7 => 'VARCHAR(36)',
             ColumnType::Vector => throw new UnsupportedException('Vector type is not supported in SQLite.'),
-            ColumnType::FixedString => throw new UnsupportedException('FixedString type is not supported in SQLite.'),
         };
     }
 

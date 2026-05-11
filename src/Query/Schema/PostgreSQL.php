@@ -79,7 +79,6 @@ class PostgreSQL extends SQL implements
             ColumnType::Serial => 'SERIAL',
             ColumnType::BigSerial => 'BIGSERIAL',
             ColumnType::SmallSerial => 'SMALLSERIAL',
-            ColumnType::FixedString => throw new UnsupportedException('FixedString type is not supported in PostgreSQL.'),
         };
     }
 

@@ -73,7 +73,6 @@ class MySQL extends SQL implements
             ColumnType::Polygon => 'POLYGON' . ($column->srid !== null ? ' SRID ' . $column->srid : ''),
             ColumnType::Uuid7 => 'VARCHAR(36)',
             ColumnType::Vector => throw new UnsupportedException('Vector type is not supported in MySQL.'),
-            ColumnType::FixedString => throw new UnsupportedException('FixedString type is not supported in MySQL.'),
         };
     }
 

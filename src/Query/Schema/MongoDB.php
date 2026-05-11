@@ -45,7 +45,6 @@ class MongoDB extends Schema implements Views, Databases, AnalyzeTable
             ColumnType::Linestring, ColumnType::Polygon => 'object',
             ColumnType::Uuid7 => 'string',
             ColumnType::Vector => 'array',
-            ColumnType::FixedString => throw new UnsupportedException('FixedString type is not supported in MongoDB.'),
         };
     }
 

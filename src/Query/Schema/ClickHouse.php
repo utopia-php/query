@@ -33,9 +33,22 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             throw new UnsupportedException('User-defined types are not supported in ClickHouse.');
         }
 
+        if ($column instanceof Column\ClickHouse && $column->isFixedString()) {
+            $type = 'FixedString(' . $column->fixedStringLength . ')';
+
+            if ($column->isLowCardinality) {
+                $type = 'LowCardinality(' . $type . ')';
+            }
+
+            if ($column->isNullable) {
+                $type = 'Nullable(' . $type . ')';
+            }
+
+            return $type;
+        }
+
         $type = match ($column->type) {
             ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'String',
-            ColumnType::FixedString => 'FixedString(' . ($column->length ?? throw new ValidationException('FixedString requires a length.')) . ')',
             ColumnType::Text => 'String',
             ColumnType::MediumText, ColumnType::LongText => 'String',
             ColumnType::Integer => $column->isUnsigned ? 'UInt32' : 'Int32',

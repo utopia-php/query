@@ -42,15 +42,17 @@ class ClickHouse extends Table
      * digests, and similar values that benefit from ClickHouse's columnar
      * storage of fixed-width data.
      *
+     * The column is registered with the generic `ColumnType::String` type and
+     * tagged with FixedString state on {@see Column\ClickHouse}; the compiler
+     * reads that state when emitting DDL, so the global `ColumnType` enum
+     * stays free of ClickHouse-only cases.
+     *
      * @throws ValidationException if $length is less than 1.
      */
     public function fixedString(string $name, int $length): Column\ClickHouse
     {
-        if ($length < 1) {
-            throw new ValidationException('FixedString length must be at least 1.');
-        }
-
-        $col = $this->newColumn($name, ColumnType::FixedString, $length);
+        $col = $this->newColumn($name, ColumnType::String, $length);
+        $col->asFixedString($length);
         $this->columns[] = $col;
 
         return $col;

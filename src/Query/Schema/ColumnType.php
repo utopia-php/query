@@ -5,7 +5,6 @@ namespace Utopia\Query\Schema;
 enum ColumnType: string
 {
     case String = 'string';
-    case FixedString = 'fixedstring';
     case Varchar = 'varchar';
     case Text = 'text';
     case MediumText = 'mediumtext';
