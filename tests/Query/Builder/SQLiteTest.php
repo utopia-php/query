@@ -435,17 +435,6 @@ class SQLiteTest extends TestCase
             ->build();
     }
 
-    public function testSpatialCoversThrowsUnsupported(): void
-    {
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('Spatial covers predicates are not supported in SQLite.');
-
-        (new Builder())
-            ->from('t')
-            ->filterCovers('area', [1.0, 2.0])
-            ->build();
-    }
-
     public function testFilterJsonContains(): void
     {
         $result = (new Builder())
@@ -827,16 +816,6 @@ class SQLiteTest extends TestCase
         (new Builder())
             ->from('t')
             ->filter([Query::distanceGreaterThan('attr', [0, 0], 500, false)])
-            ->build();
-    }
-
-    public function testSpatialEqualsThrows(): void
-    {
-        $this->expectException(UnsupportedException::class);
-
-        (new Builder())
-            ->from('t')
-            ->filterSpatialEquals('area', [1.0, 2.0])
             ->build();
     }
 

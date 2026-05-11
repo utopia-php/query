@@ -7,8 +7,4 @@ use Utopia\Query\Builder\Statement;
 interface Upsert
 {
     public function upsert(): Statement;
-
-    public function insertOrIgnore(): Statement;
-
-    public function upsertSelect(): Statement;
 }

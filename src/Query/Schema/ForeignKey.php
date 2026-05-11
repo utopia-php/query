@@ -3,18 +3,24 @@
 namespace Utopia\Query\Schema;
 
 use Utopia\Query\Builder\Statement;
-use Utopia\Query\Schema\ClickHouse\Engine;
 
+/**
+ * @template TColumn of Column = Column
+ * @template TTable of Table<TColumn, covariant ForeignKey> = Table
+ */
 class ForeignKey
 {
-    public private(set) string $refTable = '';
+    public protected(set) string $refTable = '';
 
-    public private(set) string $refColumn = '';
+    public protected(set) string $refColumn = '';
 
-    public private(set) ?ForeignKeyAction $onDelete = null;
+    public protected(set) ?ForeignKeyAction $onDelete = null;
 
-    public private(set) ?ForeignKeyAction $onUpdate = null;
+    public protected(set) ?ForeignKeyAction $onUpdate = null;
 
+    /**
+     * @param  TTable  $table
+     */
     public function __construct(
         public readonly Table $table,
         public readonly string $column,
@@ -49,81 +55,97 @@ class ForeignKey
         return $this;
     }
 
+    /** @return TColumn */
     public function id(string $name = 'id'): Column
     {
         return $this->table->id($name);
     }
 
+    /** @return TColumn */
     public function string(string $name, int $length = 255): Column
     {
         return $this->table->string($name, $length);
     }
 
+    /** @return TColumn */
     public function text(string $name): Column
     {
         return $this->table->text($name);
     }
 
+    /** @return TColumn */
     public function mediumText(string $name): Column
     {
         return $this->table->mediumText($name);
     }
 
+    /** @return TColumn */
     public function longText(string $name): Column
     {
         return $this->table->longText($name);
     }
 
+    /** @return TColumn */
     public function integer(string $name): Column
     {
         return $this->table->integer($name);
     }
 
+    /** @return TColumn */
     public function bigInteger(string $name): Column
     {
         return $this->table->bigInteger($name);
     }
 
+    /** @return TColumn */
     public function serial(string $name): Column
     {
         return $this->table->serial($name);
     }
 
+    /** @return TColumn */
     public function bigSerial(string $name): Column
     {
         return $this->table->bigSerial($name);
     }
 
+    /** @return TColumn */
     public function smallSerial(string $name): Column
     {
         return $this->table->smallSerial($name);
     }
 
+    /** @return TColumn */
     public function float(string $name): Column
     {
         return $this->table->float($name);
     }
 
+    /** @return TColumn */
     public function boolean(string $name): Column
     {
         return $this->table->boolean($name);
     }
 
+    /** @return TColumn */
     public function datetime(string $name, int $precision = 0): Column
     {
         return $this->table->datetime($name, $precision);
     }
 
+    /** @return TColumn */
     public function timestamp(string $name, int $precision = 0): Column
     {
         return $this->table->timestamp($name, $precision);
     }
 
+    /** @return TColumn */
     public function json(string $name): Column
     {
         return $this->table->json($name);
     }
 
+    /** @return TColumn */
     public function binary(string $name): Column
     {
         return $this->table->binary($name);
@@ -131,52 +153,56 @@ class ForeignKey
 
     /**
      * @param  string[]  $values
+     * @return TColumn
      */
     public function enum(string $name, array $values): Column
     {
         return $this->table->enum($name, $values);
     }
 
+    /** @return TColumn */
     public function point(string $name, int $srid = 4326): Column
     {
         return $this->table->point($name, $srid);
     }
 
+    /** @return TColumn */
     public function linestring(string $name, int $srid = 4326): Column
     {
         return $this->table->linestring($name, $srid);
     }
 
+    /** @return TColumn */
     public function polygon(string $name, int $srid = 4326): Column
     {
         return $this->table->polygon($name, $srid);
     }
 
-    public function vector(string $name, int $dimensions): Column
-    {
-        return $this->table->vector($name, $dimensions);
-    }
-
+    /** @return TTable */
     public function timestamps(int $precision = 3): Table
     {
         return $this->table->timestamps($precision);
     }
 
+    /** @return TColumn */
     public function addColumn(string $name, ColumnType $type, ?int $lengthOrPrecision = null): Column
     {
         return $this->table->addColumn($name, $type, $lengthOrPrecision);
     }
 
+    /** @return TColumn */
     public function modifyColumn(string $name, ColumnType $type, ?int $lengthOrPrecision = null): Column
     {
         return $this->table->modifyColumn($name, $type, $lengthOrPrecision);
     }
 
+    /** @return TTable */
     public function renameColumn(string $from, string $to): Table
     {
         return $this->table->renameColumn($from, $to);
     }
 
+    /** @return TTable */
     public function dropColumn(string $name): Table
     {
         return $this->table->dropColumn($name);
@@ -187,6 +213,7 @@ class ForeignKey
      * @param  array<string, int>  $lengths
      * @param  array<string, string>  $orders
      * @param  array<string, string>  $collations
+     * @return TTable
      */
     public function index(
         array $columns,
@@ -205,6 +232,7 @@ class ForeignKey
      * @param  array<string, int>  $lengths
      * @param  array<string, string>  $orders
      * @param  array<string, string>  $collations
+     * @return TTable
      */
     public function uniqueIndex(
         array $columns,
@@ -218,26 +246,11 @@ class ForeignKey
 
     /**
      * @param  string[]  $columns
-     */
-    public function fulltextIndex(array $columns, string $name = ''): Table
-    {
-        return $this->table->fulltextIndex($columns, $name);
-    }
-
-    /**
-     * @param  string[]  $columns
-     */
-    public function spatialIndex(array $columns, string $name = ''): Table
-    {
-        return $this->table->spatialIndex($columns, $name);
-    }
-
-    /**
-     * @param  string[]  $columns
      * @param  array<string, int>  $lengths
      * @param  array<string, string>  $orders
      * @param  array<string, string>  $collations
      * @param  list<string>  $rawColumns
+     * @return TTable
      */
     public function addIndex(
         string $name,
@@ -253,80 +266,22 @@ class ForeignKey
         return $this->table->addIndex($name, $columns, $type, $lengths, $orders, $method, $operatorClass, $collations, $rawColumns);
     }
 
+    /** @return TTable */
     public function dropIndex(string $name): Table
     {
         return $this->table->dropIndex($name);
     }
 
-    public function foreignKey(string $column): ForeignKey
-    {
-        return $this->table->foreignKey($column);
-    }
-
-    public function addForeignKey(string $column): ForeignKey
-    {
-        return $this->table->addForeignKey($column);
-    }
-
-    public function dropForeignKey(string $name): Table
-    {
-        return $this->table->dropForeignKey($name);
-    }
-
-    /**
-     * @param  list<string>  $columns
-     */
-    public function primary(array $columns): Table
-    {
-        return $this->table->primary($columns);
-    }
-
-    public function check(string $name, string $expression): Table
-    {
-        return $this->table->check($name, $expression);
-    }
-
+    /** @return TTable */
     public function rawColumn(string $definition): Table
     {
         return $this->table->rawColumn($definition);
     }
 
+    /** @return TTable */
     public function rawIndex(string $definition): Table
     {
         return $this->table->rawIndex($definition);
-    }
-
-    public function partitionByRange(string $expression): Table
-    {
-        return $this->table->partitionByRange($expression);
-    }
-
-    public function partitionByList(string $expression): Table
-    {
-        return $this->table->partitionByList($expression);
-    }
-
-    public function partitionByHash(string $expression, ?int $partitions = null): Table
-    {
-        return $this->table->partitionByHash($expression, $partitions);
-    }
-
-    public function engine(Engine $engine, string ...$args): Table
-    {
-        return $this->table->engine($engine, ...$args);
-    }
-
-    /**
-     * @param  list<string>  $columns
-     */
-    public function orderBy(array $columns): Table
-    {
-        return $this->table->orderBy($columns);
-    }
-
-    public function ttl(string $expression): Table
-    {
-        return $this->table->ttl($expression);
     }
 
     public function create(bool $ifNotExists = false): Statement

@@ -390,31 +390,6 @@ class CorrectnessRegressionTest extends TestCase
         );
     }
 
-    public function testBaseUpsertThrowsUnsupported(): void
-    {
-        $builder = new class () extends Builder {
-            use \Utopia\Query\Builder\Trait\Selects;
-
-            protected function quote(string $identifier): string
-            {
-                return '`' . $identifier . '`';
-            }
-
-            protected function compileRandom(): string
-            {
-                return 'RAND()';
-            }
-
-            protected function compileRegex(string $attribute, array $values): string
-            {
-                return $attribute . ' REGEXP ?';
-            }
-        };
-
-        $this->expectException(UnsupportedException::class);
-        $builder->from('t')->upsert();
-    }
-
     public function testMongoDbHasNoForUpdate(): void
     {
         $this->assertFalse(

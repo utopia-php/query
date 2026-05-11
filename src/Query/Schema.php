@@ -4,7 +4,6 @@ namespace Utopia\Query;
 
 use Closure;
 use Utopia\Query\Builder\Statement;
-use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\Column;
 use Utopia\Query\Schema\IndexType;
@@ -35,18 +34,14 @@ abstract class Schema
      * Begin a fluent table builder. Terminal methods on the returned {@see Table}
      * (`create()`, `alter()`, `drop()`, `dropIfExists()`, `truncate()`, `rename()`)
      * compile and return the final {@see Statement}.
+     *
+     * Each dialect overrides this to return the dialect-specific {@see Table}
+     * subclass exposing only methods supported by that dialect.
      */
-    public function table(string $name): Table
-    {
-        return new Table($this, $name);
-    }
+    abstract public function table(string $name): Table;
 
     public function compileCreate(Table $table, bool $ifNotExists = false): Statement
     {
-        if ($table->ttl !== null) {
-            throw new UnsupportedException('TTL is only supported in ClickHouse.');
-        }
-
         $columnDefs = [];
         $primaryKeys = [];
         $uniqueColumns = [];
@@ -125,10 +120,10 @@ abstract class Schema
         $sql = 'CREATE TABLE ' . ($ifNotExists ? 'IF NOT EXISTS ' : '') . $this->quote($table->name)
             . ' (' . \implode(', ', $columnDefs) . ')';
 
-        if ($table->partitionType !== null) {
-            $sql .= ' PARTITION BY ' . $table->partitionType->value . '(' . $table->partitionExpression . ')';
-            if ($table->partitionCount !== null) {
-                $sql .= ' PARTITIONS ' . $table->partitionCount;
+        if ($this instanceof Schema\Feature\Partitioning) {
+            $partitioning = $this->compileCreatePartitioning($table);
+            if ($partitioning !== '') {
+                $sql .= ' ' . $partitioning;
             }
         }
 
@@ -269,33 +264,8 @@ abstract class Schema
         );
     }
 
-    public function createView(string $name, Builder $query): Statement
-    {
-        $result = $query->build();
-        $sql = 'CREATE VIEW ' . $this->quote($name) . ' AS ' . $result->query;
-
-        return new Statement($sql, $result->bindings, executor: $this->executor);
-    }
-
-    public function createOrReplaceView(string $name, Builder $query): Statement
-    {
-        $result = $query->build();
-        $sql = 'CREATE OR REPLACE VIEW ' . $this->quote($name) . ' AS ' . $result->query;
-
-        return new Statement($sql, $result->bindings, executor: $this->executor);
-    }
-
-    public function dropView(string $name): Statement
-    {
-        return new Statement('DROP VIEW ' . $this->quote($name), [], executor: $this->executor);
-    }
-
     protected function compileColumnDefinition(Column $column): string
     {
-        if ($column->ttl !== null) {
-            throw new UnsupportedException('TTL is only supported in ClickHouse.');
-        }
-
         $parts = [
             $this->quote($column->name),
             $this->compileColumnType($column),
@@ -434,27 +404,4 @@ abstract class Schema
         return \implode(', ', $parts);
     }
 
-    public function renameIndex(string $table, string $from, string $to): Statement
-    {
-        return new Statement(
-            'ALTER TABLE ' . $this->quote($table) . ' RENAME INDEX ' . $this->quote($from) . ' TO ' . $this->quote($to),
-            [],
-            executor: $this->executor,
-        );
-    }
-
-    public function createDatabase(string $name): Statement
-    {
-        return new Statement('CREATE DATABASE ' . $this->quote($name), [], executor: $this->executor);
-    }
-
-    public function dropDatabase(string $name): Statement
-    {
-        return new Statement('DROP DATABASE ' . $this->quote($name), [], executor: $this->executor);
-    }
-
-    public function analyzeTable(string $table): Statement
-    {
-        return new Statement('ANALYZE TABLE ' . $this->quote($table), [], executor: $this->executor);
-    }
 }

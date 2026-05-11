@@ -8,16 +8,17 @@ use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\ClickHouse;
 use Utopia\Query\Schema\ClickHouse\Engine;
-use Utopia\Query\Schema\Column;
+use Utopia\Query\Schema\Column\PostgreSQL as Column;
 use Utopia\Query\Schema\ColumnType;
-use Utopia\Query\Schema\ForeignKey;
+use Utopia\Query\Schema\ForeignKey\PostgreSQL as ForeignKey;
 use Utopia\Query\Schema\ForeignKeyAction;
 use Utopia\Query\Schema\IndexType;
 use Utopia\Query\Schema\MongoDB;
 use Utopia\Query\Schema\MySQL;
 use Utopia\Query\Schema\PostgreSQL;
 use Utopia\Query\Schema\SQLite;
-use Utopia\Query\Schema\Table;
+use Utopia\Query\Schema\Table as BaseTable;
+use Utopia\Query\Schema\Table\PostgreSQL as Table;
 
 /**
  * Behavioural tests for the fluent Schema builder. Covers:
@@ -38,7 +39,7 @@ class FluentBuilderTest extends TestCase
         $schema = new MySQL();
         $table = $schema->table('users');
 
-        $this->assertInstanceOf(Table::class, $table);
+        $this->assertInstanceOf(BaseTable::class, $table);
         $this->assertSame('users', $table->name);
     }
 
@@ -257,15 +258,15 @@ class FluentBuilderTest extends TestCase
 
     public function testColumnForwardsEngineAndOrderByAndTtl(): void
     {
-        $bp = new Table();
+        $bp = (new ClickHouse())->table('events');
         $bp->integer('id')
             ->engine(Engine::MergeTree)
             ->orderBy(['id'])
-            ->ttl('id + INTERVAL 1 DAY');
+            ->partitionBy('toYYYYMM(id)');
 
         $this->assertSame(Engine::MergeTree, $bp->engine);
         $this->assertSame(['id'], $bp->orderBy);
-        $this->assertSame('id + INTERVAL 1 DAY', $bp->ttl);
+        $this->assertSame('toYYYYMM(id)', $bp->partitionExpression);
     }
 
     public function testColumnPrimaryNoArgsMarksColumn(): void
@@ -615,7 +616,7 @@ class FluentBuilderTest extends TestCase
 
     public function testTableOrderByRejectsInvalidIdentifier(): void
     {
-        $bp = new Table();
+        $bp = (new ClickHouse())->table('events');
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('Invalid column name in ORDER BY');
@@ -642,31 +643,6 @@ class FluentBuilderTest extends TestCase
             ->integer('a')->primary()
             ->integer('b')
             ->primary(['a', 'b'])
-            ->create();
-    }
-
-    public function testTableTtlOnNonClickHouseSchemaThrowsAtCompile(): void
-    {
-        $schema = new MySQL();
-
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('TTL is only supported in ClickHouse');
-
-        $schema->table('events')
-            ->integer('id')
-            ->ttl('id + INTERVAL 1 DAY')
-            ->create();
-    }
-
-    public function testColumnTtlOnNonClickHouseSchemaThrowsAtCompile(): void
-    {
-        $schema = new MySQL();
-
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('TTL is only supported in ClickHouse');
-
-        $schema->table('events')
-            ->datetime('ts')->ttl('ts + INTERVAL 1 DAY')
             ->create();
     }
 
@@ -820,7 +796,7 @@ class FluentBuilderTest extends TestCase
 
     public function testEngineWithRequiredArgsValidates(): void
     {
-        $bp = new Table();
+        $bp = (new ClickHouse())->table('events');
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('CollapsingMergeTree requires a sign column');
@@ -829,7 +805,7 @@ class FluentBuilderTest extends TestCase
 
     public function testReplicatedMergeTreeRequiresArgs(): void
     {
-        $bp = new Table();
+        $bp = (new ClickHouse())->table('events');
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('ReplicatedMergeTree requires zookeeper_path and replica_name');
@@ -921,20 +897,20 @@ class FluentBuilderTest extends TestCase
     public function testDeepChainOfHeterogeneousMethodsCompiles(): void
     {
         $schema = new MySQL();
-        $stmt = $schema->table('mixed')
-            ->id()
+        $table = $schema->table('mixed');
+        $table->id()
             ->string('a')->nullable()
             ->integer('b')->default(7)
             ->datetime('c', 6)
             ->boolean('d')
-            ->json('e')
-            ->index(['a', 'b'])
+            ->json('e');
+        $table->index(['a', 'b'])
             ->uniqueIndex(['a'])
-            ->fulltextIndex(['e'], 'ft_e')
-            ->foreignKey('b')->references('id')->on('parents')->onDelete(ForeignKeyAction::Cascade)
-            ->check('b_positive', '`b` >= 0')
-            ->rawColumn('`raw_col` TEXT')
-            ->create();
+            ->fulltextIndex(['e'], 'ft_e');
+        $table->foreignKey('b')->references('id')->on('parents')->onDelete(ForeignKeyAction::Cascade);
+        $table->check('b_positive', '`b` >= 0');
+        $table->rawColumn('`raw_col` TEXT');
+        $stmt = $table->create();
 
         $this->assertBindingCount($stmt);
         $this->assertStringContainsString('PRIMARY KEY (`id`)', $stmt->query);
@@ -1143,19 +1119,6 @@ class FluentBuilderTest extends TestCase
             ->foreignKey('user_id')->references('id')->on('users')
             ->partitionByHash('`id`', 4);
         $this->assertSame(4, $c->partitionCount);
-    }
-
-    public function testForeignKeyForwardsEngineAndOrderByAndTtl(): void
-    {
-        $bp = new Table();
-        $bp->integer('id')->integer('user_id');
-        $bp->foreignKey('user_id')->engine(Engine::MergeTree);
-        $bp->foreignKey('user_id')->orderBy(['id']);
-        $bp->foreignKey('user_id')->ttl('id + INTERVAL 1 DAY');
-
-        $this->assertSame(Engine::MergeTree, $bp->engine);
-        $this->assertSame(['id'], $bp->orderBy);
-        $this->assertSame('id + INTERVAL 1 DAY', $bp->ttl);
     }
 
     public function testForeignKeyForwardsAllTerminals(): void

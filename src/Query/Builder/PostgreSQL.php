@@ -6,7 +6,9 @@ use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Serializer\PostgreSQL as PostgreSQLSerializer;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\FullOuterJoins;
+use Utopia\Query\Builder\Feature\FullTextSearch;
 use Utopia\Query\Builder\Feature\GroupByModifiers;
+use Utopia\Query\Builder\Feature\InsertOrIgnore;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\LateralJoins;
 use Utopia\Query\Builder\Feature\PostgreSQL\AggregateFilter;
@@ -17,8 +19,11 @@ use Utopia\Query\Builder\Feature\PostgreSQL\OrderedSetAggregates;
 use Utopia\Query\Builder\Feature\PostgreSQL\Returning;
 use Utopia\Query\Builder\Feature\PostgreSQL\VectorSearch;
 use Utopia\Query\Builder\Feature\Sequences;
+use Utopia\Query\Builder\Feature\Spatial;
 use Utopia\Query\Builder\Feature\StringAggregates;
 use Utopia\Query\Builder\Feature\TableSampling;
+use Utopia\Query\Builder\Feature\Upsert;
+use Utopia\Query\Builder\Feature\UpsertSelect;
 use Utopia\Query\Builder\PostgreSQL\DeleteUsing;
 use Utopia\Query\Builder\PostgreSQL\MergeTarget;
 use Utopia\Query\Builder\PostgreSQL\UpdateFrom;
@@ -27,9 +32,30 @@ use Utopia\Query\Method;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\ColumnType;
 
-class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf, ConditionalAggregates, Merge, LateralJoins, TableSampling, FullOuterJoins, StringAggregates, OrderedSetAggregates, DistinctOn, AggregateFilter, GroupByModifiers, Sequences
+class PostgreSQL extends SQL implements
+    VectorSearch,
+    Json,
+    Returning,
+    LockingOf,
+    ConditionalAggregates,
+    Merge,
+    LateralJoins,
+    TableSampling,
+    FullOuterJoins,
+    StringAggregates,
+    OrderedSetAggregates,
+    DistinctOn,
+    AggregateFilter,
+    GroupByModifiers,
+    Sequences,
+    Spatial,
+    FullTextSearch,
+    Upsert,
+    UpsertSelect,
+    InsertOrIgnore
 {
     use Trait\FullOuterJoins;
+    use Trait\FullTextSearch;
     use Trait\GroupByModifiers;
     use Trait\LateralJoins;
     use Trait\PostgreSQL\AggregateFilter;
@@ -40,7 +66,14 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
     use Trait\PostgreSQL\Sequences;
     use Trait\PostgreSQL\VectorSearch;
     use Trait\Returning;
+    use Trait\Spatial;
     use Trait\StringAggregates;
+    use Trait\Upsert {
+        upsert as private baseUpsert;
+    }
+    use Trait\UpsertSelect {
+        upsertSelect as private baseUpsertSelect;
+    }
 
     protected string $wrapChar = '"';
 
@@ -337,20 +370,14 @@ class PostgreSQL extends SQL implements VectorSearch, Json, Returning, LockingOf
         $parts[] = 'WHERE ' . \implode(' AND ', $extra);
     }
 
-    #[\Override]
     public function upsert(): Statement
     {
-        $result = parent::upsert();
-
-        return $this->appendReturning($result);
+        return $this->appendReturning($this->baseUpsert());
     }
 
-    #[\Override]
     public function upsertSelect(): Statement
     {
-        $result = parent::upsertSelect();
-
-        return $this->appendReturning($result);
+        return $this->appendReturning($this->baseUpsertSelect());
     }
 
     #[\Override]

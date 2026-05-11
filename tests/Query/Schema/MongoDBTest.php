@@ -107,20 +107,6 @@ class MongoDBTest extends TestCase
         $this->assertNotContains('email', $required);
     }
 
-    public function testCreateCollectionRejectsCompositePrimaryKey(): void
-    {
-        $schema = new Schema();
-
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('Composite primary keys are not supported in MongoDB');
-
-        $schema->table('order_items')
-            ->integer('order_id')
-            ->integer('product_id')
-            ->primary(['order_id', 'product_id'])
-            ->create();
-    }
-
     public function testDrop(): void
     {
         $schema = new Schema();
@@ -375,6 +361,17 @@ class MongoDBTest extends TestCase
         /** @var list<array<string, mixed>> $pipeline */
         $pipeline = $op['pipeline'];
         $this->assertNotEmpty($pipeline);
+    }
+
+    public function testDropView(): void
+    {
+        $schema = new Schema();
+        $result = $schema->dropView('active_users');
+
+        $op = $this->decode($result->query);
+        $this->assertSame('drop', $op['command']);
+        $this->assertSame('active_users', $op['collection']);
+        $this->assertArrayNotHasKey('view', $op);
     }
 
     public function testCreateCollectionWithAllBsonTypes(): void

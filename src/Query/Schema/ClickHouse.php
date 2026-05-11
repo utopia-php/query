@@ -2,7 +2,6 @@
 
 namespace Utopia\Query\Schema;
 
-use Utopia\Query\Builder;
 use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
@@ -10,12 +9,22 @@ use Utopia\Query\QuotesIdentifiers;
 use Utopia\Query\Schema;
 use Utopia\Query\Schema\ClickHouse\Engine;
 use Utopia\Query\Schema\Feature\ColumnComments;
+use Utopia\Query\Schema\Feature\Databases;
 use Utopia\Query\Schema\Feature\DropPartition;
 use Utopia\Query\Schema\Feature\TableComments;
+use Utopia\Query\Schema\Feature\Views;
 
-class ClickHouse extends Schema implements TableComments, ColumnComments, DropPartition
+class ClickHouse extends Schema implements TableComments, ColumnComments, DropPartition, Views, Databases
 {
     use QuotesIdentifiers;
+    use Trait\Databases;
+    use Trait\Views;
+
+    #[\Override]
+    public function table(string $name): Table\ClickHouse
+    {
+        return new Table\ClickHouse($this, $name);
+    }
 
     protected function compileColumnType(Column $column): string
     {
@@ -203,7 +212,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             . ' (' . \implode(', ', $columnDefs) . ')'
             . ' ENGINE = ' . $this->compileEngine($engine, $table->engineArgs);
 
-        if ($table->partitionType !== null) {
+        if ($table->partitionExpression !== '') {
             $sql .= ' PARTITION BY ' . $table->partitionExpression;
         }
 
@@ -308,14 +317,6 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             Engine::TinyLog,
             Engine::StripeLog => $engine->value,
         };
-    }
-
-    public function createView(string $name, Builder $query): Statement
-    {
-        $result = $query->build();
-        $sql = 'CREATE VIEW ' . $this->quote($name) . ' AS ' . $result->query;
-
-        return new Statement($sql, $result->bindings, executor: $this->executor);
     }
 
     /**

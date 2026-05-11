@@ -1587,18 +1587,6 @@ class MongoDBTest extends TestCase
         $this->assertSame(['php', 'js'], $result->bindings);
     }
 
-    public function testUpsertSelectThrowsException(): void
-    {
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('upsertSelect() is not supported in MongoDB builder.');
-
-        (new Builder())
-            ->into('users')
-            ->set(['name' => 'Alice', 'email' => 'a@b.com'])
-            ->onConflict(['email'], ['name'])
-            ->upsertSelect();
-    }
-
     public function testUpsertWithoutExplicitUpdateColumns(): void
     {
         $result = (new Builder())

@@ -5,16 +5,53 @@ namespace Utopia\Query\Schema;
 use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
+use Utopia\Query\Schema\Feature\AnalyzeTable;
 use Utopia\Query\Schema\Feature\ColumnComments;
 use Utopia\Query\Schema\Feature\CreatePartition;
+use Utopia\Query\Schema\Feature\Databases;
 use Utopia\Query\Schema\Feature\DropPartition;
+use Utopia\Query\Schema\Feature\ForeignKeys;
+use Utopia\Query\Schema\Feature\Partitioning;
+use Utopia\Query\Schema\Feature\Procedures;
+use Utopia\Query\Schema\Feature\RenameIndex;
+use Utopia\Query\Schema\Feature\ReplaceView;
 use Utopia\Query\Schema\Feature\Sequences;
 use Utopia\Query\Schema\Feature\TableComments;
+use Utopia\Query\Schema\Feature\Triggers;
 use Utopia\Query\Schema\Feature\Types;
+use Utopia\Query\Schema\Feature\Views;
 
-class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnComments, CreatePartition, DropPartition
+class PostgreSQL extends SQL implements
+    ForeignKeys,
+    Procedures,
+    Triggers,
+    Types,
+    Sequences,
+    TableComments,
+    ColumnComments,
+    CreatePartition,
+    DropPartition,
+    Views,
+    ReplaceView,
+    Databases,
+    RenameIndex,
+    AnalyzeTable,
+    Partitioning
 {
+    use Trait\ForeignKeys;
+    use Trait\Partitioning;
+    use Trait\Procedures;
+    use Trait\ReplaceView;
+    use Trait\Triggers;
+    use Trait\Views;
+
     protected string $wrapChar = '"';
+
+    #[\Override]
+    public function table(string $name): Table\PostgreSQL
+    {
+        return new Table\PostgreSQL($this, $name);
+    }
 
     protected function compileColumnType(Column $column): string
     {
@@ -231,7 +268,7 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
 
     public function dropProcedure(string $name): Statement
     {
-        return new Statement('DROP FUNCTION ' . $this->quote($name), [], executor: $this->executor);
+        return new Statement('DROP FUNCTION ' . $this->quote($name) . '()', [], executor: $this->executor);
     }
 
     /**
@@ -261,6 +298,29 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             . ' ' . $timing->value . ' ' . $event->value
             . ' ON ' . $this->quote($table)
             . ' FOR EACH ROW EXECUTE FUNCTION ' . $this->quote($funcName) . '()';
+
+        return new Statement($sql, [], executor: $this->executor);
+    }
+
+    /**
+     * Drop a trigger and its backing PL/pgSQL function. PostgreSQL requires
+     * the table name (`DROP TRIGGER name ON table`); the function created by
+     * {@see createTrigger()} is dropped at the same time so callers don't need
+     * a separate {@see dropFunction()} call.
+     *
+     * @throws ValidationException if $table is null.
+     */
+    #[\Override]
+    public function dropTrigger(string $name, ?string $table = null): Statement
+    {
+        if ($table === null) {
+            throw new ValidationException('PostgreSQL dropTrigger() requires the table name.');
+        }
+
+        $funcName = $name . '_func';
+
+        $sql = 'DROP TRIGGER ' . $this->quote($name) . ' ON ' . $this->quote($table)
+            . '; DROP FUNCTION ' . $this->quote($funcName) . '()';
 
         return new Statement($sql, [], executor: $this->executor);
     }
@@ -550,5 +610,20 @@ class PostgreSQL extends SQL implements Types, Sequences, TableComments, ColumnC
             [],
             executor: $this->executor,
         );
+    }
+
+    /**
+     * PostgreSQL accepts `PARTITION BY {RANGE|LIST|HASH} (expr)` but not the
+     * `PARTITIONS N` count modifier — that is MySQL-only. Override the shared
+     * trait to omit the count.
+     */
+    #[\Override]
+    public function compileCreatePartitioning(Table $table): string
+    {
+        if ($table->partitionType === null) {
+            return '';
+        }
+
+        return 'PARTITION BY ' . $table->partitionType->value . '(' . $table->partitionExpression . ')';
     }
 }

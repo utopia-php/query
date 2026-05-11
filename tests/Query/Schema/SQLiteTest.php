@@ -9,33 +9,12 @@ use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\ColumnType;
-use Utopia\Query\Schema\Feature\ForeignKeys;
-use Utopia\Query\Schema\Feature\Procedures;
-use Utopia\Query\Schema\Feature\Triggers;
 use Utopia\Query\Schema\ForeignKeyAction;
-use Utopia\Query\Schema\ParameterDirection;
 use Utopia\Query\Schema\SQLite as Schema;
-use Utopia\Query\Schema\TriggerEvent;
-use Utopia\Query\Schema\TriggerTiming;
 
 class SQLiteTest extends TestCase
 {
     use AssertsBindingCount;
-
-    public function testImplementsForeignKeys(): void
-    {
-        $this->assertInstanceOf(ForeignKeys::class, new Schema());
-    }
-
-    public function testImplementsProcedures(): void
-    {
-        $this->assertInstanceOf(Procedures::class, new Schema());
-    }
-
-    public function testImplementsTriggers(): void
-    {
-        $this->assertInstanceOf(Triggers::class, new Schema());
-    }
 
     public function testCreateTableBasic(): void
     {
@@ -176,17 +155,6 @@ class SQLiteTest extends TestCase
         $this->assertSame('CREATE TABLE `t` (`uid` VARCHAR(36) NOT NULL)', $result->query);
     }
 
-    public function testColumnTypeVectorThrowsUnsupported(): void
-    {
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('Vector type is not supported in SQLite.');
-
-        $schema = new Schema();
-        $schema->table('t')
-            ->vector('embedding', 768)
-            ->create();
-    }
-
     public function testAutoIncrementUsesAutoincrement(): void
     {
         $schema = new Schema();
@@ -208,24 +176,6 @@ class SQLiteTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertStringNotContainsString('UNSIGNED', $result->query);
-    }
-
-    public function testCreateDatabaseThrowsUnsupported(): void
-    {
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('SQLite does not support CREATE DATABASE.');
-
-        $schema = new Schema();
-        $schema->createDatabase('mydb');
-    }
-
-    public function testDropDatabaseThrowsUnsupported(): void
-    {
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('SQLite does not support DROP DATABASE.');
-
-        $schema = new Schema();
-        $schema->dropDatabase('mydb');
     }
 
     public function testRenameUsesAlterTable(): void
@@ -259,15 +209,6 @@ class SQLiteTest extends TestCase
 
         $this->assertSame('DROP INDEX `idx_email`', $result->query);
         $this->assertSame([], $result->bindings);
-    }
-
-    public function testRenameIndexThrowsUnsupported(): void
-    {
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('SQLite does not support renaming indexes directly.');
-
-        $schema = new Schema();
-        $schema->renameIndex('users', 'old_idx', 'new_idx');
     }
 
     public function testCreateTableWithNullableAndDefault(): void
@@ -400,112 +341,12 @@ class SQLiteTest extends TestCase
         $this->assertSame([true], $result->bindings);
     }
 
-    public function testCreateOrReplaceView(): void
-    {
-        $schema = new Schema();
-        $builder = (new SQLBuilder())->from('users')->filter([Query::equal('active', [true])]);
-        $result = $schema->createOrReplaceView('active_users', $builder);
-
-        $this->assertSame(
-            'CREATE OR REPLACE VIEW `active_users` AS SELECT * FROM `users` WHERE `active` IN (?)',
-            $result->query
-        );
-        $this->assertSame([true], $result->bindings);
-    }
-
     public function testDropView(): void
     {
         $schema = new Schema();
         $result = $schema->dropView('active_users');
 
         $this->assertSame('DROP VIEW `active_users`', $result->query);
-    }
-
-    public function testAddForeignKeyStandalone(): void
-    {
-        $schema = new Schema();
-        $result = $schema->addForeignKey(
-            'orders',
-            'fk_user',
-            'user_id',
-            'users',
-            'id',
-            onDelete: ForeignKeyAction::Cascade,
-            onUpdate: ForeignKeyAction::SetNull
-        );
-
-        $this->assertSame(
-            'ALTER TABLE `orders` ADD CONSTRAINT `fk_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE SET NULL',
-            $result->query
-        );
-    }
-
-    public function testAddForeignKeyNoActions(): void
-    {
-        $schema = new Schema();
-        $result = $schema->addForeignKey('orders', 'fk_user', 'user_id', 'users', 'id');
-
-        $this->assertStringNotContainsString('ON DELETE', $result->query);
-        $this->assertStringNotContainsString('ON UPDATE', $result->query);
-    }
-
-    public function testDropForeignKeyStandalone(): void
-    {
-        $schema = new Schema();
-        $result = $schema->dropForeignKey('orders', 'fk_user');
-
-        $this->assertSame(
-            'ALTER TABLE `orders` DROP FOREIGN KEY `fk_user`',
-            $result->query
-        );
-    }
-
-    public function testCreateProcedure(): void
-    {
-        $schema = new Schema();
-        $result = $schema->createProcedure(
-            'update_stats',
-            params: [[ParameterDirection::In, 'user_id', 'INT'], [ParameterDirection::Out, 'total', 'INT']],
-            body: 'SELECT COUNT(*) INTO total FROM orders WHERE orders.user_id = user_id;'
-        );
-
-        $this->assertSame(
-            'CREATE PROCEDURE `update_stats`(IN `user_id` INT, OUT `total` INT) BEGIN SELECT COUNT(*) INTO total FROM orders WHERE orders.user_id = user_id; END',
-            $result->query
-        );
-    }
-
-    public function testDropProcedure(): void
-    {
-        $schema = new Schema();
-        $result = $schema->dropProcedure('update_stats');
-
-        $this->assertSame('DROP PROCEDURE `update_stats`', $result->query);
-    }
-
-    public function testCreateTrigger(): void
-    {
-        $schema = new Schema();
-        $result = $schema->createTrigger(
-            'trg_updated_at',
-            'users',
-            timing: TriggerTiming::Before,
-            event: TriggerEvent::Update,
-            body: 'SET NEW.updated_at = datetime();'
-        );
-
-        $this->assertSame(
-            'CREATE TRIGGER `trg_updated_at` BEFORE UPDATE ON `users` FOR EACH ROW BEGIN SET NEW.updated_at = datetime(); END',
-            $result->query
-        );
-    }
-
-    public function testDropTrigger(): void
-    {
-        $schema = new Schema();
-        $result = $schema->dropTrigger('trg_updated_at');
-
-        $this->assertSame('DROP TRIGGER `trg_updated_at`', $result->query);
     }
 
     public function testCreateTableWithMultiplePrimaryKeys(): void

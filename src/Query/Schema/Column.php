@@ -4,54 +4,59 @@ namespace Utopia\Query\Schema;
 
 use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\ValidationException;
-use Utopia\Query\Schema\ClickHouse\Engine;
 use Utopia\Query\Schema\ClickHouse\IndexAlgorithm;
 
+/**
+ * @template TTable of Table = Table
+ */
 class Column
 {
-    public private(set) bool $isNullable = false;
+    public protected(set) bool $isNullable = false;
 
-    public private(set) mixed $default = null;
+    public protected(set) mixed $default = null;
 
-    public private(set) bool $hasDefault = false;
+    public protected(set) bool $hasDefault = false;
 
-    public private(set) bool $isUnsigned = false;
+    public protected(set) bool $isUnsigned = false;
 
-    public private(set) bool $isUnique = false;
+    public protected(set) bool $isUnique = false;
 
-    public private(set) bool $isPrimary = false;
+    public protected(set) bool $isPrimary = false;
 
-    public private(set) bool $isAutoIncrement = false;
+    public protected(set) bool $isAutoIncrement = false;
 
-    public private(set) ?string $after = null;
+    public protected(set) ?string $after = null;
 
-    public private(set) ?string $comment = null;
+    public protected(set) ?string $comment = null;
 
     /** @var string[] */
-    public private(set) array $enumValues = [];
+    public protected(set) array $enumValues = [];
 
-    public private(set) ?int $srid = null;
+    public protected(set) ?int $srid = null;
 
-    public private(set) ?int $dimensions = null;
+    public protected(set) ?int $dimensions = null;
 
-    public private(set) bool $isModify = false;
+    public protected(set) bool $isModify = false;
 
-    public private(set) ?string $collation = null;
+    public protected(set) ?string $collation = null;
 
-    public private(set) ?string $checkExpression = null;
+    public protected(set) ?string $checkExpression = null;
 
-    public private(set) ?string $generatedExpression = null;
+    public protected(set) ?string $generatedExpression = null;
 
     /**
      * Null when {@see generatedAs()} has not been called.
      * True = STORED, false = VIRTUAL.
      */
-    public private(set) ?bool $generatedStored = null;
+    public protected(set) ?bool $generatedStored = null;
 
-    public private(set) ?string $ttl = null;
+    public protected(set) ?string $ttl = null;
 
-    public private(set) ?string $userTypeName = null;
+    public protected(set) ?string $userTypeName = null;
 
+    /**
+     * @param  TTable  $table
+     */
     public function __construct(
         public Table $table,
         public string $name,
@@ -91,22 +96,15 @@ class Column
     }
 
     /**
-     * Mark this column as a primary key (no args), or declare a composite
-     * primary key on the parent table (when an array is passed).
-     *
-     * @param  list<string>  $columns
-     *
-     * @phpstan-return ($columns is array{} ? static : Table)
+     * Mark this column as a primary key. Dialect Column subclasses that
+     * support composite primary keys also accept a list of column names to
+     * declare a composite key on the parent table.
      */
-    public function primary(array $columns = []): static|Table
+    public function primary(): static|Table
     {
-        if ($columns === []) {
-            $this->isPrimary = true;
+        $this->isPrimary = true;
 
-            return $this;
-        }
-
-        return $this->table->primary($columns);
+        return $this;
     }
 
     public function after(string $column): static
@@ -184,21 +182,15 @@ class Column
     }
 
     /**
-     * Attach a CHECK constraint. Called with one argument it sets a column-
-     * level CHECK on this column; called with two arguments it adds a named
-     * table-level CHECK constraint via the parent table.
-     *
-     * @phpstan-return ($expression is null ? static : Table)
+     * Attach a column-level CHECK constraint. Dialect Column subclasses that
+     * support table-level CHECK constraints also accept a name and expression
+     * pair to declare a named table-level CHECK.
      */
-    public function check(string $expressionOrName, ?string $expression = null): static|Table
+    public function check(string $expression): static|Table
     {
-        if ($expression === null) {
-            $this->checkExpression = $expressionOrName;
+        $this->checkExpression = $expression;
 
-            return $this;
-        }
-
-        return $this->table->check($expressionOrName, $expression);
+        return $this;
     }
 
     /**
@@ -263,126 +255,145 @@ class Column
         return $this;
     }
 
-    public function id(string $name = 'id'): Column
+    public function id(string $name = 'id'): static
     {
+        /** @var static */
         return $this->table->id($name);
     }
 
-    public function string(string $name, int $length = 255): Column
+    public function string(string $name, int $length = 255): static
     {
+        /** @var static */
         return $this->table->string($name, $length);
     }
 
-    public function text(string $name): Column
+    public function text(string $name): static
     {
+        /** @var static */
         return $this->table->text($name);
     }
 
-    public function mediumText(string $name): Column
+    public function mediumText(string $name): static
     {
+        /** @var static */
         return $this->table->mediumText($name);
     }
 
-    public function longText(string $name): Column
+    public function longText(string $name): static
     {
+        /** @var static */
         return $this->table->longText($name);
     }
 
-    public function integer(string $name): Column
+    public function integer(string $name): static
     {
+        /** @var static */
         return $this->table->integer($name);
     }
 
-    public function bigInteger(string $name): Column
+    public function bigInteger(string $name): static
     {
+        /** @var static */
         return $this->table->bigInteger($name);
     }
 
-    public function serial(string $name): Column
+    public function serial(string $name): static
     {
+        /** @var static */
         return $this->table->serial($name);
     }
 
-    public function bigSerial(string $name): Column
+    public function bigSerial(string $name): static
     {
+        /** @var static */
         return $this->table->bigSerial($name);
     }
 
-    public function smallSerial(string $name): Column
+    public function smallSerial(string $name): static
     {
+        /** @var static */
         return $this->table->smallSerial($name);
     }
 
-    public function float(string $name): Column
+    public function float(string $name): static
     {
+        /** @var static */
         return $this->table->float($name);
     }
 
-    public function boolean(string $name): Column
+    public function boolean(string $name): static
     {
+        /** @var static */
         return $this->table->boolean($name);
     }
 
-    public function datetime(string $name, int $precision = 0): Column
+    public function datetime(string $name, int $precision = 0): static
     {
+        /** @var static */
         return $this->table->datetime($name, $precision);
     }
 
-    public function timestamp(string $name, int $precision = 0): Column
+    public function timestamp(string $name, int $precision = 0): static
     {
+        /** @var static */
         return $this->table->timestamp($name, $precision);
     }
 
-    public function json(string $name): Column
+    public function json(string $name): static
     {
+        /** @var static */
         return $this->table->json($name);
     }
 
-    public function binary(string $name): Column
+    public function binary(string $name): static
     {
+        /** @var static */
         return $this->table->binary($name);
     }
 
-    public function point(string $name, int $srid = 4326): Column
+    public function point(string $name, int $srid = 4326): static
     {
+        /** @var static */
         return $this->table->point($name, $srid);
     }
 
-    public function linestring(string $name, int $srid = 4326): Column
+    public function linestring(string $name, int $srid = 4326): static
     {
+        /** @var static */
         return $this->table->linestring($name, $srid);
     }
 
-    public function polygon(string $name, int $srid = 4326): Column
+    public function polygon(string $name, int $srid = 4326): static
     {
+        /** @var static */
         return $this->table->polygon($name, $srid);
     }
 
-    public function vector(string $name, int $dimensions): Column
-    {
-        return $this->table->vector($name, $dimensions);
-    }
-
+    /** @return TTable */
     public function timestamps(int $precision = 3): Table
     {
         return $this->table->timestamps($precision);
     }
 
-    public function addColumn(string $name, ColumnType $type, ?int $lengthOrPrecision = null): Column
+    public function addColumn(string $name, ColumnType $type, ?int $lengthOrPrecision = null): static
     {
+        /** @var static */
         return $this->table->addColumn($name, $type, $lengthOrPrecision);
     }
 
-    public function modifyColumn(string $name, ColumnType $type, ?int $lengthOrPrecision = null): Column
+    public function modifyColumn(string $name, ColumnType $type, ?int $lengthOrPrecision = null): static
     {
+        /** @var static */
         return $this->table->modifyColumn($name, $type, $lengthOrPrecision);
     }
 
+    /** @return TTable */
     public function renameColumn(string $from, string $to): Table
     {
         return $this->table->renameColumn($from, $to);
     }
 
+    /** @return TTable */
     public function dropColumn(string $name): Table
     {
         return $this->table->dropColumn($name);
@@ -394,6 +405,7 @@ class Column
      * @param  array<string, string>  $orders
      * @param  array<string, string>  $collations
      * @param  list<string|int|float>  $algorithmArgs  ClickHouse skip-index algorithm args
+     * @return TTable
      */
     public function index(
         array $columns,
@@ -426,6 +438,7 @@ class Column
      * @param  array<string, int>  $lengths
      * @param  array<string, string>  $orders
      * @param  array<string, string>  $collations
+     * @return TTable
      */
     public function uniqueIndex(
         array $columns,
@@ -439,26 +452,11 @@ class Column
 
     /**
      * @param  string[]  $columns
-     */
-    public function fulltextIndex(array $columns, string $name = ''): Table
-    {
-        return $this->table->fulltextIndex($columns, $name);
-    }
-
-    /**
-     * @param  string[]  $columns
-     */
-    public function spatialIndex(array $columns, string $name = ''): Table
-    {
-        return $this->table->spatialIndex($columns, $name);
-    }
-
-    /**
-     * @param  string[]  $columns
      * @param  array<string, int>  $lengths
      * @param  array<string, string>  $orders
      * @param  array<string, string>  $collations
      * @param  list<string>  $rawColumns
+     * @return TTable
      */
     public function addIndex(
         string $name,
@@ -474,70 +472,22 @@ class Column
         return $this->table->addIndex($name, $columns, $type, $lengths, $orders, $method, $operatorClass, $collations, $rawColumns);
     }
 
+    /** @return TTable */
     public function dropIndex(string $name): Table
     {
         return $this->table->dropIndex($name);
     }
 
-    public function foreignKey(string $column): ForeignKey
-    {
-        return $this->table->foreignKey($column);
-    }
-
-    public function addForeignKey(string $column): ForeignKey
-    {
-        return $this->table->addForeignKey($column);
-    }
-
-    public function dropForeignKey(string $name): Table
-    {
-        return $this->table->dropForeignKey($name);
-    }
-
+    /** @return TTable */
     public function rawColumn(string $definition): Table
     {
         return $this->table->rawColumn($definition);
     }
 
+    /** @return TTable */
     public function rawIndex(string $definition): Table
     {
         return $this->table->rawIndex($definition);
-    }
-
-    public function partitionByRange(string $expression): Table
-    {
-        return $this->table->partitionByRange($expression);
-    }
-
-    public function partitionByList(string $expression): Table
-    {
-        return $this->table->partitionByList($expression);
-    }
-
-    public function partitionByHash(string $expression, ?int $partitions = null): Table
-    {
-        return $this->table->partitionByHash($expression, $partitions);
-    }
-
-    public function engine(Engine $engine, string ...$args): Table
-    {
-        return $this->table->engine($engine, ...$args);
-    }
-
-    /**
-     * @param  array<string, string|int|float|bool>  $settings
-     */
-    public function settings(array $settings): Table
-    {
-        return $this->table->settings($settings);
-    }
-
-    /**
-     * @param  list<string>  $columns
-     */
-    public function orderBy(array $columns): Table
-    {
-        return $this->table->orderBy($columns);
     }
 
     public function create(bool $ifNotExists = false): Statement

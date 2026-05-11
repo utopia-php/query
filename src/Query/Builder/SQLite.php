@@ -5,16 +5,21 @@ namespace Utopia\Query\Builder;
 use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Serializer\SQLite as SQLiteSerializer;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
+use Utopia\Query\Builder\Feature\InsertOrIgnore;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\StringAggregates;
+use Utopia\Query\Builder\Feature\Upsert;
+use Utopia\Query\Builder\Feature\UpsertSelect;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
 
-class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregates
+class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregates, InsertOrIgnore, Upsert, UpsertSelect
 {
     use Trait\ConditionalAggregates;
     use Trait\StringAggregates;
+    use Trait\Upsert;
+    use Trait\UpsertSelect;
 
     /** @var array<string, Condition> */
     protected array $jsonSets = [];

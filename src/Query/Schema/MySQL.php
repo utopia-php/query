@@ -4,12 +4,49 @@ namespace Utopia\Query\Schema;
 
 use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\UnsupportedException;
+use Utopia\Query\Schema\Feature\AnalyzeTable;
 use Utopia\Query\Schema\Feature\CreatePartition;
+use Utopia\Query\Schema\Feature\Databases;
 use Utopia\Query\Schema\Feature\DropPartition;
+use Utopia\Query\Schema\Feature\ForeignKeys;
+use Utopia\Query\Schema\Feature\Partitioning;
+use Utopia\Query\Schema\Feature\Procedures;
+use Utopia\Query\Schema\Feature\RenameIndex;
+use Utopia\Query\Schema\Feature\ReplaceView;
 use Utopia\Query\Schema\Feature\TableComments;
+use Utopia\Query\Schema\Feature\Triggers;
+use Utopia\Query\Schema\Feature\Views;
 
-class MySQL extends SQL implements TableComments, CreatePartition, DropPartition
+class MySQL extends SQL implements
+    ForeignKeys,
+    Procedures,
+    Triggers,
+    TableComments,
+    CreatePartition,
+    DropPartition,
+    Views,
+    ReplaceView,
+    Databases,
+    RenameIndex,
+    AnalyzeTable,
+    Partitioning
 {
+    use Trait\AnalyzeTable;
+    use Trait\Databases;
+    use Trait\ForeignKeys;
+    use Trait\Partitioning;
+    use Trait\Procedures;
+    use Trait\RenameIndex;
+    use Trait\ReplaceView;
+    use Trait\Triggers;
+    use Trait\Views;
+
+    #[\Override]
+    public function table(string $name): Table\MySQL
+    {
+        return new Table\MySQL($this, $name);
+    }
+
     protected function compileColumnType(Column $column): string
     {
         if ($column->userTypeName !== null) {
