@@ -11,10 +11,11 @@ use Utopia\Query\Schema\ClickHouse\Engine;
 use Utopia\Query\Schema\Feature\ColumnComments;
 use Utopia\Query\Schema\Feature\Databases;
 use Utopia\Query\Schema\Feature\DropPartition;
+use Utopia\Query\Schema\Feature\OLAP;
 use Utopia\Query\Schema\Feature\TableComments;
 use Utopia\Query\Schema\Feature\Views;
 
-class ClickHouse extends Schema implements TableComments, ColumnComments, DropPartition, Views, Databases
+class ClickHouse extends Schema implements TableComments, ColumnComments, DropPartition, Views, Databases, OLAP
 {
     use QuotesIdentifiers;
     use Trait\Databases;
@@ -34,6 +35,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
 
         $type = match ($column->type) {
             ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'String',
+            ColumnType::FixedString => 'FixedString(' . ($column->length ?? throw new ValidationException('FixedString requires a length.')) . ')',
             ColumnType::Text => 'String',
             ColumnType::MediumText, ColumnType::LongText => 'String',
             ColumnType::Integer => $column->isUnsigned ? 'UInt32' : 'Int32',
@@ -52,6 +54,10 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             ColumnType::Vector => 'Array(Float64)',
             ColumnType::Serial, ColumnType::BigSerial, ColumnType::SmallSerial => throw new UnsupportedException('SERIAL types are not supported in ClickHouse.'),
         };
+
+        if ($column instanceof Column\ClickHouse && $column->isLowCardinality) {
+            $type = 'LowCardinality(' . $type . ')';
+        }
 
         if ($column->isNullable) {
             $type = 'Nullable(' . $type . ')';
@@ -87,6 +93,10 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
 
         if ($column->hasDefault) {
             $parts[] = 'DEFAULT ' . $this->compileDefaultValue($column->default);
+        }
+
+        if ($column instanceof Column\ClickHouse && $column->codecs !== []) {
+            $parts[] = 'CODEC(' . \implode(', ', $column->codecs) . ')';
         }
 
         if ($column->ttl !== null) {
@@ -224,6 +234,15 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $sql .= ! empty($orderBy)
                 ? ' ORDER BY (' . \implode(', ', $orderBy) . ')'
                 : ' ORDER BY tuple()';
+        }
+
+        if ($table instanceof Table\ClickHouse && $table->sampleBy !== null) {
+            if (! $engine->requiresOrderBy()) {
+                throw new UnsupportedException(
+                    'SAMPLE BY is only supported on engines that take an ORDER BY clause.'
+                );
+            }
+            $sql .= ' SAMPLE BY ' . $table->sampleBy;
         }
 
         if ($table->ttl !== null) {

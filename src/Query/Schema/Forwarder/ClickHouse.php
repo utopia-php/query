@@ -18,6 +18,11 @@ trait ClickHouse
         return $this->table->vector($name, $dimensions);
     }
 
+    public function fixedString(string $name, int $length): Column\ClickHouse
+    {
+        return $this->table->fixedString($name, $length);
+    }
+
     public function engine(Engine $engine, string ...$args): Table\ClickHouse
     {
         return $this->table->engine($engine, ...$args);
@@ -44,4 +49,8 @@ trait ClickHouse
         return $this->table->partitionBy($expression);
     }
 
+    public function sampleBy(string $expression): Table\ClickHouse
+    {
+        return $this->table->sampleBy($expression);
+    }
 }

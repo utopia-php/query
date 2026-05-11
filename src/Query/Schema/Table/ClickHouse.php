@@ -16,6 +16,9 @@ class ClickHouse extends Table
 {
     use Trait\CompositePrimary;
 
+    /** ClickHouse SAMPLE BY expression. Emitted after ORDER BY when set. */
+    public protected(set) ?string $sampleBy = null;
+
     #[\Override]
     protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null): Column\ClickHouse
     {
@@ -26,6 +29,28 @@ class ClickHouse extends Table
     {
         $col = $this->newColumn($name, ColumnType::Vector);
         $col->dimensions($dimensions);
+        $this->columns[] = $col;
+
+        return $col;
+    }
+
+    /**
+     * Add a `FixedString(N)` column.
+     *
+     * Used for fixed-length string values whose byte length is known and
+     * constant — ISO 3166 country codes, ISO 4217 currency codes, hash
+     * digests, and similar values that benefit from ClickHouse's columnar
+     * storage of fixed-width data.
+     *
+     * @throws ValidationException if $length is less than 1.
+     */
+    public function fixedString(string $name, int $length): Column\ClickHouse
+    {
+        if ($length < 1) {
+            throw new ValidationException('FixedString length must be at least 1.');
+        }
+
+        $col = $this->newColumn($name, ColumnType::FixedString, $length);
         $this->columns[] = $col;
 
         return $col;
@@ -155,6 +180,30 @@ class ClickHouse extends Table
     public function partitionBy(string $expression): static
     {
         $this->partitionExpression = $expression;
+
+        return $this;
+    }
+
+    /**
+     * Set the SAMPLE BY expression. Emitted after ORDER BY at table creation
+     * time. Required to model tables that need approximate-query support via
+     * `SELECT ... SAMPLE k` on MergeTree-family engines.
+     *
+     * @throws ValidationException if the expression is empty or contains a semicolon.
+     */
+    public function sampleBy(string $expression): static
+    {
+        $trimmed = \trim($expression);
+
+        if ($trimmed === '') {
+            throw new ValidationException('SAMPLE BY expression must not be empty.');
+        }
+
+        if (\str_contains($trimmed, ';')) {
+            throw new ValidationException('SAMPLE BY expression must not contain ";".');
+        }
+
+        $this->sampleBy = $trimmed;
 
         return $this;
     }

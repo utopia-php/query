@@ -945,4 +945,222 @@ class ClickHouseTest extends TestCase
             ->settings(['index_granularity' => 4096])
             ->alter();
     }
+
+    public function testCreateTableFixedStringColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('locations')
+            ->bigInteger('id')->primary()
+            ->fixedString('country_code', 2)
+            ->fixedString('currency_code', 3)
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `locations` (`id` Int64, `country_code` FixedString(2), `currency_code` FixedString(3)) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testCreateTableFixedStringNullable(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('t')
+            ->fixedString('hash', 32)->nullable()
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `t` (`hash` Nullable(FixedString(32))) ENGINE = MergeTree() ORDER BY tuple()',
+            $result->query,
+        );
+    }
+
+    public function testFixedStringRejectsZeroLength(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('t')->fixedString('bad', 0);
+    }
+
+    public function testCreateTableLowCardinalityColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('status')->lowCardinality()
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `status` LowCardinality(String)) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testCreateTableLowCardinalityNullableWrapsInBothOrder(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('status')->lowCardinality()->nullable()
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `status` Nullable(LowCardinality(String))) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testAlterAddLowCardinalityColumn(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->addColumn('country', ColumnType::String)->lowCardinality()
+            ->alter();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'ALTER TABLE `events` ADD COLUMN `country` LowCardinality(String)',
+            $result->query,
+        );
+    }
+
+    public function testCreateTableColumnWithSingleCodec(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('metrics')
+            ->bigInteger('id')->primary()
+            ->datetime('ts', 3)->codec('LZ4')
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `metrics` (`id` Int64, `ts` DateTime64(3) CODEC(LZ4)) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testCreateTableColumnWithMultipleCodecs(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('metrics')
+            ->bigInteger('id')->primary()
+            ->datetime('ts', 3)->codec('Delta(4)')->codec('LZ4')
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `metrics` (`id` Int64, `ts` DateTime64(3) CODEC(Delta(4), LZ4)) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testCodecOrderingRelativeToTtlAndComment(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->string('payload')
+                ->codec('ZSTD(3)')
+                ->ttl('ts + INTERVAL 30 DAY')
+                ->comment('Compressed payload')
+            ->datetime('ts')
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64,'
+            . ' `payload` String CODEC(ZSTD(3)) TTL ts + INTERVAL 30 DAY COMMENT \'Compressed payload\','
+            . ' `ts` DateTime) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testCodecRejectsEmpty(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('t')
+            ->integer('id')->codec('');
+    }
+
+    public function testCodecRejectsSemicolon(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('t')
+            ->integer('id')->codec('LZ4;');
+    }
+
+    public function testCreateTableWithSampleBy(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->bigInteger('user_id')->unsigned()
+            ->sampleBy('user_id')
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `user_id` UInt64) ENGINE = MergeTree() ORDER BY (`id`) SAMPLE BY user_id',
+            $result->query,
+        );
+    }
+
+    public function testCreateTableSampleByOrderingWithTtlAndSettings(): void
+    {
+        $schema = new Schema();
+        $table = $schema->table('events');
+        $table->bigInteger('id')->primary();
+        $table->datetime('created_at');
+        $result = $table
+            ->sampleBy('id')
+            ->ttl('`created_at` + INTERVAL 30 DAY')
+            ->settings(['index_granularity' => 4096])
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `created_at` DateTime) ENGINE = MergeTree() ORDER BY (`id`)'
+            . ' SAMPLE BY id'
+            . ' TTL `created_at` + INTERVAL 30 DAY'
+            . ' SETTINGS index_granularity = 4096',
+            $result->query,
+        );
+    }
+
+    public function testSampleByRejectsEmpty(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('events')->sampleBy('');
+    }
+
+    public function testSampleByRejectsSemicolon(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $schema = new Schema();
+        $schema->table('events')->sampleBy('id;');
+    }
+
+    public function testSampleByRejectedOnEnginesWithoutOrderBy(): void
+    {
+        $this->expectException(UnsupportedException::class);
+        $this->expectExceptionMessage('SAMPLE BY');
+
+        $schema = new Schema();
+        $schema->table('cache')
+            ->integer('id')->primary()
+            ->engine(Engine::Memory)
+            ->sampleBy('id')
+            ->create();
+    }
 }
