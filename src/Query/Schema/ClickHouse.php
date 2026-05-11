@@ -32,6 +32,20 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             throw new UnsupportedException('User-defined types are not supported in ClickHouse.');
         }
 
+        if ($column instanceof Column\ClickHouse && $column->isFixedString()) {
+            $type = 'FixedString(' . $column->fixedStringLength . ')';
+
+            if ($column->isLowCardinality) {
+                $type = 'LowCardinality(' . $type . ')';
+            }
+
+            if ($column->isNullable) {
+                $type = 'Nullable(' . $type . ')';
+            }
+
+            return $type;
+        }
+
         $type = match ($column->type) {
             ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'String',
             ColumnType::Text => 'String',
@@ -52,6 +66,10 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             ColumnType::Vector => 'Array(Float64)',
             ColumnType::Serial, ColumnType::BigSerial, ColumnType::SmallSerial => throw new UnsupportedException('SERIAL types are not supported in ClickHouse.'),
         };
+
+        if ($column instanceof Column\ClickHouse && $column->isLowCardinality) {
+            $type = 'LowCardinality(' . $type . ')';
+        }
 
         if ($column->isNullable) {
             $type = 'Nullable(' . $type . ')';
@@ -87,6 +105,10 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
 
         if ($column->hasDefault) {
             $parts[] = 'DEFAULT ' . $this->compileDefaultValue($column->default);
+        }
+
+        if ($column instanceof Column\ClickHouse && $column->codecs !== []) {
+            $parts[] = 'CODEC(' . \implode(', ', $column->codecs) . ')';
         }
 
         if ($column->ttl !== null) {
@@ -224,6 +246,15 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $sql .= ! empty($orderBy)
                 ? ' ORDER BY (' . \implode(', ', $orderBy) . ')'
                 : ' ORDER BY tuple()';
+        }
+
+        if ($table instanceof Table\ClickHouse && $table->sampleBy !== null) {
+            if (! $engine->requiresOrderBy()) {
+                throw new UnsupportedException(
+                    'SAMPLE BY is only supported on engines that take an ORDER BY clause.'
+                );
+            }
+            $sql .= ' SAMPLE BY ' . $table->sampleBy;
         }
 
         if ($table->ttl !== null) {
