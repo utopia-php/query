@@ -73,6 +73,7 @@ enum Method: string
     case Avg = 'avg';
     case Min = 'min';
     case Max = 'max';
+    case GroupByInterval = 'groupByInterval';
     case Stddev = 'stddev';
     case StddevPop = 'stddevPop';
     case StddevSamp = 'stddevSamp';

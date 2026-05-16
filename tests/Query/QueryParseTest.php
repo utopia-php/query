@@ -218,6 +218,15 @@ class QueryParseTest extends TestCase
         $this->assertSame(['status', 'country'], $parsed->getValues());
     }
 
+    public function testParseGroupByInterval(): void
+    {
+        $query = Query::parse('{"method":"groupByInterval","attribute":"time","values":["1h"]}');
+
+        $this->assertSame(Method::GroupByInterval, $query->getMethod());
+        $this->assertSame('time', $query->getAttribute());
+        $this->assertSame(['1h'], $query->getValues());
+    }
+
     public function testRoundTripHaving(): void
     {
         $original = Query::having([Query::greaterThan('total', 5)]);
