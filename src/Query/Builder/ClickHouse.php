@@ -309,6 +309,34 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     }
 
     /**
+     * Map a supported `groupByTimeBucket` interval to its ClickHouse
+     * `toStartOf*` function name.
+     */
+    private const array TIME_BUCKET_FUNCTIONS = [
+        '1m' => 'toStartOfMinute',
+        '5m' => 'toStartOfFiveMinutes',
+        '15m' => 'toStartOfFifteenMinutes',
+        '1h' => 'toStartOfHour',
+        '1d' => 'toStartOfDay',
+        '1w' => 'toStartOfWeek',
+        '1M' => 'toStartOfMonth',
+    ];
+
+    #[\Override]
+    protected function compileGroupByTimeBucket(string $attribute, string $interval): string
+    {
+        $function = self::TIME_BUCKET_FUNCTIONS[$interval] ?? null;
+
+        if ($function === null) {
+            throw new ValidationException(
+                'Invalid groupByTimeBucket interval for ClickHouse: ' . $interval
+            );
+        }
+
+        return $function . '(' . $this->resolveAndWrap($attribute) . ')';
+    }
+
+    /**
      * ClickHouse uses the match(column, pattern) function instead of REGEXP
      *
      * @param  array<mixed>  $values

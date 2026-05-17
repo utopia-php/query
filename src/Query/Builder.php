@@ -776,6 +776,10 @@ abstract class Builder implements
             }
         }
 
+        foreach ($grouped->timeBuckets as $bucket) {
+            $groupByParts[] = $this->compileGroupByTimeBucket($bucket['attribute'], $bucket['interval']);
+        }
+
         foreach ($this->rawGroups as $rawGroup) {
             $groupByParts[] = $rawGroup->expression;
             $this->addBindings($rawGroup->bindings);
@@ -1410,6 +1414,13 @@ abstract class Builder implements
     #[\Override]
     public function compileGroupBy(Query $query): string
     {
+        if ($query->getMethod() === Method::GroupByTimeBucket) {
+            /** @var string $interval */
+            $interval = $query->getValue('');
+
+            return $this->compileGroupByTimeBucket($query->getAttribute(), $interval);
+        }
+
         /** @var array<string> $values */
         $values = $query->getValues();
         $columns = \array_map(
@@ -1418,6 +1429,22 @@ abstract class Builder implements
         );
 
         return \implode(', ', $columns);
+    }
+
+    /**
+     * Compile a `groupByTimeBucket` clause for this dialect.
+     *
+     * The default builder cannot model time bucketing portably — dialects
+     * differ in both function names (e.g. `toStartOfHour` vs `date_trunc`)
+     * and the set of supported buckets. Concrete dialects override this
+     * method; base throws so unsupported dialects fail loudly at build time
+     * rather than silently dropping the clause.
+     */
+    protected function compileGroupByTimeBucket(string $attribute, string $interval): string
+    {
+        throw new UnsupportedException(
+            'groupByTimeBucket is not supported by ' . static::class
+        );
     }
 
     #[\Override]

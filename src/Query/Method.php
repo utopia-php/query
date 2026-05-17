@@ -83,6 +83,7 @@ enum Method: string
     case BitOr = 'bitOr';
     case BitXor = 'bitXor';
     case GroupBy = 'groupBy';
+    case GroupByTimeBucket = 'groupByTimeBucket';
     case Having = 'having';
 
     // Distinct

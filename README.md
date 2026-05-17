@@ -1472,6 +1472,25 @@ Query::containsString('tags', ['php']);          // position(`tags`, ?) > 0
 
 **Regex** — uses `match()` function instead of `REGEXP`.
 
+**Time bucketing** — groups rows into fixed-width windows on a timestamp column. Allowed intervals: `1m`, `5m`, `15m`, `1h`, `1d`, `1w`, `1M`. Compiles to `toStartOfMinute / toStartOfFiveMinutes / toStartOfFifteenMinutes / toStartOfHour / toStartOfDay / toStartOfWeek / toStartOfMonth`:
+
+```php
+$result = (new Builder())
+    ->from('events')
+    ->selectRaw('toStartOfHour(`time`) AS `bucket`')
+    ->count('*', 'cnt')
+    ->groupByTimeBucket('time', '1h')
+    ->orderByRaw('`bucket` ASC')
+    ->build();
+
+// SELECT COUNT(*) AS `cnt`, toStartOfHour(`time`) AS `bucket`
+// FROM `events`
+// GROUP BY toStartOfHour(`time`)
+// ORDER BY `bucket` ASC
+```
+
+Other dialects throw `UnsupportedException` from `compileGroupByTimeBucket`. Re-emit the bucket function via `selectRaw` / `orderByRaw` when you need to reference it in the SELECT list or ORDER BY (same pattern as `groupByRaw`).
+
 **UPDATE/DELETE** — compiles to `ALTER TABLE ... UPDATE/DELETE` with mandatory WHERE:
 
 ```php
@@ -1726,6 +1745,7 @@ Unsupported features are not on the class — consumers type-hint the interface 
 | ARRAY JOIN | | | | | | | x | |
 | ASOF JOIN (typed operator) | | | | | | | x | |
 | WITH FILL | | | | | | | x | |
+| `groupByTimeBucket` | | | | | | | x | |
 | Approximate Aggregates (incl. `quantiles`) | | | | | | | x | |
 | Upsert (Mongo-style) | | | | | | | | x |
 | Full-Text Search (Mongo) | | | | | | | | x |
