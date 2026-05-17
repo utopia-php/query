@@ -90,6 +90,13 @@ abstract class Builder implements
     protected array $bindings = [];
 
     /**
+     * Raw column name (pre-resolution) attached to the next-to-be-added
+     * bindings. Used by dialects with typed named placeholders to look up
+     * a registered parameter type for the column.
+     */
+    protected ?string $bindingColumn = null;
+
+    /**
      * @var list<UnionClause>
      */
     protected array $unions = [];
@@ -1261,39 +1268,47 @@ abstract class Builder implements
     public function compileFilter(Query $query): string
     {
         $method = $query->getMethod();
-        $attribute = $this->resolveAndWrap($query->getAttribute());
+        $rawAttribute = $query->getAttribute();
+        $attribute = $this->resolveAndWrap($rawAttribute);
         $values = $query->getValues();
 
-        return match ($method) {
-            Method::Equal => $this->compileIn($attribute, $values),
-            Method::NotEqual => $this->compileNotIn($attribute, $values),
-            Method::LessThan => $this->compileComparison($attribute, '<', $values),
-            Method::LessThanEqual => $this->compileComparison($attribute, '<=', $values),
-            Method::GreaterThan => $this->compileComparison($attribute, '>', $values),
-            Method::GreaterThanEqual => $this->compileComparison($attribute, '>=', $values),
-            Method::Between => $this->compileBetween($attribute, $values, false),
-            Method::NotBetween => $this->compileBetween($attribute, $values, true),
-            Method::StartsWith => $this->compileLike($attribute, $values, '', '%', false),
-            Method::NotStartsWith => $this->compileLike($attribute, $values, '', '%', true),
-            Method::EndsWith => $this->compileLike($attribute, $values, '%', '', false),
-            Method::NotEndsWith => $this->compileLike($attribute, $values, '%', '', true),
-            Method::Contains => $this->compileContains($attribute, $values),
-            Method::ContainsAny => $query->onArray() ? $this->compileIn($attribute, $values) : $this->compileContains($attribute, $values),
-            Method::ContainsAll => $this->compileContainsAll($attribute, $values),
-            Method::NotContains => $this->compileNotContains($attribute, $values),
-            Method::Search => throw new UnsupportedException('Full-text search is not supported by this dialect.'),
-            Method::NotSearch => throw new UnsupportedException('Full-text search is not supported by this dialect.'),
-            Method::Regex => $this->compileRegex($attribute, $values),
-            Method::IsNull => $attribute . ' IS NULL',
-            Method::IsNotNull => $attribute . ' IS NOT NULL',
-            Method::And => $this->compileLogical($query, 'AND'),
-            Method::Or => $this->compileLogical($query, 'OR'),
-            Method::Having => $this->compileLogical($query, 'AND'),
-            Method::Exists => $this->compileExists($query),
-            Method::NotExists => $this->compileNotExists($query),
-            Method::Raw => $this->compileRaw($query),
-            default => throw new UnsupportedException('Unsupported filter type: ' . $method->value),
-        };
+        $previousBindingColumn = $this->bindingColumn;
+        $this->bindingColumn = $rawAttribute !== '' ? $rawAttribute : $previousBindingColumn;
+
+        try {
+            return match ($method) {
+                Method::Equal => $this->compileIn($attribute, $values),
+                Method::NotEqual => $this->compileNotIn($attribute, $values),
+                Method::LessThan => $this->compileComparison($attribute, '<', $values),
+                Method::LessThanEqual => $this->compileComparison($attribute, '<=', $values),
+                Method::GreaterThan => $this->compileComparison($attribute, '>', $values),
+                Method::GreaterThanEqual => $this->compileComparison($attribute, '>=', $values),
+                Method::Between => $this->compileBetween($attribute, $values, false),
+                Method::NotBetween => $this->compileBetween($attribute, $values, true),
+                Method::StartsWith => $this->compileLike($attribute, $values, '', '%', false),
+                Method::NotStartsWith => $this->compileLike($attribute, $values, '', '%', true),
+                Method::EndsWith => $this->compileLike($attribute, $values, '%', '', false),
+                Method::NotEndsWith => $this->compileLike($attribute, $values, '%', '', true),
+                Method::Contains => $this->compileContains($attribute, $values),
+                Method::ContainsAny => $query->onArray() ? $this->compileIn($attribute, $values) : $this->compileContains($attribute, $values),
+                Method::ContainsAll => $this->compileContainsAll($attribute, $values),
+                Method::NotContains => $this->compileNotContains($attribute, $values),
+                Method::Search => throw new UnsupportedException('Full-text search is not supported by this dialect.'),
+                Method::NotSearch => throw new UnsupportedException('Full-text search is not supported by this dialect.'),
+                Method::Regex => $this->compileRegex($attribute, $values),
+                Method::IsNull => $attribute . ' IS NULL',
+                Method::IsNotNull => $attribute . ' IS NOT NULL',
+                Method::And => $this->compileLogical($query, 'AND'),
+                Method::Or => $this->compileLogical($query, 'OR'),
+                Method::Having => $this->compileLogical($query, 'AND'),
+                Method::Exists => $this->compileExists($query),
+                Method::NotExists => $this->compileNotExists($query),
+                Method::Raw => $this->compileRaw($query),
+                default => throw new UnsupportedException('Unsupported filter type: ' . $method->value),
+            };
+        } finally {
+            $this->bindingColumn = $previousBindingColumn;
+        }
     }
 
     protected function compileHavingCondition(Query $query, string $expression): string
@@ -1581,7 +1596,16 @@ abstract class Builder implements
         return $this->quote($resolved);
     }
 
-    protected function addBinding(mixed $value): void
+    /**
+     * Append a single parameter binding.
+     *
+     * Most call sites pass just the value — the base builder produces
+     * positional `?` placeholders and only cares about ordering. Dialects
+     * that emit typed named placeholders (e.g. ClickHouse `{name:Type}`)
+     * may capture the optional `$column` hint to attach a registered type
+     * to the corresponding placeholder.
+     */
+    protected function addBinding(mixed $value, ?string $column = null): void
     {
         $this->bindings[] = $value;
     }

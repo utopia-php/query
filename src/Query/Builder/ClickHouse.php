@@ -63,6 +63,30 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     protected array $insertFormatColumns = [];
 
     /**
+     * Caller-registered column → ClickHouse type map. Populated via
+     * `withParamType()`; consumed at compile-time to attach `{name:Type}`
+     * placeholder metadata to bindings whose column we recognise.
+     *
+     * @var array<string, string>
+     */
+    protected array $paramTypes = [];
+
+    /**
+     * Per-binding column hint captured at `addBinding()` time, kept in
+     * lockstep with `$this->bindings`. Index N here corresponds to the
+     * N-th `?` placeholder in the compiled SQL.
+     *
+     * @var list<?string>
+     */
+    protected array $bindingMeta = [];
+
+    /**
+     * Whether to rewrite `?` placeholders to ClickHouse `{name:Type}` form
+     * at Statement creation time. Enabled by `useNamedBindings()`.
+     */
+    protected bool $namedBindings = false;
+
+    /**
      * Add PREWHERE filters (evaluated before reading all columns — major ClickHouse optimization)
      *
      * @param  array<Query>  $queries
@@ -297,9 +321,161 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         $this->rawJoinClauses = [];
         $this->insertFormat = null;
         $this->insertFormatColumns = [];
+        $this->bindingMeta = [];
         $this->resetGroupByModifier();
 
         return $this;
+    }
+
+    /**
+     * Enable rewriting of `?` placeholders to ClickHouse `{name:Type}` form
+     * at Statement-emission time. Off by default — the positional form is
+     * what every other dialect uses and what the existing test fixtures
+     * expect.
+     */
+    public function useNamedBindings(bool $enabled = true): static
+    {
+        $this->namedBindings = $enabled;
+
+        return $this;
+    }
+
+    /**
+     * Register a ClickHouse type for a column. When a `?` placeholder is
+     * produced for a binding whose column hint matches `$column`, the
+     * rewritten placeholder uses `$type`. Otherwise we fall back to the
+     * type inference rules in `inferClickHouseType()`.
+     */
+    public function withParamType(string $column, string $type): static
+    {
+        if (! \preg_match('/^[A-Za-z][A-Za-z0-9_]*(?:\([^)]*\))?$/', $type)) {
+            throw new ValidationException('Invalid ClickHouse type: ' . $type);
+        }
+
+        $this->paramTypes[$column] = $type;
+
+        return $this;
+    }
+
+    /**
+     * @param  array<string, string>  $types
+     */
+    public function withParamTypes(array $types): static
+    {
+        foreach ($types as $column => $type) {
+            $this->withParamType($column, $type);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Track each binding's column hint in lockstep with the positional
+     * list so the placeholder rewriter can attach the right ClickHouse
+     * type to the right `?`.
+     */
+    #[\Override]
+    protected function addBinding(mixed $value, ?string $column = null): void
+    {
+        parent::addBinding($value, $column);
+        $this->bindingMeta[] = $column ?? $this->bindingColumn;
+    }
+
+    /**
+     * @param  array<mixed>  $bindings
+     */
+    #[\Override]
+    protected function addBindings(array $bindings): void
+    {
+        parent::addBindings($bindings);
+        foreach ($bindings as $_) {
+            $this->bindingMeta[] = $this->bindingColumn;
+        }
+    }
+
+    /**
+     * Infer a ClickHouse type from a PHP value when no explicit registration
+     * is available. Covers the four scalars used by the audit and usage
+     * schemas plus DateTime objects. Falls back to `String`, which is the
+     * safest default for unknown payloads.
+     */
+    private function inferClickHouseType(mixed $value): string
+    {
+        return match (true) {
+            \is_int($value) => 'Int64',
+            \is_float($value) => 'Float64',
+            \is_bool($value) => 'UInt8',
+            $value === null => 'Nullable(String)',
+            $value instanceof \DateTimeInterface => 'DateTime64(3)',
+            default => 'String',
+        };
+    }
+
+    /**
+     * Resolve the ClickHouse type for the `$index`-th positional binding,
+     * preferring an explicit `withParamType()` registration over inference.
+     */
+    private function resolveBindingType(int $index): string
+    {
+        /** @var list<mixed> $bindings */
+        $bindings = $this->bindings;
+        $value = $bindings[$index] ?? null;
+
+        $column = $this->bindingMeta[$index] ?? null;
+        if ($column !== null && isset($this->paramTypes[$column])) {
+            return $this->paramTypes[$column];
+        }
+
+        return $this->inferClickHouseType($value);
+    }
+
+    /**
+     * Rewrite a `?`-placeholder statement to ClickHouse `{paramN:Type}`
+     * form, attaching `namedBindings` to the returned Statement so HTTP
+     * callers can post parameters by name.
+     *
+     * The positional `$stmt->bindings` array stays intact so existing
+     * callers that read it unchanged keep working.
+     */
+    protected function applyNamedTypedBindings(Statement $stmt): Statement
+    {
+        if (! $this->namedBindings) {
+            return $stmt;
+        }
+
+        $sql = $stmt->query;
+        $bindings = $stmt->bindings;
+
+        if (\count($bindings) === 0) {
+            return $stmt;
+        }
+
+        $named = [];
+        $index = 0;
+        $rewritten = \preg_replace_callback(
+            '/(?<!\?)\?(?![|&?])/',
+            function () use (&$index, &$named, $bindings): string {
+                $type = $this->resolveBindingType($index);
+                $name = 'param' . $index;
+                $named[$name] = $bindings[$index] ?? null;
+                $index++;
+
+                return '{' . $name . ':' . $type . '}';
+            },
+            $sql
+        );
+
+        if ($rewritten === null) {
+            return $stmt;
+        }
+
+        return new Statement(
+            $rewritten,
+            $bindings,
+            $stmt->readOnly,
+            $this->executor,
+            namedBindings: $named,
+        );
     }
 
     #[\Override]
@@ -451,14 +627,25 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     }
 
     #[\Override]
+    public function build(): Statement
+    {
+        $this->bindingMeta = [];
+
+        return $this->applyNamedTypedBindings(parent::build());
+    }
+
+    #[\Override]
     public function insert(): Statement
     {
         $format = $this->insertFormat;
         if ($format === null) {
-            return parent::insert();
+            $this->bindingMeta = [];
+
+            return $this->applyNamedTypedBindings(parent::insert());
         }
 
         $this->bindings = [];
+        $this->bindingMeta = [];
         $this->validateTable();
 
         $columns = !empty($this->insertFormatColumns)
@@ -497,6 +684,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     public function update(): Statement
     {
         $this->bindings = [];
+        $this->bindingMeta = [];
         $this->validateTable();
 
         $assignments = $this->compileAssignments();
@@ -517,13 +705,16 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             . ' UPDATE ' . \implode(', ', $assignments)
             . ' ' . \implode(' ', $parts);
 
-        return new Statement($sql, $this->bindings, executor: $this->executor);
+        return $this->applyNamedTypedBindings(
+            new Statement($sql, $this->bindings, executor: $this->executor)
+        );
     }
 
     #[\Override]
     public function delete(): Statement
     {
         $this->bindings = [];
+        $this->bindingMeta = [];
         $this->validateTable();
 
         $parts = [];
@@ -542,7 +733,9 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             $sql .= ' ' . $settings;
         }
 
-        return new Statement($sql, $this->bindings, executor: $this->executor);
+        return $this->applyNamedTypedBindings(
+            new Statement($sql, $this->bindings, executor: $this->executor)
+        );
     }
 
     /**

@@ -1491,6 +1491,35 @@ $result = (new Builder())
 
 Other dialects throw `UnsupportedException` from `compileGroupByTimeBucket`. Re-emit the bucket function via `selectRaw` / `orderByRaw` when you need to reference it in the SELECT list or ORDER BY (same pattern as `groupByRaw`).
 
+**Named-typed bindings** — opt into ClickHouse `{name:Type}` placeholders for safe parameterization over the HTTP interface. Off by default; positional `?` placeholders remain the default and behave identically to every other dialect:
+
+```php
+$result = (new Builder())
+    ->useNamedBindings()
+    ->withParamTypes([
+        'time' => 'DateTime64(3)',
+        'tenant' => 'String',
+        'value' => 'Int64',
+    ])
+    ->from('events')
+    ->filter([
+        Query::greaterThan('time', '2024-01-01 00:00:00'),
+        Query::equal('tenant', ['acme']),
+        Query::lessThanEqual('value', 100),
+    ])
+    ->build();
+
+// SELECT * FROM `events`
+// WHERE `time` > {param0:DateTime64(3)}
+// AND `tenant` IN ({param1:String})
+// AND `value` <= {param2:Int64}
+
+$result->namedBindings;
+// ['param0' => '2024-01-01 00:00:00', 'param1' => 'acme', 'param2' => 100]
+```
+
+Unregistered columns fall through to value-based inference: `int → Int64`, `float → Float64`, `bool → UInt8`, `null → Nullable(String)`, `DateTimeInterface → DateTime64(3)`, everything else → `String`. Register types via `withParamType($column, $type)` or `withParamTypes($map)` whenever the inference rule doesn't match the column's ClickHouse declaration. The positional `$bindings` array is still exposed on the resulting `Statement` for callers that prefer it.
+
 **UPDATE/DELETE** — compiles to `ALTER TABLE ... UPDATE/DELETE` with mandatory WHERE:
 
 ```php
@@ -1746,6 +1775,7 @@ Unsupported features are not on the class — consumers type-hint the interface 
 | ASOF JOIN (typed operator) | | | | | | | x | |
 | WITH FILL | | | | | | | x | |
 | `groupByTimeBucket` | | | | | | | x | |
+| Named-typed `{name:Type}` bindings | | | | | | | x | |
 | Approximate Aggregates (incl. `quantiles`) | | | | | | | x | |
 | Upsert (Mongo-style) | | | | | | | | x |
 | Full-Text Search (Mongo) | | | | | | | | x |
