@@ -1520,7 +1520,7 @@ $result->namedBindings;
 
 Unregistered columns fall through to value-based inference: `int → Int64`, `float → Float64`, `bool → UInt8`, `null → Nullable(String)`, `DateTimeInterface → DateTime64(3)`, everything else → `String`. Register types via `withParamType($column, $type)` or `withParamTypes($map)` whenever the inference rule doesn't match the column's ClickHouse declaration. The positional `$bindings` array is still exposed on the resulting `Statement` for callers that prefer it.
 
-**UPDATE/DELETE** — compiles to `ALTER TABLE ... UPDATE/DELETE` with mandatory WHERE:
+**UPDATE** — compiles to `ALTER TABLE ... UPDATE` with mandatory WHERE:
 
 ```php
 $result = (new Builder())
@@ -1531,6 +1531,31 @@ $result = (new Builder())
 
 // ALTER TABLE `events` UPDATE `status` = ? WHERE `created_at` < ?
 ```
+
+**DELETE** — two forms. `delete()` defaults to the lightweight `DELETE FROM …` form, which marks rows deleted via a mask and is async by default. Opt into the heavier mutation form (`ALTER TABLE … DELETE`) when you need parts rewritten on disk; the two are not interchangeable, so the builder never auto-translates between them.
+
+```php
+// Lightweight (default) — pair with `lightweight_deletes_sync = 0` for async
+$result = (new Builder())
+    ->from('audit_log')
+    ->settings(['lightweight_deletes_sync' => '0'])
+    ->filter([Query::lessThan('time', '2024-01-01 00:00:00')])
+    ->delete();
+
+// DELETE FROM `audit_log` WHERE `time` < ? SETTINGS lightweight_deletes_sync=0
+
+// Mutation — opt in. Pair with `mutations_sync = 0` for async
+$result = (new Builder())
+    ->from('audit_log')
+    ->deleteMode(Builder::DELETE_MODE_MUTATION)
+    ->settings(['mutations_sync' => '0'])
+    ->filter([Query::lessThan('time', '2024-01-01 00:00:00')])
+    ->delete();
+
+// ALTER TABLE `audit_log` DELETE WHERE `time` < ? SETTINGS mutations_sync=0
+```
+
+The trailing `SETTINGS` clause is whatever the caller registers via `settings()` — the builder does not auto-pair a sync setting to a chosen delete mode.
 
 > **Note:** Full-text search (`Query::search()`) is not supported in ClickHouse and throws `UnsupportedException`. The ClickHouse builder also forces all join filter hook conditions to WHERE placement, since ClickHouse does not support subqueries in JOIN ON.
 

@@ -86,6 +86,18 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      */
     protected bool $namedBindings = false;
 
+    public const DELETE_MODE_LIGHTWEIGHT = 'lightweight';
+
+    public const DELETE_MODE_MUTATION = 'mutation';
+
+    /**
+     * Which DELETE form `delete()` emits. Lightweight by default — matches
+     * the ClickHouse server default and is the form most callers want for
+     * row-level cleanup. The mutation form is heavier (rewrites parts
+     * asynchronously) and is opt-in via `deleteMode('mutation')`.
+     */
+    protected string $deleteMode = self::DELETE_MODE_LIGHTWEIGHT;
+
     /**
      * Add PREWHERE filters (evaluated before reading all columns — major ClickHouse optimization)
      *
@@ -322,6 +334,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         $this->insertFormat = null;
         $this->insertFormatColumns = [];
         $this->bindingMeta = [];
+        $this->deleteMode = self::DELETE_MODE_LIGHTWEIGHT;
         $this->resetGroupByModifier();
 
         return $this;
@@ -710,6 +723,28 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         );
     }
 
+    /**
+     * Pick which DELETE form `delete()` emits. Lightweight (`DELETE FROM
+     * t WHERE …`) marks rows deleted via a mask and is async by default;
+     * mutation (`ALTER TABLE t DELETE WHERE …`) rewrites parts on disk
+     * and is heavier. The choice is storage-path-significant: the two
+     * forms are not interchangeable, so the builder never auto-translates
+     * between them.
+     */
+    public function deleteMode(string $mode): static
+    {
+        if ($mode !== self::DELETE_MODE_LIGHTWEIGHT && $mode !== self::DELETE_MODE_MUTATION) {
+            throw new ValidationException(
+                'Invalid ClickHouse delete mode: ' . $mode
+                . '. Allowed: ' . self::DELETE_MODE_LIGHTWEIGHT . ', ' . self::DELETE_MODE_MUTATION
+            );
+        }
+
+        $this->deleteMode = $mode;
+
+        return $this;
+    }
+
     #[\Override]
     public function delete(): Statement
     {
@@ -725,8 +760,9 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             throw new ValidationException('ClickHouse DELETE requires a WHERE clause.');
         }
 
-        $sql = 'ALTER TABLE ' . $this->quote($this->table)
-            . ' DELETE ' . \implode(' ', $parts);
+        $sql = $this->deleteMode === self::DELETE_MODE_LIGHTWEIGHT
+            ? 'DELETE FROM ' . $this->quote($this->table) . ' ' . \implode(' ', $parts)
+            : 'ALTER TABLE ' . $this->quote($this->table) . ' DELETE ' . \implode(' ', $parts);
 
         $settings = $this->buildSettingsClause();
         if ($settings !== '') {

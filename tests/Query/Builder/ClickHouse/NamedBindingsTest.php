@@ -139,7 +139,7 @@ class NamedBindingsTest extends TestCase
             ->delete();
 
         $this->assertSame(
-            'ALTER TABLE `audit_log` DELETE WHERE `time` < {param0:DateTime64(3)}',
+            'DELETE FROM `audit_log` WHERE `time` < {param0:DateTime64(3)}',
             $result->query
         );
         $this->assertSame(
