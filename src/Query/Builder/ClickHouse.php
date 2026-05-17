@@ -3,6 +3,7 @@
 namespace Utopia\Query\Builder;
 
 use Utopia\Query\Builder as BaseBuilder;
+use Utopia\Query\Builder\ClickHouse\FormattedInsertStatement;
 use Utopia\Query\Builder\Feature\BitwiseAggregates;
 use Utopia\Query\Builder\Feature\ClickHouse\ApproximateAggregates;
 use Utopia\Query\Builder\Feature\ClickHouse\ArrayJoins;
@@ -56,6 +57,11 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     /** @var list<string> */
     protected array $rawJoinClauses = [];
 
+    protected ?string $insertFormat = null;
+
+    /** @var list<string> */
+    protected array $insertFormatColumns = [];
+
     /**
      * Add PREWHERE filters (evaluated before reading all columns — major ClickHouse optimization)
      *
@@ -102,6 +108,30 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         }
 
         $this->hints[] = $hint;
+
+        return $this;
+    }
+
+    /**
+     * Declare a ClickHouse FORMAT pragma for the next INSERT.
+     *
+     * When a format is set, `insert()` emits
+     * `INSERT INTO \`t\` (\`col1\`, \`col2\`) FORMAT <name>` with no VALUES.
+     * The row payload must be streamed into the HTTP body by the caller.
+     * Column names are derived from the most recent `set()` call (values are
+     * ignored). Pass `$columns` to declare them explicitly when no `set()`
+     * call has been made.
+     *
+     * @param  list<string>  $columns
+     */
+    public function insertFormat(string $format, array $columns = []): static
+    {
+        if (!\preg_match('/^[A-Za-z][A-Za-z0-9]*$/', $format)) {
+            throw new ValidationException('Invalid ClickHouse INSERT format: ' . $format);
+        }
+
+        $this->insertFormat = $format;
+        $this->insertFormatColumns = $columns;
 
         return $this;
     }
@@ -265,6 +295,8 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         $this->limitByClause = null;
         $this->arrayJoins = [];
         $this->rawJoinClauses = [];
+        $this->insertFormat = null;
+        $this->insertFormatColumns = [];
         $this->resetGroupByModifier();
 
         return $this;
@@ -388,6 +420,49 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         }
 
         return '(' . \implode(' AND ', $parts) . ')';
+    }
+
+    #[\Override]
+    public function insert(): Statement
+    {
+        $format = $this->insertFormat;
+        if ($format === null) {
+            return parent::insert();
+        }
+
+        $this->bindings = [];
+        $this->validateTable();
+
+        $columns = !empty($this->insertFormatColumns)
+            ? $this->insertFormatColumns
+            : (!empty($this->rows) ? \array_keys($this->rows[0]) : []);
+
+        if (empty($columns)) {
+            throw new ValidationException('No columns specified for FORMAT INSERT. Pass columns to insertFormat() or call set() before insert().');
+        }
+
+        foreach ($columns as $col) {
+            if ($col === '') {
+                throw new ValidationException('Column names for FORMAT INSERT must be non-empty strings.');
+            }
+        }
+
+        $wrappedColumns = \array_map(
+            fn (string $col): string => $this->resolveAndWrap($col),
+            $columns
+        );
+
+        $sql = 'INSERT INTO ' . $this->quote($this->table)
+            . ' (' . \implode(', ', $wrappedColumns) . ')'
+            . ' FORMAT ' . $format;
+
+        return new FormattedInsertStatement(
+            $sql,
+            [],
+            $columns,
+            $format,
+            executor: $this->executor,
+        );
     }
 
     #[\Override]

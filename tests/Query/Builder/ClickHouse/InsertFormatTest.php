@@ -1,0 +1,141 @@
+<?php
+
+namespace Tests\Query\Builder\ClickHouse;
+
+use PHPUnit\Framework\TestCase;
+use Tests\Query\AssertsBindingCount;
+use Utopia\Query\Builder\ClickHouse as Builder;
+use Utopia\Query\Builder\ClickHouse\FormattedInsertStatement;
+use Utopia\Query\Exception\ValidationException;
+
+class InsertFormatTest extends TestCase
+{
+    use AssertsBindingCount;
+
+    public function testInsertFormatWithExplicitColumns(): void
+    {
+        $result = (new Builder())
+            ->into('events')
+            ->insertFormat('JSONEachRow', ['id', 'event', 'time'])
+            ->insert();
+
+        $this->assertInstanceOf(FormattedInsertStatement::class, $result);
+        $this->assertSame(
+            'INSERT INTO `events` (`id`, `event`, `time`) FORMAT JSONEachRow',
+            $result->query
+        );
+        $this->assertSame([], $result->bindings);
+        $this->assertSame(['id', 'event', 'time'], $result->columns);
+        $this->assertSame('JSONEachRow', $result->format);
+    }
+
+    public function testInsertFormatDerivesColumnsFromSet(): void
+    {
+        $result = (new Builder())
+            ->into('events')
+            ->set(['id' => null, 'event' => null, 'time' => null])
+            ->insertFormat('JSONEachRow')
+            ->insert();
+
+        $this->assertInstanceOf(FormattedInsertStatement::class, $result);
+        $this->assertSame(
+            'INSERT INTO `events` (`id`, `event`, `time`) FORMAT JSONEachRow',
+            $result->query
+        );
+        $this->assertSame([], $result->bindings);
+        $this->assertSame(['id', 'event', 'time'], $result->columns);
+        $this->assertSame('JSONEachRow', $result->format);
+    }
+
+    public function testInsertFormatExplicitColumnsTakePrecedenceOverSet(): void
+    {
+        $result = (new Builder())
+            ->into('events')
+            ->set(['a' => 1, 'b' => 2])
+            ->insertFormat('JSONEachRow', ['x', 'y'])
+            ->insert();
+
+        $this->assertInstanceOf(FormattedInsertStatement::class, $result);
+        $this->assertSame(
+            'INSERT INTO `events` (`x`, `y`) FORMAT JSONEachRow',
+            $result->query
+        );
+        $this->assertSame(['x', 'y'], $result->columns);
+    }
+
+    public function testInsertFormatSupportsOtherClickHouseFormats(): void
+    {
+        $result = (new Builder())
+            ->into('events')
+            ->insertFormat('TSV', ['id', 'name'])
+            ->insert();
+
+        $this->assertInstanceOf(FormattedInsertStatement::class, $result);
+        $this->assertSame(
+            'INSERT INTO `events` (`id`, `name`) FORMAT TSV',
+            $result->query
+        );
+        $this->assertSame('TSV', $result->format);
+    }
+
+    public function testInsertFormatRejectsInvalidFormatName(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->into('events')
+            ->insertFormat('Bad Format!', ['id']);
+    }
+
+    public function testInsertFormatRejectsEmptyColumnName(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->into('events')
+            ->insertFormat('JSONEachRow', ['id', ''])
+            ->insert();
+    }
+
+    public function testInsertFormatRequiresColumns(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->into('events')
+            ->insertFormat('JSONEachRow')
+            ->insert();
+    }
+
+    public function testInsertWithoutFormatStillEmitsValues(): void
+    {
+        $result = (new Builder())
+            ->into('events')
+            ->set(['id' => 1, 'event' => 'login'])
+            ->insert();
+
+        $this->assertNotInstanceOf(FormattedInsertStatement::class, $result);
+        $this->assertSame(
+            'INSERT INTO `events` (`id`, `event`) VALUES (?, ?)',
+            $result->query
+        );
+        $this->assertSame([1, 'login'], $result->bindings);
+    }
+
+    public function testResetClearsInsertFormatState(): void
+    {
+        $builder = (new Builder())
+            ->into('events')
+            ->insertFormat('JSONEachRow', ['id']);
+
+        $builder->reset();
+
+        $result = $builder
+            ->into('events')
+            ->set(['id' => 1])
+            ->insert();
+
+        $this->assertNotInstanceOf(FormattedInsertStatement::class, $result);
+        $this->assertSame('INSERT INTO `events` (`id`) VALUES (?)', $result->query);
+    }
+}
