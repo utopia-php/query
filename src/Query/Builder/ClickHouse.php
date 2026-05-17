@@ -509,6 +509,11 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         $sql = 'ALTER TABLE ' . $this->quote($this->table)
             . ' DELETE ' . \implode(' ', $parts);
 
+        $settings = $this->buildSettingsClause();
+        if ($settings !== '') {
+            $sql .= ' ' . $settings;
+        }
+
         return new Statement($sql, $this->bindings, executor: $this->executor);
     }
 
