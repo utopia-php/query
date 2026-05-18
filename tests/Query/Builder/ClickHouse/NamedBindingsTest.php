@@ -166,6 +166,25 @@ class NamedBindingsTest extends TestCase
         (new Builder())->withParamType('time', 'DROP TABLE x; --');
     }
 
+    public function testWithParamTypeAcceptsNestedParameterizedType(): void
+    {
+        $result = (new Builder())
+            ->useNamedBindings()
+            ->withParamType('time', 'Nullable(DateTime64(3))')
+            ->from('events')
+            ->filter([Query::greaterThan('time', '2024-01-01 00:00:00')])
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM `events` WHERE `time` > {param0:Nullable(DateTime64(3))}',
+            $result->query
+        );
+        $this->assertSame(
+            ['param0' => '2024-01-01 00:00:00'],
+            $result->namedBindings
+        );
+    }
+
     public function testResetClearsBindingMetadata(): void
     {
         $builder = (new Builder())

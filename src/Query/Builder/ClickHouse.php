@@ -361,7 +361,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      */
     public function withParamType(string $column, string $type): static
     {
-        if (! \preg_match('/^[A-Za-z][A-Za-z0-9_]*(?:\([^)]*\))?$/', $type)) {
+        if (! \preg_match('/^[A-Za-z][A-Za-z0-9_]*(?:\((?:[^()]*|\([^()]*\))*\))?$/', $type)) {
             throw new ValidationException('Invalid ClickHouse type: ' . $type);
         }
 
