@@ -137,6 +137,25 @@ class InsertFormatTest extends TestCase
         $this->assertSame([1, 'login'], $result->bindings);
     }
 
+    public function testFormattedInsertStatementWithExecutorPreservesFormatMetadata(): void
+    {
+        $result = (new Builder())
+            ->into('events')
+            ->insertFormat('JSONEachRow', ['id', 'event'])
+            ->insert();
+
+        $this->assertInstanceOf(FormattedInsertStatement::class, $result);
+
+        $executor = fn (): int => 0;
+        $rebound = $result->withExecutor($executor);
+
+        $this->assertInstanceOf(FormattedInsertStatement::class, $rebound);
+        $this->assertSame($result->query, $rebound->query);
+        $this->assertSame($result->bindings, $rebound->bindings);
+        $this->assertSame($result->columns, $rebound->columns);
+        $this->assertSame($result->format, $rebound->format);
+    }
+
     public function testResetClearsInsertFormatState(): void
     {
         $builder = (new Builder())
