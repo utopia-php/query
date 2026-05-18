@@ -72,11 +72,11 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     protected array $paramTypes = [];
 
     /**
-     * Per-binding column hint captured at `addBinding()` time, kept in
-     * lockstep with `$this->bindings`. Index N here corresponds to the
-     * N-th `?` placeholder in the compiled SQL.
+     * Per-binding metadata captured at `addBinding()` time, kept in lockstep
+     * with `$this->bindings`. Index N here corresponds to the N-th `?`
+     * placeholder in the compiled SQL.
      *
-     * @var list<?string>
+     * @var list<?Binding>
      */
     protected array $bindingMeta = [];
 
@@ -385,15 +385,15 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     }
 
     /**
-     * Track each binding's column hint in lockstep with the positional
-     * list so the placeholder rewriter can attach the right ClickHouse
-     * type to the right `?`.
+     * Track each binding's value + column hint in lockstep with the positional
+     * list so the placeholder rewriter can attach the right ClickHouse type to
+     * the right `?`.
      */
     #[\Override]
     protected function addBinding(mixed $value, ?string $column = null): void
     {
         parent::addBinding($value, $column);
-        $this->bindingMeta[] = $column ?? $this->bindingColumn;
+        $this->bindingMeta[] = new Binding($value, $column ?? $this->bindingColumn);
     }
 
     /**
@@ -403,8 +403,8 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     protected function addBindings(array $bindings): void
     {
         parent::addBindings($bindings);
-        foreach ($bindings as $_) {
-            $this->bindingMeta[] = $this->bindingColumn;
+        foreach ($bindings as $binding) {
+            $this->bindingMeta[] = new Binding($binding, $this->bindingColumn);
         }
     }
 
@@ -432,16 +432,13 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      */
     private function resolveBindingType(int $index): string
     {
-        /** @var list<mixed> $bindings */
-        $bindings = $this->bindings;
-        $value = $bindings[$index] ?? null;
+        $binding = $this->bindingMeta[$index] ?? null;
 
-        $column = $this->bindingMeta[$index] ?? null;
-        if ($column !== null && isset($this->paramTypes[$column])) {
-            return $this->paramTypes[$column];
+        if ($binding !== null && $binding->column !== null && isset($this->paramTypes[$binding->column])) {
+            return $this->paramTypes[$binding->column];
         }
 
-        return $this->inferClickHouseType($value);
+        return $this->inferClickHouseType($binding?->value);
     }
 
     /**
