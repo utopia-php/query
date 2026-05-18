@@ -335,6 +335,8 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         $this->insertFormatColumns = [];
         $this->bindingMeta = [];
         $this->deleteMode = self::DELETE_MODE_LIGHTWEIGHT;
+        $this->namedBindings = false;
+        $this->paramTypes = [];
         $this->resetGroupByModifier();
 
         return $this;

@@ -208,4 +208,46 @@ class NamedBindingsTest extends TestCase
         );
         $this->assertSame(['param0' => 1], $result->namedBindings);
     }
+
+    public function testResetDisablesNamedBindingsMode(): void
+    {
+        $builder = (new Builder())
+            ->useNamedBindings()
+            ->withParamType('tenant', 'String')
+            ->from('events')
+            ->filter([Query::equal('tenant', ['acme'])]);
+
+        $builder->reset();
+
+        $result = $builder
+            ->from('events')
+            ->filter([Query::equal('tenant', ['acme'])])
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM `events` WHERE `tenant` IN (?)',
+            $result->query
+        );
+        $this->assertSame(['acme'], $result->bindings);
+        $this->assertNull($result->namedBindings);
+    }
+
+    public function testResetClearsRegisteredParamTypes(): void
+    {
+        $builder = (new Builder())
+            ->withParamType('tenant', 'FixedString(36)');
+
+        $builder->reset();
+
+        $result = $builder
+            ->useNamedBindings()
+            ->from('events')
+            ->filter([Query::equal('tenant', ['acme'])])
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM `events` WHERE `tenant` IN ({param0:String})',
+            $result->query
+        );
+    }
 }
