@@ -78,6 +78,21 @@ class InsertFormatTest extends TestCase
         $this->assertSame('TSV', $result->format);
     }
 
+    public function testInsertFormatAcceptsUnderscoreInFormatName(): void
+    {
+        $result = (new Builder())
+            ->into('events')
+            ->insertFormat('My_Format', ['id'])
+            ->insert();
+
+        $this->assertInstanceOf(FormattedInsertStatement::class, $result);
+        $this->assertSame(
+            'INSERT INTO `events` (`id`) FORMAT My_Format',
+            $result->query
+        );
+        $this->assertSame('My_Format', $result->format);
+    }
+
     public function testInsertFormatRejectsInvalidFormatName(): void
     {
         $this->expectException(ValidationException::class);

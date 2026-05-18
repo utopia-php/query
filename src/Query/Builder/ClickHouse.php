@@ -162,7 +162,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      */
     public function insertFormat(string $format, array $columns = []): static
     {
-        if (!\preg_match('/^[A-Za-z][A-Za-z0-9]*$/', $format)) {
+        if (!\preg_match('/^[A-Za-z][A-Za-z0-9_]*$/', $format)) {
             throw new ValidationException('Invalid ClickHouse INSERT format: ' . $format);
         }
 
