@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Query\Builder\ClickHouse;
+namespace Tests\Query\Builder\Feature\ClickHouse;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;

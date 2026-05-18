@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Query\Schema\ClickHouse;
+namespace Tests\Query\Schema\Feature\ClickHouse;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
@@ -8,7 +8,7 @@ use Utopia\Query\Builder\ClickHouse as ClickHouseBuilder;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\ClickHouse as Schema;
 
-class MaterializedViewTest extends TestCase
+class MaterializedViewsTest extends TestCase
 {
     use AssertsBindingCount;
 

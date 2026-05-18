@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Query\Builder\ClickHouse;
+namespace Tests\Query\Builder\Feature\ClickHouse;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
