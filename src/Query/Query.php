@@ -382,7 +382,8 @@ class Query
             Method::BitAnd,
             Method::BitOr,
             Method::BitXor => $compiler->compileAggregate($this),
-            Method::GroupBy => $compiler->compileGroupBy($this),
+            Method::GroupBy,
+            Method::GroupByTimeBucket => $compiler->compileGroupBy($this),
             Method::Join,
             Method::LeftJoin,
             Method::RightJoin,
@@ -761,6 +762,7 @@ class Query
         $selections = [];
         $aggregations = [];
         $groupBy = [];
+        $timeBuckets = [];
         $having = [];
         $distinct = false;
         $joins = [];
@@ -838,6 +840,15 @@ class Query
                     }
                     break;
 
+                case $method === Method::GroupByTimeBucket:
+                    /** @var string $interval */
+                    $interval = $values[0] ?? '';
+                    $timeBuckets[] = [
+                        'attribute' => $query->getAttribute(),
+                        'interval' => $interval,
+                    ];
+                    break;
+
                 case $method === Method::Having:
                     $having[] = clone $query;
                     break;
@@ -879,6 +890,7 @@ class Query
             offset: $offset,
             cursor: $cursor,
             cursorDirection: $cursorDirection,
+            timeBuckets: $timeBuckets,
         );
     }
 
@@ -1181,6 +1193,36 @@ class Query
     public static function groupBy(array $attributes): static
     {
         return new static(Method::GroupBy, '', $attributes);
+    }
+
+    /**
+     * Allowed bucket sizes for `groupByTimeBucket`.
+     *
+     * Kept narrow on purpose: each bucket maps to a single ClickHouse
+     * `toStartOf*` function (see `Builder\ClickHouse::compileGroupByTimeBucket`)
+     * so the set is closed and changes are explicit.
+     *
+     * @var list<string>
+     */
+    public const array GROUP_BY_TIME_BUCKET_INTERVALS = ['1m', '5m', '15m', '1h', '1d', '1w', '1M'];
+
+    /**
+     * Helper method to create Query with groupByTimeBucket method.
+     *
+     * Buckets `$attribute` into fixed-width windows of size `$interval` and
+     * groups by the bucket. Compilation is dialect-specific; see
+     * `Builder\ClickHouse::compileGroupByTimeBucket`.
+     */
+    public static function groupByTimeBucket(string $attribute, string $interval): static
+    {
+        if (! \in_array($interval, self::GROUP_BY_TIME_BUCKET_INTERVALS, true)) {
+            throw new ValidationException(
+                'Invalid groupByTimeBucket interval: ' . $interval
+                . '. Allowed: ' . \implode(', ', self::GROUP_BY_TIME_BUCKET_INTERVALS)
+            );
+        }
+
+        return new static(Method::GroupByTimeBucket, $attribute, [$interval]);
     }
 
     /**

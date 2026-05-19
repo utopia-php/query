@@ -40,6 +40,6 @@ trait UpsertSelect
 
         $sql .= ' ' . $this->compileConflictClause();
 
-        return new Statement($sql, $this->bindings, executor: $this->executor);
+        return new Statement($sql, $this->getBindingValues(), executor: $this->executor);
     }
 }
