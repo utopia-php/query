@@ -1,13 +1,13 @@
 <?php
 
-namespace Utopia\Query\Schema\Trait\ClickHouse;
+namespace Utopia\Query\Schema\Trait;
 
 use Utopia\Query\Builder;
 use Utopia\Query\Builder\Statement;
 
 trait MaterializedViews
 {
-    public function createMaterializedView(string $name, string $targetTable, Builder|string $body, bool $ifNotExists = true): Statement
+    public function createMaterializedView(string $name, Builder|string $body, ?string $targetTable = null, bool $ifNotExists = true): Statement
     {
         $bindings = [];
         if ($body instanceof Builder) {
@@ -21,7 +21,7 @@ trait MaterializedViews
         $sql = 'CREATE MATERIALIZED VIEW '
             . ($ifNotExists ? 'IF NOT EXISTS ' : '')
             . $this->quote($name)
-            . ' TO ' . $this->quote($targetTable)
+            . ($targetTable !== null ? ' TO ' . $this->quote($targetTable) : '')
             . ' AS ' . $bodySql;
 
         return new Statement($sql, $bindings, executor: $this->executor);

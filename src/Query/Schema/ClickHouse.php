@@ -8,18 +8,18 @@ use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\QuotesIdentifiers;
 use Utopia\Query\Schema;
 use Utopia\Query\Schema\ClickHouse\Engine;
-use Utopia\Query\Schema\Feature\ClickHouse\MaterializedViews;
 use Utopia\Query\Schema\Feature\ColumnComments;
 use Utopia\Query\Schema\Feature\Databases;
 use Utopia\Query\Schema\Feature\DropPartition;
+use Utopia\Query\Schema\Feature\MaterializedViews;
 use Utopia\Query\Schema\Feature\TableComments;
 use Utopia\Query\Schema\Feature\Views;
 
 class ClickHouse extends Schema implements TableComments, ColumnComments, DropPartition, Views, Databases, MaterializedViews
 {
     use QuotesIdentifiers;
-    use Trait\ClickHouse\MaterializedViews;
     use Trait\Databases;
+    use Trait\MaterializedViews;
     use Trait\Views;
 
     #[\Override]

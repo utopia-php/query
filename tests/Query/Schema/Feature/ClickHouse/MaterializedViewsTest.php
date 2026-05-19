@@ -20,8 +20,8 @@ class MaterializedViewsTest extends TestCase
 
         $result = $schema->createMaterializedView(
             'usage_events_daily_mv',
-            'usage_events_daily',
             $body,
+            'usage_events_daily',
         );
 
         $this->assertBindingCount($result);
@@ -38,8 +38,8 @@ class MaterializedViewsTest extends TestCase
 
         $result = $schema->createMaterializedView(
             'daily_mv',
-            'daily',
             'SELECT * FROM `events`',
+            'daily',
             false,
         );
 
@@ -59,8 +59,8 @@ class MaterializedViewsTest extends TestCase
 
         $result = $schema->createMaterializedView(
             'active_events_mv',
-            'active_events',
             $builder,
+            'active_events',
         );
 
         $this->assertSame(
@@ -69,6 +69,21 @@ class MaterializedViewsTest extends TestCase
             $result->query,
         );
         $this->assertSame(['active'], $result->bindings);
+    }
+
+    public function testCreateMaterializedViewWithoutTargetTable(): void
+    {
+        $schema = new Schema();
+
+        $result = $schema->createMaterializedView(
+            'snapshot_mv',
+            'SELECT * FROM `events`',
+        );
+
+        $this->assertSame(
+            'CREATE MATERIALIZED VIEW IF NOT EXISTS `snapshot_mv` AS SELECT * FROM `events`',
+            $result->query,
+        );
     }
 
     public function testCreateMaterializedViewDropInReplacementForUsageAdapter(): void
@@ -88,8 +103,8 @@ class MaterializedViewsTest extends TestCase
 
         $result = $schema->createMaterializedView(
             'usage_events_daily_mv',
-            'usage_events_daily',
             $body,
+            'usage_events_daily',
         );
 
         $expected = 'CREATE MATERIALIZED VIEW IF NOT EXISTS `usage_events_daily_mv` TO `usage_events_daily` AS '
