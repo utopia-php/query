@@ -3,6 +3,7 @@
 namespace Utopia\Query\Builder;
 
 use Utopia\Query\Builder as BaseBuilder;
+use Utopia\Query\Builder\ClickHouse\FormattedInsertStatement;
 use Utopia\Query\Builder\Feature\BitwiseAggregates;
 use Utopia\Query\Builder\Feature\ClickHouse\ApproximateAggregates;
 use Utopia\Query\Builder\Feature\ClickHouse\ArrayJoins;
@@ -56,6 +57,38 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     /** @var list<string> */
     protected array $rawJoinClauses = [];
 
+    protected ?string $insertFormat = null;
+
+    /** @var list<string> */
+    protected array $insertFormatColumns = [];
+
+    /**
+     * Caller-registered column → ClickHouse type map. Populated via
+     * `withParamType()`; consumed at compile-time to attach `{name:Type}`
+     * placeholder metadata to bindings whose column we recognise.
+     *
+     * @var array<string, string>
+     */
+    protected array $paramTypes = [];
+
+    /**
+     * Whether to rewrite `?` placeholders to ClickHouse `{name:Type}` form
+     * at Statement creation time. Enabled by `useNamedBindings()`.
+     */
+    protected bool $namedBindings = false;
+
+    public const DELETE_MODE_LIGHTWEIGHT = 'lightweight';
+
+    public const DELETE_MODE_MUTATION = 'mutation';
+
+    /**
+     * Which DELETE form `delete()` emits. Lightweight by default — matches
+     * the ClickHouse server default and is the form most callers want for
+     * row-level cleanup. The mutation form is heavier (rewrites parts
+     * asynchronously) and is opt-in via `deleteMode('mutation')`.
+     */
+    protected string $deleteMode = self::DELETE_MODE_LIGHTWEIGHT;
+
     /**
      * Add PREWHERE filters (evaluated before reading all columns — major ClickHouse optimization)
      *
@@ -102,6 +135,30 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         }
 
         $this->hints[] = $hint;
+
+        return $this;
+    }
+
+    /**
+     * Declare a ClickHouse FORMAT pragma for the next INSERT.
+     *
+     * When a format is set, `insert()` emits
+     * `INSERT INTO \`t\` (\`col1\`, \`col2\`) FORMAT <name>` with no VALUES.
+     * The row payload must be streamed into the HTTP body by the caller.
+     * Column names are derived from the most recent `set()` call (values are
+     * ignored). Pass `$columns` to declare them explicitly when no `set()`
+     * call has been made.
+     *
+     * @param  list<string>  $columns
+     */
+    public function insertFormat(string $format, array $columns = []): static
+    {
+        if (!\preg_match('/^[A-Za-z][A-Za-z0-9_]*$/', $format)) {
+            throw new ValidationException('Invalid ClickHouse INSERT format: ' . $format);
+        }
+
+        $this->insertFormat = $format;
+        $this->insertFormatColumns = $columns;
 
         return $this;
     }
@@ -265,9 +322,138 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         $this->limitByClause = null;
         $this->arrayJoins = [];
         $this->rawJoinClauses = [];
+        $this->insertFormat = null;
+        $this->insertFormatColumns = [];
+        $this->deleteMode = self::DELETE_MODE_LIGHTWEIGHT;
+        $this->namedBindings = false;
+        $this->paramTypes = [];
         $this->resetGroupByModifier();
 
         return $this;
+    }
+
+    /**
+     * Enable rewriting of `?` placeholders to ClickHouse `{name:Type}` form
+     * at Statement-emission time. Off by default — the positional form is
+     * what every other dialect uses and what the existing test fixtures
+     * expect.
+     */
+    public function useNamedBindings(bool $enabled = true): static
+    {
+        $this->namedBindings = $enabled;
+
+        return $this;
+    }
+
+    /**
+     * Register a ClickHouse type for a column. When a `?` placeholder is
+     * produced for a binding whose column hint matches `$column`, the
+     * rewritten placeholder uses `$type`. Otherwise we fall back to the
+     * type inference rules in `inferClickHouseType()`.
+     */
+    public function withParamType(string $column, string $type): static
+    {
+        if (! \preg_match('/^[A-Za-z][A-Za-z0-9_]*(?:\((?:[^()]*|\([^()]*\))*\))?$/', $type)) {
+            throw new ValidationException('Invalid ClickHouse type: ' . $type);
+        }
+
+        $this->paramTypes[$column] = $type;
+
+        return $this;
+    }
+
+    /**
+     * @param  array<string, string>  $types
+     */
+    public function withParamTypes(array $types): static
+    {
+        foreach ($types as $column => $type) {
+            $this->withParamType($column, $type);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Infer a ClickHouse type from a PHP value when no explicit registration
+     * is available. Covers the four scalars used by the audit and usage
+     * schemas plus DateTime objects. Falls back to `String`, which is the
+     * safest default for unknown payloads.
+     */
+    private function inferClickHouseType(mixed $value): string
+    {
+        return match (true) {
+            \is_int($value) => 'Int64',
+            \is_float($value) => 'Float64',
+            \is_bool($value) => 'UInt8',
+            $value === null => 'Nullable(String)',
+            $value instanceof \DateTimeInterface => 'DateTime64(3)',
+            default => 'String',
+        };
+    }
+
+    /**
+     * Resolve the ClickHouse type for the `$index`-th positional binding,
+     * preferring an explicit `withParamType()` registration over inference.
+     */
+    private function resolveBindingType(int $index): string
+    {
+        $binding = $this->bindings[$index] ?? null;
+
+        if ($binding !== null && $binding->column !== null && isset($this->paramTypes[$binding->column])) {
+            return $this->paramTypes[$binding->column];
+        }
+
+        return $this->inferClickHouseType($binding?->value);
+    }
+
+    /**
+     * Rewrite a `?`-placeholder statement to ClickHouse `{paramN:Type}`
+     * form, attaching `namedBindings` to the returned Statement so HTTP
+     * callers can post parameters by name.
+     *
+     * The positional `$stmt->bindings` array stays intact so existing
+     * callers that read it unchanged keep working.
+     */
+    protected function applyNamedTypedBindings(Statement $stmt): Statement
+    {
+        if (! $this->namedBindings) {
+            return $stmt;
+        }
+
+        $sql = $stmt->query;
+        $bindings = $stmt->bindings;
+
+        if (\count($bindings) === 0) {
+            return $stmt;
+        }
+
+        $named = [];
+        $index = 0;
+        $rewritten = \preg_replace_callback(
+            '/(?<!\?)\?(?![|&?])/',
+            function () use (&$index, &$named, $bindings): string {
+                $type = $this->resolveBindingType($index);
+                $name = 'param' . $index;
+                $named[$name] = $bindings[$index] ?? null;
+                $index++;
+
+                return '{' . $name . ':' . $type . '}';
+            },
+            $sql
+        );
+
+        if ($rewritten === null) {
+            return $stmt;
+        }
+
+        return new Statement(
+            $rewritten,
+            $bindings,
+            $stmt->readOnly,
+            $this->executor,
+            namedBindings: $named,
+        );
     }
 
     #[\Override]
@@ -277,14 +463,42 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     }
 
     /**
+     * Map a supported `groupByTimeBucket` interval to its ClickHouse
+     * `toStartOf*` function name.
+     */
+    private const array TIME_BUCKET_FUNCTIONS = [
+        '1m' => 'toStartOfMinute',
+        '5m' => 'toStartOfFiveMinutes',
+        '15m' => 'toStartOfFifteenMinutes',
+        '1h' => 'toStartOfHour',
+        '1d' => 'toStartOfDay',
+        '1w' => 'toStartOfWeek',
+        '1M' => 'toStartOfMonth',
+    ];
+
+    #[\Override]
+    protected function compileGroupByTimeBucket(string $attribute, string $interval): string
+    {
+        $function = self::TIME_BUCKET_FUNCTIONS[$interval] ?? null;
+
+        if ($function === null) {
+            throw new ValidationException(
+                'Invalid groupByTimeBucket interval for ClickHouse: ' . $interval
+            );
+        }
+
+        return $function . '(' . $this->resolveAndWrap($attribute) . ')';
+    }
+
+    /**
      * ClickHouse uses the match(column, pattern) function instead of REGEXP
      *
      * @param  array<mixed>  $values
      */
     #[\Override]
-    protected function compileRegex(string $attribute, array $values): string
+    protected function compileRegex(string $attribute, array $values, ?string $column = null): string
     {
-        $this->addBinding($values[0]);
+        $this->addBinding($values[0], $column);
 
         return 'match(' . $attribute . ', ?)';
     }
@@ -295,7 +509,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      * @param  array<mixed>  $values
      */
     #[\Override]
-    protected function compileLike(string $attribute, array $values, string $prefix, string $suffix, bool $not): string
+    protected function compileLike(string $attribute, array $values, string $prefix, string $suffix, bool $not, ?string $column = null): string
     {
         /** @var string $rawVal */
         $rawVal = $values[0];
@@ -303,7 +517,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         // startsWith: prefix='', suffix='%'
         if ($prefix === '' && $suffix === '%') {
             $func = $not ? 'NOT startsWith' : 'startsWith';
-            $this->addBinding($rawVal);
+            $this->addBinding($rawVal, $column);
 
             return $func . '(' . $attribute . ', ?)';
         }
@@ -311,14 +525,14 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         // endsWith: prefix='%', suffix=''
         if ($prefix === '%' && $suffix === '') {
             $func = $not ? 'NOT endsWith' : 'endsWith';
-            $this->addBinding($rawVal);
+            $this->addBinding($rawVal, $column);
 
             return $func . '(' . $attribute . ', ?)';
         }
 
         // Fallback for any other LIKE pattern (should not occur in practice)
         $val = $this->escapeLikeValue($rawVal);
-        $this->addBinding($prefix . $val . $suffix);
+        $this->addBinding($prefix . $val . $suffix, $column);
         $keyword = $not ? 'NOT LIKE' : 'LIKE';
 
         return $attribute . ' ' . $keyword . ' ?';
@@ -330,18 +544,18 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      * @param  array<mixed>  $values
      */
     #[\Override]
-    protected function compileContains(string $attribute, array $values): string
+    protected function compileContains(string $attribute, array $values, ?string $column = null): string
     {
         /** @var array<string> $values */
         if (\count($values) === 1) {
-            $this->addBinding($values[0]);
+            $this->addBinding($values[0], $column);
 
             return 'position(' . $attribute . ', ?) > 0';
         }
 
         $parts = [];
         foreach ($values as $value) {
-            $this->addBinding($value);
+            $this->addBinding($value, $column);
             $parts[] = 'position(' . $attribute . ', ?) > 0';
         }
 
@@ -354,12 +568,12 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      * @param  array<mixed>  $values
      */
     #[\Override]
-    protected function compileContainsAll(string $attribute, array $values): string
+    protected function compileContainsAll(string $attribute, array $values, ?string $column = null): string
     {
         /** @var array<string> $values */
         $parts = [];
         foreach ($values as $value) {
-            $this->addBinding($value);
+            $this->addBinding($value, $column);
             $parts[] = 'position(' . $attribute . ', ?) > 0';
         }
 
@@ -372,22 +586,71 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      * @param  array<mixed>  $values
      */
     #[\Override]
-    protected function compileNotContains(string $attribute, array $values): string
+    protected function compileNotContains(string $attribute, array $values, ?string $column = null): string
     {
         /** @var array<string> $values */
         if (\count($values) === 1) {
-            $this->addBinding($values[0]);
+            $this->addBinding($values[0], $column);
 
             return 'position(' . $attribute . ', ?) = 0';
         }
 
         $parts = [];
         foreach ($values as $value) {
-            $this->addBinding($value);
+            $this->addBinding($value, $column);
             $parts[] = 'position(' . $attribute . ', ?) = 0';
         }
 
         return '(' . \implode(' AND ', $parts) . ')';
+    }
+
+    #[\Override]
+    public function build(): Statement
+    {
+        return $this->applyNamedTypedBindings(parent::build());
+    }
+
+    #[\Override]
+    public function insert(): Statement
+    {
+        $format = $this->insertFormat;
+        if ($format === null) {
+            return $this->applyNamedTypedBindings(parent::insert());
+        }
+
+        $this->bindings = [];
+        $this->validateTable();
+
+        $columns = !empty($this->insertFormatColumns)
+            ? $this->insertFormatColumns
+            : (!empty($this->rows) ? \array_keys($this->rows[0]) : []);
+
+        if (empty($columns)) {
+            throw new ValidationException('No columns specified for FORMAT INSERT. Pass columns to insertFormat() or call set() before insert().');
+        }
+
+        foreach ($columns as $col) {
+            if ($col === '') {
+                throw new ValidationException('Column names for FORMAT INSERT must be non-empty strings.');
+            }
+        }
+
+        $wrappedColumns = \array_map(
+            fn (string $col): string => $this->resolveAndWrap($col),
+            $columns
+        );
+
+        $sql = 'INSERT INTO ' . $this->quote($this->table)
+            . ' (' . \implode(', ', $wrappedColumns) . ')'
+            . ' FORMAT ' . $format;
+
+        return new FormattedInsertStatement(
+            $sql,
+            [],
+            $columns,
+            $format,
+            executor: $this->executor,
+        );
     }
 
     #[\Override]
@@ -414,7 +677,31 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             . ' UPDATE ' . \implode(', ', $assignments)
             . ' ' . \implode(' ', $parts);
 
-        return new Statement($sql, $this->bindings, executor: $this->executor);
+        return $this->applyNamedTypedBindings(
+            new Statement($sql, $this->getBindingValues(), executor: $this->executor)
+        );
+    }
+
+    /**
+     * Pick which DELETE form `delete()` emits. Lightweight (`DELETE FROM
+     * t WHERE …`) marks rows deleted via a mask and is async by default;
+     * mutation (`ALTER TABLE t DELETE WHERE …`) rewrites parts on disk
+     * and is heavier. The choice is storage-path-significant: the two
+     * forms are not interchangeable, so the builder never auto-translates
+     * between them.
+     */
+    public function deleteMode(string $mode): static
+    {
+        if ($mode !== self::DELETE_MODE_LIGHTWEIGHT && $mode !== self::DELETE_MODE_MUTATION) {
+            throw new ValidationException(
+                'Invalid ClickHouse delete mode: ' . $mode
+                . '. Allowed: ' . self::DELETE_MODE_LIGHTWEIGHT . ', ' . self::DELETE_MODE_MUTATION
+            );
+        }
+
+        $this->deleteMode = $mode;
+
+        return $this;
     }
 
     #[\Override]
@@ -431,10 +718,18 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             throw new ValidationException('ClickHouse DELETE requires a WHERE clause.');
         }
 
-        $sql = 'ALTER TABLE ' . $this->quote($this->table)
-            . ' DELETE ' . \implode(' ', $parts);
+        $sql = $this->deleteMode === self::DELETE_MODE_LIGHTWEIGHT
+            ? 'DELETE FROM ' . $this->quote($this->table) . ' ' . \implode(' ', $parts)
+            : 'ALTER TABLE ' . $this->quote($this->table) . ' DELETE ' . \implode(' ', $parts);
 
-        return new Statement($sql, $this->bindings, executor: $this->executor);
+        $settings = $this->buildSettingsClause();
+        if ($settings !== '') {
+            $sql .= ' ' . $settings;
+        }
+
+        return $this->applyNamedTypedBindings(
+            new Statement($sql, $this->getBindingValues(), executor: $this->executor)
+        );
     }
 
     /**

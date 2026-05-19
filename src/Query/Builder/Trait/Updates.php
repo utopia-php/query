@@ -40,6 +40,6 @@ trait Updates
 
         $this->compileOrderAndLimit($parts, $grouped);
 
-        return new Statement(\implode(' ', $parts), $this->bindings, executor: $this->executor);
+        return new Statement(\implode(' ', $parts), $this->getBindingValues(), executor: $this->executor);
     }
 }

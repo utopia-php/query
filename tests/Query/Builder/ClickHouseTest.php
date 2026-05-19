@@ -5469,10 +5469,26 @@ class ClickHouseTest extends TestCase
             ->update();
     }
 
-    public function testDeleteUsesAlterTable(): void
+    public function testDeleteDefaultsToLightweightDeleteFrom(): void
     {
         $result = (new Builder())
             ->from('events')
+            ->filter([Query::lessThan('timestamp', '2024-01-01')])
+            ->delete();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'DELETE FROM `events` WHERE `timestamp` < ?',
+            $result->query
+        );
+        $this->assertSame(['2024-01-01'], $result->bindings);
+    }
+
+    public function testDeleteUsesAlterTableWhenMutationModeOptedIn(): void
+    {
+        $result = (new Builder())
+            ->from('events')
+            ->deleteMode(Builder::DELETE_MODE_MUTATION)
             ->filter([Query::lessThan('timestamp', '2024-01-01')])
             ->delete();
         $this->assertBindingCount($result);
@@ -5501,7 +5517,7 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertSame(
-            'ALTER TABLE `events` DELETE WHERE `status` IN (?) AND `_tenant` = ?',
+            'DELETE FROM `events` WHERE `status` IN (?) AND `_tenant` = ?',
             $result->query
         );
         $this->assertSame(['deleted', 'tenant_123'], $result->bindings);
@@ -5922,6 +5938,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('t')
+            ->deleteMode(Builder::DELETE_MODE_MUTATION)
             ->filter([Query::equal('id', [1])])
             ->delete();
         $this->assertBindingCount($result);
@@ -5953,7 +5970,7 @@ class ClickHouseTest extends TestCase
             ->delete();
         $this->assertBindingCount($result);
 
-        $this->assertSame('ALTER TABLE `t` DELETE WHERE `status` IN (?) AND `age` < ?', $result->query);
+        $this->assertSame('DELETE FROM `t` WHERE `status` IN (?) AND `age` < ?', $result->query);
         $this->assertSame(['old', 5], $result->bindings);
     }
 
@@ -7314,6 +7331,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('events')
+            ->deleteMode(Builder::DELETE_MODE_MUTATION)
             ->filter([Query::lessThan('created_at', '2023-01-01')])
             ->delete();
 
@@ -8036,6 +8054,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('events')
+            ->deleteMode(Builder::DELETE_MODE_MUTATION)
             ->filter([
                 Query::equal('status', ['deleted']),
                 Query::lessThan('created_at', '2023-01-01'),
@@ -9146,6 +9165,7 @@ class ClickHouseTest extends TestCase
     {
         $result = (new Builder())
             ->from('events')
+            ->deleteMode(Builder::DELETE_MODE_MUTATION)
             ->filter([
                 Query::lessThan('created_at', '2020-01-01'),
                 Query::equal('archived', [1]),

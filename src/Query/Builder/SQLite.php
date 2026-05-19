@@ -40,7 +40,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
      * @param  array<mixed>  $values
      */
     #[\Override]
-    protected function compileRegex(string $attribute, array $values): string
+    protected function compileRegex(string $attribute, array $values, ?string $column = null): string
     {
         throw new UnsupportedException('REGEXP is not natively supported in SQLite.');
     }
@@ -82,7 +82,7 @@ class SQLite extends SQL implements Json, ConditionalAggregates, StringAggregate
 
         $sql = \preg_replace('/^INSERT INTO/', 'INSERT OR IGNORE INTO', $sql, 1) ?? $sql;
 
-        return new Statement($sql, $this->bindings, executor: $this->executor);
+        return new Statement($sql, $this->getBindingValues(), executor: $this->executor);
     }
 
     #[\Override]

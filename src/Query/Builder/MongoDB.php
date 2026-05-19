@@ -101,9 +101,9 @@ class MongoDB extends BaseBuilder implements
      * @param array<mixed> $values
      */
     #[\Override]
-    protected function compileRegex(string $attribute, array $values): string
+    protected function compileRegex(string $attribute, array $values, ?string $column = null): string
     {
-        $this->addBinding($values[0]);
+        $this->addBinding($values[0], $column);
 
         return $attribute . ' REGEX ?';
     }
@@ -293,7 +293,7 @@ class MongoDB extends BaseBuilder implements
 
         return new Statement(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
-            $this->bindings,
+            $this->getBindingValues(),
             executor: $this->executor,
         );
     }
@@ -333,7 +333,7 @@ class MongoDB extends BaseBuilder implements
 
         return new Statement(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
-            $this->bindings,
+            $this->getBindingValues(),
             executor: $this->executor,
         );
     }
@@ -355,7 +355,7 @@ class MongoDB extends BaseBuilder implements
 
         return new Statement(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
-            $this->bindings,
+            $this->getBindingValues(),
             executor: $this->executor,
         );
     }
@@ -398,7 +398,7 @@ class MongoDB extends BaseBuilder implements
 
         return new Statement(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
-            $this->bindings,
+            $this->getBindingValues(),
             executor: $this->executor,
         );
     }
@@ -432,7 +432,7 @@ class MongoDB extends BaseBuilder implements
 
         return new Statement(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
-            $this->bindings,
+            $this->getBindingValues(),
             executor: $this->executor,
         );
     }
@@ -517,7 +517,7 @@ class MongoDB extends BaseBuilder implements
 
         return new Statement(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
-            $this->bindings,
+            $this->getBindingValues(),
             readOnly: true,
             executor: $this->executor,
         );
@@ -565,7 +565,7 @@ class MongoDB extends BaseBuilder implements
 
         return new Statement(
             \json_encode($operation, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
-            $this->bindings,
+            $this->getBindingValues(),
             readOnly: true,
             executor: $this->executor,
         );

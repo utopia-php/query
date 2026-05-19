@@ -15,6 +15,7 @@ readonly class ParsedQuery
      * @param  list<Query>  $having
      * @param  list<Query>  $joins
      * @param  list<Query>  $unions
+     * @param  list<array{attribute: string, interval: string}>  $timeBuckets
      */
     public function __construct(
         public array $filters = [],
@@ -29,6 +30,7 @@ readonly class ParsedQuery
         public ?int $offset = null,
         public mixed $cursor = null,
         public ?CursorDirection $cursorDirection = null,
+        public array $timeBuckets = [],
     ) {
     }
 }

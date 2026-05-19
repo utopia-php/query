@@ -6,6 +6,7 @@ readonly class Statement
 {
     /**
      * @param  list<mixed>  $bindings
+     * @param  array<string, mixed>|null  $namedBindings
      * @param  (\Closure(Statement): (array<mixed>|int))|null  $executor
      */
     public function __construct(
@@ -13,6 +14,7 @@ readonly class Statement
         public array $bindings,
         public bool $readOnly = false,
         private ?\Closure $executor = null,
+        public ?array $namedBindings = null,
     ) {
     }
 
@@ -30,6 +32,6 @@ readonly class Statement
 
     public function withExecutor(\Closure $executor): self
     {
-        return new self($this->query, $this->bindings, $this->readOnly, $executor);
+        return new self($this->query, $this->bindings, $this->readOnly, $executor, $this->namedBindings);
     }
 }

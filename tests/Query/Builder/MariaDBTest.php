@@ -14,6 +14,7 @@ use Utopia\Query\Builder\Feature\Sequences;
 use Utopia\Query\Builder\MariaDB as Builder;
 use Utopia\Query\Builder\Statement;
 use Utopia\Query\Compiler;
+use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
@@ -1573,5 +1574,16 @@ class MariaDBTest extends TestCase
         $this->expectExceptionMessage('Invalid sequence name');
 
         (new Builder())->nextVal('bad name; DROP TABLE x');
+    }
+
+    public function testGroupByTimeBucketUnsupported(): void
+    {
+        $this->expectException(UnsupportedException::class);
+
+        (new Builder())
+            ->from('events')
+            ->count('*', 'count')
+            ->groupByTimeBucket('time', '1h')
+            ->build();
     }
 }

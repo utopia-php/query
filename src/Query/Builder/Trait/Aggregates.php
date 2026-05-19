@@ -65,6 +65,14 @@ trait Aggregates
         return $this;
     }
 
+    #[\Override]
+    public function groupByTimeBucket(string $attribute, string $interval): static
+    {
+        $this->pendingQueries[] = Query::groupByTimeBucket($attribute, $interval);
+
+        return $this;
+    }
+
     /**
      * @param  array<Query>  $queries
      */

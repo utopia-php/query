@@ -105,6 +105,6 @@ trait Merge
             $this->addBindings($clause->bindings);
         }
 
-        return new Statement($sql, $this->bindings, executor: $this->executor);
+        return new Statement($sql, $this->getBindingValues(), executor: $this->executor);
     }
 }
