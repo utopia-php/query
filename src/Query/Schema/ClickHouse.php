@@ -51,12 +51,12 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
                 throw new UnsupportedException('LowCardinality is not supported inside Array(...). Wrap the element type instead.');
             }
 
+            if ($column->isNullable) {
+                throw new UnsupportedException('Nullable(Array(...)) is not supported in ClickHouse. Use an empty array [] to represent a missing value instead.');
+            }
+
             $inner = $this->compileNestedElementType($column->arrayElementType, $column);
             $type = 'Array(' . $inner . ')';
-
-            if ($column->isNullable) {
-                $type = 'Nullable(' . $type . ')';
-            }
 
             return $type;
         }
