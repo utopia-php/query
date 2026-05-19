@@ -72,15 +72,6 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     protected array $paramTypes = [];
 
     /**
-     * Per-binding metadata captured at `addBinding()` time, kept in lockstep
-     * with `$this->bindings`. Index N here corresponds to the N-th `?`
-     * placeholder in the compiled SQL.
-     *
-     * @var list<?Binding>
-     */
-    protected array $bindingMeta = [];
-
-    /**
      * Whether to rewrite `?` placeholders to ClickHouse `{name:Type}` form
      * at Statement creation time. Enabled by `useNamedBindings()`.
      */
@@ -333,7 +324,6 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         $this->rawJoinClauses = [];
         $this->insertFormat = null;
         $this->insertFormatColumns = [];
-        $this->bindingMeta = [];
         $this->deleteMode = self::DELETE_MODE_LIGHTWEIGHT;
         $this->namedBindings = false;
         $this->paramTypes = [];
@@ -385,30 +375,6 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     }
 
     /**
-     * Track each binding's value + column hint in lockstep with the positional
-     * list so the placeholder rewriter can attach the right ClickHouse type to
-     * the right `?`.
-     */
-    #[\Override]
-    protected function addBinding(mixed $value, ?string $column = null): void
-    {
-        parent::addBinding($value, $column);
-        $this->bindingMeta[] = new Binding($value, $column ?? $this->bindingColumn);
-    }
-
-    /**
-     * @param  array<mixed>  $bindings
-     */
-    #[\Override]
-    protected function addBindings(array $bindings): void
-    {
-        parent::addBindings($bindings);
-        foreach ($bindings as $binding) {
-            $this->bindingMeta[] = new Binding($binding, $this->bindingColumn);
-        }
-    }
-
-    /**
      * Infer a ClickHouse type from a PHP value when no explicit registration
      * is available. Covers the four scalars used by the audit and usage
      * schemas plus DateTime objects. Falls back to `String`, which is the
@@ -432,7 +398,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      */
     private function resolveBindingType(int $index): string
     {
-        $binding = $this->bindingMeta[$index] ?? null;
+        $binding = $this->bindings[$index] ?? null;
 
         if ($binding !== null && $binding->column !== null && isset($this->paramTypes[$binding->column])) {
             return $this->paramTypes[$binding->column];
@@ -530,9 +496,9 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      * @param  array<mixed>  $values
      */
     #[\Override]
-    protected function compileRegex(string $attribute, array $values): string
+    protected function compileRegex(string $attribute, array $values, ?string $column = null): string
     {
-        $this->addBinding($values[0]);
+        $this->addBinding($values[0], $column);
 
         return 'match(' . $attribute . ', ?)';
     }
@@ -543,7 +509,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      * @param  array<mixed>  $values
      */
     #[\Override]
-    protected function compileLike(string $attribute, array $values, string $prefix, string $suffix, bool $not): string
+    protected function compileLike(string $attribute, array $values, string $prefix, string $suffix, bool $not, ?string $column = null): string
     {
         /** @var string $rawVal */
         $rawVal = $values[0];
@@ -551,7 +517,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         // startsWith: prefix='', suffix='%'
         if ($prefix === '' && $suffix === '%') {
             $func = $not ? 'NOT startsWith' : 'startsWith';
-            $this->addBinding($rawVal);
+            $this->addBinding($rawVal, $column);
 
             return $func . '(' . $attribute . ', ?)';
         }
@@ -559,14 +525,14 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         // endsWith: prefix='%', suffix=''
         if ($prefix === '%' && $suffix === '') {
             $func = $not ? 'NOT endsWith' : 'endsWith';
-            $this->addBinding($rawVal);
+            $this->addBinding($rawVal, $column);
 
             return $func . '(' . $attribute . ', ?)';
         }
 
         // Fallback for any other LIKE pattern (should not occur in practice)
         $val = $this->escapeLikeValue($rawVal);
-        $this->addBinding($prefix . $val . $suffix);
+        $this->addBinding($prefix . $val . $suffix, $column);
         $keyword = $not ? 'NOT LIKE' : 'LIKE';
 
         return $attribute . ' ' . $keyword . ' ?';
@@ -578,18 +544,18 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      * @param  array<mixed>  $values
      */
     #[\Override]
-    protected function compileContains(string $attribute, array $values): string
+    protected function compileContains(string $attribute, array $values, ?string $column = null): string
     {
         /** @var array<string> $values */
         if (\count($values) === 1) {
-            $this->addBinding($values[0]);
+            $this->addBinding($values[0], $column);
 
             return 'position(' . $attribute . ', ?) > 0';
         }
 
         $parts = [];
         foreach ($values as $value) {
-            $this->addBinding($value);
+            $this->addBinding($value, $column);
             $parts[] = 'position(' . $attribute . ', ?) > 0';
         }
 
@@ -602,12 +568,12 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      * @param  array<mixed>  $values
      */
     #[\Override]
-    protected function compileContainsAll(string $attribute, array $values): string
+    protected function compileContainsAll(string $attribute, array $values, ?string $column = null): string
     {
         /** @var array<string> $values */
         $parts = [];
         foreach ($values as $value) {
-            $this->addBinding($value);
+            $this->addBinding($value, $column);
             $parts[] = 'position(' . $attribute . ', ?) > 0';
         }
 
@@ -620,18 +586,18 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
      * @param  array<mixed>  $values
      */
     #[\Override]
-    protected function compileNotContains(string $attribute, array $values): string
+    protected function compileNotContains(string $attribute, array $values, ?string $column = null): string
     {
         /** @var array<string> $values */
         if (\count($values) === 1) {
-            $this->addBinding($values[0]);
+            $this->addBinding($values[0], $column);
 
             return 'position(' . $attribute . ', ?) = 0';
         }
 
         $parts = [];
         foreach ($values as $value) {
-            $this->addBinding($value);
+            $this->addBinding($value, $column);
             $parts[] = 'position(' . $attribute . ', ?) = 0';
         }
 
@@ -641,8 +607,6 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     #[\Override]
     public function build(): Statement
     {
-        $this->bindingMeta = [];
-
         return $this->applyNamedTypedBindings(parent::build());
     }
 
@@ -651,13 +615,10 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     {
         $format = $this->insertFormat;
         if ($format === null) {
-            $this->bindingMeta = [];
-
             return $this->applyNamedTypedBindings(parent::insert());
         }
 
         $this->bindings = [];
-        $this->bindingMeta = [];
         $this->validateTable();
 
         $columns = !empty($this->insertFormatColumns)
@@ -696,7 +657,6 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     public function update(): Statement
     {
         $this->bindings = [];
-        $this->bindingMeta = [];
         $this->validateTable();
 
         $assignments = $this->compileAssignments();
@@ -718,7 +678,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             . ' ' . \implode(' ', $parts);
 
         return $this->applyNamedTypedBindings(
-            new Statement($sql, $this->bindings, executor: $this->executor)
+            new Statement($sql, $this->getBindingValues(), executor: $this->executor)
         );
     }
 
@@ -748,7 +708,6 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     public function delete(): Statement
     {
         $this->bindings = [];
-        $this->bindingMeta = [];
         $this->validateTable();
 
         $parts = [];
@@ -769,7 +728,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         }
 
         return $this->applyNamedTypedBindings(
-            new Statement($sql, $this->bindings, executor: $this->executor)
+            new Statement($sql, $this->getBindingValues(), executor: $this->executor)
         );
     }
 

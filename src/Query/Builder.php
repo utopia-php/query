@@ -21,6 +21,7 @@ use Utopia\Query\AST\Reference\Table;
 use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Star;
 use Utopia\Query\AST\Statement\Select;
+use Utopia\Query\Builder\Binding;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\Case\Kind as CaseKind;
 use Utopia\Query\Builder\Case\WhenClause;
@@ -85,16 +86,15 @@ abstract class Builder implements
     protected array $pendingQueries = [];
 
     /**
-     * @var list<mixed>
+     * Parameter bindings produced during compilation. Each entry carries its
+     * value plus the raw column name supplied at bind time (when known).
+     * `Statement::$bindings` stays `list<mixed>` for public consumption — the
+     * `Binding` wrapper is an internal capture so dialects with typed named
+     * placeholders can look up a registered type without a parallel array.
+     *
+     * @var list<Binding>
      */
     protected array $bindings = [];
-
-    /**
-     * Raw column name (pre-resolution) attached to the next-to-be-added
-     * bindings. Used by dialects with typed named placeholders to look up
-     * a registered parameter type for the column.
-     */
-    protected ?string $bindingColumn = null;
 
     /**
      * @var list<UnionClause>
@@ -233,7 +233,7 @@ abstract class Builder implements
      *
      * @param  array<mixed>  $values
      */
-    abstract protected function compileRegex(string $attribute, array $values): string;
+    abstract protected function compileRegex(string $attribute, array $values, ?string $column = null): string;
 
     protected function buildTableClause(): string
     {
@@ -440,7 +440,7 @@ abstract class Builder implements
 
         $sql = $ctePrefix . $sql;
 
-        $result = new Statement($sql, $this->bindings, readOnly: true, executor: $this->executor);
+        $result = new Statement($sql, $this->getBindingValues(), readOnly: true, executor: $this->executor);
 
         foreach ($this->afterBuildCallbacks as $callback) {
             $result = $callback($result);
@@ -1271,44 +1271,38 @@ abstract class Builder implements
         $rawAttribute = $query->getAttribute();
         $attribute = $this->resolveAndWrap($rawAttribute);
         $values = $query->getValues();
+        $column = $rawAttribute !== '' ? $rawAttribute : null;
 
-        $previousBindingColumn = $this->bindingColumn;
-        $this->bindingColumn = $rawAttribute !== '' ? $rawAttribute : $previousBindingColumn;
-
-        try {
-            return match ($method) {
-                Method::Equal => $this->compileIn($attribute, $values),
-                Method::NotEqual => $this->compileNotIn($attribute, $values),
-                Method::LessThan => $this->compileComparison($attribute, '<', $values),
-                Method::LessThanEqual => $this->compileComparison($attribute, '<=', $values),
-                Method::GreaterThan => $this->compileComparison($attribute, '>', $values),
-                Method::GreaterThanEqual => $this->compileComparison($attribute, '>=', $values),
-                Method::Between => $this->compileBetween($attribute, $values, false),
-                Method::NotBetween => $this->compileBetween($attribute, $values, true),
-                Method::StartsWith => $this->compileLike($attribute, $values, '', '%', false),
-                Method::NotStartsWith => $this->compileLike($attribute, $values, '', '%', true),
-                Method::EndsWith => $this->compileLike($attribute, $values, '%', '', false),
-                Method::NotEndsWith => $this->compileLike($attribute, $values, '%', '', true),
-                Method::Contains => $this->compileContains($attribute, $values),
-                Method::ContainsAny => $query->onArray() ? $this->compileIn($attribute, $values) : $this->compileContains($attribute, $values),
-                Method::ContainsAll => $this->compileContainsAll($attribute, $values),
-                Method::NotContains => $this->compileNotContains($attribute, $values),
-                Method::Search => throw new UnsupportedException('Full-text search is not supported by this dialect.'),
-                Method::NotSearch => throw new UnsupportedException('Full-text search is not supported by this dialect.'),
-                Method::Regex => $this->compileRegex($attribute, $values),
-                Method::IsNull => $attribute . ' IS NULL',
-                Method::IsNotNull => $attribute . ' IS NOT NULL',
-                Method::And => $this->compileLogical($query, 'AND'),
-                Method::Or => $this->compileLogical($query, 'OR'),
-                Method::Having => $this->compileLogical($query, 'AND'),
-                Method::Exists => $this->compileExists($query),
-                Method::NotExists => $this->compileNotExists($query),
-                Method::Raw => $this->compileRaw($query),
-                default => throw new UnsupportedException('Unsupported filter type: ' . $method->value),
-            };
-        } finally {
-            $this->bindingColumn = $previousBindingColumn;
-        }
+        return match ($method) {
+            Method::Equal => $this->compileIn($attribute, $values, $column),
+            Method::NotEqual => $this->compileNotIn($attribute, $values, $column),
+            Method::LessThan => $this->compileComparison($attribute, '<', $values, $column),
+            Method::LessThanEqual => $this->compileComparison($attribute, '<=', $values, $column),
+            Method::GreaterThan => $this->compileComparison($attribute, '>', $values, $column),
+            Method::GreaterThanEqual => $this->compileComparison($attribute, '>=', $values, $column),
+            Method::Between => $this->compileBetween($attribute, $values, false, $column),
+            Method::NotBetween => $this->compileBetween($attribute, $values, true, $column),
+            Method::StartsWith => $this->compileLike($attribute, $values, '', '%', false, $column),
+            Method::NotStartsWith => $this->compileLike($attribute, $values, '', '%', true, $column),
+            Method::EndsWith => $this->compileLike($attribute, $values, '%', '', false, $column),
+            Method::NotEndsWith => $this->compileLike($attribute, $values, '%', '', true, $column),
+            Method::Contains => $this->compileContains($attribute, $values, $column),
+            Method::ContainsAny => $query->onArray() ? $this->compileIn($attribute, $values, $column) : $this->compileContains($attribute, $values, $column),
+            Method::ContainsAll => $this->compileContainsAll($attribute, $values, $column),
+            Method::NotContains => $this->compileNotContains($attribute, $values, $column),
+            Method::Search => throw new UnsupportedException('Full-text search is not supported by this dialect.'),
+            Method::NotSearch => throw new UnsupportedException('Full-text search is not supported by this dialect.'),
+            Method::Regex => $this->compileRegex($attribute, $values, $column),
+            Method::IsNull => $attribute . ' IS NULL',
+            Method::IsNotNull => $attribute . ' IS NOT NULL',
+            Method::And => $this->compileLogical($query, 'AND'),
+            Method::Or => $this->compileLogical($query, 'OR'),
+            Method::Having => $this->compileLogical($query, 'AND'),
+            Method::Exists => $this->compileExists($query),
+            Method::NotExists => $this->compileNotExists($query),
+            Method::Raw => $this->compileRaw($query),
+            default => throw new UnsupportedException('Unsupported filter type: ' . $method->value),
+        };
     }
 
     protected function compileHavingCondition(Query $query, string $expression): string
@@ -1597,36 +1591,54 @@ abstract class Builder implements
     }
 
     /**
-     * Append a single parameter binding.
-     *
-     * Most call sites pass just the value — the base builder produces
-     * positional `?` placeholders and only cares about ordering. Dialects
-     * that emit typed named placeholders (e.g. ClickHouse `{name:Type}`)
-     * may capture the optional `$column` hint to attach a registered type
-     * to the corresponding placeholder.
+     * Append a single parameter binding, capturing its source column at the
+     * moment of binding so dialects with typed named placeholders can
+     * resolve a registered type without a parallel array. Most call sites
+     * pass just the value; the column hint is null for literals (LIMIT,
+     * cursor) and for sub-statement bindings that have already been
+     * compiled.
      */
     protected function addBinding(mixed $value, ?string $column = null): void
     {
-        $this->bindings[] = $value;
+        $this->bindings[] = new Binding($value, $column);
     }
 
     /**
+     * Append raw values produced by a sub-statement. The values arrive as a
+     * `list<mixed>` (from `Statement::$bindings`) and are wrapped without a
+     * column hint — the originating builder already consumed its own
+     * column-aware hints when it compiled.
+     *
      * @param  array<mixed>  $bindings
      */
     protected function addBindings(array $bindings): void
     {
-        \array_push($this->bindings, ...$bindings);
+        foreach ($bindings as $value) {
+            $this->bindings[] = new Binding($value, null);
+        }
+    }
+
+    /**
+     * Return the binding values in compile order as a plain `list<mixed>`
+     * for `Statement::$bindings`. The wrapped `Binding` objects stay
+     * internal to the builder.
+     *
+     * @return list<mixed>
+     */
+    protected function getBindingValues(): array
+    {
+        return \array_map(static fn (Binding $binding): mixed => $binding->value, $this->bindings);
     }
 
     /**
      * @param  array<mixed>  $values
      */
-    protected function compileLike(string $attribute, array $values, string $prefix, string $suffix, bool $not): string
+    protected function compileLike(string $attribute, array $values, string $prefix, string $suffix, bool $not, ?string $column = null): string
     {
         /** @var string $rawVal */
         $rawVal = $values[0];
         $val = $this->escapeLikeValue($rawVal);
-        $this->addBinding($prefix . $val . $suffix);
+        $this->addBinding($prefix . $val . $suffix, $column);
         $like = $this->getLikeKeyword();
         $keyword = $not ? 'NOT ' . $like : $like;
 
@@ -1636,19 +1648,19 @@ abstract class Builder implements
     /**
      * @param  array<mixed>  $values
      */
-    protected function compileContains(string $attribute, array $values): string
+    protected function compileContains(string $attribute, array $values, ?string $column = null): string
     {
         $like = $this->getLikeKeyword();
         /** @var array<string> $values */
         if (\count($values) === 1) {
-            $this->addBinding('%' . $this->escapeLikeValue($values[0]) . '%');
+            $this->addBinding('%' . $this->escapeLikeValue($values[0]) . '%', $column);
 
             return $attribute . ' ' . $like . ' ?';
         }
 
         $parts = [];
         foreach ($values as $value) {
-            $this->addBinding('%' . $this->escapeLikeValue($value) . '%');
+            $this->addBinding('%' . $this->escapeLikeValue($value) . '%', $column);
             $parts[] = $attribute . ' ' . $like . ' ?';
         }
 
@@ -1658,13 +1670,13 @@ abstract class Builder implements
     /**
      * @param  array<mixed>  $values
      */
-    protected function compileContainsAll(string $attribute, array $values): string
+    protected function compileContainsAll(string $attribute, array $values, ?string $column = null): string
     {
         $like = $this->getLikeKeyword();
         /** @var array<string> $values */
         $parts = [];
         foreach ($values as $value) {
-            $this->addBinding('%' . $this->escapeLikeValue($value) . '%');
+            $this->addBinding('%' . $this->escapeLikeValue($value) . '%', $column);
             $parts[] = $attribute . ' ' . $like . ' ?';
         }
 
@@ -1674,19 +1686,19 @@ abstract class Builder implements
     /**
      * @param  array<mixed>  $values
      */
-    protected function compileNotContains(string $attribute, array $values): string
+    protected function compileNotContains(string $attribute, array $values, ?string $column = null): string
     {
         $like = $this->getLikeKeyword();
         /** @var array<string> $values */
         if (\count($values) === 1) {
-            $this->addBinding('%' . $this->escapeLikeValue($values[0]) . '%');
+            $this->addBinding('%' . $this->escapeLikeValue($values[0]) . '%', $column);
 
             return $attribute . ' NOT ' . $like . ' ?';
         }
 
         $parts = [];
         foreach ($values as $value) {
-            $this->addBinding('%' . $this->escapeLikeValue($value) . '%');
+            $this->addBinding('%' . $this->escapeLikeValue($value) . '%', $column);
             $parts[] = $attribute . ' NOT ' . $like . ' ?';
         }
 
@@ -1727,7 +1739,7 @@ abstract class Builder implements
     /**
      * @param  array<mixed>  $values
      */
-    protected function compileIn(string $attribute, array $values): string
+    protected function compileIn(string $attribute, array $values, ?string $column = null): string
     {
         if ($values === []) {
             return '1 = 0';
@@ -1752,7 +1764,7 @@ abstract class Builder implements
 
         $placeholders = \array_fill(0, \count($nonNulls), '?');
         foreach ($nonNulls as $value) {
-            $this->addBinding($value);
+            $this->addBinding($value, $column);
         }
         $inClause = $attribute . ' IN (' . \implode(', ', $placeholders) . ')';
 
@@ -1766,7 +1778,7 @@ abstract class Builder implements
     /**
      * @param  array<mixed>  $values
      */
-    protected function compileNotIn(string $attribute, array $values): string
+    protected function compileNotIn(string $attribute, array $values, ?string $column = null): string
     {
         if ($values === []) {
             return '1 = 1';
@@ -1790,12 +1802,12 @@ abstract class Builder implements
         }
 
         if (\count($nonNulls) === 1) {
-            $this->addBinding($nonNulls[0]);
+            $this->addBinding($nonNulls[0], $column);
             $notClause = $attribute . ' != ?';
         } else {
             $placeholders = \array_fill(0, \count($nonNulls), '?');
             foreach ($nonNulls as $value) {
-                $this->addBinding($value);
+                $this->addBinding($value, $column);
             }
             $notClause = $attribute . ' NOT IN (' . \implode(', ', $placeholders) . ')';
         }
@@ -1810,9 +1822,9 @@ abstract class Builder implements
     /**
      * @param  array<mixed>  $values
      */
-    protected function compileComparison(string $attribute, string $operator, array $values): string
+    protected function compileComparison(string $attribute, string $operator, array $values, ?string $column = null): string
     {
-        $this->addBinding($values[0]);
+        $this->addBinding($values[0], $column);
 
         return $attribute . ' ' . $operator . ' ?';
     }
@@ -1820,10 +1832,10 @@ abstract class Builder implements
     /**
      * @param  array<mixed>  $values
      */
-    private function compileBetween(string $attribute, array $values, bool $not): string
+    private function compileBetween(string $attribute, array $values, bool $not, ?string $column = null): string
     {
-        $this->addBinding($values[0]);
-        $this->addBinding($values[1]);
+        $this->addBinding($values[0], $column);
+        $this->addBinding($values[1], $column);
         $keyword = $not ? 'NOT BETWEEN' : 'BETWEEN';
 
         return $attribute . ' ' . $keyword . ' ? AND ?';

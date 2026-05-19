@@ -391,7 +391,7 @@ trait Selects
     #[\Override]
     public function getBindings(): array
     {
-        return $this->bindings;
+        return $this->getBindingValues();
     }
 
     #[\Override]

@@ -108,9 +108,9 @@ class PostgreSQL extends SQL implements
      * @param  array<mixed>  $values
      */
     #[\Override]
-    protected function compileRegex(string $attribute, array $values): string
+    protected function compileRegex(string $attribute, array $values, ?string $column = null): string
     {
-        $this->addBinding($values[0]);
+        $this->addBinding($values[0], $column);
 
         return $attribute . ' ~ ?';
     }
@@ -194,7 +194,7 @@ class PostgreSQL extends SQL implements
 
         $sql .= ' ON CONFLICT DO NOTHING';
 
-        return $this->appendReturning(new Statement($sql, $this->bindings, executor: $this->executor));
+        return $this->appendReturning(new Statement($sql, $this->getBindingValues(), executor: $this->executor));
     }
 
     #[\Override]
@@ -289,7 +289,7 @@ class PostgreSQL extends SQL implements
         $this->compileWhereClauses($parts);
         $this->mergeIntoWhereClause($parts, $extraWhere);
 
-        return new Statement(\implode(' ', $parts), $this->bindings, executor: $this->executor);
+        return new Statement(\implode(' ', $parts), $this->getBindingValues(), executor: $this->executor);
     }
 
     public function deleteUsing(string $table, string $condition, mixed ...$bindings): static
@@ -343,7 +343,7 @@ class PostgreSQL extends SQL implements
         $this->compileWhereClauses($parts);
         $this->mergeIntoWhereClause($parts, $extraWhere);
 
-        return new Statement(\implode(' ', $parts), $this->bindings, executor: $this->executor);
+        return new Statement(\implode(' ', $parts), $this->getBindingValues(), executor: $this->executor);
     }
 
     /**

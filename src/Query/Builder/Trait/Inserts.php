@@ -111,7 +111,7 @@ trait Inserts
         [$sql, $bindings] = $this->compileInsertBody();
         $this->addBindings($bindings);
 
-        return new Statement($sql, $this->bindings, executor: $this->executor);
+        return new Statement($sql, $this->getBindingValues(), executor: $this->executor);
     }
 
     #[\Override]
@@ -122,7 +122,7 @@ trait Inserts
 
         $sql = 'INSERT INTO ' . $this->quote($this->table) . ' DEFAULT VALUES';
 
-        return new Statement($sql, $this->bindings, executor: $this->executor);
+        return new Statement($sql, $this->getBindingValues(), executor: $this->executor);
     }
 
     #[\Override]
@@ -152,6 +152,6 @@ trait Inserts
 
         $this->addBindings($sourceResult->bindings);
 
-        return new Statement($sql, $this->bindings, executor: $this->executor);
+        return new Statement($sql, $this->getBindingValues(), executor: $this->executor);
     }
 }

@@ -65,9 +65,9 @@ class MySQL extends SQL implements
      * @param  array<mixed>  $values
      */
     #[\Override]
-    protected function compileRegex(string $attribute, array $values): string
+    protected function compileRegex(string $attribute, array $values, ?string $column = null): string
     {
-        $this->addBinding($values[0]);
+        $this->addBinding($values[0], $column);
 
         return $attribute . ' REGEXP ?';
     }
@@ -216,7 +216,7 @@ class MySQL extends SQL implements
         // Replace "INSERT INTO" with "INSERT IGNORE INTO"
         $sql = \preg_replace('/^INSERT INTO/', 'INSERT IGNORE INTO', $sql, 1) ?? $sql;
 
-        return new Statement($sql, $this->bindings, executor: $this->executor);
+        return new Statement($sql, $this->getBindingValues(), executor: $this->executor);
     }
 
     #[\Override]
@@ -323,7 +323,7 @@ class MySQL extends SQL implements
         $parts = [$sql];
         $this->compileWhereClauses($parts);
 
-        return new Statement(\implode(' ', $parts), $this->bindings, executor: $this->executor);
+        return new Statement(\implode(' ', $parts), $this->getBindingValues(), executor: $this->executor);
     }
 
     public function deleteJoin(string $alias, string $table, string $left, string $right): static
@@ -359,7 +359,7 @@ class MySQL extends SQL implements
         $parts = [$sql];
         $this->compileWhereClauses($parts);
 
-        return new Statement(\implode(' ', $parts), $this->bindings, executor: $this->executor);
+        return new Statement(\implode(' ', $parts), $this->getBindingValues(), executor: $this->executor);
     }
 
     #[\Override]
@@ -388,7 +388,7 @@ class MySQL extends SQL implements
         $this->bindings = [];
         $this->validateTable();
 
-        return new Statement('INSERT INTO ' . $this->quote($this->table) . ' () VALUES ()', $this->bindings, executor: $this->executor);
+        return new Statement('INSERT INTO ' . $this->quote($this->table) . ' () VALUES ()', $this->getBindingValues(), executor: $this->executor);
     }
 
     #[\Override]
