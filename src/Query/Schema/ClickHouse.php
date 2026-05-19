@@ -78,7 +78,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $type = 'Tuple(' . $inner . ')';
 
             if ($column->isNullable) {
-                $type = 'Nullable(' . $type . ')';
+                throw new UnsupportedException('Nullable(Tuple(...)) is an experimental ClickHouse feature and requires allow_experimental_nullable_tuple_type = 1. Use Tuple(Nullable(T1), Nullable(T2), ...) instead.');
             }
 
             return $type;
