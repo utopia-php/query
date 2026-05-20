@@ -2298,17 +2298,15 @@ $schema->table('events')
     ->array('meta.value', ColumnType::String)
     ->array('user_ids', ColumnType::BigInteger)->unsigned()
     ->tuple('coords', [ColumnType::Float, ColumnType::Float])
-    ->array('scores', ColumnType::String)->nullable()
     ->create();
 
 // CREATE TABLE `events` (`id` Int64,
 //   `meta.key` Array(String), `meta.value` Array(String),
 //   `user_ids` Array(UInt64),
-//   `coords` Tuple(Float64, Float64),
-//   `scores` Nullable(Array(String))) ENGINE = MergeTree() ORDER BY (`id`)
+//   `coords` Tuple(Float64, Float64)) ENGINE = MergeTree() ORDER BY (`id`)
 ```
 
-The element type runs back through the standard column-type compiler, so the parent column's `unsigned()` and `precision` flags carry through to the inner type. `Nullable(...)` wraps the whole `Array`/`Tuple`; `LowCardinality(...)` is rejected on these columns because ClickHouse only permits it on scalar types. Both methods are only available on the ClickHouse builder.
+The element type runs back through the standard column-type compiler, so the parent column's `unsigned()` and `precision` flags carry through to the inner type. `LowCardinality(...)` is rejected on these columns because ClickHouse only permits it on scalar types. `Nullable(Array(...))` is also rejected — use an empty array `[]` as the missing-value sentinel. `Nullable(Tuple(...))` is rejected for the same reason (ClickHouse marks it experimental and gates it behind `allow_experimental_nullable_tuple_type`); use `Tuple(Nullable(T1), Nullable(T2), ...)` instead. Both `array()` and `tuple()` are only available on the ClickHouse builder.
 
 **`decimal(precision, scale)`** — fixed-point numeric column for monetary or precision-sensitive values where binary floating-point error is unacceptable:
 
