@@ -1326,19 +1326,14 @@ class ClickHouseTest extends TestCase
         );
     }
 
-    public function testCreateTableArrayNullable(): void
+    public function testArrayRejectsNullableWrap(): void
     {
+        $this->expectException(UnsupportedException::class);
+
         $schema = new Schema();
-        $result = $schema->table('events')
-            ->bigInteger('id')->primary()
+        $schema->table('events')
             ->array('tags', ColumnType::String)->nullable()
             ->create();
-        $this->assertBindingCount($result);
-
-        $this->assertSame(
-            'CREATE TABLE `events` (`id` Int64, `tags` Nullable(Array(String))) ENGINE = MergeTree() ORDER BY (`id`)',
-            $result->query,
-        );
     }
 
     public function testArrayRejectsLowCardinalityWrap(): void
