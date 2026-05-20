@@ -556,4 +556,38 @@ class SQLiteTest extends TestCase
             ->string('mood')->userType('mood_type')
             ->create();
     }
+
+    public function testTinyIntegerMapsToInteger(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('t')->tinyInteger('depth')->create();
+
+        $this->assertSame('CREATE TABLE `t` (`depth` INTEGER NOT NULL)', $result->query);
+    }
+
+    public function testSmallIntegerMapsToInteger(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('t')->smallInteger('year')->create();
+
+        $this->assertSame('CREATE TABLE `t` (`year` INTEGER NOT NULL)', $result->query);
+    }
+
+    public function testDecimalMapsToNumeric(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('orders')
+            ->decimal('amount', precision: 18, scale: 3)
+            ->create();
+
+        $this->assertSame('CREATE TABLE `orders` (`amount` NUMERIC(18, 3) NOT NULL)', $result->query);
+    }
+
+    public function testUuidMapsToText(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('t')->uuid('id')->primary()->create();
+
+        $this->assertSame('CREATE TABLE `t` (`id` TEXT NOT NULL, PRIMARY KEY (`id`))', $result->query);
+    }
 }

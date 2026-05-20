@@ -18,9 +18,9 @@ class SQLite extends Table
     use Trait\InlineForeignKey;
 
     #[\Override]
-    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null): Column\SQLite
+    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null, ?int $scale = null): Column\SQLite
     {
-        return new Column\SQLite($this, $name, $type, $length, $precision);
+        return new Column\SQLite($this, $name, $type, $length, $precision, $scale);
     }
 
     #[\Override]

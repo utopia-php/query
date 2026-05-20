@@ -13,9 +13,9 @@ use Utopia\Query\Schema\Table;
 class MongoDB extends Table
 {
     #[\Override]
-    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null): Column\MongoDB
+    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null, ?int $scale = null): Column\MongoDB
     {
-        return new Column\MongoDB($this, $name, $type, $length, $precision);
+        return new Column\MongoDB($this, $name, $type, $length, $precision, $scale);
     }
 
     public function vector(string $name, int $dimensions): Column\MongoDB

@@ -1849,9 +1849,11 @@ $result = $schema->table('users')
     ->createIfNotExists();
 ```
 
-Available column types: `id`, `string`, `text`, `mediumText`, `longText`, `integer`, `bigInteger`, `serial`, `bigSerial`, `smallSerial`, `float`, `boolean`, `datetime`, `timestamp`, `json`, `binary`, `enum`, `point`, `linestring`, `polygon`, `vector` (PostgreSQL only), `timestamps`.
+Available column types: `id`, `uuid`, `string`, `text`, `mediumText`, `longText`, `tinyInteger`, `smallInteger`, `integer`, `bigInteger`, `serial`, `bigSerial`, `smallSerial`, `float`, `decimal`, `boolean`, `datetime`, `timestamp`, `json`, `binary`, `enum`, `point`, `linestring`, `polygon`, `vector` (PostgreSQL only), `timestamps`.
 
-Column modifiers: `nullable()`, `default($value)`, `unsigned()`, `unique()`, `primary()`, `autoIncrement()`, `after($column)`, `comment($text)`, `collation($collation)`, `check($expression)`, `generatedAs($expression)` + `stored()` / `virtual()`, `ttl($expression)` (ClickHouse), `userType($name)` (PostgreSQL).
+Column modifiers: `nullable()`, `default($value)`, `defaultRaw($expression)`, `unsigned()`, `unique()`, `primary()`, `autoIncrement()`, `after($column)`, `comment($text)`, `collation($collation)`, `check($expression)`, `generatedAs($expression)` + `stored()` / `virtual()`, `ttl($expression)` (ClickHouse), `userType($name)` (PostgreSQL).
+
+**Raw default expressions** — use `defaultRaw($expression)` for dialect-specific server-generated defaults that `default()` would otherwise quote as a string literal (`now()`, `CURRENT_TIMESTAMP`, `gen_random_uuid()`, `generateUUIDv4()`, `UUID()`, …). The expression is emitted verbatim and must come from a trusted source; it must not be empty or contain a semicolon. Takes precedence over `default()` when both are set.
 
 **SERIAL types** — auto-incrementing integers. PostgreSQL emits native `SERIAL` / `BIGSERIAL` / `SMALLSERIAL`; MySQL/MariaDB compile to `INT AUTO_INCREMENT` / `BIGINT AUTO_INCREMENT` / `SMALLINT AUTO_INCREMENT`; SQLite maps to `INTEGER`. ClickHouse and MongoDB throw `UnsupportedException`:
 
@@ -2270,7 +2272,102 @@ $schema->table('events')
 
 The expression is emitted verbatim and must not be empty or contain a semicolon. `SAMPLE BY` only applies to engines that take an `ORDER BY` clause (the MergeTree family); using it with `Memory`, `Log`, `TinyLog`, or `StripeLog` throws `UnsupportedException`. The `sampleBy()` method is only available on the ClickHouse builder.
 
-These OLAP-shaped modifiers live on the ClickHouse-specific `Column\ClickHouse` and `Table\ClickHouse` builders. Because the methods only exist on the dialect's own builder subclasses, calling `->lowCardinality()` or `->sampleBy()` on a `MySQL`, `PostgreSQL`, `SQLite`, or `MongoDB` builder fails at the type level, with no runtime branch needed.
+**`UInt8` / `Int8` via `tinyInteger()` and `UInt16` / `Int16` via `smallInteger()`** — small integer columns are useful for bounded enumerations, percentage values, scroll depth, and similar fields where the value range fits well below 32 bits. Storing them as `UInt8` saves 75% of the disk and memory footprint compared to the default `UInt32` produced by `integer()->unsigned()`:
+
+```php
+$schema->table('events')
+    ->bigInteger('id')->primary()
+    ->tinyInteger('scroll_depth')->unsigned() // 0–100 percentage
+    ->smallInteger('year_offset')             // signed, fits years from epoch
+    ->create();
+
+// CREATE TABLE `events` (`id` Int64, `scroll_depth` UInt8, `year_offset` Int16)
+//   ENGINE = MergeTree() ORDER BY (`id`)
+```
+
+`tinyInteger()` and `smallInteger()` are on the base builder, so the same calls map to `TINYINT` / `SMALLINT` on MySQL, `SMALLINT` on PostgreSQL (both shapes — PostgreSQL has no `TINYINT`), and `INTEGER` on SQLite.
+
+**`Array(T)` and `Tuple(...)` column types** — model multi-valued attributes (tags, labels, parallel-array nested records) and fixed-arity composites (geo points, key/value pairs) directly on the builder:
+
+```php
+use Utopia\Query\Schema\ColumnType;
+
+$schema->table('events')
+    ->bigInteger('id')->primary()
+    ->array('meta.key', ColumnType::String)
+    ->array('meta.value', ColumnType::String)
+    ->array('user_ids', ColumnType::BigInteger)->unsigned()
+    ->tuple('coords', [ColumnType::Float, ColumnType::Float])
+    ->array('scores', ColumnType::String)->nullable()
+    ->create();
+
+// CREATE TABLE `events` (`id` Int64,
+//   `meta.key` Array(String), `meta.value` Array(String),
+//   `user_ids` Array(UInt64),
+//   `coords` Tuple(Float64, Float64),
+//   `scores` Nullable(Array(String))) ENGINE = MergeTree() ORDER BY (`id`)
+```
+
+The element type runs back through the standard column-type compiler, so the parent column's `unsigned()` and `precision` flags carry through to the inner type. `Nullable(...)` wraps the whole `Array`/`Tuple`; `LowCardinality(...)` is rejected on these columns because ClickHouse only permits it on scalar types. Both methods are only available on the ClickHouse builder.
+
+**`decimal(precision, scale)`** — fixed-point numeric column for monetary or precision-sensitive values where binary floating-point error is unacceptable:
+
+```php
+$schema->table('orders')
+    ->bigInteger('id')->primary()
+    ->decimal('amount', precision: 18, scale: 3)
+    ->decimal('rate', precision: 5, scale: 4)->nullable()
+    ->create();
+
+// CREATE TABLE `orders` (`id` Int64,
+//   `amount` Decimal(18, 3),
+//   `rate` Nullable(Decimal(5, 4))) ENGINE = MergeTree() ORDER BY (`id`)
+```
+
+`decimal()` is on the base builder: ClickHouse emits `Decimal(P, S)`, MySQL and PostgreSQL emit `DECIMAL(P, S)`, SQLite emits `NUMERIC(P, S)`, and MongoDB maps to the `decimal` BSON type. Scale must not be negative or exceed precision.
+
+**`UUID` column type with `defaultRaw()`** — UUIDs are a first-class, fixed-width identifier type in ClickHouse and PostgreSQL, and a 36-character string elsewhere. Pair with `defaultRaw()` to attach a server-generated default expression that the standard `default()` would otherwise quote as a literal:
+
+```php
+$schema->table('events')
+    ->uuid('event_id')->defaultRaw('generateUUIDv4()')->primary()
+    ->datetime('ts', 3)
+    ->create();
+
+// CREATE TABLE `events` (`event_id` UUID DEFAULT generateUUIDv4(), `ts` DateTime64(3))
+//   ENGINE = MergeTree() ORDER BY (`event_id`)
+```
+
+`uuid()` compiles to the native `UUID` type on ClickHouse and PostgreSQL, `CHAR(36)` on MySQL, `TEXT` on SQLite, and the `string` BSON type on MongoDB. `defaultRaw(string)` is on the base `Column` and emits the expression verbatim — use for `generateUUIDv4()` (ClickHouse), `gen_random_uuid()` (PostgreSQL), `UUID()` (MySQL), `now()`, `CURRENT_TIMESTAMP`, and similar dialect-specific server-generated defaults. The expression must come from a trusted source; it must not be empty or contain a semicolon. `defaultRaw()` takes precedence over `default()` when both are set.
+
+**Raw expressions in `ORDER BY`** — MergeTree `ORDER BY` clauses routinely include scalar function calls (`toDate(ts)`, `cityHash64(...)`, `intHash32(user_id)`) to control sparse-index cardinality. `orderBy(array)` restricts each entry to a plain identifier; use `orderByRaw(string)` to emit the full tuple verbatim:
+
+```php
+$schema->table('events')
+    ->string('tenant')
+    ->bigInteger('id')
+    ->datetime('ts')
+    ->orderByRaw('(`tenant`, toDate(`ts`), `id`)')
+    ->create();
+
+// CREATE TABLE `events` (`tenant` String, `id` Int64, `ts` DateTime)
+//   ENGINE = MergeTree() ORDER BY (`tenant`, toDate(`ts`), `id`)
+```
+
+The expression is emitted verbatim and must come from a trusted source. `orderByRaw()` takes precedence over `orderBy()` when both are set. Mirrors the existing `partitionBy(string)` convention. Only available on the ClickHouse builder.
+
+**`rawColumn()` passthrough** — `Table::rawColumn(string $definition)` is the standard escape hatch for column types the builder does not yet model. It is honoured on every dialect, including ClickHouse:
+
+```php
+$schema->table('events')
+    ->bigInteger('id')->primary()
+    ->rawColumn('`payload` JSON CODEC(ZSTD(3))')
+    ->create();
+
+// CREATE TABLE `events` (`id` Int64, `payload` JSON CODEC(ZSTD(3))) ...
+```
+
+These OLAP-shaped modifiers live on the ClickHouse-specific `Column\ClickHouse` and `Table\ClickHouse` builders. Because the methods only exist on the dialect's own builder subclasses, calling `->lowCardinality()`, `->sampleBy()`, `->array()`, `->tuple()`, or `->orderByRaw()` on a `MySQL`, `PostgreSQL`, `SQLite`, or `MongoDB` builder fails at the type level, with no runtime branch needed.
 
 ### SQLite Schema
 

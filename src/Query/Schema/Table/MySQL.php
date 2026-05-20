@@ -20,9 +20,9 @@ class MySQL extends Table
     use Trait\StandardPartitioning;
 
     #[\Override]
-    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null): Column\MySQL
+    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null, ?int $scale = null): Column\MySQL
     {
-        return new Column\MySQL($this, $name, $type, $length, $precision);
+        return new Column\MySQL($this, $name, $type, $length, $precision, $scale);
     }
 
     #[\Override]

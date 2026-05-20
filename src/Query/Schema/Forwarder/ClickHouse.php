@@ -4,6 +4,7 @@ namespace Utopia\Query\Schema\Forwarder;
 
 use Utopia\Query\Schema\ClickHouse\Engine;
 use Utopia\Query\Schema\Column;
+use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\Table;
 
 /**
@@ -23,6 +24,19 @@ trait ClickHouse
         return $this->table->fixedString($name, $length);
     }
 
+    public function array(string $name, ColumnType $element): Column\ClickHouse
+    {
+        return $this->table->array($name, $element);
+    }
+
+    /**
+     * @param  list<ColumnType>  $elements
+     */
+    public function tuple(string $name, array $elements): Column\ClickHouse
+    {
+        return $this->table->tuple($name, $elements);
+    }
+
     public function engine(Engine $engine, string ...$args): Table\ClickHouse
     {
         return $this->table->engine($engine, ...$args);
@@ -34,6 +48,11 @@ trait ClickHouse
     public function orderBy(array $columns): Table\ClickHouse
     {
         return $this->table->orderBy($columns);
+    }
+
+    public function orderByRaw(string $expression): Table\ClickHouse
+    {
+        return $this->table->orderByRaw($expression);
     }
 
     /**

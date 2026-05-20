@@ -25,17 +25,21 @@ class SQLite extends SQL implements Views
         return match ($column->type) {
             ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'VARCHAR(' . ($column->length ?? 255) . ')',
             ColumnType::Text, ColumnType::MediumText, ColumnType::LongText => 'TEXT',
+            ColumnType::TinyInteger, ColumnType::SmallInteger,
             ColumnType::Integer, ColumnType::BigInteger, ColumnType::Id,
             ColumnType::Serial, ColumnType::BigSerial, ColumnType::SmallSerial => 'INTEGER',
             ColumnType::Float, ColumnType::Double => 'REAL',
+            ColumnType::Decimal => 'NUMERIC(' . ($column->precision ?? 10) . ', ' . ($column->scale ?? 0) . ')',
             ColumnType::Boolean => 'INTEGER',
             ColumnType::Datetime, ColumnType::Timestamp => 'TEXT',
             ColumnType::Json, ColumnType::Object => 'TEXT',
             ColumnType::Binary => 'BLOB',
             ColumnType::Enum => 'TEXT',
             ColumnType::Point, ColumnType::Linestring, ColumnType::Polygon => 'TEXT',
+            ColumnType::Uuid => 'TEXT',
             ColumnType::Uuid7 => 'VARCHAR(36)',
             ColumnType::Vector => throw new UnsupportedException('Vector type is not supported in SQLite.'),
+            ColumnType::Array, ColumnType::Tuple => throw new UnsupportedException('Array/Tuple column types are not supported in SQLite.'),
         };
     }
 
@@ -68,7 +72,9 @@ class SQLite extends SQL implements Views
             $parts[] = 'NOT NULL';
         }
 
-        if ($column->hasDefault) {
+        if ($column->defaultRaw !== null) {
+            $parts[] = 'DEFAULT ' . $column->defaultRaw;
+        } elseif ($column->hasDefault) {
             $parts[] = 'DEFAULT ' . $this->compileDefaultValue($column->default);
         }
 
