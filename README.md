@@ -1520,6 +1520,47 @@ $result->namedBindings;
 
 Unregistered columns fall through to value-based inference: `int → Int64`, `float → Float64`, `bool → UInt8`, `null → Nullable(String)`, `DateTimeInterface → DateTime64(3)`, everything else → `String`. Register types via `withParamType($column, $type)` or `withParamTypes($map)` whenever the inference rule doesn't match the column's ClickHouse declaration. The positional `$bindings` array is still exposed on the resulting `Statement` for callers that prefer it.
 
+**Bulk insert** — emit the canonical `INSERT INTO <table> FORMAT <name>` envelope together with the serialized row payload in a single typed call. The returned `FormattedInsertStatement` exposes `->query` (the envelope) and `->body` (the format-specific payload) so the caller can ship both to ClickHouse's HTTP interface without hand-assembling either side:
+
+```php
+use Utopia\Query\Builder\ClickHouse as Builder;
+use Utopia\Query\Builder\ClickHouse\Format;
+
+$statement = (new Builder())
+    ->into('events')
+    ->bulkInsert(Format::JSONEachRow, [
+        ['id' => 1, 'event' => 'login',  'time' => '2024-01-01 00:00:00'],
+        ['id' => 2, 'event' => 'logout', 'time' => '2024-01-01 00:00:05'],
+    ]);
+
+// $statement->query
+//   INSERT INTO `events` (`id`, `event`, `time`) FORMAT JSONEachRow
+//
+// $statement->body
+//   {"id":1,"event":"login","time":"2024-01-01 00:00:00"}
+//   {"id":2,"event":"logout","time":"2024-01-01 00:00:05"}
+```
+
+Ship the result over the HTTP interface by passing `$statement->query` as the `?query=` parameter and `$statement->body` as the POST body. Columns are derived from the first row's keys; pass an explicit third argument to pin the order or fill missing keys with `null`:
+
+```php
+$statement = (new Builder())
+    ->into('events')
+    ->bulkInsert(Format::JSONEachRow, $rows, ['id', 'event', 'time']);
+```
+
+The `Format` enum currently supports `Format::JSONEachRow` and `Format::TabSeparated`. JSONEachRow rows are encoded with `JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE` (slashes and non-ASCII are preserved verbatim); TabSeparated escapes `\\`, `\t`, `\n`, `\r` and emits `\N` for `null`. An empty row iterable produces an empty body, which ClickHouse accepts as a zero-row ingest. The iterable is consumed eagerly — pass a generator if you want to defer row construction, but the serialized body is materialized in full before the statement is returned.
+
+For envelopes only (no body — e.g. when streaming the payload from elsewhere), the lower-level `insertFormat()` setter remains available and pairs with `insert()` as before:
+
+```php
+$statement = (new Builder())
+    ->into('events')
+    ->insertFormat('JSONEachRow', ['id', 'event', 'time'])
+    ->insert();
+// $statement->body is null; assemble the payload separately.
+```
+
 **UPDATE** — compiles to `ALTER TABLE ... UPDATE` with mandatory WHERE:
 
 ```php

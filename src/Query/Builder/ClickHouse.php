@@ -3,6 +3,7 @@
 namespace Utopia\Query\Builder;
 
 use Utopia\Query\Builder as BaseBuilder;
+use Utopia\Query\Builder\ClickHouse\Format;
 use Utopia\Query\Builder\ClickHouse\FormattedInsertStatement;
 use Utopia\Query\Builder\Feature\BitwiseAggregates;
 use Utopia\Query\Builder\Feature\ClickHouse\ApproximateAggregates;
@@ -161,6 +162,72 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         $this->insertFormatColumns = $columns;
 
         return $this;
+    }
+
+    /**
+     * Build a single statement that carries both the `INSERT INTO <table>
+     * FORMAT <name>` envelope and the serialized row payload for a
+     * ClickHouse bulk ingest. Returns a `FormattedInsertStatement` whose
+     * `->query` is the envelope and whose `->body` is the formatted
+     * payload to send as the HTTP request body.
+     *
+     * The target table must be set via `into()` first. Columns are derived
+     * from the keys of the first row when `$columns` is omitted; pass
+     * `$columns` explicitly to pin the order when row shapes vary or when
+     * an empty iterable is passed. An empty iterable produces an empty
+     * body — ClickHouse accepts this as a zero-row ingest.
+     *
+     * @param  iterable<array<string, mixed>>  $rows
+     * @param  list<string>  $columns  Optional explicit column ordering.
+     */
+    public function bulkInsert(Format $format, iterable $rows, array $columns = []): FormattedInsertStatement
+    {
+        $this->bindings = [];
+        $this->validateTable();
+
+        $materialized = [];
+        foreach ($rows as $row) {
+            /** @phpstan-ignore function.alreadyNarrowedType */
+            if (!\is_array($row)) {
+                throw new ValidationException('bulkInsert() rows must be associative arrays.');
+            }
+            $materialized[] = $row;
+        }
+
+        if (empty($columns) && !empty($materialized)) {
+            $columns = \array_keys($materialized[0]);
+        }
+
+        foreach ($columns as $col) {
+            if ($col === '') {
+                throw new ValidationException('Column names for bulkInsert() must be non-empty strings.');
+            }
+        }
+
+        $wrappedColumns = empty($columns)
+            ? ''
+            : ' (' . \implode(', ', \array_map(
+                fn (string $col): string => $this->resolveAndWrap($col),
+                $columns
+            )) . ')';
+
+        $sql = 'INSERT INTO ' . $this->quote($this->table)
+            . $wrappedColumns
+            . ' FORMAT ' . $format->value;
+
+        $body = $format->serialize($materialized, empty($columns) ? null : $columns);
+
+        $this->insertFormat = $format->value;
+        $this->insertFormatColumns = $columns;
+
+        return new FormattedInsertStatement(
+            $sql,
+            [],
+            $columns,
+            $format->value,
+            $body,
+            executor: $this->executor,
+        );
     }
 
     /**
