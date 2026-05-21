@@ -112,14 +112,20 @@ class InsertFormatTest extends TestCase
             ->insert();
     }
 
-    public function testInsertFormatRequiresColumns(): void
+    public function testInsertFormatWithoutColumnsEmitsBareEnvelope(): void
     {
-        $this->expectException(ValidationException::class);
-
-        (new Builder())
+        $result = (new Builder())
             ->into('events')
             ->insertFormat('JSONEachRow')
             ->insert();
+
+        $this->assertInstanceOf(FormattedInsertStatement::class, $result);
+        $this->assertSame(
+            'INSERT INTO `events` FORMAT JSONEachRow',
+            $result->query
+        );
+        $this->assertSame([], $result->columns);
+        $this->assertNull($result->body);
     }
 
     public function testInsertWithoutFormatStillEmitsValues(): void

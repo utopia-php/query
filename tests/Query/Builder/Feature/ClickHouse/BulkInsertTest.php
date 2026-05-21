@@ -305,4 +305,51 @@ class BulkInsertTest extends TestCase
         $this->assertInstanceOf(FormattedInsertStatement::class, $result);
         $this->assertNull($result->body);
     }
+
+    public function testBulkInsertAndInsertFormatEmitIdenticalEnvelopeForSameInputs(): void
+    {
+        $bulk = (new Builder())
+            ->into('events')
+            ->bulkInsert(Format::JSONEachRow, [
+                ['id' => 1, 'event' => 'login'],
+            ]);
+
+        $envelope = (new Builder())
+            ->into('events')
+            ->insertFormat('JSONEachRow', ['id', 'event'])
+            ->insert();
+
+        $this->assertInstanceOf(FormattedInsertStatement::class, $envelope);
+        $this->assertSame($bulk->query, $envelope->query);
+        $this->assertSame($bulk->columns, $envelope->columns);
+        $this->assertSame($bulk->format, $envelope->format);
+    }
+
+    public function testInsertFormatEnvelopeQuotesTableWithLiteralDot(): void
+    {
+        $envelope = (new Builder())
+            ->into('my.namespace')
+            ->insertFormat('JSONEachRow', ['id'])
+            ->insert();
+
+        $bulk = (new Builder())
+            ->into('my.namespace')
+            ->bulkInsert(Format::JSONEachRow, [['id' => 1]]);
+
+        $this->assertSame(
+            'INSERT INTO `my`.`namespace` (`id`) FORMAT JSONEachRow',
+            $envelope->query,
+        );
+        $this->assertSame($envelope->query, $bulk->query);
+    }
+
+    public function testInsertFormatRejectsEmptyColumnNameMatchingBulkInsert(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new Builder())
+            ->into('events')
+            ->insertFormat('JSONEachRow', ['id', ''])
+            ->insert();
+    }
 }

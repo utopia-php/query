@@ -1551,7 +1551,7 @@ $statement = (new Builder())
 
 The `Format` enum currently supports `Format::JSONEachRow` and `Format::TabSeparated`. JSONEachRow rows are encoded with `JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE` (slashes and non-ASCII are preserved verbatim); TabSeparated escapes `\\`, `\t`, `\n`, `\r` and emits `\N` for `null`. An empty row iterable produces an empty body, which ClickHouse accepts as a zero-row ingest. The iterable is consumed eagerly — pass a generator if you want to defer row construction, but the serialized body is materialized in full before the statement is returned.
 
-For envelopes only (no body — e.g. when streaming the payload from elsewhere), the lower-level `insertFormat()` setter remains available and pairs with `insert()` as before:
+`bulkInsert()` is the recommended entry point for FORMAT-based ingest — it covers the full envelope + body contract in one typed call. The lower-level `insertFormat()` setter pairs with `insert()` for the envelope-only path (returns `body = null`) and is retained for callers that stream the payload separately. Both paths share the same envelope emitter, so the resulting `query` is identical for equivalent inputs:
 
 ```php
 $statement = (new Builder())
