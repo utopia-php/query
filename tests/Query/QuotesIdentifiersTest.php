@@ -4,6 +4,7 @@ namespace Tests\Query;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\Fixture\QuotesIdentifiersHarness;
+use Utopia\Query\Exception\ValidationException;
 
 final class QuotesIdentifiersTest extends TestCase
 {
@@ -52,5 +53,36 @@ final class QuotesIdentifiersTest extends TestCase
     public function testStarOnlyAllowedBareInFinalSegment(): void
     {
         $this->assertSame('`a`.`b`.*', $this->wrapper->quote('a.b.*'));
+    }
+
+    public function testQuoteLiteralPreservesDot(): void
+    {
+        $this->assertSame('`meta.key`', $this->wrapper->quoteLiteral('meta.key'));
+    }
+
+    public function testQuoteLiteralWrapsPlainIdentifier(): void
+    {
+        $this->assertSame('`plain_name`', $this->wrapper->quoteLiteral('plain_name'));
+    }
+
+    public function testQuoteLiteralDoublesWrapChar(): void
+    {
+        $this->assertSame('```weird```', $this->wrapper->quoteLiteral('`weird`'));
+    }
+
+    public function testQuoteLiteralPreservesBareStar(): void
+    {
+        $this->assertSame('*', $this->wrapper->quoteLiteral('*'));
+    }
+
+    public function testQuoteLiteralTreatsTrailingStarAsLiteral(): void
+    {
+        $this->assertSame('`users.*`', $this->wrapper->quoteLiteral('users.*'));
+    }
+
+    public function testQuoteLiteralRejectsControlCharacter(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->wrapper->quoteLiteral("contains\x00null");
     }
 }

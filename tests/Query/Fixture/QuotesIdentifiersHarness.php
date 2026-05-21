@@ -11,5 +11,6 @@ final class QuotesIdentifiersHarness
 {
     use QuotesIdentifiers {
         quote as public;
+        quoteLiteral as public;
     }
 }

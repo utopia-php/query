@@ -26,6 +26,8 @@ abstract class Schema
 
     abstract protected function quote(string $identifier): string;
 
+    abstract protected function quoteLiteral(string $identifier): string;
+
     abstract protected function compileColumnType(Column $column): string;
 
     abstract protected function compileAutoIncrement(): string;
