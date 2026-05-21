@@ -352,4 +352,48 @@ class BulkInsertTest extends TestCase
             ->insertFormat('JSONEachRow', ['id', ''])
             ->insert();
     }
+
+    public function testBulkInsertDoesNotPersistFormatStateOnBuilder(): void
+    {
+        $builder = (new Builder())
+            ->into('events');
+
+        $builder->bulkInsert(Format::JSONEachRow, [['id' => 1]]);
+
+        $regular = $builder
+            ->into('users')
+            ->set(['name' => 'alice'])
+            ->insert();
+
+        $this->assertNotInstanceOf(FormattedInsertStatement::class, $regular);
+        $this->assertStringNotContainsString('FORMAT', $regular->query);
+        $this->assertSame(
+            'INSERT INTO `users` (`name`) VALUES (?)',
+            $regular->query,
+        );
+        $this->assertSame(['alice'], $regular->bindings);
+    }
+
+    public function testFormatSerializeExplicitColumnsPinOrderingAcrossInconsistentRows(): void
+    {
+        $rows = [
+            ['id' => 1, 'event' => 'login'],
+            ['event' => 'view', 'id' => 2],
+            ['id' => 3],
+        ];
+
+        $tabSeparated = Format::TabSeparated->serialize($rows, ['id', 'event']);
+        $this->assertSame(
+            "1\tlogin\n2\tview\n3\t\\N",
+            $tabSeparated,
+        );
+
+        $jsonEachRow = Format::JSONEachRow->serialize($rows, ['id', 'event']);
+        $this->assertSame(
+            '{"id":1,"event":"login"}' . "\n"
+            . '{"id":2,"event":"view"}' . "\n"
+            . '{"id":3,"event":null}',
+            $jsonEachRow,
+        );
+    }
 }

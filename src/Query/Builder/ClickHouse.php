@@ -176,9 +176,6 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
 
         $body = $format->serialize($materialized, empty($columns) ? null : $columns);
 
-        $this->insertFormat = $format->value;
-        $this->insertFormatColumns = $columns;
-
         return new FormattedInsertStatement(
             $sql,
             [],

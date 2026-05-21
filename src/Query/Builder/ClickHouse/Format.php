@@ -19,12 +19,27 @@ enum Format: string
 
     /**
      * Serialize an iterable of associative rows into the body payload for
-     * this format. Columns are derived from the first row; subsequent rows
-     * use the same column ordering. An empty iterable yields an empty
-     * string — ClickHouse accepts an empty body as a zero-row insert.
+     * this format. An empty iterable yields an empty string — ClickHouse
+     * accepts an empty body as a zero-row insert.
+     *
+     * When `$columns` is null the column ordering is derived from the keys
+     * of the first row encountered. Subsequent rows are serialized against
+     * whatever shape they themselves carry — there is no cross-row
+     * consistency check. The implications differ per format:
+     *
+     * - For positional formats (e.g. {@see Format::TabSeparated}) values
+     *   are emitted in row-key order. If later rows reorder their keys the
+     *   columns silently misalign with the envelope's column list. Pass
+     *   `$columns` explicitly whenever row shapes are not guaranteed
+     *   identical, or whenever the format is positional.
+     * - For named formats (e.g. {@see Format::JSONEachRow}) key ordering
+     *   does not affect correctness because each value is paired with its
+     *   key in the wire format. `$columns` still acts as a projection
+     *   filter: rows missing a listed column receive `null`, and row keys
+     *   outside the list are dropped.
      *
      * @param  iterable<array<string, mixed>>  $rows
-     * @param  list<string>|null  $columns  Optional explicit column ordering. When null, derived from the first row.
+     * @param  list<string>|null  $columns  Optional explicit column ordering. When null, derived from the keys of the first row.
      */
     public function serialize(iterable $rows, ?array $columns = null): string
     {
