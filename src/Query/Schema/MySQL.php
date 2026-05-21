@@ -101,7 +101,7 @@ class MySQL extends SQL implements
     {
         return new Statement(
             'ALTER TABLE ' . $this->quote($table)
-            . ' CHANGE COLUMN ' . $this->quote($oldName) . ' ' . $this->quote($newName) . ' ' . $type,
+            . ' CHANGE COLUMN ' . $this->quoteLiteral($oldName) . ' ' . $this->quoteLiteral($newName) . ' ' . $type,
             [],
             executor: $this->executor,
         );
@@ -114,7 +114,7 @@ class MySQL extends SQL implements
     {
         return new Statement(
             'ALTER TABLE ' . $this->quote($table)
-            . ' MODIFY ' . $this->quote($name) . ' ' . $type,
+            . ' MODIFY ' . $this->quoteLiteral($name) . ' ' . $type,
             [],
             executor: $this->executor,
         );

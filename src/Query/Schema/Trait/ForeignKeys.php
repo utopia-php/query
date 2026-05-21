@@ -18,9 +18,9 @@ trait ForeignKeys
     ): Statement {
         $sql = 'ALTER TABLE ' . $this->quote($table)
             . ' ADD CONSTRAINT ' . $this->quote($name)
-            . ' FOREIGN KEY (' . $this->quote($column) . ')'
+            . ' FOREIGN KEY (' . $this->quoteLiteral($column) . ')'
             . ' REFERENCES ' . $this->quote($refTable)
-            . ' (' . $this->quote($refColumn) . ')';
+            . ' (' . $this->quoteLiteral($refColumn) . ')';
 
         if ($onDelete !== null) {
             $sql .= ' ON DELETE ' . $onDelete->toSql();

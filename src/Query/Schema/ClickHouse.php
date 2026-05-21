@@ -144,7 +144,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         }
 
         $parts = [
-            $this->quote($column->name),
+            $this->quoteLiteral($column->name),
             $this->compileColumnType($column),
         ];
 
@@ -190,12 +190,12 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         }
 
         foreach ($table->renameColumns as $rename) {
-            $alterations[] = 'RENAME COLUMN ' . $this->quote($rename->from)
-                . ' TO ' . $this->quote($rename->to);
+            $alterations[] = 'RENAME COLUMN ' . $this->quoteLiteral($rename->from)
+                . ' TO ' . $this->quoteLiteral($rename->to);
         }
 
         foreach ($table->dropColumns as $col) {
-            $alterations[] = 'DROP COLUMN ' . $this->quote($col);
+            $alterations[] = 'DROP COLUMN ' . $this->quoteLiteral($col);
         }
 
         foreach ($table->dropIndexes as $name) {
@@ -246,7 +246,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $columnDefs[] = $def;
 
             if ($column->isPrimary) {
-                $primaryKeys[] = $this->quote($column->name);
+                $primaryKeys[] = $this->quoteLiteral($column->name);
             }
         }
 
@@ -255,7 +255,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         }
 
         if (empty($primaryKeys) && ! empty($table->compositePrimaryKey)) {
-            $primaryKeys = \array_map(fn (string $c): string => $this->quote($c), $table->compositePrimaryKey);
+            $primaryKeys = \array_map(fn (string $c): string => $this->quoteLiteral($c), $table->compositePrimaryKey);
         }
 
         foreach ($table->rawColumnDefs as $rawDef) {
@@ -294,7 +294,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
                 $sql .= ' ORDER BY ' . $table->orderByRaw;
             } else {
                 $orderBy = ! empty($table->orderBy)
-                    ? \array_map(fn (string $c): string => $this->quote($c), $table->orderBy)
+                    ? \array_map(fn (string $c): string => $this->quoteLiteral($c), $table->orderBy)
                     : $primaryKeys;
 
                 $sql .= ! empty($orderBy)
@@ -337,7 +337,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
      */
     private function compileSkipIndex(Index $index): string
     {
-        $cols = \array_map(fn (string $c): string => $this->quote($c), $index->columns);
+        $cols = \array_map(fn (string $c): string => $this->quoteLiteral($c), $index->columns);
         $expr = \count($cols) === 1 ? $cols[0] : '(' . \implode(', ', $cols) . ')';
 
         if ($index->algorithm === null) {
@@ -383,16 +383,16 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             Engine::AggregatingMergeTree => $engine->value . '()',
 
             Engine::ReplacingMergeTree => $engine->value . '('
-                . (isset($args[0]) ? $this->quote($args[0]) : '')
+                . (isset($args[0]) ? $this->quoteLiteral($args[0]) : '')
                 . ')',
 
             Engine::SummingMergeTree => $engine->value . '('
                 . (empty($args)
                     ? ''
-                    : \implode(', ', \array_map(fn (string $c): string => $this->quote($c), $args)))
+                    : \implode(', ', \array_map(fn (string $c): string => $this->quoteLiteral($c), $args)))
                 . ')',
 
-            Engine::CollapsingMergeTree => $engine->value . '(' . $this->quote($args[0]) . ')',
+            Engine::CollapsingMergeTree => $engine->value . '(' . $this->quoteLiteral($args[0]) . ')',
 
             Engine::ReplicatedMergeTree => $engine->value
                 . "('" . \str_replace("'", "''", $args[0]) . "'"
@@ -470,7 +470,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
     public function commentOnColumn(string $table, string $column, string $comment): Statement
     {
         return new Statement(
-            'ALTER TABLE ' . $this->quote($table) . ' COMMENT COLUMN ' . $this->quote($column) . " '" . str_replace(['\\', "'"], ['\\\\', "''"], $comment) . "'",
+            'ALTER TABLE ' . $this->quote($table) . ' COMMENT COLUMN ' . $this->quoteLiteral($column) . " '" . str_replace(['\\', "'"], ['\\\\', "''"], $comment) . "'",
             [],
             executor: $this->executor,
         );

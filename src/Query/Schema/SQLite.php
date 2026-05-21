@@ -62,7 +62,7 @@ class SQLite extends SQL implements Views
         }
 
         $parts = [
-            $this->quote($column->name),
+            $this->quoteLiteral($column->name),
             $this->compileColumnType($column),
             'PRIMARY KEY',
             $this->compileAutoIncrement(),

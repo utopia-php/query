@@ -1326,6 +1326,22 @@ class ClickHouseTest extends TestCase
         );
     }
 
+    public function testCreateTableArrayWithDottedColumnName(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->array('meta.key', ColumnType::String)
+            ->array('meta.value', ColumnType::String)
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `meta.key` Array(String), `meta.value` Array(String)) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
     public function testCreateTableArrayUnsignedInteger(): void
     {
         $schema = new Schema();
