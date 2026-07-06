@@ -2217,10 +2217,10 @@ $schema->table('events')
     ->create();
 
 // CREATE TABLE `events` (`id` Int64, `status` LowCardinality(String),
-//   `country` Nullable(LowCardinality(String))) ENGINE = MergeTree() ORDER BY (`id`)
+//   `country` LowCardinality(Nullable(String))) ENGINE = MergeTree() ORDER BY (`id`)
 ```
 
-`Nullable` is applied outside `LowCardinality` to match ClickHouse's required wrapping order. The `lowCardinality()` method is only available on the ClickHouse builder — callers on other dialects (`MySQL`, `PostgreSQL`, `SQLite`, `MongoDB`) cannot reach this method at all.
+`Nullable` is applied inside `LowCardinality` to match ClickHouse's required wrapping order. The `lowCardinality()` method is only available on the ClickHouse builder — callers on other dialects (`MySQL`, `PostgreSQL`, `SQLite`, `MongoDB`) cannot reach this method at all.
 
 **FixedString(N)** — fixed-length string column. Use for ISO codes, hash digests, and other values whose byte length is known and constant:
 

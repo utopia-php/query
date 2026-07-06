@@ -114,8 +114,8 @@ class ClickHouse extends Column
      *
      * Suitable for string columns with a small number of distinct values
      * (status enums, type discriminators, country codes). `Nullable` is
-     * applied outside `LowCardinality` to match ClickHouse's required
-     * wrapping order: `Nullable(LowCardinality(String))`.
+     * applied inside `LowCardinality` to match ClickHouse's required
+     * wrapping order: `LowCardinality(Nullable(String))`.
      */
     public function lowCardinality(): static
     {

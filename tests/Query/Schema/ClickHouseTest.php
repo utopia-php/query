@@ -999,7 +999,7 @@ class ClickHouseTest extends TestCase
         );
     }
 
-    public function testCreateTableLowCardinalityNullableWrapsInBothOrder(): void
+    public function testCreateTableLowCardinalityNullableWrapsLowCardinalityOutermost(): void
     {
         $schema = new Schema();
         $result = $schema->table('events')
@@ -1009,7 +1009,22 @@ class ClickHouseTest extends TestCase
         $this->assertBindingCount($result);
 
         $this->assertSame(
-            'CREATE TABLE `events` (`id` Int64, `status` Nullable(LowCardinality(String))) ENGINE = MergeTree() ORDER BY (`id`)',
+            'CREATE TABLE `events` (`id` Int64, `status` LowCardinality(Nullable(String))) ENGINE = MergeTree() ORDER BY (`id`)',
+            $result->query,
+        );
+    }
+
+    public function testCreateTableLowCardinalityNullableFixedStringWrapsLowCardinalityOutermost(): void
+    {
+        $schema = new Schema();
+        $result = $schema->table('events')
+            ->bigInteger('id')->primary()
+            ->fixedString('code', 2)->lowCardinality()->nullable()
+            ->create();
+        $this->assertBindingCount($result);
+
+        $this->assertSame(
+            'CREATE TABLE `events` (`id` Int64, `code` LowCardinality(Nullable(FixedString(2)))) ENGINE = MergeTree() ORDER BY (`id`)',
             $result->query,
         );
     }

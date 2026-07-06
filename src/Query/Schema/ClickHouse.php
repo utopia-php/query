@@ -37,12 +37,12 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
         if ($column instanceof Column\ClickHouse && $column->isFixedString()) {
             $type = 'FixedString(' . $column->fixedStringLength . ')';
 
-            if ($column->isLowCardinality) {
-                $type = 'LowCardinality(' . $type . ')';
-            }
-
             if ($column->isNullable) {
                 $type = 'Nullable(' . $type . ')';
+            }
+
+            if ($column->isLowCardinality) {
+                $type = 'LowCardinality(' . $type . ')';
             }
 
             return $type;
@@ -112,12 +112,12 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             ),
         };
 
-        if ($column instanceof Column\ClickHouse && $column->isLowCardinality) {
-            $type = 'LowCardinality(' . $type . ')';
-        }
-
         if ($column->isNullable) {
             $type = 'Nullable(' . $type . ')';
+        }
+
+        if ($column instanceof Column\ClickHouse && $column->isLowCardinality) {
+            $type = 'LowCardinality(' . $type . ')';
         }
 
         return $type;
