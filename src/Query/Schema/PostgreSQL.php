@@ -99,7 +99,7 @@ class PostgreSQL extends SQL implements
     protected function compileColumnDefinition(Column $column): string
     {
         $parts = [
-            $this->quote($column->name),
+            $this->quoteLiteral($column->name),
             $this->compileColumnType($column),
         ];
 
@@ -149,7 +149,7 @@ class PostgreSQL extends SQL implements
         // PostgreSQL enum emulation via CHECK constraint
         if ($column->type === ColumnType::Enum && ! empty($column->enumValues)) {
             $values = \array_map(fn (string $v): string => "'" . \str_replace(['\\', "'"], ['\\\\', "''"], $v) . "'", $column->enumValues);
-            $parts[] = 'CHECK (' . $this->quote($column->name) . ' IN (' . \implode(', ', $values) . '))';
+            $parts[] = 'CHECK (' . $this->quoteLiteral($column->name) . ' IN (' . \implode(', ', $values) . '))';
         }
 
         if ($column->checkExpression !== null) {
@@ -352,7 +352,7 @@ class PostgreSQL extends SQL implements
         foreach ($table->columns as $column) {
             $keyword = $column->isModify ? 'ALTER COLUMN' : 'ADD COLUMN';
             if ($column->isModify) {
-                $def = $keyword . ' ' . $this->quote($column->name)
+                $def = $keyword . ' ' . $this->quoteLiteral($column->name)
                     . ' TYPE ' . $this->compileColumnType($column);
             } else {
                 $def = $keyword . ' ' . $this->compileColumnDefinition($column);
@@ -361,18 +361,18 @@ class PostgreSQL extends SQL implements
         }
 
         foreach ($table->renameColumns as $rename) {
-            $alterations[] = 'RENAME COLUMN ' . $this->quote($rename->from)
-                . ' TO ' . $this->quote($rename->to);
+            $alterations[] = 'RENAME COLUMN ' . $this->quoteLiteral($rename->from)
+                . ' TO ' . $this->quoteLiteral($rename->to);
         }
 
         foreach ($table->dropColumns as $col) {
-            $alterations[] = 'DROP COLUMN ' . $this->quote($col);
+            $alterations[] = 'DROP COLUMN ' . $this->quoteLiteral($col);
         }
 
         foreach ($table->foreignKeys as $fk) {
-            $def = 'ADD FOREIGN KEY (' . $this->quote($fk->column) . ')'
+            $def = 'ADD FOREIGN KEY (' . $this->quoteLiteral($fk->column) . ')'
                 . ' REFERENCES ' . $this->quote($fk->refTable)
-                . ' (' . $this->quote($fk->refColumn) . ')';
+                . ' (' . $this->quoteLiteral($fk->refColumn) . ')';
             if ($fk->onDelete !== null) {
                 $def .= ' ON DELETE ' . $fk->onDelete->toSql();
             }
@@ -500,7 +500,7 @@ class PostgreSQL extends SQL implements
         }
 
         $sql = 'ALTER TABLE ' . $this->quote($table)
-            . ' ALTER COLUMN ' . $this->quote($column)
+            . ' ALTER COLUMN ' . $this->quoteLiteral($column)
             . ' TYPE ' . $type;
 
         if ($using !== '') {
@@ -589,7 +589,7 @@ class PostgreSQL extends SQL implements
     public function commentOnColumn(string $table, string $column, string $comment): Statement
     {
         return new Statement(
-            'COMMENT ON COLUMN ' . $this->quote($table) . '.' . $this->quote($column) . " IS '" . str_replace(['\\', "'"], ['\\\\', "''"], $comment) . "'",
+            'COMMENT ON COLUMN ' . $this->quote($table) . '.' . $this->quoteLiteral($column) . " IS '" . str_replace(['\\', "'"], ['\\\\', "''"], $comment) . "'",
             [],
             executor: $this->executor,
         );

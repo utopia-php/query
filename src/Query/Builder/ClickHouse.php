@@ -3,6 +3,7 @@
 namespace Utopia\Query\Builder;
 
 use Utopia\Query\Builder as BaseBuilder;
+use Utopia\Query\Builder\ClickHouse\Format;
 use Utopia\Query\Builder\ClickHouse\FormattedInsertStatement;
 use Utopia\Query\Builder\Feature\BitwiseAggregates;
 use Utopia\Query\Builder\Feature\ClickHouse\ApproximateAggregates;
@@ -140,11 +141,58 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     }
 
     /**
-     * Declare a ClickHouse FORMAT pragma for the next INSERT.
+     * Recommended bulk-ingest entry point. Emits the canonical `INSERT INTO
+     * <table> [(<cols>)] FORMAT <name>` envelope alongside the serialized row
+     * payload in a single typed call. The returned `FormattedInsertStatement`
+     * exposes `->query` (envelope, no bindings) and `->body` (format-specific
+     * payload) so the caller can ship both to ClickHouse's HTTP interface
+     * without hand-assembling either side.
      *
-     * When a format is set, `insert()` emits
-     * `INSERT INTO \`t\` (\`col1\`, \`col2\`) FORMAT <name>` with no VALUES.
-     * The row payload must be streamed into the HTTP body by the caller.
+     * The target table must be set via `into()` first. Columns are derived
+     * from the keys of the first row when `$columns` is omitted; pass
+     * `$columns` explicitly to pin the order when row shapes vary or when
+     * an empty iterable is passed. An empty iterable produces an empty
+     * body — ClickHouse accepts this as a zero-row ingest.
+     *
+     * @param  iterable<array<string, mixed>>  $rows
+     * @param  list<string>  $columns  Optional explicit column ordering.
+     */
+    public function bulkInsert(Format $format, iterable $rows, array $columns = []): FormattedInsertStatement
+    {
+        $materialized = [];
+        foreach ($rows as $row) {
+            /** @phpstan-ignore function.alreadyNarrowedType */
+            if (!\is_array($row)) {
+                throw new ValidationException('bulkInsert() rows must be associative arrays.');
+            }
+            $materialized[] = $row;
+        }
+
+        if (empty($columns) && !empty($materialized)) {
+            $columns = \array_keys($materialized[0]);
+        }
+
+        $sql = $this->compileFormatInsertEnvelope($format->value, $columns);
+
+        $body = $format->serialize($materialized, empty($columns) ? null : $columns);
+
+        return new FormattedInsertStatement(
+            $sql,
+            [],
+            $columns,
+            $format->value,
+            $body,
+            executor: $this->executor,
+        );
+    }
+
+    /**
+     * Lower-level setter for the FORMAT envelope. Use `bulkInsert()` for the
+     * typed entry point; this method is retained for callers that need to
+     * stream the body payload separately (e.g. piping a pre-serialized stream
+     * straight into the HTTP request) — the subsequent `insert()` call emits
+     * the envelope only, with `body = null`.
+     *
      * Column names are derived from the most recent `set()` call (values are
      * ignored). Pass `$columns` to declare them explicitly when no `set()`
      * call has been made.
@@ -161,6 +209,38 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
         $this->insertFormatColumns = $columns;
 
         return $this;
+    }
+
+    /**
+     * Build the shared `INSERT INTO <table> [(<cols>)] FORMAT <name>`
+     * envelope. Validates the table, validates column names, quotes the
+     * table identifier, and wraps each column via `resolveAndWrap()`.
+     * Resets bindings so callers don't accumulate stale values from prior
+     * builder operations.
+     *
+     * @param  list<string>  $columns
+     */
+    private function compileFormatInsertEnvelope(string $format, array $columns): string
+    {
+        $this->bindings = [];
+        $this->validateTable();
+
+        foreach ($columns as $col) {
+            if ($col === '') {
+                throw new ValidationException('Column names for FORMAT INSERT must be non-empty strings.');
+            }
+        }
+
+        $wrappedColumns = empty($columns)
+            ? ''
+            : ' (' . \implode(', ', \array_map(
+                fn (string $col): string => $this->resolveAndWrap($col),
+                $columns
+            )) . ')';
+
+        return 'INSERT INTO ' . $this->quote($this->table)
+            . $wrappedColumns
+            . ' FORMAT ' . $format;
     }
 
     /**
@@ -618,31 +698,11 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
             return $this->applyNamedTypedBindings(parent::insert());
         }
 
-        $this->bindings = [];
-        $this->validateTable();
-
         $columns = !empty($this->insertFormatColumns)
             ? $this->insertFormatColumns
             : (!empty($this->rows) ? \array_keys($this->rows[0]) : []);
 
-        if (empty($columns)) {
-            throw new ValidationException('No columns specified for FORMAT INSERT. Pass columns to insertFormat() or call set() before insert().');
-        }
-
-        foreach ($columns as $col) {
-            if ($col === '') {
-                throw new ValidationException('Column names for FORMAT INSERT must be non-empty strings.');
-            }
-        }
-
-        $wrappedColumns = \array_map(
-            fn (string $col): string => $this->resolveAndWrap($col),
-            $columns
-        );
-
-        $sql = 'INSERT INTO ' . $this->quote($this->table)
-            . ' (' . \implode(', ', $wrappedColumns) . ')'
-            . ' FORMAT ' . $format;
+        $sql = $this->compileFormatInsertEnvelope($format, $columns);
 
         return new FormattedInsertStatement(
             $sql,

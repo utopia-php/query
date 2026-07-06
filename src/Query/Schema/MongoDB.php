@@ -24,6 +24,11 @@ class MongoDB extends Schema implements Views, Databases, AnalyzeTable
         return $identifier;
     }
 
+    protected function quoteLiteral(string $identifier): string
+    {
+        return $identifier;
+    }
+
     protected function compileColumnType(Column $column): string
     {
         if ($column->userTypeName !== null) {

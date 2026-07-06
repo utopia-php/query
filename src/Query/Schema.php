@@ -26,6 +26,8 @@ abstract class Schema
 
     abstract protected function quote(string $identifier): string;
 
+    abstract protected function quoteLiteral(string $identifier): string;
+
     abstract protected function compileColumnType(Column $column): string;
 
     abstract protected function compileAutoIncrement(): string;
@@ -51,7 +53,7 @@ abstract class Schema
             $columnDefs[] = $def;
 
             if ($column->isPrimary) {
-                $primaryKeys[] = $this->quote($column->name);
+                $primaryKeys[] = $this->quoteLiteral($column->name);
             }
             if ($column->isUnique) {
                 $uniqueColumns[] = $column->name;
@@ -72,13 +74,13 @@ abstract class Schema
             $columnDefs[] = 'PRIMARY KEY (' . \implode(', ', $primaryKeys) . ')';
         } elseif (! empty($table->compositePrimaryKey)) {
             $columnDefs[] = 'PRIMARY KEY ('
-                . \implode(', ', \array_map(fn (string $c): string => $this->quote($c), $table->compositePrimaryKey))
+                . \implode(', ', \array_map(fn (string $c): string => $this->quoteLiteral($c), $table->compositePrimaryKey))
                 . ')';
         }
 
         // Inline UNIQUE constraints for columns marked unique
         foreach ($uniqueColumns as $col) {
-            $columnDefs[] = 'UNIQUE (' . $this->quote($col) . ')';
+            $columnDefs[] = 'UNIQUE (' . $this->quoteLiteral($col) . ')';
         }
 
         // Table-level CHECK constraints
@@ -105,9 +107,9 @@ abstract class Schema
 
         // Foreign keys
         foreach ($table->foreignKeys as $fk) {
-            $def = 'FOREIGN KEY (' . $this->quote($fk->column) . ')'
+            $def = 'FOREIGN KEY (' . $this->quoteLiteral($fk->column) . ')'
                 . ' REFERENCES ' . $this->quote($fk->refTable)
-                . ' (' . $this->quote($fk->refColumn) . ')';
+                . ' (' . $this->quoteLiteral($fk->refColumn) . ')';
             if ($fk->onDelete !== null) {
                 $def .= ' ON DELETE ' . $fk->onDelete->toSql();
             }
@@ -138,18 +140,18 @@ abstract class Schema
             $keyword = $column->isModify ? 'MODIFY COLUMN' : 'ADD COLUMN';
             $def = $keyword . ' ' . $this->compileColumnDefinition($column);
             if ($column->after !== null) {
-                $def .= ' AFTER ' . $this->quote($column->after);
+                $def .= ' AFTER ' . $this->quoteLiteral($column->after);
             }
             $alterations[] = $def;
         }
 
         foreach ($table->renameColumns as $rename) {
-            $alterations[] = 'RENAME COLUMN ' . $this->quote($rename->from)
-                . ' TO ' . $this->quote($rename->to);
+            $alterations[] = 'RENAME COLUMN ' . $this->quoteLiteral($rename->from)
+                . ' TO ' . $this->quoteLiteral($rename->to);
         }
 
         foreach ($table->dropColumns as $col) {
-            $alterations[] = 'DROP COLUMN ' . $this->quote($col);
+            $alterations[] = 'DROP COLUMN ' . $this->quoteLiteral($col);
         }
 
         foreach ($table->indexes as $index) {
@@ -168,9 +170,9 @@ abstract class Schema
         }
 
         foreach ($table->foreignKeys as $fk) {
-            $def = 'ADD FOREIGN KEY (' . $this->quote($fk->column) . ')'
+            $def = 'ADD FOREIGN KEY (' . $this->quoteLiteral($fk->column) . ')'
                 . ' REFERENCES ' . $this->quote($fk->refTable)
-                . ' (' . $this->quote($fk->refColumn) . ')';
+                . ' (' . $this->quoteLiteral($fk->refColumn) . ')';
             if ($fk->onDelete !== null) {
                 $def .= ' ON DELETE ' . $fk->onDelete->toSql();
             }
@@ -267,7 +269,7 @@ abstract class Schema
     protected function compileColumnDefinition(Column $column): string
     {
         $parts = [
-            $this->quote($column->name),
+            $this->quoteLiteral($column->name),
             $this->compileColumnType($column),
         ];
 
@@ -369,7 +371,7 @@ abstract class Schema
         $parts = [];
 
         foreach ($index->columns as $col) {
-            $part = $this->quote($col);
+            $part = $this->quoteLiteral($col);
 
             if (isset($index->collations[$col])) {
                 $collation = $index->collations[$col];
