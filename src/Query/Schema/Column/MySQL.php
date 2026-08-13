@@ -11,6 +11,10 @@ use Utopia\Query\Schema\Table;
  */
 class MySQL extends Column
 {
+    use Trait\Collation;
+    use Trait\Positioning;
+    use Trait\Comment;
+    use Trait\Unique;
     use Trait\Generated;
     use Trait\VirtualGenerated;
     use Forwarder\MySQL;

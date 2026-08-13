@@ -122,11 +122,9 @@ abstract class Schema
         $sql = 'CREATE TABLE ' . ($ifNotExists ? 'IF NOT EXISTS ' : '') . $this->quote($table->name)
             . ' (' . \implode(', ', $columnDefs) . ')';
 
-        if ($this instanceof Schema\Feature\Partitioning) {
-            $partitioning = $this->compileCreatePartitioning($table);
-            if ($partitioning !== '') {
-                $sql .= ' ' . $partitioning;
-            }
+        $suffix = $this->compileCreateSuffix($table);
+        if ($suffix !== '') {
+            $sql .= ' ' . $suffix;
         }
 
         return new Statement($sql, [], executor: $this->executor);
@@ -273,6 +271,10 @@ abstract class Schema
             $this->compileColumnType($column),
         ];
 
+        if ($column->collation !== null) {
+            $parts[] = 'COLLATE ' . $this->quoteCollation($column->collation);
+        }
+
         if ($column->isUnsigned) {
             $unsigned = $this->compileUnsigned();
             if ($unsigned !== '') {
@@ -354,6 +356,27 @@ abstract class Schema
 
         /** @var string|int|float $value */
         return "'" . \str_replace(['\\', "'"], ['\\\\', "''"], (string) $value) . "'";
+    }
+
+    /**
+     * Dialect-specific clauses appended after the closing paren of CREATE TABLE.
+     *
+     * Overridden by capability traits (e.g. Trait\Partitioning) rather than
+     * gated on the schema's own type, so the base class does not need to know
+     * which features exist.
+     */
+    protected function compileCreateSuffix(Table $table): string
+    {
+        return '';
+    }
+
+    /**
+     * Render a column COLLATE name. MySQL and SQLite take a bare identifier;
+     * PostgreSQL requires a quoted one.
+     */
+    protected function quoteCollation(string $collation): string
+    {
+        return $collation;
     }
 
     protected function compileUnsigned(): string

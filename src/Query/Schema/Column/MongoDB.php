@@ -11,5 +11,6 @@ use Utopia\Query\Schema\Table;
  */
 class MongoDB extends Column
 {
+    use Trait\Comment;
     use Forwarder\MongoDB;
 }

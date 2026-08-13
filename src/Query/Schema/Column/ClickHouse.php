@@ -13,6 +13,7 @@ use Utopia\Query\Schema\Table;
  */
 class ClickHouse extends Column
 {
+    use Trait\Comment;
     use Forwarder\ClickHouse;
 
     public protected(set) bool $isLowCardinality = false;

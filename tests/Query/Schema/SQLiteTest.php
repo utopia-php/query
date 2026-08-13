@@ -545,6 +545,15 @@ class SQLiteTest extends TestCase
         $this->assertSame('CREATE TABLE `t` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL)', $result->query);
     }
 
+    public function testColumnCollationIsEmitted(): void
+    {
+        $result = (new Schema())->table('t')
+            ->string('name')->collation('NOCASE')
+            ->create();
+
+        $this->assertStringContainsString('COLLATE NOCASE', $result->query);
+    }
+
     public function testColumnDoesNotExposeUserType(): void
     {
         $column = (new Schema())->table('t')->string('mood');

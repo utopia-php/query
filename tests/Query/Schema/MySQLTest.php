@@ -1091,13 +1091,16 @@ class MySQLTest extends TestCase
         $this->assertSame('CREATE TABLE `t` (`data` BLOB NOT NULL)', $result->query);
     }
 
-    public function testColumnCollation(): void
+    public function testColumnCollationIsEmitted(): void
     {
-        $bp = (new Schema())->table('t');
-        $col = new Column($bp, 'name', ColumnType::String, 255);
-        $col->collation('utf8mb4_unicode_ci');
+        $result = (new Schema())->table('t')
+            ->string('name')->collation('utf8mb4_unicode_ci')
+            ->create();
 
-        $this->assertSame('utf8mb4_unicode_ci', $col->collation);
+        $this->assertSame(
+            'CREATE TABLE `t` (`name` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL)',
+            $result->query
+        );
     }
 
     public function testColumnPrecision(): void

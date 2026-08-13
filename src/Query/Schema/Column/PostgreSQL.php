@@ -12,6 +12,8 @@ use Utopia\Query\Schema\Table;
  */
 class PostgreSQL extends Column
 {
+    use Trait\Collation;
+    use Trait\Unique;
     use Trait\Generated;
     use Forwarder\PostgreSQL;
 

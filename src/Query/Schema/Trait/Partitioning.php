@@ -6,6 +6,12 @@ use Utopia\Query\Schema\Table;
 
 trait Partitioning
 {
+    #[\Override]
+    protected function compileCreateSuffix(Table $table): string
+    {
+        return $this->compileCreatePartitioning($table);
+    }
+
     public function compileCreatePartitioning(Table $table): string
     {
         if ($table->partitionType === null) {

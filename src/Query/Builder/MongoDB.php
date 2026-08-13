@@ -18,6 +18,9 @@ use Utopia\Query\Builder\MongoDB\PipelineStage;
 use Utopia\Query\Builder\MongoDB\UpdateOperator;
 use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
+use Utopia\Query\Hook;
+use Utopia\Query\Hook\Filter;
+use Utopia\Query\Hook\Join\Filter as JoinFilter;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
 
@@ -219,6 +222,30 @@ class MongoDB extends BaseBuilder implements
         $this->indexHint = null;
 
         return $this;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Hook\Filter and Hook\Join\Filter return a {@see Condition}: a raw SQL
+     * expression plus bindings. A MongoDB operation document has nowhere to put
+     * one, so they are rejected rather than accepted and dropped -- silently
+     * ignoring a Hook\Filter\Tenant would leave every query unscoped.
+     *
+     * Hook\Attribute and Hook\Write are dialect-neutral and still apply.
+     */
+    #[\Override]
+    public function addHook(Hook $hook): static
+    {
+        if ($hook instanceof Filter || $hook instanceof JoinFilter) {
+            throw new UnsupportedException(
+                'Filter hooks are not supported on the MongoDB builder: '
+                . Filter::class . ' returns a SQL expression, which has no place in an '
+                . 'operation document. Express the constraint as a Query passed to filter() instead.'
+            );
+        }
+
+        return parent::addHook($hook);
     }
 
     #[\Override]
