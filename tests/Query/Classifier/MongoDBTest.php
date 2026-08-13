@@ -1,19 +1,19 @@
 <?php
 
-namespace Tests\Query\Parser;
+namespace Tests\Query\Classifier;
 
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
-use Utopia\Query\Parser\MongoDB;
+use Utopia\Query\Classifier\MongoDB;
 use Utopia\Query\Type;
 
 class MongoDBTest extends TestCase
 {
-    protected MongoDB $parser;
+    protected MongoDB $classifier;
 
     protected function setUp(): void
     {
-        $this->parser = new MongoDB();
+        $this->classifier = new MongoDB();
     }
 
     /**
@@ -74,91 +74,91 @@ class MongoDBTest extends TestCase
     public function testFindCommand(): void
     {
         $data = $this->buildOpMsg(['find' => 'users', '$db' => 'mydb']);
-        $this->assertSame(Type::Read, $this->parser->parse($data));
+        $this->assertSame(Type::Read, $this->classifier->classify($data));
     }
 
     public function testAggregateCommand(): void
     {
         $data = $this->buildOpMsg(['aggregate' => 'users', '$db' => 'mydb']);
-        $this->assertSame(Type::Read, $this->parser->parse($data));
+        $this->assertSame(Type::Read, $this->classifier->classify($data));
     }
 
     public function testCountCommand(): void
     {
         $data = $this->buildOpMsg(['count' => 'users', '$db' => 'mydb']);
-        $this->assertSame(Type::Read, $this->parser->parse($data));
+        $this->assertSame(Type::Read, $this->classifier->classify($data));
     }
 
     public function testDistinctCommand(): void
     {
         $data = $this->buildOpMsg(['distinct' => 'users', 'key' => 'name', '$db' => 'mydb']);
-        $this->assertSame(Type::Read, $this->parser->parse($data));
+        $this->assertSame(Type::Read, $this->classifier->classify($data));
     }
 
     public function testListCollectionsCommand(): void
     {
         $data = $this->buildOpMsg(['listCollections' => 1, '$db' => 'mydb']);
-        $this->assertSame(Type::Read, $this->parser->parse($data));
+        $this->assertSame(Type::Read, $this->classifier->classify($data));
     }
 
     public function testListDatabasesCommand(): void
     {
         $data = $this->buildOpMsg(['listDatabases' => 1, '$db' => 'admin']);
-        $this->assertSame(Type::Read, $this->parser->parse($data));
+        $this->assertSame(Type::Read, $this->classifier->classify($data));
     }
 
     public function testListIndexesCommand(): void
     {
         $data = $this->buildOpMsg(['listIndexes' => 'users', '$db' => 'mydb']);
-        $this->assertSame(Type::Read, $this->parser->parse($data));
+        $this->assertSame(Type::Read, $this->classifier->classify($data));
     }
 
     public function testDbStatsCommand(): void
     {
         $data = $this->buildOpMsg(['dbStats' => 1, '$db' => 'mydb']);
-        $this->assertSame(Type::Read, $this->parser->parse($data));
+        $this->assertSame(Type::Read, $this->classifier->classify($data));
     }
 
     public function testCollStatsCommand(): void
     {
         $data = $this->buildOpMsg(['collStats' => 'users', '$db' => 'mydb']);
-        $this->assertSame(Type::Read, $this->parser->parse($data));
+        $this->assertSame(Type::Read, $this->classifier->classify($data));
     }
 
     public function testExplainCommand(): void
     {
         $data = $this->buildOpMsg(['explain' => 'users', '$db' => 'mydb']);
-        $this->assertSame(Type::Read, $this->parser->parse($data));
+        $this->assertSame(Type::Read, $this->classifier->classify($data));
     }
 
     public function testGetMoreCommand(): void
     {
         $data = $this->buildOpMsg(['getMore' => 12345, '$db' => 'mydb']);
-        $this->assertSame(Type::Read, $this->parser->parse($data));
+        $this->assertSame(Type::Read, $this->classifier->classify($data));
     }
 
     public function testServerStatusCommand(): void
     {
         $data = $this->buildOpMsg(['serverStatus' => 1, '$db' => 'admin']);
-        $this->assertSame(Type::Read, $this->parser->parse($data));
+        $this->assertSame(Type::Read, $this->classifier->classify($data));
     }
 
     public function testPingCommand(): void
     {
         $data = $this->buildOpMsg(['ping' => 1, '$db' => 'admin']);
-        $this->assertSame(Type::Read, $this->parser->parse($data));
+        $this->assertSame(Type::Read, $this->classifier->classify($data));
     }
 
     public function testHelloCommand(): void
     {
         $data = $this->buildOpMsg(['hello' => 1, '$db' => 'admin']);
-        $this->assertSame(Type::Read, $this->parser->parse($data));
+        $this->assertSame(Type::Read, $this->classifier->classify($data));
     }
 
     public function testIsMasterCommand(): void
     {
         $data = $this->buildOpMsg(['isMaster' => 1, '$db' => 'admin']);
-        $this->assertSame(Type::Read, $this->parser->parse($data));
+        $this->assertSame(Type::Read, $this->classifier->classify($data));
     }
 
     // -- Write Commands --
@@ -166,61 +166,61 @@ class MongoDBTest extends TestCase
     public function testInsertCommand(): void
     {
         $data = $this->buildOpMsg(['insert' => 'users', '$db' => 'mydb']);
-        $this->assertSame(Type::Write, $this->parser->parse($data));
+        $this->assertSame(Type::Write, $this->classifier->classify($data));
     }
 
     public function testUpdateCommand(): void
     {
         $data = $this->buildOpMsg(['update' => 'users', '$db' => 'mydb']);
-        $this->assertSame(Type::Write, $this->parser->parse($data));
+        $this->assertSame(Type::Write, $this->classifier->classify($data));
     }
 
     public function testDeleteCommand(): void
     {
         $data = $this->buildOpMsg(['delete' => 'users', '$db' => 'mydb']);
-        $this->assertSame(Type::Write, $this->parser->parse($data));
+        $this->assertSame(Type::Write, $this->classifier->classify($data));
     }
 
     public function testFindAndModifyCommand(): void
     {
         $data = $this->buildOpMsg(['findAndModify' => 'users', '$db' => 'mydb']);
-        $this->assertSame(Type::Write, $this->parser->parse($data));
+        $this->assertSame(Type::Write, $this->classifier->classify($data));
     }
 
     public function testCreateCommand(): void
     {
         $data = $this->buildOpMsg(['create' => 'new_collection', '$db' => 'mydb']);
-        $this->assertSame(Type::Write, $this->parser->parse($data));
+        $this->assertSame(Type::Write, $this->classifier->classify($data));
     }
 
     public function testDropCommand(): void
     {
         $data = $this->buildOpMsg(['drop' => 'users', '$db' => 'mydb']);
-        $this->assertSame(Type::Write, $this->parser->parse($data));
+        $this->assertSame(Type::Write, $this->classifier->classify($data));
     }
 
     public function testCreateIndexesCommand(): void
     {
         $data = $this->buildOpMsg(['createIndexes' => 'users', '$db' => 'mydb']);
-        $this->assertSame(Type::Write, $this->parser->parse($data));
+        $this->assertSame(Type::Write, $this->classifier->classify($data));
     }
 
     public function testDropIndexesCommand(): void
     {
         $data = $this->buildOpMsg(['dropIndexes' => 'users', '$db' => 'mydb']);
-        $this->assertSame(Type::Write, $this->parser->parse($data));
+        $this->assertSame(Type::Write, $this->classifier->classify($data));
     }
 
     public function testDropDatabaseCommand(): void
     {
         $data = $this->buildOpMsg(['dropDatabase' => 1, '$db' => 'mydb']);
-        $this->assertSame(Type::Write, $this->parser->parse($data));
+        $this->assertSame(Type::Write, $this->classifier->classify($data));
     }
 
     public function testRenameCollectionCommand(): void
     {
         $data = $this->buildOpMsg(['renameCollection' => 'users', '$db' => 'admin']);
-        $this->assertSame(Type::Write, $this->parser->parse($data));
+        $this->assertSame(Type::Write, $this->classifier->classify($data));
     }
 
     // -- Transaction Commands --
@@ -228,19 +228,19 @@ class MongoDBTest extends TestCase
     public function testStartTransaction(): void
     {
         $data = $this->buildOpMsg(['find' => 'users', '$db' => 'mydb', 'startTransaction' => true]);
-        $this->assertSame(Type::TransactionBegin, $this->parser->parse($data));
+        $this->assertSame(Type::TransactionBegin, $this->classifier->classify($data));
     }
 
     public function testCommitTransaction(): void
     {
         $data = $this->buildOpMsg(['commitTransaction' => 1, '$db' => 'admin']);
-        $this->assertSame(Type::TransactionEnd, $this->parser->parse($data));
+        $this->assertSame(Type::TransactionEnd, $this->classifier->classify($data));
     }
 
     public function testAbortTransaction(): void
     {
         $data = $this->buildOpMsg(['abortTransaction' => 1, '$db' => 'admin']);
-        $this->assertSame(Type::TransactionEnd, $this->parser->parse($data));
+        $this->assertSame(Type::TransactionEnd, $this->classifier->classify($data));
     }
 
     public function testStartTransactionFlagOnNonEligibleCommandIsIgnored(): void
@@ -250,7 +250,7 @@ class MongoDBTest extends TestCase
         // as TransactionBegin — ping is not transaction-eligible, and the
         // parser skips the scan entirely on the hot path.
         $data = $this->buildOpMsg(['ping' => 1, '$db' => 'admin', 'startTransaction' => true]);
-        $this->assertSame(Type::Read, $this->parser->parse($data));
+        $this->assertSame(Type::Read, $this->classifier->classify($data));
     }
 
     public function testStartTransactionFlagOnEligibleCommands(): void
@@ -259,7 +259,7 @@ class MongoDBTest extends TestCase
             $data = $this->buildOpMsg([$command => 'users', '$db' => 'mydb', 'startTransaction' => true]);
             $this->assertSame(
                 Type::TransactionBegin,
-                $this->parser->parse($data),
+                $this->classifier->classify($data),
                 \sprintf('Command %s with startTransaction should be TransactionBegin', $command),
             );
         }
@@ -269,7 +269,7 @@ class MongoDBTest extends TestCase
 
     public function testTooShortPacket(): void
     {
-        $this->assertSame(Type::Unknown, $this->parser->parse("\x00\x00\x00\x00"));
+        $this->assertSame(Type::Unknown, $this->classifier->classify("\x00\x00\x00\x00"));
     }
 
     public function testWrongOpcode(): void
@@ -282,13 +282,13 @@ class MongoDBTest extends TestCase
             . \pack('V', 0)
             . \pack('V', 2004); // wrong opcode
 
-        $this->assertSame(Type::Unknown, $this->parser->parse($header . $body));
+        $this->assertSame(Type::Unknown, $this->classifier->classify($header . $body));
     }
 
     public function testUnknownCommand(): void
     {
         $data = $this->buildOpMsg(['customCommand' => 1, '$db' => 'mydb']);
-        $this->assertSame(Type::Unknown, $this->parser->parse($data));
+        $this->assertSame(Type::Unknown, $this->classifier->classify($data));
     }
 
     public function testEmptyBsonDocument(): void
@@ -301,7 +301,7 @@ class MongoDBTest extends TestCase
             . \pack('V', 0)
             . \pack('V', 2013);
 
-        $this->assertSame(Type::Unknown, $this->parser->parse($header . $body));
+        $this->assertSame(Type::Unknown, $this->classifier->classify($header . $body));
     }
 
     public function testMalformedBsonStringLengthDoesNotCrash(): void
@@ -330,7 +330,7 @@ class MongoDBTest extends TestCase
         // The hasBsonKey scan for startTransaction must bail safely
         // (returning false), and the first-key command lookup is 'foo',
         // which is unknown — so classification is Unknown.
-        $this->assertSame(Type::Unknown, $this->parser->parse($data));
+        $this->assertSame(Type::Unknown, $this->classifier->classify($data));
     }
 
     public function testMalformedBsonBinaryLengthDoesNotCrash(): void
@@ -352,7 +352,7 @@ class MongoDBTest extends TestCase
 
         $data = $header . $body;
 
-        $this->assertSame(Type::Unknown, $this->parser->parse($data));
+        $this->assertSame(Type::Unknown, $this->classifier->classify($data));
     }
 
     public function testMalformedBsonNestedDocumentLengthDoesNotCrash(): void
@@ -378,7 +378,7 @@ class MongoDBTest extends TestCase
 
         $data = $header . $body;
 
-        $result = $this->withStrictErrors(fn () => $this->parser->parse($data));
+        $result = $this->withStrictErrors(fn () => $this->classifier->classify($data));
         $this->assertSame(Type::Unknown, $result);
     }
 
@@ -404,7 +404,7 @@ class MongoDBTest extends TestCase
         // docLen before scanning keys. With no valid classification available,
         // the parser returns Unknown. The important guarantee is no crash /
         // out-of-bounds read, so we run under strict error handling.
-        $result = $this->withStrictErrors(fn () => $this->parser->parse($data));
+        $result = $this->withStrictErrors(fn () => $this->classifier->classify($data));
         $this->assertSame(Type::Unknown, $result);
     }
 
@@ -428,7 +428,7 @@ class MongoDBTest extends TestCase
         $data = $header . $body;
 
         // No crash; first key 'rx' is unknown → Unknown.
-        $result = $this->withStrictErrors(fn () => $this->parser->parse($data));
+        $result = $this->withStrictErrors(fn () => $this->classifier->classify($data));
         $this->assertSame(Type::Unknown, $result);
     }
 
@@ -455,7 +455,7 @@ class MongoDBTest extends TestCase
 
         // First key 'ref' is unknown → Unknown. Important: no crash while
         // hasBsonKey walks the malformed DBPointer.
-        $result = $this->withStrictErrors(fn () => $this->parser->parse($data));
+        $result = $this->withStrictErrors(fn () => $this->classifier->classify($data));
         $this->assertSame(Type::Unknown, $result);
     }
 
@@ -484,14 +484,12 @@ class MongoDBTest extends TestCase
         }
     }
 
-    public function testClassifySqlReturnsUnknown(): void
+    public function testDoesNotExposeSqlHelpers(): void
     {
-        $this->assertSame(Type::Unknown, $this->parser->classifySQL('SELECT * FROM users'));
-    }
+        $methods = \get_class_methods($this->classifier);
 
-    public function testExtractKeywordReturnsEmpty(): void
-    {
-        $this->assertSame('', $this->parser->extractKeyword('SELECT'));
+        $this->assertNotContains('classifySQL', $methods);
+        $this->assertNotContains('extractKeyword', $methods);
     }
 
     // -- Performance --
@@ -508,7 +506,7 @@ class MongoDBTest extends TestCase
 
         $start = \hrtime(true);
         for ($i = 0; $i < $iterations; $i++) {
-            $this->parser->parse($data);
+            $this->classifier->classify($data);
         }
         $elapsed = (\hrtime(true) - $start) / 1_000_000_000;
         $perQuery = ($elapsed / $iterations) * 1_000_000;
@@ -516,7 +514,7 @@ class MongoDBTest extends TestCase
         $this->assertLessThan(
             2.0,
             $perQuery,
-            \sprintf('MongoDB parse took %.3f us/query (target: < 2.0 us)', $perQuery)
+            \sprintf('MongoDB classify took %.3f us/query (target: < 2.0 us)', $perQuery)
         );
     }
 
@@ -540,7 +538,7 @@ class MongoDBTest extends TestCase
 
         $start = \hrtime(true);
         for ($i = 0; $i < $iterations; $i++) {
-            $this->parser->parse($data);
+            $this->classifier->classify($data);
         }
         $elapsed = (\hrtime(true) - $start) / 1_000_000_000;
         $perQuery = ($elapsed / $iterations) * 1_000_000;

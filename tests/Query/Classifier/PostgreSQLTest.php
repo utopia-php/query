@@ -1,19 +1,19 @@
 <?php
 
-namespace Tests\Query\Parser;
+namespace Tests\Query\Classifier;
 
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
-use Utopia\Query\Parser\PostgreSQL;
+use Utopia\Query\Classifier\PostgreSQL;
 use Utopia\Query\Type;
 
 class PostgreSQLTest extends TestCase
 {
-    protected PostgreSQL $parser;
+    protected PostgreSQL $classifier;
 
     protected function setUp(): void
     {
-        $this->parser = new PostgreSQL();
+        $this->classifier = new PostgreSQL();
     }
 
     /**
@@ -64,171 +64,171 @@ class PostgreSQLTest extends TestCase
 
     public function testSelectQuery(): void
     {
-        $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('SELECT * FROM users WHERE id = 1')));
+        $this->assertSame(Type::Read, $this->classifier->classify($this->buildQuery('SELECT * FROM users WHERE id = 1')));
     }
 
     public function testSelectLowercase(): void
     {
-        $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('select id, name from users')));
+        $this->assertSame(Type::Read, $this->classifier->classify($this->buildQuery('select id, name from users')));
     }
 
     public function testSelectMixedCase(): void
     {
-        $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('SeLeCt * FROM users')));
+        $this->assertSame(Type::Read, $this->classifier->classify($this->buildQuery('SeLeCt * FROM users')));
     }
 
     public function testShowQuery(): void
     {
-        $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('SHOW TABLES')));
+        $this->assertSame(Type::Read, $this->classifier->classify($this->buildQuery('SHOW TABLES')));
     }
 
     public function testDescribeQuery(): void
     {
-        $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('DESCRIBE users')));
+        $this->assertSame(Type::Read, $this->classifier->classify($this->buildQuery('DESCRIBE users')));
     }
 
     public function testExplainQuery(): void
     {
-        $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('EXPLAIN SELECT * FROM users')));
+        $this->assertSame(Type::Read, $this->classifier->classify($this->buildQuery('EXPLAIN SELECT * FROM users')));
     }
 
     public function testTableQuery(): void
     {
-        $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery('TABLE users')));
+        $this->assertSame(Type::Read, $this->classifier->classify($this->buildQuery('TABLE users')));
     }
 
     public function testValuesQuery(): void
     {
-        $this->assertSame(Type::Read, $this->parser->parse($this->buildQuery("VALUES (1, 'a'), (2, 'b')")));
+        $this->assertSame(Type::Read, $this->classifier->classify($this->buildQuery("VALUES (1, 'a'), (2, 'b')")));
     }
 
     // -- Write Queries --
 
     public function testInsertQuery(): void
     {
-        $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery("INSERT INTO users (name) VALUES ('test')")));
+        $this->assertSame(Type::Write, $this->classifier->classify($this->buildQuery("INSERT INTO users (name) VALUES ('test')")));
     }
 
     public function testUpdateQuery(): void
     {
-        $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery("UPDATE users SET name = 'test' WHERE id = 1")));
+        $this->assertSame(Type::Write, $this->classifier->classify($this->buildQuery("UPDATE users SET name = 'test' WHERE id = 1")));
     }
 
     public function testDeleteQuery(): void
     {
-        $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('DELETE FROM users WHERE id = 1')));
+        $this->assertSame(Type::Write, $this->classifier->classify($this->buildQuery('DELETE FROM users WHERE id = 1')));
     }
 
     public function testCreateTable(): void
     {
-        $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('CREATE TABLE test (id INT PRIMARY KEY)')));
+        $this->assertSame(Type::Write, $this->classifier->classify($this->buildQuery('CREATE TABLE test (id INT PRIMARY KEY)')));
     }
 
     public function testDropTable(): void
     {
-        $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('DROP TABLE IF EXISTS test')));
+        $this->assertSame(Type::Write, $this->classifier->classify($this->buildQuery('DROP TABLE IF EXISTS test')));
     }
 
     public function testAlterTable(): void
     {
-        $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('ALTER TABLE users ADD COLUMN email TEXT')));
+        $this->assertSame(Type::Write, $this->classifier->classify($this->buildQuery('ALTER TABLE users ADD COLUMN email TEXT')));
     }
 
     public function testTruncate(): void
     {
-        $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('TRUNCATE TABLE users')));
+        $this->assertSame(Type::Write, $this->classifier->classify($this->buildQuery('TRUNCATE TABLE users')));
     }
 
     public function testGrant(): void
     {
-        $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('GRANT SELECT ON users TO readonly')));
+        $this->assertSame(Type::Write, $this->classifier->classify($this->buildQuery('GRANT SELECT ON users TO readonly')));
     }
 
     public function testRevoke(): void
     {
-        $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('REVOKE ALL ON users FROM public')));
+        $this->assertSame(Type::Write, $this->classifier->classify($this->buildQuery('REVOKE ALL ON users FROM public')));
     }
 
     public function testLockTable(): void
     {
-        $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('LOCK TABLE users IN ACCESS EXCLUSIVE MODE')));
+        $this->assertSame(Type::Write, $this->classifier->classify($this->buildQuery('LOCK TABLE users IN ACCESS EXCLUSIVE MODE')));
     }
 
     public function testCall(): void
     {
-        $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery('CALL my_procedure()')));
+        $this->assertSame(Type::Write, $this->classifier->classify($this->buildQuery('CALL my_procedure()')));
     }
 
     public function testDo(): void
     {
-        $this->assertSame(Type::Write, $this->parser->parse($this->buildQuery("DO \$\$ BEGIN RAISE NOTICE 'hello'; END \$\$")));
+        $this->assertSame(Type::Write, $this->classifier->classify($this->buildQuery("DO \$\$ BEGIN RAISE NOTICE 'hello'; END \$\$")));
     }
 
     // -- Transaction Commands --
 
     public function testBeginTransaction(): void
     {
-        $this->assertSame(Type::TransactionBegin, $this->parser->parse($this->buildQuery('BEGIN')));
+        $this->assertSame(Type::TransactionBegin, $this->classifier->classify($this->buildQuery('BEGIN')));
     }
 
     public function testStartTransaction(): void
     {
-        $this->assertSame(Type::TransactionBegin, $this->parser->parse($this->buildQuery('START TRANSACTION')));
+        $this->assertSame(Type::TransactionBegin, $this->classifier->classify($this->buildQuery('START TRANSACTION')));
     }
 
     public function testCommit(): void
     {
-        $this->assertSame(Type::TransactionEnd, $this->parser->parse($this->buildQuery('COMMIT')));
+        $this->assertSame(Type::TransactionEnd, $this->classifier->classify($this->buildQuery('COMMIT')));
     }
 
     public function testRollback(): void
     {
-        $this->assertSame(Type::TransactionEnd, $this->parser->parse($this->buildQuery('ROLLBACK')));
+        $this->assertSame(Type::TransactionEnd, $this->classifier->classify($this->buildQuery('ROLLBACK')));
     }
 
     public function testSavepoint(): void
     {
-        $this->assertSame(Type::Transaction, $this->parser->parse($this->buildQuery('SAVEPOINT sp1')));
+        $this->assertSame(Type::Transaction, $this->classifier->classify($this->buildQuery('SAVEPOINT sp1')));
     }
 
     public function testReleaseSavepoint(): void
     {
-        $this->assertSame(Type::Transaction, $this->parser->parse($this->buildQuery('RELEASE SAVEPOINT sp1')));
+        $this->assertSame(Type::Transaction, $this->classifier->classify($this->buildQuery('RELEASE SAVEPOINT sp1')));
     }
 
     public function testSetCommand(): void
     {
-        $this->assertSame(Type::Transaction, $this->parser->parse($this->buildQuery("SET search_path TO 'public'")));
+        $this->assertSame(Type::Transaction, $this->classifier->classify($this->buildQuery("SET search_path TO 'public'")));
     }
 
     // -- Extended Query Protocol --
 
     public function testParseMessageRoutesToWrite(): void
     {
-        $this->assertSame(Type::Write, $this->parser->parse($this->buildParse('stmt1', 'SELECT * FROM users')));
+        $this->assertSame(Type::Write, $this->classifier->classify($this->buildParse('stmt1', 'SELECT * FROM users')));
     }
 
     public function testBindMessageRoutesToWrite(): void
     {
-        $this->assertSame(Type::Write, $this->parser->parse($this->buildBind()));
+        $this->assertSame(Type::Write, $this->classifier->classify($this->buildBind()));
     }
 
     public function testExecuteMessageRoutesToWrite(): void
     {
-        $this->assertSame(Type::Write, $this->parser->parse($this->buildExecute()));
+        $this->assertSame(Type::Write, $this->classifier->classify($this->buildExecute()));
     }
 
     // -- Edge Cases --
 
     public function testTooShortPacket(): void
     {
-        $this->assertSame(Type::Unknown, $this->parser->parse('Q'));
+        $this->assertSame(Type::Unknown, $this->classifier->classify('Q'));
     }
 
     public function testUnknownMessageType(): void
     {
         $data = 'X' . \pack('N', 5) . "\x00";
-        $this->assertSame(Type::Unknown, $this->parser->parse($data));
+        $this->assertSame(Type::Unknown, $this->classifier->classify($data));
     }
 
     // -- Performance --
@@ -245,7 +245,7 @@ class PostgreSQLTest extends TestCase
 
         $start = \hrtime(true);
         for ($i = 0; $i < $iterations; $i++) {
-            $this->parser->parse($data);
+            $this->classifier->classify($data);
         }
         $elapsed = (\hrtime(true) - $start) / 1_000_000_000;
         $perQuery = ($elapsed / $iterations) * 1_000_000;

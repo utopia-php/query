@@ -85,11 +85,11 @@ composer require utopia-php/query
   - [Serializing an AST](#serializing-an-ast)
   - [Walking and Rewriting](#walking-and-rewriting)
   - [Builder Round-Trip](#builder-round-trip)
-- [Wire Protocol Parsers](#wire-protocol-parsers)
-  - [SQL Parser](#sql-parser)
-  - [MySQL Parser](#mysql-parser)
-  - [PostgreSQL Parser](#postgresql-parser)
-  - [MongoDB Parser](#mongodb-parser)
+- [Wire Protocol Classifiers](#wire-protocol-classifiers)
+  - [SQL Classifier](#sql-classifier)
+  - [MySQL Classifier](#mysql-classifier)
+  - [PostgreSQL Classifier](#postgresql-classifier)
+  - [MongoDB Classifier](#mongodb-classifier)
 - [Compiler Interface](#compiler-interface)
 - [Contributing](#contributing)
 - [License](#license)
@@ -2627,7 +2627,7 @@ Column types map to BSON types: `string` → `string`, `integer`/`bigInteger` �
 
 ## SQL Tokenizer and AST
 
-Everything above generates SQL. This layer goes the other way: it takes existing SQL text and turns it into an inspectable, rewritable tree. Use it to validate columns against an allow-list, inject tenant predicates into queries you did not author, rename tables, or translate a statement from one dialect's quoting to another's.
+Everything above generates SQL. This layer goes the other way: it takes existing SQL text and turns it into an inspectable, rewritable tree. (For merely deciding whether a query reads or writes, without building a tree, see [Wire Protocol Classifiers](#wire-protocol-classifiers).) Use it to validate columns against an allow-list, inject tenant predicates into queries you did not author, rename tables, or translate a statement from one dialect's quoting to another's.
 
 ```php
 use Utopia\Query\Tokenizer\Tokenizer;
@@ -2735,27 +2735,29 @@ $rebuilt = Builder::fromAst($ast);      // static
 $rebuilt->build()->query;               // SELECT `id`, `name` FROM `users` WHERE `status` IN (?)
 ```
 
-## Wire Protocol Parsers
+## Wire Protocol Classifiers
 
-The `Parser` interface classifies raw database traffic into query types (`Read`, `Write`, `TransactionBegin`, `TransactionEnd`, `Transaction`, `Unknown`). This is useful for connection proxies, audit logging, and read/write splitting.
+The `Classifier` interface sorts raw database traffic into query types (`Read`, `Write`, `TransactionBegin`, `TransactionEnd`, `Transaction`, `Unknown`). This is useful for connection proxies, audit logging, and read/write splitting.
 
 ```php
-use Utopia\Query\Parser;
+use Utopia\Query\Classifier;
 use Utopia\Query\Type;
 ```
 
-### SQL Parser
+> **Not a parser.** A classifier reads a message's leading keyword (or, for document protocols, its first command name) and looks it up — it never builds a structure. To parse SQL text into a syntax tree you can inspect and rewrite, use [`AST\Parser`](#sql-tokenizer-and-ast) instead.
 
-The abstract `Parser\SQL` class provides keyword-based classification for SQL dialects:
+### SQL Classifier
+
+The abstract `Classifier\SQL` class provides keyword-based classification for SQL dialects:
 
 ```php
-use Utopia\Query\Parser\SQL;
+use Utopia\Query\Classifier\SQL;
 
 // Classify SQL text directly
-$type = $parser->classifySQL('SELECT * FROM users');  // Type::Read
-$type = $parser->classifySQL('INSERT INTO users ...');  // Type::Write
-$type = $parser->classifySQL('BEGIN');  // Type::TransactionBegin
-$type = $parser->classifySQL('COMMIT');  // Type::TransactionEnd
+$type = $classifier->classifySQL('SELECT * FROM users');  // Type::Read
+$type = $classifier->classifySQL('INSERT INTO users ...');  // Type::Write
+$type = $classifier->classifySQL('BEGIN');  // Type::TransactionBegin
+$type = $classifier->classifySQL('COMMIT');  // Type::TransactionEnd
 ```
 
 Read keywords: `SELECT`, `SHOW`, `DESCRIBE`, `DESC`, `EXPLAIN`, `WITH` (when followed by a read), `TABLE`, `VALUES`.
@@ -2768,41 +2770,41 @@ Anything else — including `RENAME`, `REPLACE`, `LOAD`, `MERGE`, and `EXECUTE` 
 
 Special handling: `COPY` is classified based on direction (`FROM STDIN` = Write, `TO STDOUT` = Read).
 
-### MySQL Parser
+### MySQL Classifier
 
 Parses MySQL wire protocol binary packets:
 
 ```php
-use Utopia\Query\Parser\MySQL;
+use Utopia\Query\Classifier\MySQL;
 
-$parser = new MySQL();
-$type = $parser->parse($rawPacketData);  // Type::Read, Write, TransactionBegin, etc.
+$classifier = new MySQL();
+$type = $classifier->classify($rawPacketData);  // Type::Read, Write, TransactionBegin, etc.
 ```
 
 Recognizes `COM_QUERY` (`0x03`, classified via its SQL text), `COM_STMT_PREPARE` (`0x16`), `COM_STMT_EXECUTE` (`0x17`), `COM_STMT_SEND_LONG_DATA` (`0x18`), `COM_STMT_CLOSE` (`0x19`), and `COM_STMT_RESET` (`0x1A`). The prepared-statement commands are routed to the primary.
 
-### PostgreSQL Parser
+### PostgreSQL Classifier
 
 Parses PostgreSQL wire protocol messages:
 
 ```php
-use Utopia\Query\Parser\PostgreSQL;
+use Utopia\Query\Classifier\PostgreSQL;
 
-$parser = new PostgreSQL();
-$type = $parser->parse($rawMessageData);  // Type::Read, Write, TransactionBegin, etc.
+$classifier = new PostgreSQL();
+$type = $classifier->classify($rawMessageData);  // Type::Read, Write, TransactionBegin, etc.
 ```
 
 Handles message types `Q` (simple query, classified via its SQL text), `P` (parse), `B` (bind), and `E` (execute). Other message types, including terminate and startup messages, return `Type::Unknown`.
 
-### MongoDB Parser
+### MongoDB Classifier
 
 Parses MongoDB OP_MSG binary protocol messages:
 
 ```php
-use Utopia\Query\Parser\MongoDB;
+use Utopia\Query\Classifier\MongoDB;
 
-$parser = new MongoDB();
-$type = $parser->parse($rawOpMsgData);  // Type::Read, Write, TransactionBegin, etc.
+$classifier = new MongoDB();
+$type = $classifier->classify($rawOpMsgData);  // Type::Read, Write, TransactionBegin, etc.
 ```
 
 Extracts the command name from BSON documents and classifies:

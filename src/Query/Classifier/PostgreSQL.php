@@ -1,6 +1,6 @@
 <?php
 
-namespace Utopia\Query\Parser;
+namespace Utopia\Query\Classifier;
 
 use Utopia\Query\Type;
 
@@ -22,7 +22,7 @@ use Utopia\Query\Type;
  */
 class PostgreSQL extends SQL
 {
-    public function parse(string $data): Type
+    public function classify(string $data): Type
     {
         $len = \strlen($data);
         if ($len < 6) {
