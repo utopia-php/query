@@ -1996,7 +1996,7 @@ The rest are only on the dialects that emit them, so an unsupported combination 
 | `virtual()` | MySQL, MariaDB, SQLite | PostgreSQL supports `STORED` only |
 | `collation($collation)` | MySQL, MariaDB, PostgreSQL, SQLite | ClickHouse collates in `ORDER BY`; MongoDB per collection |
 | `unique()` | MySQL, MariaDB, PostgreSQL, SQLite | ClickHouse enforces no uniqueness; MongoDB uses a unique index |
-| `after($column)` | MySQL, MariaDB, SQLite | PostgreSQL cannot order columns; MongoDB documents have none |
+| `after($column)` | MySQL, MariaDB | PostgreSQL cannot order columns; SQLite's `ADD COLUMN` has no `AFTER` clause; MongoDB documents have no order |
 | `comment($text)` | MySQL, MariaDB, SQLite, ClickHouse, MongoDB | PostgreSQL needs a separate statement — use `commentOnColumn()` |
 | `ttl($expression)` | ClickHouse | — |
 | `userType($name)` | PostgreSQL | — |

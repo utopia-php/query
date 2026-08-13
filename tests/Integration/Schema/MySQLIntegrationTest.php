@@ -42,6 +42,21 @@ class MySQLIntegrationTest extends IntegrationTestCase
         $this->assertSame('100', (string) $nameCol['CHARACTER_MAXIMUM_LENGTH']); // @phpstan-ignore cast.string
     }
 
+    public function testColumnCollationIsAppliedByTheServer(): void
+    {
+        $table = 'test_collation_' . uniqid();
+        $this->trackMysqlTable($table);
+
+        $result = $this->schema->table($table)
+            ->string('name', 100)->collation('utf8mb4_bin')
+            ->create();
+
+        $this->mysqlStatement($result->query);
+
+        $nameCol = $this->findColumn($this->fetchMysqlColumns($table), 'name');
+        $this->assertSame('utf8mb4_bin', $nameCol['COLLATION_NAME']);
+    }
+
     public function testCreateTableWithPrimaryKeyAndUnique(): void
     {
         $table = 'test_pk_uniq_' . uniqid();

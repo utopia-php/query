@@ -41,6 +41,21 @@ class PostgreSQLIntegrationTest extends IntegrationTestCase
         $this->assertSame('100', (string) $nameCol['character_maximum_length']); // @phpstan-ignore cast.string
     }
 
+    public function testColumnCollationIsAppliedByTheServer(): void
+    {
+        $table = 'test_collation_' . uniqid();
+        $this->trackPostgresTable($table);
+
+        $result = $this->schema->table($table)
+            ->string('name', 100)->collation('C')
+            ->create();
+
+        $this->postgresStatement($result->query);
+
+        $nameCol = $this->findColumn($this->fetchPostgresColumns($table), 'name');
+        $this->assertSame('C', $nameCol['collation_name']);
+    }
+
     public function testCreateTableWithIdentityColumn(): void
     {
         $table = 'test_identity_' . uniqid();
