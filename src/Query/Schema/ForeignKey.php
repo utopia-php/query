@@ -196,18 +196,6 @@ class ForeignKey
         return $this->table->modifyColumn($name, $type, $lengthOrPrecision);
     }
 
-    /** @return TTable */
-    public function renameColumn(string $from, string $to): Table
-    {
-        return $this->table->renameColumn($from, $to);
-    }
-
-    /** @return TTable */
-    public function dropColumn(string $name): Table
-    {
-        return $this->table->dropColumn($name);
-    }
-
     /**
      * @param  string[]  $columns
      * @param  array<string, int>  $lengths

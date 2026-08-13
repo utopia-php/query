@@ -520,20 +520,6 @@ class Table
         return $col;
     }
 
-    public function renameColumn(string $from, string $to): static
-    {
-        $this->renameColumns[] = new RenameColumn($from, $to);
-
-        return $this;
-    }
-
-    public function dropColumn(string $name): static
-    {
-        $this->dropColumns[] = $name;
-
-        return $this;
-    }
-
     /**
      * @param  string[]  $columns
      * @param  array<string, int>  $lengths

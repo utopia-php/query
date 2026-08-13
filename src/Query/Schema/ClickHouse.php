@@ -30,10 +30,6 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
 
     protected function compileColumnType(Column $column): string
     {
-        if ($column->userTypeName !== null) {
-            throw new UnsupportedException('User-defined types are not supported in ClickHouse.');
-        }
-
         if ($column instanceof Column\ClickHouse && $column->isFixedString()) {
             $type = 'FixedString(' . $column->fixedStringLength . ')';
 
@@ -135,14 +131,6 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
 
     protected function compileColumnDefinition(Column $column): string
     {
-        if ($column->generatedExpression !== null) {
-            throw new UnsupportedException('Generated columns are not supported in ClickHouse.');
-        }
-
-        if ($column->checkExpression !== null) {
-            throw new UnsupportedException('CHECK constraints are not supported in ClickHouse.');
-        }
-
         $parts = [
             $this->quoteLiteral($column->name),
             $this->compileColumnType($column),

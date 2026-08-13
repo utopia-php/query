@@ -2,6 +2,7 @@
 
 namespace Utopia\Query\Schema\Column;
 
+use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\Column;
 use Utopia\Query\Schema\Forwarder;
 use Utopia\Query\Schema\Table;
@@ -11,6 +12,7 @@ use Utopia\Query\Schema\Table;
  */
 class PostgreSQL extends Column
 {
+    use Trait\Generated;
     use Forwarder\PostgreSQL;
 
     /**
@@ -41,5 +43,20 @@ class PostgreSQL extends Column
         }
 
         return $this->table->check($expressionOrName, $expression);
+    }
+    /**
+     * Reference a user-defined type (e.g. a PostgreSQL enum type created via CREATE TYPE).
+     *
+     * @throws ValidationException if $name is not a valid identifier.
+     */
+    public function userType(string $name): static
+    {
+        if (! \preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name)) {
+            throw new ValidationException('Invalid user-defined type name: ' . $name);
+        }
+
+        $this->userTypeName = $name;
+
+        return $this;
     }
 }

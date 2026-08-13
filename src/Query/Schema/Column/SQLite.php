@@ -11,6 +11,8 @@ use Utopia\Query\Schema\Table;
  */
 class SQLite extends Column
 {
+    use Trait\Generated;
+    use Trait\VirtualGenerated;
     use Forwarder\SQLite;
 
     /**

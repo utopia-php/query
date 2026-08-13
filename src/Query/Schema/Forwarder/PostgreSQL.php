@@ -63,4 +63,13 @@ trait PostgreSQL
         return $this->table->vector($name, $dimensions);
     }
 
+    public function renameColumn(string $from, string $to): Table\PostgreSQL
+    {
+        return $this->table->renameColumn($from, $to);
+    }
+
+    public function dropColumn(string $name): Table\PostgreSQL
+    {
+        return $this->table->dropColumn($name);
+    }
 }

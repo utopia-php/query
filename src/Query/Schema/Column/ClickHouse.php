@@ -151,4 +151,25 @@ class ClickHouse extends Column
 
         return $this;
     }
+    /**
+     * Attach a column-level TTL expression.
+     *
+     * @throws ValidationException if the expression is empty or contains a semicolon.
+     */
+    public function ttl(string $expression): static
+    {
+        $trimmed = \trim($expression);
+
+        if ($trimmed === '') {
+            throw new ValidationException('TTL expression must not be empty.');
+        }
+
+        if (\str_contains($trimmed, ';')) {
+            throw new ValidationException('TTL expression must not contain ";".');
+        }
+
+        $this->ttl = $trimmed;
+
+        return $this;
+    }
 }

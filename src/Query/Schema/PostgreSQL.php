@@ -162,20 +162,12 @@ class PostgreSQL extends SQL implements
     }
 
     /**
-     * PostgreSQL only supports STORED generated columns. Virtual generated columns
-     * are rejected with UnsupportedException.
-     *
-     * @throws UnsupportedException if a VIRTUAL generated column is requested.
+     * PostgreSQL supports STORED generated columns only, which is why
+     * {@see Column\PostgreSQL} does not expose virtual().
      */
     #[\Override]
     protected function compileGeneratedClause(Column $column): string
     {
-        if ($column->generatedStored === false) {
-            throw new UnsupportedException(
-                'PostgreSQL does not support VIRTUAL generated columns. Use stored() instead.'
-            );
-        }
-
         return 'GENERATED ALWAYS AS (' . $column->generatedExpression . ') STORED';
     }
 

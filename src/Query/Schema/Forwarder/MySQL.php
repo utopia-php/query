@@ -58,4 +58,13 @@ trait MySQL
         return $this->table->spatialIndex($columns, $name);
     }
 
+    public function renameColumn(string $from, string $to): Table\MySQL
+    {
+        return $this->table->renameColumn($from, $to);
+    }
+
+    public function dropColumn(string $name): Table\MySQL
+    {
+        return $this->table->dropColumn($name);
+    }
 }

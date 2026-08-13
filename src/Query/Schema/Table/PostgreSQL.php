@@ -13,6 +13,7 @@ use Utopia\Query\Schema\Table;
 class PostgreSQL extends Table
 {
     use Trait\Checks;
+    use Trait\ColumnAlterations;
     use Trait\CompositePrimary;
     /** @use Trait\ForeignKeys<ForeignKey\PostgreSQL> */
     use Trait\ForeignKeys;

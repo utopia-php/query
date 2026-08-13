@@ -31,10 +31,6 @@ class MongoDB extends Schema implements Views, Databases, AnalyzeTable
 
     protected function compileColumnType(Column $column): string
     {
-        if ($column->userTypeName !== null) {
-            throw new UnsupportedException('User-defined types are not supported in MongoDB.');
-        }
-
         return match ($column->type) {
             ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'string',
             ColumnType::Text, ColumnType::MediumText, ColumnType::LongText => 'string',
@@ -64,10 +60,6 @@ class MongoDB extends Schema implements Views, Databases, AnalyzeTable
     #[\Override]
     public function compileCreate(Table $table, bool $ifNotExists = false): Statement
     {
-        if (! empty($table->compositePrimaryKey)) {
-            throw new UnsupportedException('Composite primary keys are not supported in MongoDB; documents use "_id" implicitly.');
-        }
-
         $properties = [];
         $required = [];
 
@@ -122,10 +114,6 @@ class MongoDB extends Schema implements Views, Databases, AnalyzeTable
     #[\Override]
     public function compileAlter(Table $table): Statement
     {
-        if (! empty($table->dropColumns) || ! empty($table->renameColumns)) {
-            throw new UnsupportedException('MongoDB does not support dropping or renaming columns via schema. Use $unset/$rename update operators.');
-        }
-
         $properties = [];
         $required = [];
 

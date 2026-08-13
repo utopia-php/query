@@ -5,11 +5,13 @@ namespace Tests\Query\Schema;
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\CheckConstraint;
-use Utopia\Query\Schema\Column;
+use Utopia\Query\Schema\Column\MySQL as MySQLColumn;
+use Utopia\Query\Schema\Column\PostgreSQL as Column;
 use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\ForeignKey;
 use Utopia\Query\Schema\Index;
 use Utopia\Query\Schema\RenameColumn;
+use Utopia\Query\Schema\Table\MySQL as MySQLTable;
 use Utopia\Query\Schema\Table\PostgreSQL as Table;
 
 class TableTest extends TestCase
@@ -437,8 +439,8 @@ class TableTest extends TestCase
 
     public function testColumnGeneratedAsDefaultsToVirtualOnCompile(): void
     {
-        $bp = new Table();
-        $col = new Column($bp, 'area', ColumnType::Integer);
+        $bp = new MySQLTable();
+        $col = new MySQLColumn($bp, 'area', ColumnType::Integer);
         $col->generatedAs('`width` * `height`');
 
         $this->assertSame('`width` * `height`', $col->generatedExpression);
@@ -447,8 +449,8 @@ class TableTest extends TestCase
 
     public function testColumnStoredAndVirtualAreMutuallyExclusive(): void
     {
-        $bp = new Table();
-        $col = new Column($bp, 'area', ColumnType::Integer);
+        $bp = new MySQLTable();
+        $col = new MySQLColumn($bp, 'area', ColumnType::Integer);
         $col->generatedAs('`width` * `height`')->stored();
         $this->assertTrue($col->generatedStored);
 
@@ -457,6 +459,15 @@ class TableTest extends TestCase
 
         $col->stored();
         $this->assertTrue($col->generatedStored);
+    }
+
+    public function testPostgreSQLColumnDoesNotExposeVirtual(): void
+    {
+        $methods = \get_class_methods(new Column((new Table()), 'area', ColumnType::Integer));
+
+        $this->assertContains('generatedAs', $methods);
+        $this->assertContains('stored', $methods);
+        $this->assertNotContains('virtual', $methods);
     }
 
     public function testPartitionByHashWithCount(): void

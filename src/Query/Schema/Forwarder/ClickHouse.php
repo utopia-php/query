@@ -72,4 +72,13 @@ trait ClickHouse
     {
         return $this->table->sampleBy($expression);
     }
+    public function renameColumn(string $from, string $to): Table\ClickHouse
+    {
+        return $this->table->renameColumn($from, $to);
+    }
+
+    public function dropColumn(string $name): Table\ClickHouse
+    {
+        return $this->table->dropColumn($name);
+    }
 }

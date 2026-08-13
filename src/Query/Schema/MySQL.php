@@ -49,10 +49,6 @@ class MySQL extends SQL implements
 
     protected function compileColumnType(Column $column): string
     {
-        if ($column->userTypeName !== null) {
-            throw new UnsupportedException('User-defined types are not supported in MySQL.');
-        }
-
         return match ($column->type) {
             ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'VARCHAR(' . ($column->length ?? 255) . ')',
             ColumnType::Text => 'TEXT',
