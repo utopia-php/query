@@ -72,4 +72,18 @@ trait PostgreSQL
     {
         return $this->table->dropColumn($name);
     }
+    public function serial(string $name): Column\PostgreSQL
+    {
+        return $this->table->serial($name);
+    }
+
+    public function bigSerial(string $name): Column\PostgreSQL
+    {
+        return $this->table->bigSerial($name);
+    }
+
+    public function smallSerial(string $name): Column\PostgreSQL
+    {
+        return $this->table->smallSerial($name);
+    }
 }

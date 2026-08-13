@@ -12,6 +12,8 @@ use Utopia\Query\Schema\Table;
  */
 class MySQL extends Table
 {
+    /** @use Trait\Serial<Column\MySQL> */
+    use Trait\Serial;
     use Trait\Checks;
     use Trait\ColumnAlterations;
     use Trait\CompositePrimary;

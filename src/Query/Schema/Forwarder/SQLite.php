@@ -29,4 +29,18 @@ trait SQLite
     {
         return $this->table->dropColumn($name);
     }
+    public function serial(string $name): Column\SQLite
+    {
+        return $this->table->serial($name);
+    }
+
+    public function bigSerial(string $name): Column\SQLite
+    {
+        return $this->table->bigSerial($name);
+    }
+
+    public function smallSerial(string $name): Column\SQLite
+    {
+        return $this->table->smallSerial($name);
+    }
 }

@@ -272,53 +272,6 @@ class Table
         return $col;
     }
 
-    /**
-     * Auto-incrementing integer column (PostgreSQL SERIAL; INT AUTO_INCREMENT
-     * on MySQL; INTEGER on SQLite). Not exposed on ClickHouse/MongoDB.
-     *
-     * @return TColumn
-     */
-    public function serial(string $name): Column
-    {
-        $col = $this->newColumn($name, ColumnType::Serial);
-        $col->autoIncrement();
-        $this->columns[] = $col;
-
-        return $col;
-    }
-
-    /**
-     * Auto-incrementing big integer column (PostgreSQL BIGSERIAL;
-     * BIGINT AUTO_INCREMENT on MySQL; INTEGER on SQLite). Not exposed on
-     * ClickHouse/MongoDB.
-     *
-     * @return TColumn
-     */
-    public function bigSerial(string $name): Column
-    {
-        $col = $this->newColumn($name, ColumnType::BigSerial);
-        $col->autoIncrement();
-        $this->columns[] = $col;
-
-        return $col;
-    }
-
-    /**
-     * Auto-incrementing small integer column (PostgreSQL SMALLSERIAL;
-     * SMALLINT AUTO_INCREMENT on MySQL; INTEGER on SQLite). Not exposed on
-     * ClickHouse/MongoDB.
-     *
-     * @return TColumn
-     */
-    public function smallSerial(string $name): Column
-    {
-        $col = $this->newColumn($name, ColumnType::SmallSerial);
-        $col->autoIncrement();
-        $this->columns[] = $col;
-
-        return $col;
-    }
-
     /** @return TColumn */
     public function float(string $name): Column
     {

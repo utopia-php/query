@@ -15,4 +15,18 @@ trait MongoDB
     {
         return $this->table->vector($name, $dimensions);
     }
+    public function serial(string $name): Column\MongoDB
+    {
+        return $this->table->serial($name);
+    }
+
+    public function bigSerial(string $name): Column\MongoDB
+    {
+        return $this->table->bigSerial($name);
+    }
+
+    public function smallSerial(string $name): Column\MongoDB
+    {
+        return $this->table->smallSerial($name);
+    }
 }

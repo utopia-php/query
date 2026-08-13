@@ -88,6 +88,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             ColumnType::SmallInteger => $column->isUnsigned ? 'UInt16' : 'Int16',
             ColumnType::Integer => $column->isUnsigned ? 'UInt32' : 'Int32',
             ColumnType::BigInteger, ColumnType::Id => $column->isUnsigned ? 'UInt64' : 'Int64',
+            ColumnType::Serial, ColumnType::BigSerial, ColumnType::SmallSerial => throw new UnsupportedException('SERIAL types are not supported in ClickHouse. Reached via addColumn(); Table\\ClickHouse has no serial() factory.'),
             ColumnType::Float, ColumnType::Double => 'Float64',
             ColumnType::Decimal => 'Decimal(' . ($column->precision ?? 10) . ', ' . ($column->scale ?? 0) . ')',
             ColumnType::Boolean => 'UInt8',
@@ -102,7 +103,6 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             ColumnType::Uuid => 'UUID',
             ColumnType::Uuid7 => 'FixedString(36)',
             ColumnType::Vector => 'Array(Float64)',
-            ColumnType::Serial, ColumnType::BigSerial, ColumnType::SmallSerial => throw new UnsupportedException('SERIAL types are not supported in ClickHouse.'),
             ColumnType::Array, ColumnType::Tuple => throw new UnsupportedException(
                 'Array/Tuple columns must be declared via Table\\ClickHouse::array() or ::tuple().'
             ),

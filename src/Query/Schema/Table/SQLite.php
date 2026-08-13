@@ -12,6 +12,8 @@ use Utopia\Query\Schema\Table;
  */
 class SQLite extends Table
 {
+    /** @use Trait\Serial<Column\SQLite> */
+    use Trait\Serial;
     use Trait\Checks;
     use Trait\ColumnAlterations;
     use Trait\CompositePrimary;

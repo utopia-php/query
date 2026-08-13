@@ -67,4 +67,18 @@ trait MySQL
     {
         return $this->table->dropColumn($name);
     }
+    public function serial(string $name): Column\MySQL
+    {
+        return $this->table->serial($name);
+    }
+
+    public function bigSerial(string $name): Column\MySQL
+    {
+        return $this->table->bigSerial($name);
+    }
+
+    public function smallSerial(string $name): Column\MySQL
+    {
+        return $this->table->smallSerial($name);
+    }
 }

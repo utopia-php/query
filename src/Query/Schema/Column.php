@@ -282,24 +282,6 @@ class Column
         return $this->table->uuid($name);
     }
 
-    public function serial(string $name): static
-    {
-        /** @var static */
-        return $this->table->serial($name);
-    }
-
-    public function bigSerial(string $name): static
-    {
-        /** @var static */
-        return $this->table->bigSerial($name);
-    }
-
-    public function smallSerial(string $name): static
-    {
-        /** @var static */
-        return $this->table->smallSerial($name);
-    }
-
     public function float(string $name): static
     {
         /** @var static */
