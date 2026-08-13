@@ -2749,7 +2749,7 @@ abstract class Builder implements
                 $serializer = $this->createAstSerializer();
                 $rawExpr = $serializer->serializeExpression($item->expression);
                 $dir = $item->direction === OrderDirection::Desc ? ' DESC' : ' ASC';
-                $this->orderByRaw($rawExpr . $dir);
+                $this->rawOrders[] = new Condition($rawExpr . $dir);
             }
         }
     }

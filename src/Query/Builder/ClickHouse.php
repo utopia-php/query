@@ -12,18 +12,21 @@ use Utopia\Query\Builder\Feature\ClickHouse\AsofJoins;
 use Utopia\Query\Builder\Feature\ClickHouse\LimitBy;
 use Utopia\Query\Builder\Feature\ClickHouse\WithFill;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
+use Utopia\Query\Builder\Feature\Cube;
 use Utopia\Query\Builder\Feature\FullOuterJoins;
-use Utopia\Query\Builder\Feature\GroupByModifiers;
 use Utopia\Query\Builder\Feature\Hints;
+use Utopia\Query\Builder\Feature\RawSql;
+use Utopia\Query\Builder\Feature\Rollup;
 use Utopia\Query\Builder\Feature\StatisticalAggregates;
 use Utopia\Query\Builder\Feature\StringAggregates;
 use Utopia\Query\Builder\Feature\TableSampling;
+use Utopia\Query\Builder\Feature\Totals;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Hook\Join\Placement;
 use Utopia\Query\Query;
 use Utopia\Query\QuotesIdentifiers;
 
-class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, TableSampling, FullOuterJoins, StringAggregates, StatisticalAggregates, BitwiseAggregates, LimitBy, ArrayJoins, AsofJoins, WithFill, GroupByModifiers, ApproximateAggregates
+class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, TableSampling, FullOuterJoins, StringAggregates, StatisticalAggregates, BitwiseAggregates, LimitBy, ArrayJoins, AsofJoins, WithFill, Rollup, Cube, Totals, ApproximateAggregates, RawSql
 {
     use QuotesIdentifiers;
     use Trait\BitwiseAggregates;
@@ -34,6 +37,7 @@ class ClickHouse extends BaseBuilder implements Hints, ConditionalAggregates, Ta
     use Trait\ClickHouse\WithFill;
     use Trait\FullOuterJoins;
     use Trait\GroupByModifiers;
+    use Trait\RawSql;
     use Trait\StatisticalAggregates;
     use Trait\StringAggregates;
 

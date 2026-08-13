@@ -10,6 +10,7 @@ use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\Feature\Aggregates;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\CTEs;
+use Utopia\Query\Builder\Feature\Cube;
 use Utopia\Query\Builder\Feature\Deletes;
 use Utopia\Query\Builder\Feature\FullOuterJoins;
 use Utopia\Query\Builder\Feature\Hints;
@@ -21,10 +22,12 @@ use Utopia\Query\Builder\Feature\LateralJoins;
 use Utopia\Query\Builder\Feature\Locking;
 use Utopia\Query\Builder\Feature\PostgreSQL\Merge;
 use Utopia\Query\Builder\Feature\PostgreSQL\VectorSearch;
+use Utopia\Query\Builder\Feature\Rollup;
 use Utopia\Query\Builder\Feature\Selects;
 use Utopia\Query\Builder\Feature\Sequences;
 use Utopia\Query\Builder\Feature\Spatial;
 use Utopia\Query\Builder\Feature\TableSampling;
+use Utopia\Query\Builder\Feature\Totals;
 use Utopia\Query\Builder\Feature\Transactions;
 use Utopia\Query\Builder\Feature\Unions;
 use Utopia\Query\Builder\Feature\Updates;
@@ -46,6 +49,19 @@ class PostgreSQLTest extends TestCase
     public function testImplementsCompiler(): void
     {
         $this->assertInstanceOf(Compiler::class, new Builder());
+    }
+
+    public function testImplementsRollupAndCube(): void
+    {
+        $builder = new Builder();
+
+        $this->assertInstanceOf(Rollup::class, $builder);
+        $this->assertInstanceOf(Cube::class, $builder);
+    }
+
+    public function testDoesNotImplementTotals(): void
+    {
+        $this->assertArrayNotHasKey(Totals::class, \class_implements(new Builder()));
     }
 
     public function testImplementsSelects(): void

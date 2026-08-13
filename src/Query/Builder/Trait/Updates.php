@@ -8,18 +8,6 @@ use Utopia\Query\Query;
 
 trait Updates
 {
-    /**
-     * @param  list<mixed>  $bindings
-     */
-    #[\Override]
-    public function setRaw(string $column, string $expression, array $bindings = []): static
-    {
-        $this->rawSets[$column] = $expression;
-        $this->rawSetBindings[$column] = $bindings;
-
-        return $this;
-    }
-
     #[\Override]
     public function update(): Statement
     {

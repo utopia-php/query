@@ -13,12 +13,4 @@ trait FullTextSearch
 
         return $this;
     }
-
-    #[\Override]
-    public function filterNotSearch(string $attribute, string $value): static
-    {
-        $this->pendingQueries[] = Query::notSearch($attribute, $value);
-
-        return $this;
-    }
 }

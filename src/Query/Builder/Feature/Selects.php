@@ -28,8 +28,6 @@ interface Selects
      */
     public function queries(array $queries): static;
 
-    public function selectCast(string $column, string $type, string $alias = ''): static;
-
     public function sortAsc(string $attribute, ?NullsPosition $nulls = null): static;
 
     public function sortDesc(string $attribute, ?NullsPosition $nulls = null): static;

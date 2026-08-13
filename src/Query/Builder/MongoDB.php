@@ -181,12 +181,6 @@ class MongoDB extends BaseBuilder implements
     }
 
     #[\Override]
-    public function filterNotSearch(string $attribute, string $value): static
-    {
-        throw new UnsupportedException('MongoDB does not support negated full-text search.');
-    }
-
-    #[\Override]
     public function tablesample(float $percent, string $method = 'BERNOULLI'): static
     {
         $this->sampleSize = $percent;
@@ -225,21 +219,6 @@ class MongoDB extends BaseBuilder implements
         $this->indexHint = null;
 
         return $this;
-    }
-
-    /**
-     * @param  list<mixed>  $bindings
-     */
-    #[\Override]
-    public function whereRaw(string $expression, array $bindings = []): static
-    {
-        throw new ValidationException('whereRaw() is not supported on the MongoDB builder.');
-    }
-
-    #[\Override]
-    public function whereColumn(string $left, string $operator, string $right): static
-    {
-        throw new ValidationException('whereColumn() is not supported on the MongoDB builder.');
     }
 
     #[\Override]
@@ -303,13 +282,6 @@ class MongoDB extends BaseBuilder implements
     {
         $this->bindings = [];
         $this->validateTable();
-
-        if (! empty($this->rawSets) || ! empty($this->caseSets) || ! empty($this->conflictRawSets)) {
-            throw new UnsupportedException(
-                'setRaw()/setCase() are not supported on the MongoDB builder. '
-                . 'Use typed set()/updateInc/updatePush/etc. or raw pipeline stages instead.'
-            );
-        }
 
         $grouped = Query::groupByType($this->pendingQueries);
         $filter = $this->buildFilter($grouped);

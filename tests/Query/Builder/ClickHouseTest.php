@@ -18,9 +18,9 @@ use Utopia\Query\Builder\Feature\ClickHouse\LimitBy;
 use Utopia\Query\Builder\Feature\ClickHouse\WithFill;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\CTEs;
+use Utopia\Query\Builder\Feature\Cube;
 use Utopia\Query\Builder\Feature\Deletes;
 use Utopia\Query\Builder\Feature\FullOuterJoins;
-use Utopia\Query\Builder\Feature\GroupByModifiers;
 use Utopia\Query\Builder\Feature\Hints;
 use Utopia\Query\Builder\Feature\Hooks;
 use Utopia\Query\Builder\Feature\Inserts;
@@ -28,11 +28,13 @@ use Utopia\Query\Builder\Feature\Joins;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\Locking;
 use Utopia\Query\Builder\Feature\PostgreSQL\VectorSearch;
+use Utopia\Query\Builder\Feature\Rollup;
 use Utopia\Query\Builder\Feature\Selects;
 use Utopia\Query\Builder\Feature\Spatial;
 use Utopia\Query\Builder\Feature\StatisticalAggregates;
 use Utopia\Query\Builder\Feature\StringAggregates;
 use Utopia\Query\Builder\Feature\TableSampling;
+use Utopia\Query\Builder\Feature\Totals;
 use Utopia\Query\Builder\Feature\Transactions;
 use Utopia\Query\Builder\Feature\Unions;
 use Utopia\Query\Builder\Feature\Updates;
@@ -9245,7 +9247,11 @@ class ClickHouseTest extends TestCase
 
     public function testImplementsGroupByModifiers(): void
     {
-        $this->assertInstanceOf(GroupByModifiers::class, new Builder());
+        $builder = new Builder();
+
+        $this->assertInstanceOf(Rollup::class, $builder);
+        $this->assertInstanceOf(Cube::class, $builder);
+        $this->assertInstanceOf(Totals::class, $builder);
     }
 
     public function testImplementsApproximateAggregates(): void
