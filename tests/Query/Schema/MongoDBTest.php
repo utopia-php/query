@@ -396,7 +396,7 @@ class MongoDBTest extends TestCase
             ->linestring('path')
             ->polygon('area')
             ->addColumn('uid', ColumnType::Uuid7)
-            ->vector('embedding', 768)
+            ->vector('embedding')
             ->create();
 
         $op = $this->decode($result->query);

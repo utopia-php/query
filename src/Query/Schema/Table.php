@@ -119,10 +119,10 @@ class Table
      *
      * @return TColumn
      */
-    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null, ?int $scale = null): Column
+    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null, ?int $scale = null, ?int $srid = null, ?int $dimensions = null, bool $autoIncrement = false): Column
     {
         /** @var TColumn */
-        return new Column($this, $name, $type, $length, $precision, $scale);
+        return new Column($this, $name, $type, $length, $precision, $scale, $srid, $dimensions, $autoIncrement);
     }
 
     /**
@@ -141,9 +141,8 @@ class Table
     /** @return TColumn */
     public function id(string $name = 'id'): Column
     {
-        $col = $this->newColumn($name, ColumnType::BigInteger);
+        $col = $this->newColumn($name, ColumnType::BigInteger, autoIncrement: true);
         $col->unsigned();
-        $col->autoIncrement();
         $col->primary();
         $this->columns[] = $col;
 
@@ -348,8 +347,7 @@ class Table
     /** @return TColumn */
     public function point(string $name, int $srid = 4326): Column
     {
-        $col = $this->newColumn($name, ColumnType::Point);
-        $col->srid($srid);
+        $col = $this->newColumn($name, ColumnType::Point, srid: $srid);
         $this->columns[] = $col;
 
         return $col;
@@ -358,8 +356,7 @@ class Table
     /** @return TColumn */
     public function linestring(string $name, int $srid = 4326): Column
     {
-        $col = $this->newColumn($name, ColumnType::Linestring);
-        $col->srid($srid);
+        $col = $this->newColumn($name, ColumnType::Linestring, srid: $srid);
         $this->columns[] = $col;
 
         return $col;
@@ -368,8 +365,7 @@ class Table
     /** @return TColumn */
     public function polygon(string $name, int $srid = 4326): Column
     {
-        $col = $this->newColumn($name, ColumnType::Polygon);
-        $col->srid($srid);
+        $col = $this->newColumn($name, ColumnType::Polygon, srid: $srid);
         $this->columns[] = $col;
 
         return $col;

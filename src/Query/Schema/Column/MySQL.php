@@ -11,6 +11,8 @@ use Utopia\Query\Schema\Table;
  */
 class MySQL extends Column
 {
+    use Trait\Srid;
+    use Trait\AutoIncrement;
     use Trait\Collation;
     use Trait\Positioning;
     use Trait\Comment;

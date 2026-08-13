@@ -17,8 +17,11 @@ use Utopia\Query\Schema\MySQL;
 use Utopia\Query\Schema\PostgreSQL;
 use Utopia\Query\Schema\SQLite;
 use Utopia\Query\Schema\Table as BaseTable;
+use Utopia\Query\Schema\Table\ClickHouse as ClickHouseTable;
+use Utopia\Query\Schema\Table\MongoDB as MongoTable;
 use Utopia\Query\Schema\Table\MySQL as MySQLTable;
 use Utopia\Query\Schema\Table\PostgreSQL as Table;
+use Utopia\Query\Schema\Table\SQLite as SQLiteTable;
 
 /**
  * Behavioural tests for the fluent Schema builder. Covers:
@@ -813,6 +816,48 @@ class FluentBuilderTest extends TestCase
         $this->assertSame($col, $col->comment('hi'));
         $this->assertSame($col, $col->after('id'));
         $this->assertSame($col, $col->collation('utf8mb4_bin'));
+    }
+
+    /**
+     * srid, dimensions and autoIncrement are intrinsic column properties set by
+     * the factories, so the factories keep working on every dialect while the
+     * modifiers exist only where the value is emitted.
+     */
+    public function testFactoriesStillSetIntrinsicsWhereModifiersAreAbsent(): void
+    {
+        // SQLite has no srid() modifier, but point() still records the SRID.
+        $sqlite = (new SQLiteTable())->point('g', 3857);
+        $this->assertSame(3857, $sqlite->srid);
+        $this->assertNotContains('srid', \get_class_methods($sqlite));
+
+        // ClickHouse has no autoIncrement() modifier, but id() still flags it.
+        $clickhouse = (new ClickHouseTable())->id();
+        $this->assertTrue($clickhouse->isAutoIncrement);
+        $this->assertNotContains('autoIncrement', \get_class_methods($clickhouse));
+
+        // MongoDB has no autoIncrement() modifier, but serial() still flags it.
+        $mongo = (new MongoTable())->serial('s');
+        $this->assertTrue($mongo->isAutoIncrement);
+        $this->assertNotContains('autoIncrement', \get_class_methods($mongo));
+    }
+
+    public function testIntrinsicModifiersAreScopedToDialectsThatEmitThem(): void
+    {
+        $mysql = \get_class_methods((new MySQLTable())->integer('a'));
+        $pg = \get_class_methods((new Table())->integer('a'));
+        $sqlite = \get_class_methods((new SQLiteTable())->integer('a'));
+        $clickhouse = \get_class_methods((new ClickHouseTable())->integer('a'));
+
+        $this->assertContains('srid', $mysql);
+        $this->assertContains('srid', $pg);
+        $this->assertNotContains('srid', $sqlite);
+
+        $this->assertContains('dimensions', $pg);
+        $this->assertNotContains('dimensions', $mysql);
+        $this->assertNotContains('dimensions', $clickhouse);
+
+        $this->assertContains('autoIncrement', $sqlite);
+        $this->assertNotContains('autoIncrement', $clickhouse);
     }
 
     public function testColumnModifiersAreScopedToDialectsThatEmitThem(): void

@@ -180,9 +180,10 @@ class ForwarderTest extends TestCase
 
         $this->assertInstanceOf(Column\ClickHouse::class, $col);
 
-        $vector = $col->vector('embedding', 768);
+        $vector = $col->vector('embedding');
         $this->assertInstanceOf(Column\ClickHouse::class, $vector);
-        $this->assertSame(768, $vector->dimensions);
+        // ClickHouse vectors are Array(Float64) and carry no declared width.
+        $this->assertNull($vector->dimensions);
 
         $this->assertSame($table, $col->engine(Engine::MergeTree));
         $this->assertSame(Engine::MergeTree, $table->engine);
@@ -219,9 +220,10 @@ class ForwarderTest extends TestCase
 
         $this->assertInstanceOf(Column\MongoDB::class, $col);
 
-        $vector = $col->vector('embedding', 384);
+        $vector = $col->vector('embedding');
         $this->assertInstanceOf(Column\MongoDB::class, $vector);
-        $this->assertSame(384, $vector->dimensions);
+        // MongoDB's array bsonType is unsized.
+        $this->assertNull($vector->dimensions);
     }
 
     public function testTableEntryPointReturnsDialectSpecificType(): void

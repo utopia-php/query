@@ -23,9 +23,9 @@ class PostgreSQL extends Table
     use Trait\StandardPartitioning;
 
     #[\Override]
-    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null, ?int $scale = null): Column\PostgreSQL
+    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null, ?int $scale = null, ?int $srid = null, ?int $dimensions = null, bool $autoIncrement = false): Column\PostgreSQL
     {
-        return new Column\PostgreSQL($this, $name, $type, $length, $precision, $scale);
+        return new Column\PostgreSQL($this, $name, $type, $length, $precision, $scale, $srid, $dimensions, $autoIncrement);
     }
 
     #[\Override]
@@ -36,8 +36,7 @@ class PostgreSQL extends Table
 
     public function vector(string $name, int $dimensions): Column\PostgreSQL
     {
-        $col = $this->newColumn($name, ColumnType::Vector);
-        $col->dimensions($dimensions);
+        $col = $this->newColumn($name, ColumnType::Vector, dimensions: $dimensions);
         $this->columns[] = $col;
 
         return $col;

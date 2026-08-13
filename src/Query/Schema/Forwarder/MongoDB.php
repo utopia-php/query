@@ -11,9 +11,9 @@ use Utopia\Query\Schema\Column;
  */
 trait MongoDB
 {
-    public function vector(string $name, int $dimensions): Column\MongoDB
+    public function vector(string $name): Column\MongoDB
     {
-        return $this->table->vector($name, $dimensions);
+        return $this->table->vector($name);
     }
     public function serial(string $name): Column\MongoDB
     {
