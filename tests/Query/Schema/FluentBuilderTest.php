@@ -4,7 +4,6 @@ namespace Tests\Query\Schema;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
-use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\ClickHouse;
 use Utopia\Query\Schema\ClickHouse\Engine;
@@ -430,7 +429,7 @@ class FluentBuilderTest extends TestCase
         $bp = new Table();
         $bp->string('name');
 
-        $this->expectException(UnsupportedException::class);
+        $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('Cannot compile a Table without a Schema');
         $bp->create();
     }
@@ -440,7 +439,7 @@ class FluentBuilderTest extends TestCase
         $bp = new Table();
         $bp->dropColumn('x');
 
-        $this->expectException(UnsupportedException::class);
+        $this->expectException(ValidationException::class);
         $bp->alter();
     }
 
@@ -448,7 +447,7 @@ class FluentBuilderTest extends TestCase
     {
         $bp = new Table();
 
-        $this->expectException(UnsupportedException::class);
+        $this->expectException(ValidationException::class);
         $bp->drop();
     }
 
@@ -456,7 +455,7 @@ class FluentBuilderTest extends TestCase
     {
         $bp = new Table();
 
-        $this->expectException(UnsupportedException::class);
+        $this->expectException(ValidationException::class);
         $bp->truncate();
     }
 
@@ -464,7 +463,7 @@ class FluentBuilderTest extends TestCase
     {
         $bp = new Table();
 
-        $this->expectException(UnsupportedException::class);
+        $this->expectException(ValidationException::class);
         $bp->rename('to');
     }
 

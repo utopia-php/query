@@ -5,7 +5,7 @@ namespace Utopia\Query\Schema;
 use stdClass;
 use Utopia\Query\Builder;
 use Utopia\Query\Builder\Statement;
-use Utopia\Query\Exception\UnsupportedException;
+use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema;
 use Utopia\Query\Schema\Feature\AnalyzeTable;
 use Utopia\Query\Schema\Feature\Databases;
@@ -269,7 +269,7 @@ class MongoDB extends Schema implements Views, Databases, AnalyzeTable
         /** @var array<string, mixed>|null $op */
         $op = \json_decode($result->query, true);
         if ($op === null) {
-            throw new UnsupportedException('Cannot parse query for MongoDB view creation.');
+            throw new ValidationException('Cannot parse query for MongoDB view creation.');
         }
 
         $command = [

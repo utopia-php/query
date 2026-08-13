@@ -717,7 +717,7 @@ class MongoDB extends BaseBuilder implements
             /** @var array<string, mixed>|null $subOp */
             $subOp = \json_decode($union->query, true);
             if ($subOp === null) {
-                throw new UnsupportedException('Cannot parse union query for MongoDB.');
+                throw new ValidationException('Cannot parse union query for MongoDB.');
             }
 
             $subPipeline = $this->operationToPipeline($subOp);
@@ -1468,7 +1468,7 @@ class MongoDB extends BaseBuilder implements
         /** @var array<string, mixed>|null $subOp */
         $subOp = \json_decode($subResult->query, true);
         if ($subOp === null) {
-            throw new UnsupportedException('Cannot parse subquery for MongoDB WHERE IN.');
+            throw new ValidationException('Cannot parse subquery for MongoDB WHERE IN.');
         }
 
         $this->addBindings($subResult->bindings);
@@ -1521,7 +1521,7 @@ class MongoDB extends BaseBuilder implements
         /** @var array<string, mixed>|null $subOp */
         $subOp = \json_decode($subResult->query, true);
         if ($subOp === null) {
-            throw new UnsupportedException('Cannot parse subquery for MongoDB EXISTS.');
+            throw new ValidationException('Cannot parse subquery for MongoDB EXISTS.');
         }
 
         $this->addBindings($subResult->bindings);

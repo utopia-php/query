@@ -3,7 +3,6 @@
 namespace Utopia\Query\Schema;
 
 use Utopia\Query\Builder\Statement;
-use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema;
 use Utopia\Query\Schema\ClickHouse\Engine;
@@ -108,7 +107,7 @@ class Table
     private function requireSchema(): Schema
     {
         if ($this->schema === null) {
-            throw new UnsupportedException('Cannot compile a Table without a Schema. Use Schema::table($name) to obtain a builder.');
+            throw new ValidationException('Cannot compile a Table without a Schema. Use Schema::table($name) to obtain a builder.');
         }
 
         return $this->schema;
