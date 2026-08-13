@@ -1,11 +1,10 @@
 # Utopia Query
 
-[![Tests](https://github.com/utopia-php/query/actions/workflows/tests.yml/badge.svg)](https://github.com/utopia-php/query/actions/workflows/tests.yml)
-[![Integration Tests](https://github.com/utopia-php/query/actions/workflows/integration.yml/badge.svg)](https://github.com/utopia-php/query/actions/workflows/integration.yml)
+[![CI](https://github.com/utopia-php/query/actions/workflows/ci.yml/badge.svg)](https://github.com/utopia-php/query/actions/workflows/ci.yml)
 [![Linter](https://github.com/utopia-php/query/actions/workflows/linter.yml/badge.svg)](https://github.com/utopia-php/query/actions/workflows/linter.yml)
 [![Static Analysis](https://github.com/utopia-php/query/actions/workflows/static-analysis.yml/badge.svg)](https://github.com/utopia-php/query/actions/workflows/static-analysis.yml)
 
-A PHP library for building type-safe, dialect-aware queries and DDL statements. Provides a fluent builder API with parameterized output for MySQL, MariaDB, PostgreSQL, SQLite, ClickHouse, and MongoDB, plus wire protocol parsers and a serializable `Query` value object for passing query definitions between services.
+A PHP library for building type-safe, dialect-aware queries and DDL statements. Provides a fluent builder API with parameterized output for MySQL, MariaDB, PostgreSQL, SQLite, ClickHouse, and MongoDB, plus a SQL tokenizer and AST for inspecting and rewriting existing SQL, wire protocol parsers, and a serializable `Query` value object for passing query definitions between services.
 
 ## Installation
 
@@ -53,6 +52,7 @@ composer require utopia-php/query
   - [Conditional Building](#conditional-building)
   - [Builder Cloning and Callbacks](#builder-cloning-and-callbacks)
   - [Debugging](#debugging)
+  - [Executors](#executors)
   - [Hooks](#hooks)
 - [Dialect-Specific Features](#dialect-specific-features)
   - [MySQL](#mysql)
@@ -73,11 +73,18 @@ composer require utopia-php/query
   - [Partitions](#partitions)
   - [Comments](#comments)
   - [Views](#views)
+  - [Databases and Maintenance](#databases-and-maintenance)
   - [Procedures and Triggers](#procedures-and-triggers)
   - [PostgreSQL Schema Extensions](#postgresql-schema-extensions)
   - [ClickHouse Schema](#clickhouse-schema)
   - [SQLite Schema](#sqlite-schema)
   - [MongoDB Schema](#mongodb-schema)
+- [SQL Tokenizer and AST](#sql-tokenizer-and-ast)
+  - [Tokenizer](#tokenizer)
+  - [Parsing to an AST](#parsing-to-an-ast)
+  - [Serializing an AST](#serializing-an-ast)
+  - [Walking and Rewriting](#walking-and-rewriting)
+  - [Builder Round-Trip](#builder-round-trip)
 - [Wire Protocol Parsers](#wire-protocol-parsers)
   - [SQL Parser](#sql-parser)
   - [MySQL Parser](#mysql-parser)
@@ -135,18 +142,30 @@ Query::exists(['name', 'email']);
 Query::notExists('legacyField');
 
 // Date helpers
+Query::createdBefore('2024-01-01');
 Query::createdAfter('2024-01-01');
+Query::createdBetween('2024-01-01', '2024-06-30');
+Query::updatedBefore('2024-01-01');
+Query::updatedAfter('2024-01-01');
 Query::updatedBetween('2024-01-01', '2024-06-30');
 ```
+
+Most text and containment filters have a negated counterpart: `notSearch()`, `notStartsWith()`, `notEndsWith()`, `notContains()`, `notBetween()`.
 
 > **Note:** `Query::contains()` is deprecated — use `Query::containsString()` for string substring matching or `Query::containsAny()` for array/relationship attributes.
 
 ### Ordering and Pagination
 
 ```php
+use Utopia\Query\NullsPosition;
+
 Query::orderAsc('createdAt');
 Query::orderDesc('score');
 Query::orderRandom();
+
+// Control where NULLs sort
+Query::orderAsc('deletedAt', NullsPosition::Last);
+Query::orderDesc('score', NullsPosition::First);
 
 Query::limit(25);
 Query::offset(50);
@@ -168,6 +187,8 @@ Query::or([
     Query::equal('role', ['moderator']),
 ]);
 ```
+
+A `Query::elemMatch($attribute, $queries)` factory also exists, for matching a single array element against all of the given predicates. It serializes and parses like any other query, but **no bundled builder compiles it** — every dialect throws `UnsupportedException`. It is only useful to consumers that implement their own [`Compiler`](#compiler-interface).
 
 ### Spatial Queries
 
@@ -204,7 +225,10 @@ Query::jsonPath('metadata', 'address.city', '=', 'London');
 
 ```php
 Query::select(['name', 'email', 'createdAt']);
+Query::distinct();
 ```
+
+Most builder clauses have a `Query` factory equivalent, so a whole statement can be expressed as a serializable array and passed to `queries()` — aggregations (`count`, `countDistinct`, `sum`, `avg`, `min`, `max`, `stddev`, `variance`, `bitAnd`, …), `groupBy`, `having`, joins (`join`, `leftJoin`, `rightJoin`, `crossJoin`, `fullOuterJoin`, `naturalJoin`), set operations (`union`, `unionAll`), and `groupByTimeBucket` (ClickHouse only). Builder-only clauses with no `Query` counterpart include `whereRaw()`, `whereColumn()`, `window()`, and the locking methods.
 
 ### Raw Expressions
 
@@ -237,10 +261,16 @@ $queries = Query::parseQueries([$json1, $json2]);
 $parsed = Query::groupByType($queries);
 // $parsed->filters, $parsed->selections, $parsed->aggregations, $parsed->groupBy,
 // $parsed->having, $parsed->joins, $parsed->unions, $parsed->limit, $parsed->offset,
-// $parsed->cursor, $parsed->cursorDirection, $parsed->distinct
+// $parsed->cursor, $parsed->cursorDirection, $parsed->distinct, $parsed->timeBuckets
 
 // Filter by method type
 $cursors = Query::getByType($queries, [Method::CursorAfter, Method::CursorBefore]);
+
+// Shorthand for the cursor queries specifically
+$cursors = Query::getCursorQueries($queries);
+
+// Stable hash of query shape, ignoring bound values — for cache keys and plan logging
+$key = Query::fingerprint($queries);
 
 // Merge (later limit/offset/cursor overrides earlier)
 $merged = Query::merge($defaultQueries, $userQueries);
@@ -368,8 +398,10 @@ $result = (new Builder())
     ->build();
 
 // SELECT COUNT(*) AS `total`, SUM(`price`) AS `total_price`, `status`
-//   FROM `orders` GROUP BY `status` HAVING `total` > ?
+//   FROM `orders` GROUP BY `status` HAVING COUNT(*) > ?
 ```
+
+A `having()` predicate may reference an aggregate by the alias given to the aggregate call itself (`total` above); the builder expands that alias back to the underlying expression, since standard SQL does not allow `HAVING` to reference a `SELECT` alias.
 
 **Distinct:**
 
@@ -385,7 +417,7 @@ $result = (new Builder())
 
 ### Statistical Aggregates
 
-Available on MySQL, PostgreSQL, SQLite, and ClickHouse via the `StatisticalAggregates` interface:
+Available on MySQL, MariaDB, PostgreSQL, SQLite, and ClickHouse via the `StatisticalAggregates` interface:
 
 ```php
 use Utopia\Query\Builder\PostgreSQL as Builder;
@@ -403,7 +435,7 @@ $result = (new Builder())
 
 ### Bitwise Aggregates
 
-Available on MySQL, PostgreSQL, SQLite, and ClickHouse via the `BitwiseAggregates` interface:
+Available on MySQL, MariaDB, PostgreSQL, SQLite, and ClickHouse via the `BitwiseAggregates` interface:
 
 ```php
 $result = (new Builder())
@@ -416,7 +448,7 @@ $result = (new Builder())
 
 ### Conditional Aggregates
 
-Available on MySQL, PostgreSQL, SQLite, and ClickHouse via the `ConditionalAggregates` interface:
+Available on MySQL, MariaDB, PostgreSQL, SQLite, and ClickHouse via the `ConditionalAggregates` interface:
 
 ```php
 use Utopia\Query\Builder\PostgreSQL as Builder;
@@ -436,7 +468,7 @@ Also available: `avgWhen()`, `minWhen()`, `maxWhen()`.
 
 ### String Aggregates
 
-Available on MySQL, PostgreSQL, and ClickHouse via the `StringAggregates` interface:
+Available on MySQL, MariaDB, PostgreSQL, SQLite, and ClickHouse via the `StringAggregates` interface:
 
 ```php
 use Utopia\Query\Builder\MySQL as Builder;
@@ -468,7 +500,7 @@ $result = (new Builder())
 
 ### Group By Modifiers
 
-Available on MySQL, PostgreSQL, and ClickHouse via the `GroupByModifiers` interface:
+Available on MySQL, MariaDB, PostgreSQL, and ClickHouse via the `GroupByModifiers` interface:
 
 ```php
 use Utopia\Query\Builder\MySQL as Builder;
@@ -749,7 +781,7 @@ $result = (new Builder())
 
 ### Upsert
 
-Available on MySQL, PostgreSQL, and SQLite builders (`Builder\SQL` subclasses):
+Available on MySQL, MariaDB, PostgreSQL, and SQLite via the `Upsert` and `UpsertSelect` interfaces. MongoDB implements `Upsert` with its own document semantics (see [MongoDB](#mongodb)):
 
 `onConflict()` takes the conflict key columns and the columns to update on conflict:
 
@@ -799,7 +831,7 @@ $result = (new Builder())
 
 ### Locking
 
-Available on MySQL, PostgreSQL, and SQLite builders:
+Available on MySQL, MariaDB, PostgreSQL, and SQLite via the `Locking` interface:
 
 ```php
 $result = (new Builder())
@@ -817,7 +849,7 @@ PostgreSQL also supports table-specific locking: `forUpdateOf('accounts')`, `for
 
 ### Transactions
 
-Available on MySQL, PostgreSQL, and SQLite builders:
+Available on MySQL, MariaDB, PostgreSQL, and SQLite via the `Transactions` interface:
 
 ```php
 $builder = new Builder();
@@ -831,7 +863,7 @@ $builder->rollback();         // ROLLBACK
 
 ### EXPLAIN
 
-Available on all builders. MySQL and PostgreSQL provide extended options:
+Available on every SQL builder and ClickHouse. MySQL and PostgreSQL provide extended options:
 
 ```php
 use Utopia\Query\Builder\MySQL as Builder;
@@ -854,6 +886,8 @@ $result = (new PgBuilder())
     ->from('users')
     ->explain(analyze: true, verbose: true, buffers: true, format: 'JSON');
 ```
+
+> **Note:** the MongoDB builder inherits `explain()` but merely prefixes `EXPLAIN ` to the JSON operation document, which is not a valid MongoDB command. Use the driver's own explain support instead.
 
 ### Conditional Building
 
@@ -901,6 +935,34 @@ $sql = (new Builder())
 
 // SELECT * FROM `users` WHERE `status` IN ('active') LIMIT 10
 ```
+
+### Executors
+
+The library never talks to a database itself — it emits `Statement` objects. Attaching an executor closure is optional and lets you collapse build-and-run into one call. The closure receives the `Statement` and returns rows or an affected-row count:
+
+```php
+$executor = function (Statement $statement) use ($pdo): array|int {
+    $prepared = $pdo->prepare($statement->query);
+    $prepared->execute($statement->bindings);
+
+    return $statement->readOnly ? $prepared->fetchAll() : $prepared->rowCount();
+};
+
+$rows = (new Builder())
+    ->setExecutor($executor)
+    ->from('users')
+    ->filter([Query::equal('status', ['active'])])
+    ->execute();  // array<mixed>|int
+```
+
+An executor can also be attached to a single `Statement` after the fact. `withExecutor()` returns a new `Statement` — `Statement` is readonly:
+
+```php
+$statement = (new Builder())->from('users')->build();
+$rows = $statement->withExecutor($executor)->execute();
+```
+
+Calling `execute()` on a `Statement` with no executor throws `BadMethodCallException`. `Schema::setExecutor()` accepts the same closure shape for DDL statements.
 
 ### Hooks
 
@@ -1816,15 +1878,20 @@ Unsupported features are not on the class — consumers type-hint the interface 
 | Selects, Filters, Aggregates, Joins, Unions, CTEs, Inserts, Updates, Deletes, Hooks | x | | | | | | | |
 | Windows | x | | | | | | | |
 | `whereRaw` / `whereColumn` | | x | | | | | x | |
-| Locking, Transactions, Upsert | | x | | | | | | |
-| Spatial, Full-Text Search | | x | | | | | | |
+| Locking, Transactions | | x | | | | | | |
+| Locking `OF` (`forUpdateOf`/`forShareOf`) | | | | | x | | | |
+| Upsert | | | x | x | x | x | | x |
+| Upsert Select | | | x | x | x | x | | |
+| Insert or Ignore | | | x | x | x | x | | x |
+| Spatial | | | x | x | x | | | |
+| Full-Text Search | | | x | x | x | | | x |
 | Statistical Aggregates | | | x | x | x | x | x | |
 | Bitwise Aggregates | | | x | x | x | x | x | |
 | Conditional Aggregates | | | x | x | x | x | x | |
 | JSON (incl. `setJsonPath`) | | | x | x | x | x | | |
 | Hints | | | x | x | | | x | |
 | Lateral Joins | | | x | x | x | | | |
-| String Aggregates | | | x | x | x | | x | |
+| String Aggregates | | | x | x | x | x | x | |
 | Group By Modifiers | | | x | x | x | | x | |
 | Sequences (`nextVal`/`currVal`) | | | | x | x | | | |
 | `RETURNING` | | | | x | x | | | |
@@ -1843,13 +1910,13 @@ Unsupported features are not on the class — consumers type-hint the interface 
 | `groupByTimeBucket` | | | | | | | x | |
 | Named-typed `{name:Type}` bindings | | | | | | | x | |
 | Approximate Aggregates (incl. `quantiles`) | | | | | | | x | |
-| Upsert (Mongo-style) | | | | | | | | x |
-| Full-Text Search (Mongo) | | | | | | | | x |
 | Field Updates | | | | | | | | x |
 | Array Push Modifiers | | | | | | | | x |
 | Conditional Array Updates | | | | | | | | x |
 | Pipeline Stages | | | | | | | | x |
 | Atlas Search | | | | | | | | x |
+
+MongoDB implements the same `Upsert` and `FullTextSearch` interfaces as the SQL dialects, so `instanceof` checks pass, but both emit MongoDB operation documents with document semantics rather than SQL — see [MongoDB](#mongodb).
 
 ## Schema Builder
 
@@ -1890,13 +1957,13 @@ $result = $schema->table('users')
     ->createIfNotExists();
 ```
 
-Available column types: `id`, `uuid`, `string`, `text`, `mediumText`, `longText`, `tinyInteger`, `smallInteger`, `integer`, `bigInteger`, `serial`, `bigSerial`, `smallSerial`, `float`, `decimal`, `boolean`, `datetime`, `timestamp`, `json`, `binary`, `enum`, `point`, `linestring`, `polygon`, `vector` (PostgreSQL only), `timestamps`.
+Available column types: `id`, `uuid`, `string`, `text`, `mediumText`, `longText`, `tinyInteger`, `smallInteger`, `integer`, `bigInteger`, `serial`, `bigSerial`, `smallSerial`, `float`, `decimal`, `boolean`, `datetime`, `timestamp`, `json`, `binary`, `enum`, `point`, `linestring`, `polygon`, `vector` (PostgreSQL, ClickHouse, MongoDB), `timestamps`.
 
-Column modifiers: `nullable()`, `default($value)`, `defaultRaw($expression)`, `unsigned()`, `unique()`, `primary()`, `autoIncrement()`, `after($column)`, `comment($text)`, `collation($collation)`, `check($expression)`, `generatedAs($expression)` + `stored()` / `virtual()`, `ttl($expression)` (ClickHouse), `userType($name)` (PostgreSQL).
+Column modifiers: `nullable()`, `default($value)`, `defaultRaw($expression)`, `unsigned()`, `unique()`, `primary()`, `autoIncrement()`, `after($column)`, `comment($text)`, `collation($collation)`, `check($expression)`, `generatedAs($expression)` + `stored()` / `virtual()`, `srid($srid)` (spatial columns), `dimensions($dimensions)` (vector columns), `ttl($expression)` (ClickHouse), `userType($name)` (PostgreSQL).
 
 **Raw default expressions** — use `defaultRaw($expression)` for dialect-specific server-generated defaults that `default()` would otherwise quote as a string literal (`now()`, `CURRENT_TIMESTAMP`, `gen_random_uuid()`, `generateUUIDv4()`, `UUID()`, …). The expression is emitted verbatim and must come from a trusted source; it must not be empty or contain a semicolon. Takes precedence over `default()` when both are set.
 
-**SERIAL types** — auto-incrementing integers. PostgreSQL emits native `SERIAL` / `BIGSERIAL` / `SMALLSERIAL`; MySQL/MariaDB compile to `INT AUTO_INCREMENT` / `BIGINT AUTO_INCREMENT` / `SMALLINT AUTO_INCREMENT`; SQLite maps to `INTEGER`. ClickHouse and MongoDB throw `UnsupportedException`:
+**SERIAL types** — auto-incrementing integers. PostgreSQL emits native `SERIAL` / `BIGSERIAL` / `SMALLSERIAL`; MySQL/MariaDB compile to `INT AUTO_INCREMENT` / `BIGINT AUTO_INCREMENT` / `SMALLINT AUTO_INCREMENT`; SQLite maps to `INTEGER`; MongoDB maps them to the BSON `int` type. ClickHouse throws `UnsupportedException`:
 
 ```php
 $result = $schema->table('orders')
@@ -1971,6 +2038,9 @@ $result = $schema->table('order_items')
 ```php
 $result = $schema->createIndex('users', 'idx_email', ['email'], unique: true);
 $result = $schema->dropIndex('users', 'idx_email');
+
+// Rename an existing index (MySQL, PostgreSQL) — RenameIndex interface
+$result = $schema->renameIndex('users', 'idx_email', 'idx_users_email');
 ```
 
 PostgreSQL supports index methods, operator classes, and concurrent creation:
@@ -2008,9 +2078,22 @@ $result = $schema->dropForeignKey('orders', 'fk_user');
 
 Available actions: `ForeignKeyAction::Cascade`, `SetNull`, `SetDefault`, `Restrict`, `NoAction`.
 
+`addForeignKey()`/`dropForeignKey()` come from the `ForeignKeys` interface (MySQL, PostgreSQL). Foreign keys can also be declared inline at table-creation time with `foreignKey($column)`, which is additionally available on SQLite:
+
+```php
+$result = $schema->table('posts')
+    ->integer('user_id')
+    ->foreignKey('user_id')->references('id')->on('users')
+        ->onDelete(ForeignKeyAction::Cascade)
+    ->create();
+
+// CREATE TABLE `posts` (`user_id` INTEGER NOT NULL,
+//   FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE)
+```
+
 ### Partitions
 
-Available on MySQL, PostgreSQL, and ClickHouse:
+The `partitionBy*` strategies below and `createPartition()` are available on MySQL and PostgreSQL only. ClickHouse partitions through its own `Table\ClickHouse::partitionBy(string $expression)` (see [ClickHouse Schema](#clickhouse-schema)) and implements `DropPartition` but neither `Partitioning` nor `CreatePartition`.
 
 ```php
 // Define partition strategy in table creation
@@ -2023,7 +2106,7 @@ $result = $schema->table('events')
 // Create a child partition (MySQL, PostgreSQL)
 $result = $schema->createPartition('events', 'events_2024', "VALUES LESS THAN ('2025-01-01')");
 
-// Drop a partition
+// Drop a partition (MySQL, PostgreSQL, ClickHouse)
 $result = $schema->dropPartition('events', 'events_2024');
 ```
 
@@ -2053,12 +2136,34 @@ $result = $schema->commentOnColumn('users', 'email', 'Primary contact email');
 
 ### Views
 
+`createView()` and `dropView()` come from the `Views` interface, implemented on every dialect. `createOrReplaceView()` comes from `ReplaceView` (MySQL and PostgreSQL only).
+
 ```php
 $query = (new Builder())->from('users')->filter([Query::equal('active', [true])]);
 
 $result = $schema->createView('active_users', $query);
 $result = $schema->createOrReplaceView('active_users', $query);
 $result = $schema->dropView('active_users');
+```
+
+**Materialized views** — via the `MaterializedViews` interface, currently ClickHouse only. The body accepts a `Builder` (whose bindings ride along on the returned `Statement`) or a raw SQL string. `$targetTable` is the ClickHouse destination table for the materialized aggregate:
+
+```php
+$result = $schema->createMaterializedView('daily_totals', $query, targetTable: 'daily_totals_store');
+$result = $schema->dropMaterializedView('daily_totals');
+```
+
+> **Security:** when `$body` is a string it is inlined verbatim with no escaping or validation. Pass only SQL you fully control, and prefer the `Builder` overload whenever any part of the body is parameterized.
+
+### Databases and Maintenance
+
+```php
+// Databases interface (MySQL, PostgreSQL, ClickHouse, MongoDB)
+$result = $schema->createDatabase('analytics');
+$result = $schema->dropDatabase('analytics');
+
+// AnalyzeTable interface (MySQL, PostgreSQL, MongoDB)
+$result = $schema->analyzeTable('users');
 ```
 
 ### Procedures and Triggers
@@ -2149,9 +2254,9 @@ $result = $schema->table('events')
 // CREATE TABLE `events` (...) ENGINE = MergeTree() ORDER BY (...)
 ```
 
-ClickHouse uses `Nullable(type)` wrapping for nullable columns, `Enum8(...)` for enums, `Tuple(Float64, Float64)` for points, and `TYPE minmax GRANULARITY 3` for indexes. Foreign keys, stored procedures, triggers, generated columns, and CHECK constraints throw `UnsupportedException`.
+ClickHouse uses `Nullable(type)` wrapping for nullable columns, `Enum8(...)` for enums, `Tuple(Float64, Float64)` for points, and `TYPE minmax GRANULARITY 3` for indexes. Foreign keys, generated columns, and CHECK constraints throw `UnsupportedException`. Stored procedures and triggers are absent from the class entirely — check with `instanceof` rather than catching.
 
-Supports the `TableComments`, `ColumnComments`, `DropPartition`, `Views`, and `Databases` interfaces.
+Supports the `TableComments`, `ColumnComments`, `DropPartition`, `Views`, `MaterializedViews`, and `Databases` interfaces.
 
 **Engine selection** — choose from 10 variants of the `Engine` enum:
 
@@ -2202,7 +2307,7 @@ $schema->table('events')
 // differ from the primary key.
 ```
 
-TTL expressions are emitted verbatim; they must not be empty or contain semicolons. Dialects other than ClickHouse throw `UnsupportedException`.
+TTL expressions are emitted verbatim; they must not be empty or contain semicolons. Table-level `ttl()` exists only on `Table\ClickHouse`. Column-level `ttl()` is on the shared `Column` class but only ClickHouse reads it — on other dialects it is silently ignored rather than raising.
 
 **Skip-index algorithms** — every ClickHouse index is a data-skipping index that accelerates WHERE pruning by letting the engine skip whole granules. Pick the algorithm that matches the column shape via the `algorithm` argument on `Table::index()`:
 
@@ -2414,7 +2519,7 @@ These OLAP-shaped modifiers live on the ClickHouse-specific `Column\ClickHouse` 
 use Utopia\Query\Schema\SQLite as Schema;
 ```
 
-SQLite uses simplified type mappings: `INTEGER` for booleans, `TEXT` for datetimes/JSON, `REAL` for floats, `BLOB` for binary. Auto-increment uses `AUTOINCREMENT`. Vector and spatial types are not supported. Foreign keys, stored procedures, and triggers throw `UnsupportedException`. SERIAL types map to `INTEGER`. Both `STORED` and `VIRTUAL` generated columns are supported.
+SQLite uses simplified type mappings: `INTEGER` for booleans, `TEXT` for datetimes/JSON, `REAL` for floats, `BLOB` for binary. Auto-increment uses `AUTOINCREMENT`. Vector and `Array`/`Tuple` types throw `UnsupportedException`; spatial column types compile to `TEXT` with no geometry semantics. Foreign keys are supported inline at table creation via `foreignKey($column)`; the ALTER-based `addForeignKey()`/`dropForeignKey()`, stored procedures, and triggers are absent from the class rather than throwing. SERIAL types map to `INTEGER`. Both `STORED` and `VIRTUAL` generated columns are supported.
 
 ### MongoDB Schema
 
@@ -2482,11 +2587,121 @@ $result = $schema->createDatabase('analytics');
 $result = $schema->dropDatabase('analytics');
 ```
 
-Column types map to BSON types: `string` → `string`, `integer`/`bigInteger` → `int`, `float`/`double` → `double`, `boolean` → `bool`, `datetime`/`timestamp` → `date`, `json` → `object`, `binary` → `binData`. Composite primary keys, CHECK constraints, generated columns, SERIAL types, and user-defined types all throw `UnsupportedException`.
+Column types map to BSON types: `string` → `string`, `integer`/`bigInteger` → `int`, `float`/`double` → `double`, `boolean` → `bool`, `datetime`/`timestamp` → `date`, `json` → `object`, `binary` → `binData`. Composite primary keys and user-defined types throw `UnsupportedException`, as does dropping or renaming a column. SERIAL types map to `int`. CHECK constraints and generated columns are silently dropped — the JSON Schema validator has no equivalent, so enforce them in application code.
+
+## SQL Tokenizer and AST
+
+Everything above generates SQL. This layer goes the other way: it takes existing SQL text and turns it into an inspectable, rewritable tree. Use it to validate columns against an allow-list, inject tenant predicates into queries you did not author, rename tables, or translate a statement from one dialect's quoting to another's.
+
+```php
+use Utopia\Query\Tokenizer\Tokenizer;
+use Utopia\Query\AST\Parser;
+use Utopia\Query\AST\Serializer;
+```
+
+### Tokenizer
+
+`Tokenizer::tokenize()` returns a flat list of `Token` objects, each with a `type` (`TokenType`), a `value`, and a `position`. `Tokenizer::filter()` strips whitespace and comment tokens, leaving only meaningful ones:
+
+```php
+$tokenizer = new Tokenizer();
+$tokens = Tokenizer::filter($tokenizer->tokenize(
+    "SELECT name, email FROM users WHERE status = 'active' ORDER BY name ASC LIMIT 10"
+));
+
+$tokens[0]->type;   // TokenType::Keyword
+$tokens[0]->value;  // 'SELECT'
+```
+
+`TokenType` covers `Keyword`, `Identifier`, `QuotedIdentifier`, `Integer`, `Float`, `String`, `Boolean`, `Null`, `Operator`, `LeftParen`, `RightParen`, `Comma`, `Semicolon`, `Dot`, `Star`, `Placeholder`, `NamedPlaceholder`, `NumberedPlaceholder`, `LineComment`, `BlockComment`, `Whitespace`, and `Eof`.
+
+Dialect subclasses handle dialect-specific quoting and operators — `Tokenizer\MySQL`, `Tokenizer\MariaDB`, `Tokenizer\PostgreSQL`, `Tokenizer\SQLite`, and `Tokenizer\ClickHouse`.
+
+### Parsing to an AST
+
+`AST\Parser` is a recursive-descent parser over the token list. It produces an `AST\Statement\Select`:
+
+```php
+$ast = (new Parser())->parse($tokens);
+
+$ast->from->name;        // 'users'
+count($ast->columns);    // 2
+$ast->where;             // AST\Expression\Binary
+```
+
+The node hierarchy is made of readonly value objects. Expressions implement the `AST\Expression` marker interface: `Literal`, `Raw`, `Star`, `Placeholder`, `Reference\Column`, `Call\Func`, and `Expression\{Aliased, Between, Binary, CaseWhen, Cast, Conditional, Exists, In, Subquery, Unary, Window}`. Structural nodes include `Reference\Table`, `JoinClause`, `OrderByItem`, `SubquerySource`, `Definition\Cte`, `Definition\Window`, and `Specification\Window`.
+
+`Statement\Select` is immutable; use its `with()` helper to derive a modified copy.
+
+### Serializing an AST
+
+`AST\Serializer` renders a `Select` back to SQL. Dialect subclasses override identifier quoting:
+
+```php
+use Utopia\Query\AST\Serializer\MySQL;
+use Utopia\Query\AST\Serializer\PostgreSQL;
+
+(new MySQL())->serialize($ast);
+// SELECT `name`, `email` FROM `users` WHERE `status` = 'active' ORDER BY `name` ASC LIMIT 10
+
+(new PostgreSQL())->serialize($ast);
+// SELECT "name", "email" FROM "users" WHERE "status" = 'active' ORDER BY "name" ASC LIMIT 10
+```
+
+Subclasses are provided for `MySQL`, `MariaDB`, `PostgreSQL`, `SQLite`, and `ClickHouse`. `serializeExpression()` renders a single expression node in isolation.
+
+### Walking and Rewriting
+
+`AST\Walker` applies a `Visitor` to every node and returns a new, possibly transformed `Select`. The `Visitor` interface has three methods — `visitExpression()`, `visitTableReference()`, and `visitSelect()` — each returning the original node to keep it or a replacement to swap it.
+
+Three visitors ship with the library:
+
+```php
+use Utopia\Query\AST\Walker;
+use Utopia\Query\AST\Visitor\ColumnValidator;
+use Utopia\Query\AST\Visitor\FilterInjector;
+use Utopia\Query\AST\Visitor\TableRenamer;
+use Utopia\Query\AST\Expression\Binary;
+use Utopia\Query\AST\Reference\Column;
+use Utopia\Query\AST\Literal;
+
+$walker = new Walker();
+
+// Rename tables — everywhere they appear, including joins
+$result = $walker->walk($ast, new TableRenamer(['users' => 'accounts']));
+// SELECT `name`, `email` FROM `accounts` WHERE `status` = 'active' ...
+
+// AND an extra predicate onto the WHERE clause
+$result = $walker->walk($ast, new FilterInjector(
+    new Binary(new Column('tenant_id'), '=', new Literal(42))
+));
+// SELECT `name`, `email` FROM `users` WHERE `status` = 'active' AND `tenant_id` = 42 ...
+
+// Reject any column outside the allow-list
+$result = $walker->walk($ast, new ColumnValidator(['name'], allowStar: false));
+// throws Utopia\Query\Exception: Column 'email' is not in the allowed list
+```
+
+`ColumnValidator` also rejects `SELECT *` unless constructed with `allowStar: true`.
+
+### Builder Round-Trip
+
+Any builder can hand out its AST and be reconstructed from one, so a fluent query can be rewritten through the visitor pipeline and then rebuilt:
+
+```php
+$builder = (new Builder())
+    ->from('users')
+    ->select(['id', 'name'])
+    ->filter([Query::equal('status', ['active'])]);
+
+$ast = $builder->toAst();               // AST\Statement\Select
+$rebuilt = Builder::fromAst($ast);      // static
+$rebuilt->build()->query;               // SELECT `id`, `name` FROM `users` WHERE `status` IN (?)
+```
 
 ## Wire Protocol Parsers
 
-The `Parser` interface classifies raw database traffic into query types (`Read`, `Write`, `TransactionBegin`, `TransactionEnd`, `Unknown`). This is useful for connection proxies, audit logging, and read/write splitting.
+The `Parser` interface classifies raw database traffic into query types (`Read`, `Write`, `TransactionBegin`, `TransactionEnd`, `Transaction`, `Unknown`). This is useful for connection proxies, audit logging, and read/write splitting.
 
 ```php
 use Utopia\Query\Parser;
@@ -2509,11 +2724,13 @@ $type = $parser->classifySQL('COMMIT');  // Type::TransactionEnd
 
 Read keywords: `SELECT`, `SHOW`, `DESCRIBE`, `DESC`, `EXPLAIN`, `WITH` (when followed by a read), `TABLE`, `VALUES`.
 
-Write keywords: `INSERT`, `UPDATE`, `DELETE`, `ALTER`, `DROP`, `CREATE`, `TRUNCATE`, `RENAME`, `REPLACE`, `LOAD`, `GRANT`, `REVOKE`, `MERGE`, `CALL`, `EXECUTE`, `DO`, `HANDLER`, `IMPORT`.
+Write keywords: `INSERT`, `UPDATE`, `DELETE`, `CREATE`, `DROP`, `ALTER`, `TRUNCATE`, `GRANT`, `REVOKE`, `LOCK`, `CALL`, `DO`.
 
-Transaction keywords: `BEGIN`, `START` → `TransactionBegin`; `COMMIT`, `ROLLBACK`, `SAVEPOINT`, `RELEASE` → `TransactionEnd`.
+Transaction keywords: `BEGIN`, `START` → `TransactionBegin`; `COMMIT`, `ROLLBACK` → `TransactionEnd`; `SAVEPOINT`, `RELEASE`, `SET` → `Transaction`.
 
-Special handling: `COPY` is classified based on direction (`FROM STDIN` = Write, `TO STDOUT` = Read). `SET` is classified as `TransactionEnd` (session configuration).
+Anything else — including `RENAME`, `REPLACE`, `LOAD`, `MERGE`, and `EXECUTE` — falls through to `Type::Unknown`.
+
+Special handling: `COPY` is classified based on direction (`FROM STDIN` = Write, `TO STDOUT` = Read).
 
 ### MySQL Parser
 
@@ -2526,7 +2743,7 @@ $parser = new MySQL();
 $type = $parser->parse($rawPacketData);  // Type::Read, Write, TransactionBegin, etc.
 ```
 
-Recognizes MySQL command bytes including `COM_QUERY` (classifies via SQL text), `COM_STMT_PREPARE`, `COM_STMT_EXECUTE`, `COM_INIT_DB`, `COM_QUIT`, and others.
+Recognizes `COM_QUERY` (`0x03`, classified via its SQL text), `COM_STMT_PREPARE` (`0x16`), `COM_STMT_EXECUTE` (`0x17`), `COM_STMT_SEND_LONG_DATA` (`0x18`), `COM_STMT_CLOSE` (`0x19`), and `COM_STMT_RESET` (`0x1A`). The prepared-statement commands are routed to the primary.
 
 ### PostgreSQL Parser
 
@@ -2539,7 +2756,7 @@ $parser = new PostgreSQL();
 $type = $parser->parse($rawMessageData);  // Type::Read, Write, TransactionBegin, etc.
 ```
 
-Handles message types including `Q` (simple query), `P` (parse/prepared statement), `X` (terminate), and startup messages.
+Handles message types `Q` (simple query, classified via its SQL text), `P` (parse), `B` (bind), and `E` (execute). Other message types, including terminate and startup messages, return `Type::Unknown`.
 
 ### MongoDB Parser
 
@@ -2590,17 +2807,18 @@ This is the pattern used by [utopia-php/database](https://github.com/utopia-php/
 All code contributions should go through a pull request and be approved by a core developer before being merged.
 
 ```bash
-composer install       # Install dependencies
-composer test          # Run tests
-composer lint          # Check formatting
-composer format        # Auto-format code
-composer check         # Run static analysis (PHPStan level max)
+composer install           # Install dependencies
+composer test              # Run unit tests in parallel (excludes the performance group)
+composer test:performance  # Run the performance group
+composer lint              # Check formatting
+composer format            # Auto-format code
+composer check             # Run static analysis (PHPStan level max)
 ```
 
-**Integration tests** require Docker:
+**Integration tests** require Docker. The compose file brings up MySQL, MariaDB, PostgreSQL (pgvector), ClickHouse, and MongoDB; SQLite runs in-memory with no container. Connection details are fixed in `tests/Integration/IntegrationTestCase.php`, so the containers must be up or the suite fails rather than skips:
 
 ```bash
-docker compose -f docker-compose.test.yml up -d   # Start MySQL, PostgreSQL, ClickHouse
+docker compose -f docker-compose.test.yml up -d   # Start the database containers
 composer test:integration                          # Run integration tests
 docker compose -f docker-compose.test.yml down     # Stop containers
 ```
