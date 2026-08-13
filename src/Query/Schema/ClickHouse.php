@@ -199,14 +199,6 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $alterations[] = 'ADD ' . $this->compileSkipIndex($index);
         }
 
-        if (! empty($table->foreignKeys)) {
-            throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
-        }
-
-        if (! empty($table->dropForeignKeys)) {
-            throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
-        }
-
         if (! empty($table->settings)) {
             throw new UnsupportedException(
                 'Table SETTINGS can only be set on CREATE TABLE; emit `ALTER TABLE ... MODIFY SETTING` directly to change them.'
@@ -257,14 +249,6 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
                 );
             }
             $columnDefs[] = $this->compileSkipIndex($index);
-        }
-
-        if (! empty($table->foreignKeys)) {
-            throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
-        }
-
-        if (! empty($table->checks)) {
-            throw new UnsupportedException('CHECK constraints are not supported in ClickHouse.');
         }
 
         $engine = $table->engine ?? Engine::MergeTree;

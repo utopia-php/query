@@ -5,6 +5,7 @@ namespace Tests\Query\Builder;
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\Feature\Aggregates;
+use Utopia\Query\Builder\Feature\CrossJoins;
 use Utopia\Query\Builder\Feature\CTEs;
 use Utopia\Query\Builder\Feature\Deletes;
 use Utopia\Query\Builder\Feature\FullTextSearch;
@@ -3793,25 +3794,35 @@ class MongoDBTest extends TestCase
         $this->assertSame(1, $projectBody['total_sales']);
     }
 
-    public function testCrossJoinThrowsUnsupportedException(): void
+    public function testDoesNotExposeCrossOrNaturalJoins(): void
+    {
+        $builder = new Builder();
+        $methods = \get_class_methods($builder);
+
+        $this->assertArrayNotHasKey(CrossJoins::class, \class_implements($builder));
+        $this->assertNotContains('crossJoin', $methods);
+        $this->assertNotContains('naturalJoin', $methods);
+    }
+
+    public function testCrossJoinViaQueryStillReports(): void
     {
         $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('Cross/natural joins are not supported');
+        $this->expectExceptionMessage('cannot be expressed as a MongoDB $lookup');
 
         (new Builder())
             ->from('users')
-            ->crossJoin('roles')
+            ->queries([Query::crossJoin('roles')])
             ->build();
     }
 
-    public function testNaturalJoinThrowsUnsupportedException(): void
+    public function testNaturalJoinViaQueryStillReports(): void
     {
         $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('Cross/natural joins are not supported');
+        $this->expectExceptionMessage('cannot be expressed as a MongoDB $lookup');
 
         (new Builder())
             ->from('users')
-            ->naturalJoin('roles')
+            ->queries([Query::naturalJoin('roles')])
             ->build();
     }
 

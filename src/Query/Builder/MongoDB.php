@@ -1259,7 +1259,10 @@ class MongoDB extends BaseBuilder implements
         $stages = [];
 
         if ($joinQuery->getMethod() === Method::CrossJoin || $joinQuery->getMethod() === Method::NaturalJoin) {
-            throw new UnsupportedException('Cross/natural joins are not supported in MongoDB builder.');
+            throw new UnsupportedException(
+                'Cross and natural joins cannot be expressed as a MongoDB $lookup. '
+                . 'Reached via queries([Query::crossJoin(...)]); the MongoDB builder does not implement Feature\\CrossJoins.'
+            );
         }
 
         if (empty($values)) {

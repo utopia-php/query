@@ -2513,12 +2513,12 @@ abstract class Builder implements
             $type = \strtoupper($join->type);
 
             if ($type === 'CROSS JOIN') {
-                $this->crossJoin($table, $alias);
+                $this->pendingQueries[] = Query::crossJoin($table, $alias);
                 continue;
             }
 
             if ($type === 'NATURAL JOIN') {
-                $this->naturalJoin($table, $alias);
+                $this->pendingQueries[] = Query::naturalJoin($table, $alias);
                 continue;
             }
 
