@@ -24,15 +24,14 @@ class ClickHouse extends Table
     public protected(set) ?string $orderByRaw = null;
 
     #[\Override]
-    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null, ?int $scale = null): Column\ClickHouse
+    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null, ?int $scale = null, ?int $srid = null, ?int $dimensions = null, bool $autoIncrement = false): Column\ClickHouse
     {
-        return new Column\ClickHouse($this, $name, $type, $length, $precision, $scale);
+        return new Column\ClickHouse($this, $name, $type, $length, $precision, $scale, $srid, $dimensions, $autoIncrement);
     }
 
-    public function vector(string $name, int $dimensions): Column\ClickHouse
+    public function vector(string $name): Column\ClickHouse
     {
         $col = $this->newColumn($name, ColumnType::Vector);
-        $col->dimensions($dimensions);
         $this->columns[] = $col;
 
         return $col;

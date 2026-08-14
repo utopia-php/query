@@ -15,15 +15,14 @@ class MongoDB extends Table
     /** @use Trait\Serial<Column\MongoDB> */
     use Trait\Serial;
     #[\Override]
-    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null, ?int $scale = null): Column\MongoDB
+    protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null, ?int $scale = null, ?int $srid = null, ?int $dimensions = null, bool $autoIncrement = false): Column\MongoDB
     {
-        return new Column\MongoDB($this, $name, $type, $length, $precision, $scale);
+        return new Column\MongoDB($this, $name, $type, $length, $precision, $scale, $srid, $dimensions, $autoIncrement);
     }
 
-    public function vector(string $name, int $dimensions): Column\MongoDB
+    public function vector(string $name): Column\MongoDB
     {
         $col = $this->newColumn($name, ColumnType::Vector);
-        $col->dimensions($dimensions);
         $this->columns[] = $col;
 
         return $col;

@@ -14,9 +14,9 @@ use Utopia\Query\Schema\Table;
  */
 trait ClickHouse
 {
-    public function vector(string $name, int $dimensions): Column\ClickHouse
+    public function vector(string $name): Column\ClickHouse
     {
-        return $this->table->vector($name, $dimensions);
+        return $this->table->vector($name);
     }
 
     public function fixedString(string $name, int $length): Column\ClickHouse

@@ -11,6 +11,7 @@ use Utopia\Query\Schema\Table;
  */
 class SQLite extends Column
 {
+    use Trait\AutoIncrement;
     use Trait\Collation;
     use Trait\Comment;
     use Trait\Unique;

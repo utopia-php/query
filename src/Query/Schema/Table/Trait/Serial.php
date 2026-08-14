@@ -25,8 +25,7 @@ trait Serial
      */
     public function serial(string $name): Column
     {
-        $col = $this->newColumn($name, ColumnType::Serial);
-        $col->autoIncrement();
+        $col = $this->newColumn($name, ColumnType::Serial, autoIncrement: true);
         $this->columns[] = $col;
 
         return $col;
@@ -41,8 +40,7 @@ trait Serial
      */
     public function bigSerial(string $name): Column
     {
-        $col = $this->newColumn($name, ColumnType::BigSerial);
-        $col->autoIncrement();
+        $col = $this->newColumn($name, ColumnType::BigSerial, autoIncrement: true);
         $this->columns[] = $col;
 
         return $col;
@@ -57,8 +55,7 @@ trait Serial
      */
     public function smallSerial(string $name): Column
     {
-        $col = $this->newColumn($name, ColumnType::SmallSerial);
-        $col->autoIncrement();
+        $col = $this->newColumn($name, ColumnType::SmallSerial, autoIncrement: true);
         $this->columns[] = $col;
 
         return $col;

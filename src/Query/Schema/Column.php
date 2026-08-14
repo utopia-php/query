@@ -62,6 +62,12 @@ class Column
     public protected(set) ?string $userTypeName = null;
 
     /**
+     * $srid, $dimensions and $autoIncrement are intrinsic to the column the way
+     * $length is, and are set by the Table factories that create it (point(),
+     * vector(), id(), serial()). They are constructor parameters rather than
+     * modifier calls so that the factories do not depend on modifier methods
+     * that only some dialects expose.
+     *
      * @param  TTable  $table
      */
     public function __construct(
@@ -71,7 +77,13 @@ class Column
         public ?int $length = null,
         public ?int $precision = null,
         public ?int $scale = null,
+        ?int $srid = null,
+        ?int $dimensions = null,
+        bool $autoIncrement = false,
     ) {
+        $this->srid = $srid;
+        $this->dimensions = $dimensions;
+        $this->isAutoIncrement = $autoIncrement;
     }
 
     public function nullable(): static
@@ -135,13 +147,6 @@ class Column
         return $this;
     }
 
-    public function autoIncrement(): static
-    {
-        $this->isAutoIncrement = true;
-
-        return $this;
-    }
-
     /**
      * Set the allowed values on this enum column (when called with one array
      * argument), or add a new enum column to the parent table (when called
@@ -165,20 +170,6 @@ class Column
         }
 
         return $this->table->enum($nameOrValues, $values ?? []);
-    }
-
-    public function srid(int $srid): static
-    {
-        $this->srid = $srid;
-
-        return $this;
-    }
-
-    public function dimensions(int $dimensions): static
-    {
-        $this->dimensions = $dimensions;
-
-        return $this;
     }
 
     public function modify(): static

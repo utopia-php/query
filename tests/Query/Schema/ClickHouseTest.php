@@ -112,7 +112,7 @@ class ClickHouseTest extends TestCase
     {
         $schema = new Schema();
         $result = $schema->table('embeddings')
-            ->vector('embedding', 768)
+            ->vector('embedding')
             ->create();
         $this->assertBindingCount($result);
 
@@ -514,11 +514,19 @@ class ClickHouseTest extends TestCase
         $this->assertSame('CREATE TABLE IF NOT EXISTS `events` (`id` Int64, `name` String) ENGINE = MergeTree() ORDER BY (`id`)', $result->query);
     }
 
-    public function testCompileAutoIncrementReturnsEmpty(): void
+    public function testDoesNotExposeAutoIncrementAndEmitsNone(): void
     {
         $schema = new Schema();
-        $result = $schema->table('t')
-            ->bigInteger('id')->primary()->autoIncrement()
+        $column = $schema->table('t')->bigInteger('id');
+
+        // ClickHouse has no auto-increment, so the modifier is absent rather
+        // than accepted and ignored. id() still works and emits nothing for it.
+        $this->assertNotContains('autoIncrement', \get_class_methods($column));
+
+        $result = $schema->table('t2')
+            ->id()
+            ->engine(Engine::MergeTree)
+            ->orderBy(['id'])
             ->create();
         $this->assertBindingCount($result);
 

@@ -1983,9 +1983,9 @@ $result = $schema->table('users')
     ->createIfNotExists();
 ```
 
-Available column types: `id`, `uuid`, `string`, `text`, `mediumText`, `longText`, `tinyInteger`, `smallInteger`, `integer`, `bigInteger`, `serial`, `bigSerial`, `smallSerial`, `float`, `decimal`, `boolean`, `datetime`, `timestamp`, `json`, `binary`, `enum`, `point`, `linestring`, `polygon`, `vector` (PostgreSQL, ClickHouse, MongoDB), `timestamps`.
+Available column types: `id`, `uuid`, `string`, `text`, `mediumText`, `longText`, `tinyInteger`, `smallInteger`, `integer`, `bigInteger`, `serial`, `bigSerial`, `smallSerial`, `float`, `decimal`, `boolean`, `datetime`, `timestamp`, `json`, `binary`, `enum`, `point`, `linestring`, `polygon`, `vector` (PostgreSQL, ClickHouse, MongoDB — only PostgreSQL takes a `$dimensions` argument), `timestamps`.
 
-Column modifiers available on every dialect: `nullable()`, `default($value)`, `defaultRaw($expression)`, `primary()`, `unsigned()`, `autoIncrement()`, `srid($srid)` (spatial columns), `dimensions($dimensions)` (vector columns).
+Column modifiers available on every dialect: `nullable()`, `default($value)`, `defaultRaw($expression)`, `primary()`, `unsigned()`.
 
 The rest are only on the dialects that emit them, so an unsupported combination is a type error rather than something silently dropped:
 
@@ -2000,10 +2000,15 @@ The rest are only on the dialects that emit them, so an unsupported combination 
 | `comment($text)` | MySQL, MariaDB, SQLite, ClickHouse, MongoDB | PostgreSQL needs a separate statement — use `commentOnColumn()` |
 | `ttl($expression)` | ClickHouse | — |
 | `userType($name)` | PostgreSQL | — |
+| `srid($srid)` | MySQL, MariaDB, PostgreSQL | SQLite stores geometry as `TEXT`, ClickHouse as a `Tuple`, MongoDB as an object — none carry an SRID |
+| `dimensions($dimensions)` | PostgreSQL | ClickHouse's `Array(Float64)` and MongoDB's array bsonType are unsized |
+| `autoIncrement()` | MySQL, MariaDB, PostgreSQL, SQLite | ClickHouse has none; MongoDB assigns `_id` itself |
 
 Likewise `serial()` / `bigSerial()` / `smallSerial()` are absent from the ClickHouse table, and `dropColumn()` / `renameColumn()` are absent from the MongoDB table.
 
-> **Known gaps.** `unsigned()` is accepted everywhere but renders nothing on PostgreSQL and SQLite, which have no unsigned integer types — you get a signed column. `srid()`, `autoIncrement()` and the `$dimensions` argument to `vector()` are likewise accepted on dialects that cannot express them, because the library's own column factories set them internally. Treat those four as advisory rather than guaranteed.
+The column factories still work everywhere: `point($name, $srid)`, `id()` and `serial()` set the SRID and auto-increment flag intrinsically, so portable schema code is unaffected — only the standalone modifiers are scoped. `Table\ClickHouse::vector()` and `Table\MongoDB::vector()` take no `$dimensions` argument, since neither type records one.
+
+> **Known gap.** `unsigned()` is accepted everywhere but renders nothing on PostgreSQL and SQLite, which have no unsigned integer types — you get a signed column. This one is a deliberate dialect mapping via an overridable `compileUnsigned()` hook, not an oversight.
 
 **Raw default expressions** — use `defaultRaw($expression)` for dialect-specific server-generated defaults that `default()` would otherwise quote as a string literal (`now()`, `CURRENT_TIMESTAMP`, `gen_random_uuid()`, `generateUUIDv4()`, `UUID()`, …). The expression is emitted verbatim and must come from a trusted source; it must not be empty or contain a semicolon. Takes precedence over `default()` when both are set.
 
