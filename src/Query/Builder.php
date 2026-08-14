@@ -2513,12 +2513,12 @@ abstract class Builder implements
             $type = \strtoupper($join->type);
 
             if ($type === 'CROSS JOIN') {
-                $this->crossJoin($table, $alias);
+                $this->pendingQueries[] = Query::crossJoin($table, $alias);
                 continue;
             }
 
             if ($type === 'NATURAL JOIN') {
-                $this->naturalJoin($table, $alias);
+                $this->pendingQueries[] = Query::naturalJoin($table, $alias);
                 continue;
             }
 
@@ -2749,7 +2749,7 @@ abstract class Builder implements
                 $serializer = $this->createAstSerializer();
                 $rawExpr = $serializer->serializeExpression($item->expression);
                 $dir = $item->direction === OrderDirection::Desc ? ' DESC' : ' ASC';
-                $this->orderByRaw($rawExpr . $dir);
+                $this->rawOrders[] = new Condition($rawExpr . $dir);
             }
         }
     }

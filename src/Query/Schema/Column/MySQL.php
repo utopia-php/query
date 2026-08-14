@@ -11,6 +11,8 @@ use Utopia\Query\Schema\Table;
  */
 class MySQL extends Column
 {
+    use Trait\Generated;
+    use Trait\VirtualGenerated;
     use Forwarder\MySQL;
 
     /**

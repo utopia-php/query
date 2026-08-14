@@ -4,7 +4,9 @@ namespace Utopia\Query\Builder;
 
 use Utopia\Query\Builder as BaseBuilder;
 use Utopia\Query\Builder\Feature\BitwiseAggregates;
+use Utopia\Query\Builder\Feature\CrossJoins;
 use Utopia\Query\Builder\Feature\Locking;
+use Utopia\Query\Builder\Feature\RawSql;
 use Utopia\Query\Builder\Feature\StatisticalAggregates;
 use Utopia\Query\Builder\Feature\Transactions;
 use Utopia\Query\Method;
@@ -12,12 +14,14 @@ use Utopia\Query\Query;
 use Utopia\Query\QuotesIdentifiers;
 use Utopia\Query\Schema\ColumnType;
 
-abstract class SQL extends BaseBuilder implements Locking, Transactions, StatisticalAggregates, BitwiseAggregates
+abstract class SQL extends BaseBuilder implements Locking, Transactions, StatisticalAggregates, BitwiseAggregates, RawSql, CrossJoins
 {
     use QuotesIdentifiers;
     use Trait\BitwiseAggregates;
     use Trait\Json;
+    use Trait\CrossJoins;
     use Trait\Locking;
+    use Trait\RawSql;
     use Trait\StatisticalAggregates;
     use Trait\Transactions;
 

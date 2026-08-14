@@ -7,7 +7,10 @@ use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\Case\Expression as CaseExpression;
 use Utopia\Query\Builder\Case\Operator;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
+use Utopia\Query\Builder\Feature\Cube;
 use Utopia\Query\Builder\Feature\Json;
+use Utopia\Query\Builder\Feature\Rollup;
+use Utopia\Query\Builder\Feature\Totals;
 use Utopia\Query\Builder\SQLite as Builder;
 use Utopia\Query\Builder\Statement;
 use Utopia\Query\Compiler;
@@ -22,6 +25,15 @@ class SQLiteTest extends TestCase
     public function testImplementsCompiler(): void
     {
         $this->assertInstanceOf(Compiler::class, new Builder());
+    }
+
+    public function testDoesNotImplementGroupByModifiers(): void
+    {
+        $interfaces = \class_implements(new Builder());
+
+        $this->assertArrayNotHasKey(Rollup::class, $interfaces);
+        $this->assertArrayNotHasKey(Cube::class, $interfaces);
+        $this->assertArrayNotHasKey(Totals::class, $interfaces);
     }
 
     public function testImplementsJson(): void

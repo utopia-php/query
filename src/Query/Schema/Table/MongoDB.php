@@ -12,6 +12,8 @@ use Utopia\Query\Schema\Table;
  */
 class MongoDB extends Table
 {
+    /** @use Trait\Serial<Column\MongoDB> */
+    use Trait\Serial;
     #[\Override]
     protected function newColumn(string $name, ColumnType $type, ?int $length = null, ?int $precision = null, ?int $scale = null): Column\MongoDB
     {

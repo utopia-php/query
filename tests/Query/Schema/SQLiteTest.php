@@ -5,7 +5,6 @@ namespace Tests\Query\Schema;
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\SQLite as SQLBuilder;
-use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\ColumnType;
@@ -546,15 +545,11 @@ class SQLiteTest extends TestCase
         $this->assertSame('CREATE TABLE `t` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL)', $result->query);
     }
 
-    public function testUserTypeColumnThrowsUnsupported(): void
+    public function testColumnDoesNotExposeUserType(): void
     {
-        $this->expectException(UnsupportedException::class);
+        $column = (new Schema())->table('t')->string('mood');
 
-        $schema = new Schema();
-        $schema->table('t')
-            ->integer('id')->primary()
-            ->string('mood')->userType('mood_type')
-            ->create();
+        $this->assertNotContains('userType', \get_class_methods($column));
     }
 
     public function testTinyIntegerMapsToInteger(): void

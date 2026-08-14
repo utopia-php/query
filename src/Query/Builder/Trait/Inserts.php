@@ -64,35 +64,6 @@ trait Inserts
     }
 
     /**
-     * @param  list<mixed>  $bindings
-     */
-    public function conflictSetRaw(string $column, string $expression, array $bindings = []): static
-    {
-        $this->conflictRawSets[$column] = $expression;
-        $this->conflictRawSetBindings[$column] = $bindings;
-
-        return $this;
-    }
-
-    /**
-     * Register a raw expression wrapper for a column in INSERT statements.
-     *
-     * The expression must contain exactly one `?` placeholder which will receive
-     * the column's value from each row. E.g. `ST_GeomFromText(?, 4326)`.
-     *
-     * @param  list<mixed>  $extraBindings  Additional bindings beyond the column value (e.g. SRID)
-     */
-    public function insertColumnExpression(string $column, string $expression, array $extraBindings = []): static
-    {
-        $this->insertColumnExpressions[$column] = $expression;
-        if (! empty($extraBindings)) {
-            $this->insertColumnExpressionBindings[$column] = $extraBindings;
-        }
-
-        return $this;
-    }
-
-    /**
      * @param  list<string>  $columns
      */
     #[\Override]

@@ -4,7 +4,6 @@ namespace Tests\Query\Schema;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
-use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\ClickHouse;
 use Utopia\Query\Schema\ClickHouse\Engine;
@@ -61,6 +60,44 @@ class FluentBuilderTest extends TestCase
         $col = $bp->string('name');
 
         $this->assertSame($bp, $col->table);
+    }
+
+    /**
+     * The serial and column-alteration forwarders live on the per-dialect
+     * Forwarder traits, which are shared by Column\X and ForeignKey\X. This
+     * pins the ForeignKey half of that: a chain may continue through a
+     * foreign key into a column factory and back out to a terminal call.
+     */
+    public function testChainContinuesThroughForeignKeyIntoColumnFactories(): void
+    {
+        foreach ([MySQL::class, PostgreSQL::class, SQLite::class] as $schemaClass) {
+            $schema = new $schemaClass();
+
+            $result = $schema->table('posts')
+                ->integer('user_id')
+                ->foreignKey('user_id')->references('id')->on('users')
+                    ->onDelete(ForeignKeyAction::Cascade)
+                ->serial('seq')
+                ->create();
+
+            $this->assertStringContainsString('seq', $result->query);
+            $this->assertStringContainsString('FOREIGN KEY', $result->query);
+        }
+    }
+
+    public function testForeignKeyExposesForwardersForSupportedDialects(): void
+    {
+        foreach ([
+            \Utopia\Query\Schema\ForeignKey\MySQL::class,
+            \Utopia\Query\Schema\ForeignKey\PostgreSQL::class,
+            \Utopia\Query\Schema\ForeignKey\SQLite::class,
+        ] as $class) {
+            $methods = \get_class_methods($class);
+
+            foreach (['serial', 'bigSerial', 'smallSerial', 'renameColumn', 'dropColumn'] as $method) {
+                $this->assertContains($method, $methods, "{$class} must forward {$method}()");
+            }
+        }
     }
 
     public function testForeignKeyHoldsBackPointerToParentTable(): void
@@ -430,7 +467,7 @@ class FluentBuilderTest extends TestCase
         $bp = new Table();
         $bp->string('name');
 
-        $this->expectException(UnsupportedException::class);
+        $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('Cannot compile a Table without a Schema');
         $bp->create();
     }
@@ -440,7 +477,7 @@ class FluentBuilderTest extends TestCase
         $bp = new Table();
         $bp->dropColumn('x');
 
-        $this->expectException(UnsupportedException::class);
+        $this->expectException(ValidationException::class);
         $bp->alter();
     }
 
@@ -448,7 +485,7 @@ class FluentBuilderTest extends TestCase
     {
         $bp = new Table();
 
-        $this->expectException(UnsupportedException::class);
+        $this->expectException(ValidationException::class);
         $bp->drop();
     }
 
@@ -456,7 +493,7 @@ class FluentBuilderTest extends TestCase
     {
         $bp = new Table();
 
-        $this->expectException(UnsupportedException::class);
+        $this->expectException(ValidationException::class);
         $bp->truncate();
     }
 
@@ -464,7 +501,7 @@ class FluentBuilderTest extends TestCase
     {
         $bp = new Table();
 
-        $this->expectException(UnsupportedException::class);
+        $this->expectException(ValidationException::class);
         $bp->rename('to');
     }
 

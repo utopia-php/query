@@ -4,8 +4,6 @@ namespace Utopia\Query\Builder\Trait;
 
 use Closure;
 use Utopia\Query\Builder;
-use Utopia\Query\Builder\Case\Expression as CaseExpression;
-use Utopia\Query\Builder\ColumnPredicate;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\ExistsSubquery;
 use Utopia\Query\Builder\Statement;
@@ -92,14 +90,6 @@ trait Selects
         return $this;
     }
 
-    /**
-     * @param  list<mixed>  $bindings
-     */
-    public function selectRaw(string $expression, array $bindings = []): static
-    {
-        return $this->select($expression, $bindings);
-    }
-
     #[\Override]
     public function distinct(): static
     {
@@ -130,22 +120,6 @@ trait Selects
         foreach ($queries as $query) {
             $this->pendingQueries[] = $query;
         }
-
-        return $this;
-    }
-
-    #[\Override]
-    public function selectCast(string $column, string $type, string $alias = ''): static
-    {
-        if (!\preg_match('/^[A-Za-z_][A-Za-z0-9_]*(\s+[A-Za-z_][A-Za-z0-9_]*)*(\s*\(\s*[A-Za-z0-9_,\s]+\s*\))?$/', $type)) {
-            throw new ValidationException('Invalid cast type: ' . $type);
-        }
-
-        $expr = 'CAST(' . $this->resolveAndWrap($column) . ' AS ' . $type . ')';
-        if ($alias !== '') {
-            $expr .= ' AS ' . $this->quote($alias);
-        }
-        $this->rawSelects[] = new Condition($expr, []);
 
         return $this;
     }
@@ -237,82 +211,6 @@ trait Selects
         if ($condition) {
             $callback($this);
         }
-
-        return $this;
-    }
-
-    /**
-     * @param  list<mixed>  $bindings
-     */
-    public function orderByRaw(string $expression, array $bindings = []): static
-    {
-        $this->rawOrders[] = new Condition($expression, $bindings);
-
-        return $this;
-    }
-
-    /**
-     * @param  list<mixed>  $bindings
-     */
-    public function groupByRaw(string $expression, array $bindings = []): static
-    {
-        $this->rawGroups[] = new Condition($expression, $bindings);
-
-        return $this;
-    }
-
-    /**
-     * @param  list<mixed>  $bindings
-     */
-    public function havingRaw(string $expression, array $bindings = []): static
-    {
-        $this->rawHavings[] = new Condition($expression, $bindings);
-
-        return $this;
-    }
-
-    /**
-     * Append a raw WHERE fragment with its own bindings.
-     *
-     * Caller owns the SQL fragment - no column or operator validation is performed.
-     * Use this sparingly; prefer `filter()` with typed `Query::*` factories when possible.
-     *
-     * @param  list<mixed>  $bindings
-     */
-    public function whereRaw(string $expression, array $bindings = []): static
-    {
-        $this->rawWheres[] = new Condition($expression, $bindings);
-
-        return $this;
-    }
-
-    /**
-     * Append a column-to-column WHERE predicate (e.g. `users.id = orders.user_id`).
-     *
-     * Both columns are quoted per dialect. The operator is validated against
-     * an allowlist: =, !=, <>, <, >, <=, >=.
-     */
-    public function whereColumn(string $left, string $operator, string $right): static
-    {
-        if (! \in_array($operator, self::COLUMN_PREDICATE_OPERATORS, true)) {
-            throw new ValidationException('Invalid whereColumn operator: ' . $operator);
-        }
-
-        $this->columnPredicates[] = new ColumnPredicate($left, $operator, $right);
-
-        return $this;
-    }
-
-    public function selectCase(CaseExpression $case): static
-    {
-        $this->cases[] = $case;
-
-        return $this;
-    }
-
-    public function setCase(string $column, CaseExpression $case): static
-    {
-        $this->caseSets[$column] = $case;
 
         return $this;
     }

@@ -353,7 +353,7 @@ $rows = $stmt->fetchAll();
 
 ### Raw and Column Predicates
 
-In addition to the typed `filter()` API, two escape hatches are available on every SQL dialect (MySQL, MariaDB, PostgreSQL, SQLite, ClickHouse). Both throw `ValidationException` on the MongoDB builder.
+In addition to the typed `filter()` API, two escape hatches are available on every SQL dialect (MySQL, MariaDB, PostgreSQL, SQLite, ClickHouse). Neither exists on the MongoDB builder: they are part of the `RawSql` capability, which only the SQL dialects and ClickHouse implement.
 
 **`whereRaw()`** — emit a raw SQL fragment with its own bindings. The caller owns the SQL:
 
@@ -500,7 +500,13 @@ $result = (new Builder())
 
 ### Group By Modifiers
 
-Available on MySQL, MariaDB, PostgreSQL, and ClickHouse via the `GroupByModifiers` interface:
+Each modifier is its own capability interface, because dialect support does not line up:
+
+| Modifier | Interface | Dialects |
+|---|---|---|
+| `withRollup()` | `Rollup` | MySQL, MariaDB, PostgreSQL, ClickHouse |
+| `withCube()` | `Cube` | PostgreSQL, ClickHouse |
+| `withTotals()` | `Totals` | ClickHouse |
 
 ```php
 use Utopia\Query\Builder\MySQL as Builder;
@@ -514,8 +520,10 @@ $result = (new Builder())
     ->withRollup()
     ->build();
 
-// WITH CUBE — adds subtotals for all dimension combinations (MySQL 8.0.1+, PostgreSQL, ClickHouse)
-$result = (new Builder())
+// WITH CUBE — adds subtotals for all dimension combinations
+use Utopia\Query\Builder\PostgreSQL as PgBuilder;
+
+$result = (new PgBuilder())
     ->from('sales')
     ->select(['region', 'product'])
     ->sum('amount', 'total')
@@ -1668,7 +1676,9 @@ The trailing `SETTINGS` clause is whatever the caller registers via `settings()`
 use Utopia\Query\Builder\MongoDB as Builder;
 ```
 
-The MongoDB builder generates JSON operation documents instead of SQL. The `Statement->query` contains a JSON-encoded operation and `Statement->bindings` contains parameter values. `whereRaw()` and `whereColumn()` are not supported and throw `ValidationException`.
+The MongoDB builder generates JSON operation documents instead of SQL. The `Statement->query` contains a JSON-encoded operation and `Statement->bindings` contains parameter values.
+
+Because there is no position in an operation document where a SQL fragment could go, the MongoDB builder does not implement `RawSql` — `selectRaw()`, `selectCast()`, `orderByRaw()`, `groupByRaw()`, `havingRaw()`, `whereRaw()`, `whereColumn()`, `selectCase()`, `setCase()`, `setRaw()`, `conflictSetRaw()` and `insertColumnExpression()` do not exist on it. It also does not implement `CrossJoins` (`$lookup` always joins on a field pair) or `NegatedFullTextSearch` (`$text` has no negated form). Use the typed `set()`, field-update and pipeline-stage methods instead.
 
 **Basic queries:**
 
@@ -1871,13 +1881,24 @@ $result = (new Builder())
 
 ### Feature Matrix
 
-Unsupported features are not on the class — consumers type-hint the interface to check capability (e.g., `if ($builder instanceof Spatial)`).
+Capability is expressed in the type, not at runtime: if a dialect cannot do
+something, the method is not on its builder. Check with `instanceof` against the
+capability interface (e.g. `if ($builder instanceof Spatial)`) rather than
+catching an exception.
+
+`UnsupportedException` is therefore reserved for what the type system cannot
+exclude — an unsupported *value* arriving through a correctly typed API. Passing
+`Query::regex(...)` to `filter()` on SQLite, or `ColumnType::Serial` to
+`addColumn()` on ClickHouse, still raises it, because `filter(array $queries)`
+and `addColumn(string $name, ColumnType $type)` accept any query or column type
+by contract.
 
 | Feature | Builder | SQL | MySQL | MariaDB | PostgreSQL | SQLite | ClickHouse | MongoDB |
 |---------|:-------:|:---:|:-----:|:-------:|:----------:|:------:|:----------:|:-------:|
 | Selects, Filters, Aggregates, Joins, Unions, CTEs, Inserts, Updates, Deletes, Hooks | x | | | | | | | |
 | Windows | x | | | | | | | |
-| `whereRaw` / `whereColumn` | | x | | | | | x | |
+| Raw SQL (`whereRaw`, `selectRaw`, `setRaw`, `selectCase`, …) | | x | | | | | x | |
+| Cross / Natural Joins | | x | | | | | x | |
 | Locking, Transactions | | x | | | | | | |
 | Locking `OF` (`forUpdateOf`/`forShareOf`) | | | | | x | | | |
 | Upsert | | | x | x | x | x | | x |
@@ -1885,6 +1906,7 @@ Unsupported features are not on the class — consumers type-hint the interface 
 | Insert or Ignore | | | x | x | x | x | | x |
 | Spatial | | | x | x | x | | | |
 | Full-Text Search | | | x | x | x | | | x |
+| Negated Full-Text Search | | | x | x | x | | | |
 | Statistical Aggregates | | | x | x | x | x | x | |
 | Bitwise Aggregates | | | x | x | x | x | x | |
 | Conditional Aggregates | | | x | x | x | x | x | |
@@ -1892,7 +1914,9 @@ Unsupported features are not on the class — consumers type-hint the interface 
 | Hints | | | x | x | | | x | |
 | Lateral Joins | | | x | x | x | | | |
 | String Aggregates | | | x | x | x | x | x | |
-| Group By Modifiers | | | x | x | x | | x | |
+| Rollup | | | x | x | x | | x | |
+| Cube | | | | | x | | x | |
+| Totals | | | | | | | x | |
 | Sequences (`nextVal`/`currVal`) | | | | x | x | | | |
 | `RETURNING` | | | | x | x | | | |
 | Full Outer Joins | | | | | x | | x | |
@@ -1916,7 +1940,7 @@ Unsupported features are not on the class — consumers type-hint the interface 
 | Pipeline Stages | | | | | | | | x |
 | Atlas Search | | | | | | | | x |
 
-MongoDB implements the same `Upsert` and `FullTextSearch` interfaces as the SQL dialects, so `instanceof` checks pass, but both emit MongoDB operation documents with document semantics rather than SQL — see [MongoDB](#mongodb).
+MongoDB implements the same `Upsert` and `FullTextSearch` interfaces as the SQL dialects, so `instanceof` checks pass, but both emit MongoDB operation documents with document semantics rather than SQL — see [MongoDB](#mongodb). It does not implement `NegatedFullTextSearch`, because `$text` has no negated form.
 
 ## Schema Builder
 
@@ -1959,11 +1983,23 @@ $result = $schema->table('users')
 
 Available column types: `id`, `uuid`, `string`, `text`, `mediumText`, `longText`, `tinyInteger`, `smallInteger`, `integer`, `bigInteger`, `serial`, `bigSerial`, `smallSerial`, `float`, `decimal`, `boolean`, `datetime`, `timestamp`, `json`, `binary`, `enum`, `point`, `linestring`, `polygon`, `vector` (PostgreSQL, ClickHouse, MongoDB), `timestamps`.
 
-Column modifiers: `nullable()`, `default($value)`, `defaultRaw($expression)`, `unsigned()`, `unique()`, `primary()`, `autoIncrement()`, `after($column)`, `comment($text)`, `collation($collation)`, `check($expression)`, `generatedAs($expression)` + `stored()` / `virtual()`, `srid($srid)` (spatial columns), `dimensions($dimensions)` (vector columns), `ttl($expression)` (ClickHouse), `userType($name)` (PostgreSQL).
+Column modifiers available on every dialect: `nullable()`, `default($value)`, `defaultRaw($expression)`, `unsigned()`, `unique()`, `primary()`, `autoIncrement()`, `after($column)`, `comment($text)`, `collation($collation)`, `srid($srid)` (spatial columns), `dimensions($dimensions)` (vector columns).
+
+The rest are only on the dialects that honour them, so an unsupported combination is a type error rather than a runtime one:
+
+| Modifier | Dialects |
+|---|---|
+| `check($expression)` | MySQL, MariaDB, PostgreSQL, SQLite |
+| `generatedAs($expression)`, `stored()` | MySQL, MariaDB, PostgreSQL, SQLite |
+| `virtual()` | MySQL, MariaDB, SQLite (PostgreSQL supports `STORED` only) |
+| `ttl($expression)` | ClickHouse |
+| `userType($name)` | PostgreSQL |
+
+Likewise `serial()` / `bigSerial()` / `smallSerial()` are absent from the ClickHouse table, and `dropColumn()` / `renameColumn()` are absent from the MongoDB table.
 
 **Raw default expressions** — use `defaultRaw($expression)` for dialect-specific server-generated defaults that `default()` would otherwise quote as a string literal (`now()`, `CURRENT_TIMESTAMP`, `gen_random_uuid()`, `generateUUIDv4()`, `UUID()`, …). The expression is emitted verbatim and must come from a trusted source; it must not be empty or contain a semicolon. Takes precedence over `default()` when both are set.
 
-**SERIAL types** — auto-incrementing integers. PostgreSQL emits native `SERIAL` / `BIGSERIAL` / `SMALLSERIAL`; MySQL/MariaDB compile to `INT AUTO_INCREMENT` / `BIGINT AUTO_INCREMENT` / `SMALLINT AUTO_INCREMENT`; SQLite maps to `INTEGER`; MongoDB maps them to the BSON `int` type. ClickHouse throws `UnsupportedException`:
+**SERIAL types** — auto-incrementing integers. PostgreSQL emits native `SERIAL` / `BIGSERIAL` / `SMALLSERIAL`; MySQL/MariaDB compile to `INT AUTO_INCREMENT` / `BIGINT AUTO_INCREMENT` / `SMALLINT AUTO_INCREMENT`; SQLite maps to `INTEGER`; MongoDB maps them to the BSON `int` type. ClickHouse has no sequence type, so `Table\ClickHouse` does not expose these factories at all:
 
 ```php
 $result = $schema->table('orders')
@@ -2254,7 +2290,7 @@ $result = $schema->table('events')
 // CREATE TABLE `events` (...) ENGINE = MergeTree() ORDER BY (...)
 ```
 
-ClickHouse uses `Nullable(type)` wrapping for nullable columns, `Enum8(...)` for enums, `Tuple(Float64, Float64)` for points, and `TYPE minmax GRANULARITY 3` for indexes. Foreign keys, generated columns, and CHECK constraints throw `UnsupportedException`. Stored procedures and triggers are absent from the class entirely — check with `instanceof` rather than catching.
+ClickHouse uses `Nullable(type)` wrapping for nullable columns, `Enum8(...)` for enums, `Tuple(Float64, Float64)` for points, and `TYPE minmax GRANULARITY 3` for indexes. Foreign keys, generated columns, CHECK constraints, stored procedures, triggers and the `serial()` factories are all absent from the ClickHouse table and column classes rather than throwing — check with `instanceof` rather than catching. `ttl()` is exposed only on `Column\ClickHouse`.
 
 Supports the `TableComments`, `ColumnComments`, `DropPartition`, `Views`, `MaterializedViews`, and `Databases` interfaces.
 
@@ -2587,7 +2623,7 @@ $result = $schema->createDatabase('analytics');
 $result = $schema->dropDatabase('analytics');
 ```
 
-Column types map to BSON types: `string` → `string`, `integer`/`bigInteger` → `int`, `float`/`double` → `double`, `boolean` → `bool`, `datetime`/`timestamp` → `date`, `json` → `object`, `binary` → `binData`. Composite primary keys and user-defined types throw `UnsupportedException`, as does dropping or renaming a column. SERIAL types map to `int`. CHECK constraints and generated columns are silently dropped — the JSON Schema validator has no equivalent, so enforce them in application code.
+Column types map to BSON types: `string` → `string`, `integer`/`bigInteger` → `int`, `float`/`double` → `double`, `boolean` → `bool`, `datetime`/`timestamp` → `date`, `json` → `object`, `binary` → `binData`. SERIAL types map to `int`. Composite primary keys, `dropColumn()`/`renameColumn()`, CHECK constraints, generated columns and `userType()` are not exposed on the MongoDB table and column classes — a JSON Schema validator has no equivalent for any of them, so enforce those constraints in application code.
 
 ## SQL Tokenizer and AST
 

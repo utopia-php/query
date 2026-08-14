@@ -10,6 +10,7 @@ use Utopia\Query\Builder\Case\Operator;
 use Utopia\Query\Builder\Condition;
 use Utopia\Query\Builder\Feature\Aggregates;
 use Utopia\Query\Builder\Feature\CTEs;
+use Utopia\Query\Builder\Feature\Cube;
 use Utopia\Query\Builder\Feature\Deletes;
 use Utopia\Query\Builder\Feature\Hints;
 use Utopia\Query\Builder\Feature\Hooks;
@@ -18,8 +19,10 @@ use Utopia\Query\Builder\Feature\Joins;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\Locking;
 use Utopia\Query\Builder\Feature\PostgreSQL\VectorSearch;
+use Utopia\Query\Builder\Feature\Rollup;
 use Utopia\Query\Builder\Feature\Selects;
 use Utopia\Query\Builder\Feature\Spatial;
+use Utopia\Query\Builder\Feature\Totals;
 use Utopia\Query\Builder\Feature\Transactions;
 use Utopia\Query\Builder\Feature\Unions;
 use Utopia\Query\Builder\Feature\Updates;
@@ -48,6 +51,19 @@ class MySQLTest extends TestCase
     {
         $builder = new Builder();
         $this->assertInstanceOf(Compiler::class, $builder);
+    }
+
+    public function testImplementsRollup(): void
+    {
+        $this->assertInstanceOf(Rollup::class, new Builder());
+    }
+
+    public function testDoesNotImplementCubeOrTotals(): void
+    {
+        $interfaces = \class_implements(new Builder());
+
+        $this->assertArrayNotHasKey(Cube::class, $interfaces);
+        $this->assertArrayNotHasKey(Totals::class, $interfaces);
     }
 
     public function testImplementsTransactions(): void

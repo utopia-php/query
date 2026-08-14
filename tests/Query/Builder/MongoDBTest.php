@@ -4,9 +4,8 @@ namespace Tests\Query\Builder;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Query\AssertsBindingCount;
-use Utopia\Query\Builder\Case\Expression as CaseExpression;
-use Utopia\Query\Builder\Case\Operator;
 use Utopia\Query\Builder\Feature\Aggregates;
+use Utopia\Query\Builder\Feature\CrossJoins;
 use Utopia\Query\Builder\Feature\CTEs;
 use Utopia\Query\Builder\Feature\Deletes;
 use Utopia\Query\Builder\Feature\FullTextSearch;
@@ -18,6 +17,8 @@ use Utopia\Query\Builder\Feature\MongoDB\AtlasSearch;
 use Utopia\Query\Builder\Feature\MongoDB\ConditionalArrayUpdates;
 use Utopia\Query\Builder\Feature\MongoDB\FieldUpdates;
 use Utopia\Query\Builder\Feature\MongoDB\PipelineStages;
+use Utopia\Query\Builder\Feature\NegatedFullTextSearch;
+use Utopia\Query\Builder\Feature\RawSql;
 use Utopia\Query\Builder\Feature\Selects;
 use Utopia\Query\Builder\Feature\TableSampling;
 use Utopia\Query\Builder\Feature\Unions;
@@ -1116,14 +1117,13 @@ class MongoDBTest extends TestCase
         $this->assertSame(100, $sampleBody['size']);
     }
 
-    public function testFilterNotSearchThrowsException(): void
+    public function testDoesNotExposeNegatedFullTextSearch(): void
     {
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('MongoDB does not support negated full-text search.');
+        $builder = new Builder();
 
-        (new Builder())
-            ->from('articles')
-            ->filterNotSearch('content', 'bad term');
+        $this->assertInstanceOf(FullTextSearch::class, $builder);
+        $this->assertArrayNotHasKey(NegatedFullTextSearch::class, \class_implements($builder));
+        $this->assertNotContains('filterNotSearch', \get_class_methods($builder));
     }
 
     public function testFilterExistsSubquery(): void
@@ -1831,31 +1831,13 @@ class MongoDBTest extends TestCase
             ->build();
     }
 
-    public function testUpdateWithSetRawThrows(): void
+    public function testDoesNotExposeRawSqlSetters(): void
     {
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('setRaw()/setCase()');
+        $methods = \get_class_methods(new Builder());
 
-        (new Builder())
-            ->from('users')
-            ->setRaw('counter', 'counter + 1')
-            ->update();
-    }
-
-    public function testUpdateWithSetCaseThrows(): void
-    {
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('setRaw()/setCase()');
-
-        (new Builder())
-            ->from('users')
-            ->setCase(
-                'status',
-                (new CaseExpression())
-                    ->when('age', Operator::GreaterThan, 18, 'adult')
-                    ->else('minor')
-            )
-            ->update();
+        $this->assertNotContains('setRaw', $methods);
+        $this->assertNotContains('setCase', $methods);
+        $this->assertNotContains('conflictSetRaw', $methods);
     }
 
     public function testWindowFunctionMultiArgumentThrows(): void
@@ -3812,25 +3794,35 @@ class MongoDBTest extends TestCase
         $this->assertSame(1, $projectBody['total_sales']);
     }
 
-    public function testCrossJoinThrowsUnsupportedException(): void
+    public function testDoesNotExposeCrossOrNaturalJoins(): void
+    {
+        $builder = new Builder();
+        $methods = \get_class_methods($builder);
+
+        $this->assertArrayNotHasKey(CrossJoins::class, \class_implements($builder));
+        $this->assertNotContains('crossJoin', $methods);
+        $this->assertNotContains('naturalJoin', $methods);
+    }
+
+    public function testCrossJoinViaQueryStillReports(): void
     {
         $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('Cross/natural joins are not supported');
+        $this->expectExceptionMessage('cannot be expressed as a MongoDB $lookup');
 
         (new Builder())
             ->from('users')
-            ->crossJoin('roles')
+            ->queries([Query::crossJoin('roles')])
             ->build();
     }
 
-    public function testNaturalJoinThrowsUnsupportedException(): void
+    public function testNaturalJoinViaQueryStillReports(): void
     {
         $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('Cross/natural joins are not supported');
+        $this->expectExceptionMessage('cannot be expressed as a MongoDB $lookup');
 
         (new Builder())
             ->from('users')
-            ->naturalJoin('roles')
+            ->queries([Query::naturalJoin('roles')])
             ->build();
     }
 
@@ -5647,14 +5639,25 @@ class MongoDBTest extends TestCase
         $this->assertSame('$currentDate', UpdateOperator::CurrentDate->value);
     }
 
-    public function testWhereColumnIsNotSupportedOnMongoDB(): void
+    public function testDoesNotImplementRawSql(): void
     {
-        $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('whereColumn() is not supported on the MongoDB builder.');
+        $builder = new Builder();
 
-        (new Builder())
-            ->from('users')
-            ->whereColumn('users.id', '=', 'orders.user_id');
+        $this->assertArrayNotHasKey(RawSql::class, \class_implements($builder));
+
+        $methods = \get_class_methods($builder);
+
+        foreach ([
+            'selectRaw', 'selectCast', 'orderByRaw', 'groupByRaw', 'havingRaw',
+            'whereRaw', 'whereColumn', 'selectCase', 'setCase', 'setRaw',
+            'conflictSetRaw', 'insertColumnExpression',
+        ] as $method) {
+            $this->assertNotContains(
+                $method,
+                $methods,
+                "MongoDB builder must not expose {$method}()"
+            );
+        }
     }
 
 }

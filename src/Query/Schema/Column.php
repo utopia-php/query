@@ -216,80 +216,6 @@ class Column
         return $this;
     }
 
-    /**
-     * Attach a column-level CHECK constraint. Dialect Column subclasses that
-     * support table-level CHECK constraints also accept a name and expression
-     * pair to declare a named table-level CHECK.
-     */
-    public function check(string $expression): static|Table
-    {
-        $this->checkExpression = $expression;
-
-        return $this;
-    }
-
-    /**
-     * Mark the column as a generated column computed from the given expression.
-     */
-    public function generatedAs(string $expression): static
-    {
-        $this->generatedExpression = $expression;
-
-        return $this;
-    }
-
-    public function stored(): static
-    {
-        $this->generatedStored = true;
-
-        return $this;
-    }
-
-    public function virtual(): static
-    {
-        $this->generatedStored = false;
-
-        return $this;
-    }
-
-    /**
-     * Attach a column-level TTL expression (ClickHouse only).
-     *
-     * @throws ValidationException if the expression is empty or contains a semicolon.
-     */
-    public function ttl(string $expression): static
-    {
-        $trimmed = \trim($expression);
-
-        if ($trimmed === '') {
-            throw new ValidationException('TTL expression must not be empty.');
-        }
-
-        if (\str_contains($trimmed, ';')) {
-            throw new ValidationException('TTL expression must not contain ";".');
-        }
-
-        $this->ttl = $trimmed;
-
-        return $this;
-    }
-
-    /**
-     * Reference a user-defined type (e.g. a PostgreSQL enum type created via CREATE TYPE).
-     *
-     * @throws ValidationException if $name is not a valid identifier.
-     */
-    public function userType(string $name): static
-    {
-        if (! \preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name)) {
-            throw new ValidationException('Invalid user-defined type name: ' . $name);
-        }
-
-        $this->userTypeName = $name;
-
-        return $this;
-    }
-
     public function id(string $name = 'id'): static
     {
         /** @var static */
@@ -354,24 +280,6 @@ class Column
     {
         /** @var static */
         return $this->table->uuid($name);
-    }
-
-    public function serial(string $name): static
-    {
-        /** @var static */
-        return $this->table->serial($name);
-    }
-
-    public function bigSerial(string $name): static
-    {
-        /** @var static */
-        return $this->table->bigSerial($name);
-    }
-
-    public function smallSerial(string $name): static
-    {
-        /** @var static */
-        return $this->table->smallSerial($name);
     }
 
     public function float(string $name): static
@@ -444,18 +352,6 @@ class Column
     {
         /** @var static */
         return $this->table->modifyColumn($name, $type, $lengthOrPrecision);
-    }
-
-    /** @return TTable */
-    public function renameColumn(string $from, string $to): Table
-    {
-        return $this->table->renameColumn($from, $to);
-    }
-
-    /** @return TTable */
-    public function dropColumn(string $name): Table
-    {
-        return $this->table->dropColumn($name);
     }
 
     /**

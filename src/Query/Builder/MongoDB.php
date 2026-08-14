@@ -181,12 +181,6 @@ class MongoDB extends BaseBuilder implements
     }
 
     #[\Override]
-    public function filterNotSearch(string $attribute, string $value): static
-    {
-        throw new UnsupportedException('MongoDB does not support negated full-text search.');
-    }
-
-    #[\Override]
     public function tablesample(float $percent, string $method = 'BERNOULLI'): static
     {
         $this->sampleSize = $percent;
@@ -225,21 +219,6 @@ class MongoDB extends BaseBuilder implements
         $this->indexHint = null;
 
         return $this;
-    }
-
-    /**
-     * @param  list<mixed>  $bindings
-     */
-    #[\Override]
-    public function whereRaw(string $expression, array $bindings = []): static
-    {
-        throw new ValidationException('whereRaw() is not supported on the MongoDB builder.');
-    }
-
-    #[\Override]
-    public function whereColumn(string $left, string $operator, string $right): static
-    {
-        throw new ValidationException('whereColumn() is not supported on the MongoDB builder.');
     }
 
     #[\Override]
@@ -303,13 +282,6 @@ class MongoDB extends BaseBuilder implements
     {
         $this->bindings = [];
         $this->validateTable();
-
-        if (! empty($this->rawSets) || ! empty($this->caseSets) || ! empty($this->conflictRawSets)) {
-            throw new UnsupportedException(
-                'setRaw()/setCase() are not supported on the MongoDB builder. '
-                . 'Use typed set()/updateInc/updatePush/etc. or raw pipeline stages instead.'
-            );
-        }
 
         $grouped = Query::groupByType($this->pendingQueries);
         $filter = $this->buildFilter($grouped);
@@ -745,7 +717,7 @@ class MongoDB extends BaseBuilder implements
             /** @var array<string, mixed>|null $subOp */
             $subOp = \json_decode($union->query, true);
             if ($subOp === null) {
-                throw new UnsupportedException('Cannot parse union query for MongoDB.');
+                throw new ValidationException('Cannot parse union query for MongoDB.');
             }
 
             $subPipeline = $this->operationToPipeline($subOp);
@@ -1287,7 +1259,10 @@ class MongoDB extends BaseBuilder implements
         $stages = [];
 
         if ($joinQuery->getMethod() === Method::CrossJoin || $joinQuery->getMethod() === Method::NaturalJoin) {
-            throw new UnsupportedException('Cross/natural joins are not supported in MongoDB builder.');
+            throw new UnsupportedException(
+                'Cross and natural joins cannot be expressed as a MongoDB $lookup. '
+                . 'Reached via queries([Query::crossJoin(...)]); the MongoDB builder does not implement Feature\\CrossJoins.'
+            );
         }
 
         if (empty($values)) {
@@ -1496,7 +1471,7 @@ class MongoDB extends BaseBuilder implements
         /** @var array<string, mixed>|null $subOp */
         $subOp = \json_decode($subResult->query, true);
         if ($subOp === null) {
-            throw new UnsupportedException('Cannot parse subquery for MongoDB WHERE IN.');
+            throw new ValidationException('Cannot parse subquery for MongoDB WHERE IN.');
         }
 
         $this->addBindings($subResult->bindings);
@@ -1549,7 +1524,7 @@ class MongoDB extends BaseBuilder implements
         /** @var array<string, mixed>|null $subOp */
         $subOp = \json_decode($subResult->query, true);
         if ($subOp === null) {
-            throw new UnsupportedException('Cannot parse subquery for MongoDB EXISTS.');
+            throw new ValidationException('Cannot parse subquery for MongoDB EXISTS.');
         }
 
         $this->addBindings($subResult->bindings);

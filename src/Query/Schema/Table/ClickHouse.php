@@ -14,6 +14,7 @@ use Utopia\Query\Schema\Table;
  */
 class ClickHouse extends Table
 {
+    use Trait\ColumnAlterations;
     use Trait\CompositePrimary;
 
     /** ClickHouse SAMPLE BY expression. Emitted after ORDER BY when set. */

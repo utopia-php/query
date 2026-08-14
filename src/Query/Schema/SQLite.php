@@ -18,10 +18,6 @@ class SQLite extends SQL implements Views
 
     protected function compileColumnType(Column $column): string
     {
-        if ($column->userTypeName !== null) {
-            throw new UnsupportedException('User-defined types are not supported in SQLite.');
-        }
-
         return match ($column->type) {
             ColumnType::String, ColumnType::Varchar, ColumnType::Relationship => 'VARCHAR(' . ($column->length ?? 255) . ')',
             ColumnType::Text, ColumnType::MediumText, ColumnType::LongText => 'TEXT',

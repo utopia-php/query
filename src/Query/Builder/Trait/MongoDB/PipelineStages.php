@@ -2,7 +2,7 @@
 
 namespace Utopia\Query\Builder\Trait\MongoDB;
 
-use Utopia\Query\Exception\UnsupportedException;
+use Utopia\Query\Exception\ValidationException;
 
 trait PipelineStages
 {
@@ -58,7 +58,7 @@ trait PipelineStages
             /** @var array<string, mixed>|null $subOp */
             $subOp = \json_decode($result->query, true);
             if ($subOp === null) {
-                throw new UnsupportedException('Cannot parse facet query for MongoDB.');
+                throw new ValidationException('Cannot parse facet query for MongoDB.');
             }
             $this->facetStages[$name] = [
                 'pipeline' => $this->operationToPipeline($subOp),

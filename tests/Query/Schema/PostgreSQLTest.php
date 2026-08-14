@@ -7,7 +7,7 @@ use Tests\Query\AssertsBindingCount;
 use Utopia\Query\Builder\PostgreSQL as PgBuilder;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Query;
-use Utopia\Query\Schema\Column;
+use Utopia\Query\Schema\Column\PostgreSQL as PostgreSQLColumn;
 use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\Feature\ColumnComments;
 use Utopia\Query\Schema\Feature\CreatePartition;
@@ -1297,7 +1297,7 @@ class PostgreSQLTest extends TestCase
         $this->expectExceptionMessage('Invalid user-defined type name');
 
         $bp = (new Schema())->table('t');
-        $col = new Column($bp, 'mood', ColumnType::String);
+        $col = new PostgreSQLColumn($bp, 'mood', ColumnType::String);
         $col->userType('bad; DROP TABLE users');
     }
 

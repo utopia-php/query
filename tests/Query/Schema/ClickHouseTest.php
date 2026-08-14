@@ -23,6 +23,28 @@ class ClickHouseTest extends TestCase
 {
     use AssertsBindingCount;
 
+    public function testTableDoesNotExposeSerialFactories(): void
+    {
+        $methods = \get_class_methods((new Schema())->table('t'));
+
+        $this->assertNotContains('serial', $methods);
+        $this->assertNotContains('bigSerial', $methods);
+        $this->assertNotContains('smallSerial', $methods);
+    }
+
+    public function testSerialViaAddColumnStillReports(): void
+    {
+        $this->expectException(UnsupportedException::class);
+        $this->expectExceptionMessage('SERIAL types are not supported in ClickHouse');
+
+        (new Schema())->table('t')
+            ->addColumn('id', ColumnType::Serial)
+            ->table
+            ->engine(Engine::MergeTree)
+            ->orderBy(['id'])
+            ->create();
+    }
+
     public function testCreateTableBasic(): void
     {
         $schema = new Schema();

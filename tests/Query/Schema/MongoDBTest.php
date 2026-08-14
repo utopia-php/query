@@ -4,7 +4,6 @@ namespace Tests\Query\Schema;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Builder\MongoDB as Builder;
-use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\ColumnType;
 use Utopia\Query\Schema\MongoDB as Schema;
@@ -304,26 +303,17 @@ class MongoDBTest extends TestCase
         $this->assertSame('User phone number', $props['phone']['description']);
     }
 
-    public function testAlterDropColumnThrows(): void
+    public function testTableDoesNotExposeColumnAlterations(): void
     {
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('MongoDB does not support dropping or renaming columns via schema');
+        $methods = \get_class_methods((new Schema())->table('users'));
 
-        $schema = new Schema();
-        $schema->table('users')
-            ->dropColumn('old_field')
-            ->alter();
+        $this->assertNotContains('dropColumn', $methods);
+        $this->assertNotContains('renameColumn', $methods);
     }
 
-    public function testAlterRenameColumnThrows(): void
+    public function testTableDoesNotExposeCompositePrimaryKey(): void
     {
-        $this->expectException(UnsupportedException::class);
-        $this->expectExceptionMessage('MongoDB does not support dropping or renaming columns via schema');
-
-        $schema = new Schema();
-        $schema->table('users')
-            ->renameColumn('old_name', 'new_name')
-            ->alter();
+        $this->assertNotContains('primary', \get_class_methods((new Schema())->table('users')));
     }
 
     public function testCreateView(): void

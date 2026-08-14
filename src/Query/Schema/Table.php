@@ -3,7 +3,6 @@
 namespace Utopia\Query\Schema;
 
 use Utopia\Query\Builder\Statement;
-use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema;
 use Utopia\Query\Schema\ClickHouse\Engine;
@@ -108,7 +107,7 @@ class Table
     private function requireSchema(): Schema
     {
         if ($this->schema === null) {
-            throw new UnsupportedException('Cannot compile a Table without a Schema. Use Schema::table($name) to obtain a builder.');
+            throw new ValidationException('Cannot compile a Table without a Schema. Use Schema::table($name) to obtain a builder.');
         }
 
         return $this->schema;
@@ -268,53 +267,6 @@ class Table
     public function uuid(string $name): Column
     {
         $col = $this->newColumn($name, ColumnType::Uuid);
-        $this->columns[] = $col;
-
-        return $col;
-    }
-
-    /**
-     * Auto-incrementing integer column (PostgreSQL SERIAL; INT AUTO_INCREMENT
-     * on MySQL; INTEGER on SQLite). Not exposed on ClickHouse/MongoDB.
-     *
-     * @return TColumn
-     */
-    public function serial(string $name): Column
-    {
-        $col = $this->newColumn($name, ColumnType::Serial);
-        $col->autoIncrement();
-        $this->columns[] = $col;
-
-        return $col;
-    }
-
-    /**
-     * Auto-incrementing big integer column (PostgreSQL BIGSERIAL;
-     * BIGINT AUTO_INCREMENT on MySQL; INTEGER on SQLite). Not exposed on
-     * ClickHouse/MongoDB.
-     *
-     * @return TColumn
-     */
-    public function bigSerial(string $name): Column
-    {
-        $col = $this->newColumn($name, ColumnType::BigSerial);
-        $col->autoIncrement();
-        $this->columns[] = $col;
-
-        return $col;
-    }
-
-    /**
-     * Auto-incrementing small integer column (PostgreSQL SMALLSERIAL;
-     * SMALLINT AUTO_INCREMENT on MySQL; INTEGER on SQLite). Not exposed on
-     * ClickHouse/MongoDB.
-     *
-     * @return TColumn
-     */
-    public function smallSerial(string $name): Column
-    {
-        $col = $this->newColumn($name, ColumnType::SmallSerial);
-        $col->autoIncrement();
         $this->columns[] = $col;
 
         return $col;
@@ -518,20 +470,6 @@ class Table
         $this->columns[] = $col;
 
         return $col;
-    }
-
-    public function renameColumn(string $from, string $to): static
-    {
-        $this->renameColumns[] = new RenameColumn($from, $to);
-
-        return $this;
-    }
-
-    public function dropColumn(string $name): static
-    {
-        $this->dropColumns[] = $name;
-
-        return $this;
     }
 
     /**

@@ -5,12 +5,13 @@ namespace Utopia\Query\Builder;
 use Utopia\Query\AST\Serializer;
 use Utopia\Query\AST\Serializer\PostgreSQL as PostgreSQLSerializer;
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
+use Utopia\Query\Builder\Feature\Cube;
 use Utopia\Query\Builder\Feature\FullOuterJoins;
 use Utopia\Query\Builder\Feature\FullTextSearch;
-use Utopia\Query\Builder\Feature\GroupByModifiers;
 use Utopia\Query\Builder\Feature\InsertOrIgnore;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\LateralJoins;
+use Utopia\Query\Builder\Feature\NegatedFullTextSearch;
 use Utopia\Query\Builder\Feature\PostgreSQL\AggregateFilter;
 use Utopia\Query\Builder\Feature\PostgreSQL\DistinctOn;
 use Utopia\Query\Builder\Feature\PostgreSQL\LockingOf;
@@ -18,6 +19,7 @@ use Utopia\Query\Builder\Feature\PostgreSQL\Merge;
 use Utopia\Query\Builder\Feature\PostgreSQL\OrderedSetAggregates;
 use Utopia\Query\Builder\Feature\PostgreSQL\Returning;
 use Utopia\Query\Builder\Feature\PostgreSQL\VectorSearch;
+use Utopia\Query\Builder\Feature\Rollup;
 use Utopia\Query\Builder\Feature\Sequences;
 use Utopia\Query\Builder\Feature\Spatial;
 use Utopia\Query\Builder\Feature\StringAggregates;
@@ -46,16 +48,19 @@ class PostgreSQL extends SQL implements
     OrderedSetAggregates,
     DistinctOn,
     AggregateFilter,
-    GroupByModifiers,
+    Rollup,
+    Cube,
     Sequences,
     Spatial,
     FullTextSearch,
+    NegatedFullTextSearch,
     Upsert,
     UpsertSelect,
     InsertOrIgnore
 {
     use Trait\FullOuterJoins;
     use Trait\FullTextSearch;
+    use Trait\NegatedFullTextSearch;
     use Trait\GroupByModifiers;
     use Trait\LateralJoins;
     use Trait\PostgreSQL\AggregateFilter;

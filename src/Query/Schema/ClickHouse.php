@@ -30,10 +30,6 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
 
     protected function compileColumnType(Column $column): string
     {
-        if ($column->userTypeName !== null) {
-            throw new UnsupportedException('User-defined types are not supported in ClickHouse.');
-        }
-
         if ($column instanceof Column\ClickHouse && $column->isFixedString()) {
             $type = 'FixedString(' . $column->fixedStringLength . ')';
 
@@ -92,6 +88,7 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             ColumnType::SmallInteger => $column->isUnsigned ? 'UInt16' : 'Int16',
             ColumnType::Integer => $column->isUnsigned ? 'UInt32' : 'Int32',
             ColumnType::BigInteger, ColumnType::Id => $column->isUnsigned ? 'UInt64' : 'Int64',
+            ColumnType::Serial, ColumnType::BigSerial, ColumnType::SmallSerial => throw new UnsupportedException('SERIAL types are not supported in ClickHouse. Reached via addColumn(); Table\\ClickHouse has no serial() factory.'),
             ColumnType::Float, ColumnType::Double => 'Float64',
             ColumnType::Decimal => 'Decimal(' . ($column->precision ?? 10) . ', ' . ($column->scale ?? 0) . ')',
             ColumnType::Boolean => 'UInt8',
@@ -106,7 +103,6 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             ColumnType::Uuid => 'UUID',
             ColumnType::Uuid7 => 'FixedString(36)',
             ColumnType::Vector => 'Array(Float64)',
-            ColumnType::Serial, ColumnType::BigSerial, ColumnType::SmallSerial => throw new UnsupportedException('SERIAL types are not supported in ClickHouse.'),
             ColumnType::Array, ColumnType::Tuple => throw new UnsupportedException(
                 'Array/Tuple columns must be declared via Table\\ClickHouse::array() or ::tuple().'
             ),
@@ -135,14 +131,6 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
 
     protected function compileColumnDefinition(Column $column): string
     {
-        if ($column->generatedExpression !== null) {
-            throw new UnsupportedException('Generated columns are not supported in ClickHouse.');
-        }
-
-        if ($column->checkExpression !== null) {
-            throw new UnsupportedException('CHECK constraints are not supported in ClickHouse.');
-        }
-
         $parts = [
             $this->quoteLiteral($column->name),
             $this->compileColumnType($column),
@@ -211,14 +199,6 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
             $alterations[] = 'ADD ' . $this->compileSkipIndex($index);
         }
 
-        if (! empty($table->foreignKeys)) {
-            throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
-        }
-
-        if (! empty($table->dropForeignKeys)) {
-            throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
-        }
-
         if (! empty($table->settings)) {
             throw new UnsupportedException(
                 'Table SETTINGS can only be set on CREATE TABLE; emit `ALTER TABLE ... MODIFY SETTING` directly to change them.'
@@ -269,14 +249,6 @@ class ClickHouse extends Schema implements TableComments, ColumnComments, DropPa
                 );
             }
             $columnDefs[] = $this->compileSkipIndex($index);
-        }
-
-        if (! empty($table->foreignKeys)) {
-            throw new UnsupportedException('Foreign keys are not supported in ClickHouse.');
-        }
-
-        if (! empty($table->checks)) {
-            throw new UnsupportedException('CHECK constraints are not supported in ClickHouse.');
         }
 
         $engine = $table->engine ?? Engine::MergeTree;

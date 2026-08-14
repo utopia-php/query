@@ -20,4 +20,27 @@ trait SQLite
     {
         return $this->table->foreignKey($column);
     }
+    public function renameColumn(string $from, string $to): Table\SQLite
+    {
+        return $this->table->renameColumn($from, $to);
+    }
+
+    public function dropColumn(string $name): Table\SQLite
+    {
+        return $this->table->dropColumn($name);
+    }
+    public function serial(string $name): Column\SQLite
+    {
+        return $this->table->serial($name);
+    }
+
+    public function bigSerial(string $name): Column\SQLite
+    {
+        return $this->table->bigSerial($name);
+    }
+
+    public function smallSerial(string $name): Column\SQLite
+    {
+        return $this->table->smallSerial($name);
+    }
 }

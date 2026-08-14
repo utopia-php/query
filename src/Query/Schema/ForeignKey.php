@@ -98,24 +98,6 @@ class ForeignKey
     }
 
     /** @return TColumn */
-    public function serial(string $name): Column
-    {
-        return $this->table->serial($name);
-    }
-
-    /** @return TColumn */
-    public function bigSerial(string $name): Column
-    {
-        return $this->table->bigSerial($name);
-    }
-
-    /** @return TColumn */
-    public function smallSerial(string $name): Column
-    {
-        return $this->table->smallSerial($name);
-    }
-
-    /** @return TColumn */
     public function float(string $name): Column
     {
         return $this->table->float($name);
@@ -194,18 +176,6 @@ class ForeignKey
     public function modifyColumn(string $name, ColumnType $type, ?int $lengthOrPrecision = null): Column
     {
         return $this->table->modifyColumn($name, $type, $lengthOrPrecision);
-    }
-
-    /** @return TTable */
-    public function renameColumn(string $from, string $to): Table
-    {
-        return $this->table->renameColumn($from, $to);
-    }
-
-    /** @return TTable */
-    public function dropColumn(string $name): Table
-    {
-        return $this->table->dropColumn($name);
     }
 
     /**

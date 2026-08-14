@@ -13,10 +13,5 @@ interface Updates
      */
     public function set(array $row): static;
 
-    /**
-     * @param  list<mixed>  $bindings
-     */
-    public function setRaw(string $column, string $expression, array $bindings = []): static;
-
     public function update(): Statement;
 }

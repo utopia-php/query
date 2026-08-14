@@ -4,11 +4,12 @@ namespace Utopia\Query\Builder;
 
 use Utopia\Query\Builder\Feature\ConditionalAggregates;
 use Utopia\Query\Builder\Feature\FullTextSearch;
-use Utopia\Query\Builder\Feature\GroupByModifiers;
 use Utopia\Query\Builder\Feature\Hints;
 use Utopia\Query\Builder\Feature\InsertOrIgnore;
 use Utopia\Query\Builder\Feature\Json;
 use Utopia\Query\Builder\Feature\LateralJoins;
+use Utopia\Query\Builder\Feature\NegatedFullTextSearch;
+use Utopia\Query\Builder\Feature\Rollup;
 use Utopia\Query\Builder\Feature\Spatial;
 use Utopia\Query\Builder\Feature\StringAggregates;
 use Utopia\Query\Builder\Feature\Upsert;
@@ -22,15 +23,17 @@ class MySQL extends SQL implements
     ConditionalAggregates,
     LateralJoins,
     StringAggregates,
-    GroupByModifiers,
+    Rollup,
     Spatial,
     FullTextSearch,
+    NegatedFullTextSearch,
     Upsert,
     UpsertSelect,
     InsertOrIgnore
 {
     use Trait\ConditionalAggregates;
     use Trait\FullTextSearch;
+    use Trait\NegatedFullTextSearch;
     use Trait\GroupByModifiers;
     use Trait\Hints;
     use Trait\LateralJoins;

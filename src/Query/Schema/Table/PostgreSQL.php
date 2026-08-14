@@ -12,7 +12,10 @@ use Utopia\Query\Schema\Table;
  */
 class PostgreSQL extends Table
 {
+    /** @use Trait\Serial<Column\PostgreSQL> */
+    use Trait\Serial;
     use Trait\Checks;
+    use Trait\ColumnAlterations;
     use Trait\CompositePrimary;
     /** @use Trait\ForeignKeys<ForeignKey\PostgreSQL> */
     use Trait\ForeignKeys;
