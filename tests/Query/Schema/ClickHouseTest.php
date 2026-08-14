@@ -23,6 +23,15 @@ class ClickHouseTest extends TestCase
 {
     use AssertsBindingCount;
 
+    public function testColumnDoesNotExposeCollation(): void
+    {
+        $methods = \get_class_methods((new Schema())->table('t')->string('s'));
+
+        $this->assertNotContains('collation', $methods);
+        $this->assertNotContains('unique', $methods);
+        $this->assertNotContains('after', $methods);
+    }
+
     public function testTableDoesNotExposeSerialFactories(): void
     {
         $methods = \get_class_methods((new Schema())->table('t'));

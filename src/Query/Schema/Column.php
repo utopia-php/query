@@ -123,13 +123,6 @@ class Column
         return $this;
     }
 
-    public function unique(): static
-    {
-        $this->isUnique = true;
-
-        return $this;
-    }
-
     /**
      * Mark this column as a primary key. Dialect Column subclasses that
      * support composite primary keys also accept a list of column names to
@@ -142,30 +135,9 @@ class Column
         return $this;
     }
 
-    public function after(string $column): static
-    {
-        $this->after = $column;
-
-        return $this;
-    }
-
     public function autoIncrement(): static
     {
         $this->isAutoIncrement = true;
-
-        return $this;
-    }
-
-    public function comment(string $comment): static
-    {
-        $this->comment = $comment;
-
-        return $this;
-    }
-
-    public function collation(string $collation): static
-    {
-        $this->collation = $collation;
 
         return $this;
     }

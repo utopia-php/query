@@ -545,6 +545,49 @@ class SQLiteTest extends TestCase
         $this->assertSame('CREATE TABLE `t` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL)', $result->query);
     }
 
+    /**
+     * SQLite's ALTER TABLE ADD COLUMN has no AFTER clause, so exposing after()
+     * here produced DDL that failed at execution. Asserted by running it.
+     */
+    public function testColumnDoesNotExposeAfter(): void
+    {
+        $this->assertNotContains('after', \get_class_methods((new Schema())->table('t')->integer('b')));
+    }
+
+    public function testEmittedAlterExecutesAgainstRealSqlite(): void
+    {
+        $pdo = new \PDO('sqlite::memory:');
+        $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+        $pdo->exec('CREATE TABLE t (a INTEGER)');
+
+        $alter = (new Schema())->table('t')->integer('b')->alter()->query;
+        $pdo->exec($alter);
+
+        $statement = $pdo->query('SELECT name FROM pragma_table_info(\'t\')');
+        $this->assertNotFalse($statement);
+        $this->assertSame(['a', 'b'], $statement->fetchAll(\PDO::FETCH_COLUMN));
+    }
+
+    public function testEmittedCollationExecutesAgainstRealSqlite(): void
+    {
+        $pdo = new \PDO('sqlite::memory:');
+        $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+        $create = (new Schema())->table('t')->string('name')->collation('NOCASE')->create()->query;
+        $pdo->exec($create);
+
+        $this->assertStringContainsString('COLLATE NOCASE', $create);
+    }
+
+    public function testColumnCollationIsEmitted(): void
+    {
+        $result = (new Schema())->table('t')
+            ->string('name')->collation('NOCASE')
+            ->create();
+
+        $this->assertStringContainsString('COLLATE NOCASE', $result->query);
+    }
+
     public function testColumnDoesNotExposeUserType(): void
     {
         $column = (new Schema())->table('t')->string('mood');

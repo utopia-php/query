@@ -4,12 +4,16 @@ namespace Tests\Query\Regression;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Builder\JoinBuilder;
+use Utopia\Query\Builder\MongoDB as MongoDBBuilder;
 use Utopia\Query\Builder\MySQL as MySQLBuilder;
 use Utopia\Query\Builder\PostgreSQL as PostgreSQLBuilder;
 use Utopia\Query\Classifier\MongoDB as MongoDBClassifier;
 use Utopia\Query\Classifier\MySQL as MySQLClassifier;
 use Utopia\Query\Classifier\PostgreSQL as PostgreSQLClassifier;
+use Utopia\Query\Exception\UnsupportedException;
 use Utopia\Query\Exception\ValidationException;
+use Utopia\Query\Hook\Attribute\Map;
+use Utopia\Query\Hook\Filter\Tenant;
 use Utopia\Query\Method;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\Index;
@@ -34,6 +38,11 @@ use Utopia\Query\Type;
  *  - 5662d27  fix: cast/window selectors + mongo field names + parser depth + tokenizer bounds
  *      testMongoBuilderRejectsDollarPrefixedFieldName
  *      testMongoBuilderRejectsEmptyFieldName
+ *  - (this branch)  fix: MongoDB silently dropped Hook\Filter
+ *      testMongoBuilderRejectsFilterHookInsteadOfDroppingIt
+ *      testMongoBuilderRejectsJoinFilterHook
+ *      testSqlBuildersStillScopeByTenantHook
+ *      testMongoBuilderStillAppliesAttributeHooks
  *  - c5a4ed3  fix: escape backslashes in DDL string literals
  *      testMySqlCreateTypeEnumEscapesTrailingBackslash
  *      testPostgreSqlCreateCollationRejectsInvalidOptionKey
@@ -365,5 +374,55 @@ class SecurityRegressionTest extends TestCase
         $join->on('users.id', 'orders.user_id');
 
         $this->assertCount(1, $join->ons);
+    }
+    /**
+     * A Hook\Filter returns a Condition -- a raw SQL expression plus bindings --
+     * which cannot be placed in a MongoDB operation document. The builder used
+     * to accept the hook and drop it, so a Hook\Filter\Tenant that correctly
+     * scoped MySQL left every MongoDB query unscoped and returned other
+     * tenants' documents. It must refuse the hook instead.
+     */
+    public function testMongoBuilderRejectsFilterHookInsteadOfDroppingIt(): void
+    {
+        $this->expectException(UnsupportedException::class);
+        $this->expectExceptionMessage('Filter hooks are not supported on the MongoDB builder');
+
+        (new MongoDBBuilder())->addHook(new Tenant(['7']));
+    }
+
+    public function testMongoBuilderRejectsJoinFilterHook(): void
+    {
+        // Tenant implements both Hook\Filter and Hook\Join\Filter.
+        $this->expectException(UnsupportedException::class);
+
+        (new MongoDBBuilder())->addHook(new Tenant(['7'], 'org_id'));
+    }
+
+    /** The SQL builders must keep scoping, so the fix cannot regress them. */
+    public function testSqlBuildersStillScopeByTenantHook(): void
+    {
+        foreach ([MySQLBuilder::class, PostgreSQLBuilder::class] as $builderClass) {
+            $result = (new $builderClass())
+                ->addHook(new Tenant(['7']))
+                ->from('docs')
+                ->select(['a'])
+                ->build();
+
+            $this->assertStringContainsString('tenant_id', $result->query);
+            $this->assertContains('7', $result->bindings);
+        }
+    }
+
+    /** Attribute hooks are dialect-neutral and must still apply on MongoDB. */
+    public function testMongoBuilderStillAppliesAttributeHooks(): void
+    {
+        $result = (new MongoDBBuilder())
+            ->addHook(new Map(['a' => 'renamed']))
+            ->from('docs')
+            ->filter([Query::equal('a', ['x'])])
+            ->build();
+
+        $this->assertStringContainsString('renamed', $result->query);
+        $this->assertStringNotContainsString('"a"', $result->query);
     }
 }

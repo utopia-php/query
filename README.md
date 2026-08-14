@@ -1008,6 +1008,8 @@ $result = (new Builder())
 //   WHERE `status` IN (?) AND `tenant_id` IN (?)
 ```
 
+> **SQL builders only.** `Hook\Filter` and `Hook\Join\Filter` return a `Condition` — a raw SQL expression plus bindings — so there is nowhere to put one in a MongoDB operation document. `MongoDB::addHook()` rejects them with `UnsupportedException` rather than accepting and dropping them; a silently ignored `Hook\Filter\Tenant` would leave every query unscoped. `Hook\Attribute` and `Hook\Write` are dialect-neutral and work everywhere. On MongoDB, express the constraint as a `Query` passed to `filter()`.
+
 **Custom filter hooks** implement `Hook\Filter`:
 
 ```php
@@ -1983,19 +1985,25 @@ $result = $schema->table('users')
 
 Available column types: `id`, `uuid`, `string`, `text`, `mediumText`, `longText`, `tinyInteger`, `smallInteger`, `integer`, `bigInteger`, `serial`, `bigSerial`, `smallSerial`, `float`, `decimal`, `boolean`, `datetime`, `timestamp`, `json`, `binary`, `enum`, `point`, `linestring`, `polygon`, `vector` (PostgreSQL, ClickHouse, MongoDB), `timestamps`.
 
-Column modifiers available on every dialect: `nullable()`, `default($value)`, `defaultRaw($expression)`, `unsigned()`, `unique()`, `primary()`, `autoIncrement()`, `after($column)`, `comment($text)`, `collation($collation)`, `srid($srid)` (spatial columns), `dimensions($dimensions)` (vector columns).
+Column modifiers available on every dialect: `nullable()`, `default($value)`, `defaultRaw($expression)`, `primary()`, `unsigned()`, `autoIncrement()`, `srid($srid)` (spatial columns), `dimensions($dimensions)` (vector columns).
 
-The rest are only on the dialects that honour them, so an unsupported combination is a type error rather than a runtime one:
+The rest are only on the dialects that emit them, so an unsupported combination is a type error rather than something silently dropped:
 
-| Modifier | Dialects |
-|---|---|
-| `check($expression)` | MySQL, MariaDB, PostgreSQL, SQLite |
-| `generatedAs($expression)`, `stored()` | MySQL, MariaDB, PostgreSQL, SQLite |
-| `virtual()` | MySQL, MariaDB, SQLite (PostgreSQL supports `STORED` only) |
-| `ttl($expression)` | ClickHouse |
-| `userType($name)` | PostgreSQL |
+| Modifier | Dialects | Why not the others |
+|---|---|---|
+| `check($expression)` | MySQL, MariaDB, PostgreSQL, SQLite | ClickHouse and MongoDB have no CHECK |
+| `generatedAs($expression)`, `stored()` | MySQL, MariaDB, PostgreSQL, SQLite | — |
+| `virtual()` | MySQL, MariaDB, SQLite | PostgreSQL supports `STORED` only |
+| `collation($collation)` | MySQL, MariaDB, PostgreSQL, SQLite | ClickHouse collates in `ORDER BY`; MongoDB per collection |
+| `unique()` | MySQL, MariaDB, PostgreSQL, SQLite | ClickHouse enforces no uniqueness; MongoDB uses a unique index |
+| `after($column)` | MySQL, MariaDB | PostgreSQL cannot order columns; SQLite's `ADD COLUMN` has no `AFTER` clause; MongoDB documents have no order |
+| `comment($text)` | MySQL, MariaDB, SQLite, ClickHouse, MongoDB | PostgreSQL needs a separate statement — use `commentOnColumn()` |
+| `ttl($expression)` | ClickHouse | — |
+| `userType($name)` | PostgreSQL | — |
 
 Likewise `serial()` / `bigSerial()` / `smallSerial()` are absent from the ClickHouse table, and `dropColumn()` / `renameColumn()` are absent from the MongoDB table.
+
+> **Known gaps.** `unsigned()` is accepted everywhere but renders nothing on PostgreSQL and SQLite, which have no unsigned integer types — you get a signed column. `srid()`, `autoIncrement()` and the `$dimensions` argument to `vector()` are likewise accepted on dialects that cannot express them, because the library's own column factories set them internally. Treat those four as advisory rather than guaranteed.
 
 **Raw default expressions** — use `defaultRaw($expression)` for dialect-specific server-generated defaults that `default()` would otherwise quote as a string literal (`now()`, `CURRENT_TIMESTAMP`, `gen_random_uuid()`, `generateUUIDv4()`, `UUID()`, …). The expression is emitted verbatim and must come from a trusted source; it must not be empty or contain a semicolon. Takes precedence over `default()` when both are set.
 

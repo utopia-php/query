@@ -116,15 +116,26 @@ class PostgreSQLTest extends TestCase
         $this->assertSame('CREATE TABLE "t" ("age" INTEGER NOT NULL)', $result->query);
     }
 
-    public function testCreateTableNoInlineComment(): void
+    public function testColumnCollationIsEmittedAndQuoted(): void
     {
-        $schema = new Schema();
-        $result = $schema->table('t')
-            ->string('name')->comment('User display name')
+        $result = (new Schema())->table('t')
+            ->string('name')->collation('C')
             ->create();
-        $this->assertBindingCount($result);
 
-        $this->assertStringNotContainsString('COMMENT', $result->query);
+        $this->assertSame('CREATE TABLE "t" ("name" VARCHAR(255) COLLATE "C" NOT NULL)', $result->query);
+    }
+
+    public function testColumnDoesNotExposeInlineComment(): void
+    {
+        // PostgreSQL cannot inline a comment in CREATE TABLE; it needs a
+        // separate COMMENT ON statement, which commentOnColumn() emits.
+        $column = (new Schema())->table('t')->string('name');
+
+        $this->assertNotContains('comment', \get_class_methods($column));
+        $this->assertStringContainsString(
+            'COMMENT ON COLUMN',
+            (new Schema())->commentOnColumn('t', 'name', 'User display name')->query
+        );
     }
 
     public function testAutoIncrementUsesIdentity(): void

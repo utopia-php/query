@@ -17,6 +17,7 @@ use Utopia\Query\Schema\MySQL;
 use Utopia\Query\Schema\PostgreSQL;
 use Utopia\Query\Schema\SQLite;
 use Utopia\Query\Schema\Table as BaseTable;
+use Utopia\Query\Schema\Table\MySQL as MySQLTable;
 use Utopia\Query\Schema\Table\PostgreSQL as Table;
 
 /**
@@ -802,9 +803,29 @@ class FluentBuilderTest extends TestCase
         $this->assertSame($col, $col->unique());
         $this->assertSame($col, $col->primary());
         $this->assertSame($col, $col->autoIncrement());
+        $this->assertSame($col, $col->collation('C'));
+    }
+
+    public function testMySQLColumnReturnsItselfForDialectScopedFluentMethods(): void
+    {
+        $col = (new MySQLTable())->string('name');
+
         $this->assertSame($col, $col->comment('hi'));
-        $this->assertSame($col, $col->collation('utf8mb4_bin'));
         $this->assertSame($col, $col->after('id'));
+        $this->assertSame($col, $col->collation('utf8mb4_bin'));
+    }
+
+    public function testColumnModifiersAreScopedToDialectsThatEmitThem(): void
+    {
+        $mysql = \get_class_methods((new MySQLTable())->string('s'));
+        $pg = \get_class_methods((new Table())->string('s'));
+
+        // PostgreSQL cannot order columns, and cannot inline a comment in
+        // CREATE TABLE -- commentOnColumn() is the supported path there.
+        $this->assertContains('after', $mysql);
+        $this->assertContains('comment', $mysql);
+        $this->assertNotContains('after', $pg);
+        $this->assertNotContains('comment', $pg);
     }
 
     public function testForeignKeyReturnsItselfForChainingFluentMethods(): void

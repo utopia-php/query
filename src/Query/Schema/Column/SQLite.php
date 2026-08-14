@@ -11,6 +11,9 @@ use Utopia\Query\Schema\Table;
  */
 class SQLite extends Column
 {
+    use Trait\Collation;
+    use Trait\Comment;
+    use Trait\Unique;
     use Trait\Generated;
     use Trait\VirtualGenerated;
     use Forwarder\SQLite;
