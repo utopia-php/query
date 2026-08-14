@@ -6,11 +6,11 @@ use PHPUnit\Framework\TestCase;
 use Utopia\Query\Builder\JoinBuilder;
 use Utopia\Query\Builder\MySQL as MySQLBuilder;
 use Utopia\Query\Builder\PostgreSQL as PostgreSQLBuilder;
+use Utopia\Query\Classifier\MongoDB as MongoDBClassifier;
+use Utopia\Query\Classifier\MySQL as MySQLClassifier;
+use Utopia\Query\Classifier\PostgreSQL as PostgreSQLClassifier;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Method;
-use Utopia\Query\Parser\MongoDB as MongoDBParser;
-use Utopia\Query\Parser\MySQL as MySQLParser;
-use Utopia\Query\Parser\PostgreSQL as PostgreSQLParser;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\Index;
 use Utopia\Query\Schema\MySQL as MySQLSchema;
@@ -75,30 +75,30 @@ class SecurityRegressionTest extends TestCase
 
     public function testExtractKeywordIgnoresKeywordInsideStringLiteral(): void
     {
-        $parser = new MySQLParser();
+        $classifier = new MySQLClassifier();
 
         // The keyword hidden inside the quoted string must not leak out.
         // Pre-fix naive byte-scan would see "DELETE" as the first word after
         // the SELECT in position, but extractKeyword should still report SELECT.
-        $this->assertSame('SELECT', $parser->extractKeyword("SELECT 'DELETE FROM users' AS x"));
+        $this->assertSame('SELECT', $classifier->extractKeyword("SELECT 'DELETE FROM users' AS x"));
     }
 
     public function testExtractKeywordIgnoresKeywordInsideBlockComment(): void
     {
-        $parser = new MySQLParser();
+        $classifier = new MySQLClassifier();
 
-        $this->assertSame('SELECT', $parser->extractKeyword('/* DELETE FROM users */ SELECT 1'));
+        $this->assertSame('SELECT', $classifier->extractKeyword('/* DELETE FROM users */ SELECT 1'));
     }
 
     public function testCteClassifierIgnoresKeywordHiddenInStringLiteral(): void
     {
-        $parser = new PostgreSQLParser();
+        $classifier = new PostgreSQLClassifier();
 
         // Pre-fix: a naive byte-scan could match INSERT inside the string and
         // misclassify as Write. With the state machine, the quoted literal is
         // skipped and the outer SELECT is the classifying keyword (Read).
         $sql = "WITH x AS (SELECT 'INSERT INTO users VALUES(1)' AS s) SELECT * FROM x";
-        $this->assertSame(Type::Read, $parser->classifySQL($sql));
+        $this->assertSame(Type::Read, $classifier->classifySQL($sql));
     }
 
     public function testMongoBuilderRejectsDollarPrefixedFieldNameInPush(): void
@@ -310,10 +310,10 @@ class SecurityRegressionTest extends TestCase
             . \pack('V', 2013);
         $data = $header . $body;
 
-        $parser = new MongoDBParser();
+        $classifier = new MongoDBClassifier();
         // Malformed packet must not produce a classification — extractFirstBsonKey
         // must bail on the out-of-bounds docLen instead of scanning past it.
-        $this->assertSame(Type::Unknown, $parser->parse($data));
+        $this->assertSame(Type::Unknown, $classifier->classify($data));
     }
 
     public function testQuoteRejectsNullByteInIdentifier(): void

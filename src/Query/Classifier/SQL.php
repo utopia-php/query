@@ -1,8 +1,8 @@
 <?php
 
-namespace Utopia\Query\Parser;
+namespace Utopia\Query\Classifier;
 
-use Utopia\Query\Parser;
+use Utopia\Query\Classifier;
 use Utopia\Query\Type;
 
 /**
@@ -14,7 +14,7 @@ use Utopia\Query\Type;
  * Performance: Uses byte-level checks and simple string operations (no regex).
  * Designed to run on every packet with sub-microsecond overhead.
  */
-abstract class SQL implements Parser
+abstract class SQL implements Classifier
 {
     /**
      * Read keywords lookup (uppercase)

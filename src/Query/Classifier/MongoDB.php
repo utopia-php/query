@@ -1,8 +1,8 @@
 <?php
 
-namespace Utopia\Query\Parser;
+namespace Utopia\Query\Classifier;
 
-use Utopia\Query\Parser;
+use Utopia\Query\Classifier;
 use Utopia\Query\Type;
 
 /**
@@ -26,7 +26,7 @@ use Utopia\Query\Type;
  * - TransactionBegin: startTransaction flag present
  * - TransactionEnd: commitTransaction or abortTransaction command
  */
-class MongoDB implements Parser
+class MongoDB implements Classifier
 {
     /**
      * Read command names (lowercase)
@@ -99,7 +99,7 @@ class MongoDB implements Parser
      */
     private const MIN_MSG_SIZE = 26;
 
-    public function parse(string $data): Type
+    public function classify(string $data): Type
     {
         $len = \strlen($data);
         if ($len < self::MIN_MSG_SIZE) {
@@ -157,22 +157,6 @@ class MongoDB implements Parser
         }
 
         return Type::Unknown;
-    }
-
-    /**
-     * Not applicable — MongoDB does not use SQL
-     */
-    public function classifySQL(string $query): Type
-    {
-        return Type::Unknown;
-    }
-
-    /**
-     * Not applicable — MongoDB does not use SQL
-     */
-    public function extractKeyword(string $query): string
-    {
-        return '';
     }
 
     /**

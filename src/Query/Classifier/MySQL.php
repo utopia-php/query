@@ -1,6 +1,6 @@
 <?php
 
-namespace Utopia\Query\Parser;
+namespace Utopia\Query\Classifier;
 
 use Utopia\Query\Type;
 
@@ -37,7 +37,7 @@ class MySQL extends SQL
 
     private const COM_STMT_RESET = 0x1A;
 
-    public function parse(string $data): Type
+    public function classify(string $data): Type
     {
         $len = \strlen($data);
         if ($len < 5) {

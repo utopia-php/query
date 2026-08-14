@@ -27,6 +27,16 @@ use Utopia\Query\OrderDirection;
 use Utopia\Query\Tokenizer\Token;
 use Utopia\Query\Tokenizer\TokenType;
 
+/**
+ * Recursive-descent SQL parser.
+ *
+ * Consumes filtered {@see Token}s from a {@see \Utopia\Query\Tokenizer\Tokenizer}
+ * and builds a {@see Select} tree that can be inspected, rewritten via
+ * {@see Walker} and {@see Visitor}, and re-serialized by {@see Serializer}.
+ *
+ * Not to be confused with {@see \Utopia\Query\Classifier}, which only reads a
+ * message's leading keyword to route it to a primary or replica.
+ */
 class Parser
 {
     private const int MAX_DEPTH = 256;
