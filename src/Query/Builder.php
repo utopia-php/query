@@ -1945,6 +1945,8 @@ abstract class Builder implements
     {
         $grouped = Query::groupByType($this->pendingQueries);
 
+        $this->prepareAliasQualification($grouped);
+
         $columns = $this->buildAstColumns($grouped);
         $from = $this->buildAstFrom();
         $joins = $this->buildAstJoins($grouped);
@@ -2015,6 +2017,10 @@ abstract class Builder implements
                 return new Star($parts[0]);
             }
             return new Column($parts[1], $parts[0]);
+        }
+
+        if ($this->qualify && ! isset($this->aggregationAliases[$col])) {
+            return new Column($col, $this->alias);
         }
 
         return new Column($col);

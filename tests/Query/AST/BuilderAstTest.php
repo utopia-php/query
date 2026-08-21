@@ -553,6 +553,29 @@ class BuilderAstTest extends TestCase
         $this->assertSame('users', $join->condition->left->left->table);
     }
 
+    public function testToAstNestedJoinOnQualifiesUnqualifiedOperandsWithBaseAlias(): void
+    {
+        $builder = (new MySQL())
+            ->from('users', 'u')
+            ->filter([
+                Query::leftJoin('orders', 'ord', [
+                    Query::on('id', 'userId'),
+                ]),
+            ]);
+
+        $ast = $builder->toAst();
+
+        $this->assertCount(1, $ast->joins);
+        $condition = $ast->joins[0]->condition;
+        $this->assertInstanceOf(Binary::class, $condition);
+        $this->assertInstanceOf(Column::class, $condition->left);
+        $this->assertSame('id', $condition->left->name);
+        $this->assertSame('u', $condition->left->table);
+        $this->assertInstanceOf(Column::class, $condition->right);
+        $this->assertSame('userId', $condition->right->name);
+        $this->assertSame('u', $condition->right->table);
+    }
+
     public function testToAstNestedJoinRejectsUnsupportedOnPredicate(): void
     {
         $builder = (new MySQL())

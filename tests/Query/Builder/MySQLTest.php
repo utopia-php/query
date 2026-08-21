@@ -3229,6 +3229,23 @@ class MySQLTest extends TestCase
         );
         $this->assertSame(['paid'], $result->bindings);
     }
+
+    public function testBuildNestedJoinOnQualifiesUnqualifiedOperandsWithBaseAlias(): void
+    {
+        $result = (new Builder())
+            ->from('users', 'u')
+            ->filter([
+                Query::leftJoin('orders', 'ord', [
+                    Query::on('id', 'userId'),
+                ]),
+            ])
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM `users` AS `u` LEFT JOIN `orders` AS `ord` ON `u`.`id` = `u`.`userId`',
+            $result->query,
+        );
+    }
     //  6. Filter edge cases
 
     public function testEqualWithSingleValue(): void
