@@ -78,6 +78,59 @@ class Query
         return $this->values[0] ?? $default;
     }
 
+    public function isNestedJoin(): bool
+    {
+        if (! $this->method->isJoin()) {
+            return false;
+        }
+
+        foreach ($this->values as $value) {
+            if ($value instanceof self) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function getJoinAlias(): string
+    {
+        if ($this->method === Method::CrossJoin || $this->method === Method::NaturalJoin) {
+            $alias = $this->values[0] ?? '';
+
+            return \is_string($alias) ? $alias : '';
+        }
+
+        if ($this->isNestedJoin()) {
+            $first = $this->values[0] ?? null;
+
+            return \is_string($first) ? $first : '';
+        }
+
+        $alias = $this->values[3] ?? '';
+
+        return \is_string($alias) ? $alias : '';
+    }
+
+    /**
+     * @return list<self>
+     */
+    public function getJoinOnQueries(): array
+    {
+        if (! $this->isNestedJoin()) {
+            return [];
+        }
+
+        $queries = [];
+        foreach ($this->values as $value) {
+            if ($value instanceof self) {
+                $queries[] = $value;
+            }
+        }
+
+        return $queries;
+    }
+
     /**
      * Sets method
      */
@@ -204,6 +257,13 @@ class Query
                 /** @var array<string, mixed> $value */
                 $values[$index] = static::parseQuery($value, $allowRaw);
             }
+        } elseif ($methodEnum->isJoin()) {
+            foreach ($values as $index => $value) {
+                if (\is_array($value) && isset($value['method']) && \is_string($value['method'])) {
+                    /** @var array<string, mixed> $value */
+                    $values[$index] = static::parseQuery($value, $allowRaw);
+                }
+            }
         }
 
         return new static($methodEnum, $attribute, $values);
@@ -291,7 +351,7 @@ class Query
             $node = \array_pop($stack);
             $nodes[] = $node;
 
-            if (! \in_array($node->method, self::LOGICAL_TYPES, true)) {
+            if (! \in_array($node->method, self::LOGICAL_TYPES, true) && ! $node->isNestedJoin()) {
                 continue;
             }
             foreach ($node->values as $child) {
@@ -306,7 +366,7 @@ class Query
         foreach (\array_reverse($nodes) as $node) {
             $id = \spl_object_id($node);
 
-            if (! \in_array($node->method, self::LOGICAL_TYPES, true)) {
+            if (! \in_array($node->method, self::LOGICAL_TYPES, true) && ! $node->isNestedJoin()) {
                 $shapes[$id] = $node->method->value.':'.$node->attribute;
 
                 continue;
@@ -338,16 +398,9 @@ class Query
             $array['attribute'] = $this->attribute;
         }
 
-        if ($this->method->isNested()) {
-            foreach ($this->values as $index => $value) {
-                /** @var Query $value */
-                $array['values'][$index] = $value->toArray();
-            }
-        } else {
-            $array['values'] = [];
-            foreach ($this->values as $value) {
-                $array['values'][] = $value;
-            }
+        $array['values'] = [];
+        foreach ($this->values as $value) {
+            $array['values'][] = $value instanceof self ? $value->toArray() : $value;
         }
 
         return $array;
@@ -1240,34 +1293,39 @@ class Query
 
     // Join factory methods
 
-    public static function join(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
+    /**
+     * Column-to-column join ON condition.
+     */
+    public static function on(string $left, string $right, string $operator = '='): static
     {
-        $values = [$left, $operator, $right];
-        if ($alias !== '') {
-            $values[] = $alias;
-        }
-
-        return new static(Method::Join, $table, $values);
+        return new static(Method::On, '', [$left, $operator, $right]);
     }
 
-    public static function leftJoin(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
+    /**
+     * @param  string|list<Query|string>  $leftOrAliasOrOn
+     * @param  string|list<Query|string>  $rightOrOn
+     */
+    public static function join(string $table, string|array $leftOrAliasOrOn, string|array $rightOrOn = '', string $operator = '=', string $alias = ''): static
     {
-        $values = [$left, $operator, $right];
-        if ($alias !== '') {
-            $values[] = $alias;
-        }
-
-        return new static(Method::LeftJoin, $table, $values);
+        return self::createJoin(Method::Join, $table, $leftOrAliasOrOn, $rightOrOn, $operator, $alias);
     }
 
-    public static function rightJoin(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
+    /**
+     * @param  string|list<Query|string>  $leftOrAliasOrOn
+     * @param  string|list<Query|string>  $rightOrOn
+     */
+    public static function leftJoin(string $table, string|array $leftOrAliasOrOn, string|array $rightOrOn = '', string $operator = '=', string $alias = ''): static
     {
-        $values = [$left, $operator, $right];
-        if ($alias !== '') {
-            $values[] = $alias;
-        }
+        return self::createJoin(Method::LeftJoin, $table, $leftOrAliasOrOn, $rightOrOn, $operator, $alias);
+    }
 
-        return new static(Method::RightJoin, $table, $values);
+    /**
+     * @param  string|list<Query|string>  $leftOrAliasOrOn
+     * @param  string|list<Query|string>  $rightOrOn
+     */
+    public static function rightJoin(string $table, string|array $leftOrAliasOrOn, string|array $rightOrOn = '', string $operator = '=', string $alias = ''): static
+    {
+        return self::createJoin(Method::RightJoin, $table, $leftOrAliasOrOn, $rightOrOn, $operator, $alias);
     }
 
     public static function crossJoin(string $table, string $alias = ''): static
@@ -1275,19 +1333,67 @@ class Query
         return new static(Method::CrossJoin, $table, $alias !== '' ? [$alias] : []);
     }
 
-    public static function fullOuterJoin(string $table, string $left, string $right, string $operator = '=', string $alias = ''): static
+    /**
+     * @param  string|list<Query|string>  $leftOrAliasOrOn
+     * @param  string|list<Query|string>  $rightOrOn
+     */
+    public static function fullOuterJoin(string $table, string|array $leftOrAliasOrOn, string|array $rightOrOn = '', string $operator = '=', string $alias = ''): static
     {
-        $values = [$left, $operator, $right];
-        if ($alias !== '') {
-            $values[] = $alias;
-        }
-
-        return new static(Method::FullOuterJoin, $table, $values);
+        return self::createJoin(Method::FullOuterJoin, $table, $leftOrAliasOrOn, $rightOrOn, $operator, $alias);
     }
 
     public static function naturalJoin(string $table, string $alias = ''): static
     {
         return new static(Method::NaturalJoin, $table, $alias !== '' ? [$alias] : []);
+    }
+
+    /**
+     * @param  string|list<Query|string>  $leftOrAliasOrOn
+     * @param  string|list<Query|string>  $rightOrOn
+     */
+    private static function createJoin(Method $method, string $table, string|array $leftOrAliasOrOn, string|array $rightOrOn, string $operator, string $alias): static
+    {
+        if (\is_array($leftOrAliasOrOn)) {
+            return self::createNestedJoin($method, $table, '', $leftOrAliasOrOn);
+        }
+
+        if (\is_array($rightOrOn)) {
+            return self::createNestedJoin($method, $table, $leftOrAliasOrOn, $rightOrOn);
+        }
+
+        $values = [$leftOrAliasOrOn, $operator, $rightOrOn];
+        if ($alias !== '') {
+            $values[] = $alias;
+        }
+
+        return new static($method, $table, $values);
+    }
+
+    /**
+     * @param  array<mixed>  $on
+     */
+    private static function createNestedJoin(Method $method, string $table, string $alias, array $on): static
+    {
+        if ($on === []) {
+            throw new ValidationException('Join ON requires at least one condition');
+        }
+
+        $values = [];
+        if ($alias !== '') {
+            $values[] = $alias;
+        }
+
+        foreach ($on as $query) {
+            if (\is_string($query)) {
+                $query = static::parse($query);
+            }
+            if (! $query instanceof self) {
+                throw new ValidationException('Join ON conditions must be Query objects');
+            }
+            $values[] = $query;
+        }
+
+        return new static($method, $table, $values);
     }
 
     // Union factory methods

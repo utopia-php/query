@@ -3196,6 +3196,39 @@ class MySQLTest extends TestCase
         $sql = $builder->compileJoin(Query::crossJoin('colors'));
         $this->assertSame('CROSS JOIN `colors`', $sql);
     }
+
+    public function testCompileNestedJoinOn(): void
+    {
+        $builder = new Builder();
+        $sql = $builder->compileJoin(Query::leftJoin('orders', 'ord', [
+            Query::on('users.id', 'orders.user_id'),
+            Query::equal('ord.status', ['paid']),
+        ]));
+        $this->assertSame(
+            'LEFT JOIN `orders` AS `ord` ON `users`.`id` = `orders`.`user_id` AND `ord`.`status` IN (?)',
+            $sql,
+        );
+        $this->assertSame(['paid'], $builder->getBindings());
+    }
+
+    public function testBuildNestedJoinOn(): void
+    {
+        $result = (new Builder())
+            ->from('users')
+            ->filter([
+                Query::leftJoin('orders', 'ord', [
+                    Query::on('users.id', 'orders.user_id'),
+                    Query::equal('ord.status', ['paid']),
+                ]),
+            ])
+            ->build();
+
+        $this->assertSame(
+            'SELECT * FROM `users` LEFT JOIN `orders` AS `ord` ON `users`.`id` = `orders`.`user_id` AND `ord`.`status` IN (?)',
+            $result->query,
+        );
+        $this->assertSame(['paid'], $result->bindings);
+    }
     //  6. Filter edge cases
 
     public function testEqualWithSingleValue(): void

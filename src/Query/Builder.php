@@ -659,15 +659,7 @@ abstract class Builder implements
                     default => throw new UnsupportedException('Unsupported join method: ' . $joinQuery->getMethod()->value),
                 };
                 $isCrossJoin = $joinType === JoinType::Cross || $joinType === JoinType::Natural;
-
-                $joinValues = $joinQuery->getValues();
-                if ($isCrossJoin) {
-                    /** @var string $joinAlias */
-                    $joinAlias = $joinValues[0] ?? '';
-                } else {
-                    /** @var string $joinAlias */
-                    $joinAlias = $joinValues[3] ?? '';
-                }
+                $joinAlias = $joinQuery->getJoinAlias();
                 $effectiveJoinTable = $joinAlias !== '' ? $joinAlias : $joinTable;
 
                 foreach ($this->joinFilterHooks as $hook) {
@@ -1301,6 +1293,7 @@ abstract class Builder implements
             Method::Exists => $this->compileExists($query),
             Method::NotExists => $this->compileNotExists($query),
             Method::Raw => $this->compileRaw($query),
+            Method::On => $this->compileOn($query),
             default => throw new UnsupportedException('Unsupported filter type: ' . $method->value),
         };
     }
@@ -1483,6 +1476,15 @@ abstract class Builder implements
             return $type . ' ' . $table;
         }
 
+        if ($query->isNestedJoin()) {
+            $alias = $query->getJoinAlias();
+            if ($alias !== '') {
+                $table .= ' AS ' . $this->quote($alias);
+            }
+
+            return $type . ' ' . $table . ' ON ' . \implode(' AND ', $this->compileJoinOn($query));
+        }
+
         if (empty($values)) {
             return $type . ' ' . $table;
         }
@@ -1511,6 +1513,52 @@ abstract class Builder implements
         return $type . ' ' . $table . ' ON ' . $left . ' ' . $operator . ' ' . $right;
     }
 
+    /**
+     * @return list<string>
+     */
+    private function compileJoinOn(Query $query): array
+    {
+        $onQueries = $query->getJoinOnQueries();
+        if ($onQueries === []) {
+            throw new ValidationException('Join ON requires at least one condition');
+        }
+
+        $parts = [];
+
+        foreach ($onQueries as $onQuery) {
+            if ($onQuery->getMethod() === Method::On) {
+                $parts[] = $this->compileOn($onQuery);
+                continue;
+            }
+
+            $parts[] = $this->compileFilter($onQuery);
+        }
+
+        return $parts;
+    }
+
+    private function compileOn(Query $query): string
+    {
+        $values = $query->getValues();
+        /** @var string $leftCol */
+        $leftCol = $values[0] ?? '';
+        /** @var string $operator */
+        $operator = $values[1] ?? '=';
+        /** @var string $rightCol */
+        $rightCol = $values[2] ?? '';
+
+        if ($leftCol === '' || $rightCol === '') {
+            throw new ValidationException('Join ON requires left and right columns');
+        }
+
+        $allowedOperators = ['=', '!=', '<', '>', '<=', '>=', '<>'];
+        if (! \in_array($operator, $allowedOperators, true)) {
+            throw new ValidationException('Invalid join operator: ' . $operator);
+        }
+
+        return $this->resolveAndWrap($leftCol) . ' ' . $operator . ' ' . $this->resolveAndWrap($rightCol);
+    }
+
     protected function compileJoinWithBuilder(Query $query, JoinBuilder $joinBuilder): string
     {
         $type = match ($query->getMethod()) {
@@ -1524,16 +1572,7 @@ abstract class Builder implements
         };
 
         $table = $this->quote($query->getAttribute());
-        $values = $query->getValues();
-
-        // Handle alias
-        if ($query->getMethod() === Method::CrossJoin || $query->getMethod() === Method::NaturalJoin) {
-            /** @var string $alias */
-            $alias = $values[0] ?? '';
-        } else {
-            /** @var string $alias */
-            $alias = $values[3] ?? '';
-        }
+        $alias = $query->getJoinAlias();
 
         if ($alias !== '') {
             $table .= ' AS ' . $this->quote($alias);
@@ -2040,10 +2079,13 @@ abstract class Builder implements
             $isCrossOrNatural = $joinMethod === Method::CrossJoin || $joinMethod === Method::NaturalJoin;
 
             if ($isCrossOrNatural) {
-                /** @var string $joinAlias */
-                $joinAlias = $values[0] ?? '';
+                $joinAlias = $joinQuery->getJoinAlias();
                 $tableRef = new Table($table, $joinAlias !== '' ? $joinAlias : null);
                 $joins[] = new AstJoinClause($type, $tableRef, null);
+            } elseif ($joinQuery->isNestedJoin()) {
+                $joinAlias = $joinQuery->getJoinAlias();
+                $tableRef = new Table($table, $joinAlias !== '' ? $joinAlias : null);
+                $joins[] = new AstJoinClause($type, $tableRef, $this->nestedJoinOnToAst($joinQuery));
             } else {
                 /** @var string $leftCol */
                 $leftCol = $values[0] ?? '';
@@ -2051,8 +2093,7 @@ abstract class Builder implements
                 $operator = $values[1] ?? '=';
                 /** @var string $rightCol */
                 $rightCol = $values[2] ?? '';
-                /** @var string $joinAlias */
-                $joinAlias = $values[3] ?? '';
+                $joinAlias = $joinQuery->getJoinAlias();
 
                 $tableRef = new Table($table, $joinAlias !== '' ? $joinAlias : null);
 
@@ -2112,9 +2153,51 @@ abstract class Builder implements
             Method::NotEndsWith => new Binary(new Column($attr), 'NOT LIKE', new Literal('%' . $this->toScalar($values[0] ?? ''))),
             Method::And => $this->buildLogicalAstExpression($query, 'AND'),
             Method::Or => $this->buildLogicalAstExpression($query, 'OR'),
+            Method::On => $this->buildOnAstExpression($query),
             Method::Raw => new Raw($attr),
             default => new Raw($attr !== '' ? $attr : '1 = 1'),
         };
+    }
+
+    private function nestedJoinOnToAst(Query $joinQuery): Expression
+    {
+        $onQueries = $joinQuery->getJoinOnQueries();
+        if ($onQueries === []) {
+            throw new ValidationException('Join ON requires at least one condition');
+        }
+
+        $exprs = [];
+        foreach ($onQueries as $onQuery) {
+            $exprs[] = $this->queryToAstExpression($onQuery);
+        }
+
+        return $this->combineAstExpressions($exprs, 'AND');
+    }
+
+    private function buildOnAstExpression(Query $query): Expression
+    {
+        $values = $query->getValues();
+        /** @var string $leftCol */
+        $leftCol = $values[0] ?? '';
+        /** @var string $operator */
+        $operator = $values[1] ?? '=';
+        /** @var string $rightCol */
+        $rightCol = $values[2] ?? '';
+
+        if ($leftCol === '' || $rightCol === '') {
+            throw new ValidationException('Join ON requires left and right columns');
+        }
+
+        $allowedOperators = ['=', '!=', '<', '>', '<=', '>=', '<>'];
+        if (! \in_array($operator, $allowedOperators, true)) {
+            throw new ValidationException('Invalid join operator: ' . $operator);
+        }
+
+        return new Binary(
+            $this->columnNameToAstExpression($leftCol),
+            $operator,
+            $this->columnNameToAstExpression($rightCol),
+        );
     }
 
     private function toLiteral(mixed $value): Literal

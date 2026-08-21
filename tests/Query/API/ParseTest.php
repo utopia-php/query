@@ -246,6 +246,52 @@ class ParseTest extends TestCase
         $this->assertSame(['users.id', '=', 'orders.user_id'], $parsed->getValues());
     }
 
+    public function testRoundTripNestedJoin(): void
+    {
+        $original = Query::leftJoin('orders', 'ord', [
+            Query::on('$id', 'customerId'),
+            Query::equal('ord.status', ['paid']),
+        ]);
+        $parsed = Query::parse($original->toString());
+
+        $this->assertSame(Method::LeftJoin, $parsed->getMethod());
+        $this->assertSame('orders', $parsed->getAttribute());
+        $this->assertTrue($parsed->isNestedJoin());
+        $this->assertSame('ord', $parsed->getJoinAlias());
+        $on = $parsed->getJoinOnQueries();
+        $this->assertCount(2, $on);
+        $this->assertSame(Method::On, $on[0]->getMethod());
+        $this->assertSame(['$id', '=', 'customerId'], $on[0]->getValues());
+        $this->assertSame(Method::Equal, $on[1]->getMethod());
+        $this->assertSame('ord.status', $on[1]->getAttribute());
+        $this->assertSame(['paid'], $on[1]->getValues());
+    }
+
+    public function testRoundTripOn(): void
+    {
+        $original = Query::on('$id', 'customerId', '!=');
+        $parsed = Query::parse($original->toString());
+        $this->assertSame(Method::On, $parsed->getMethod());
+        $this->assertSame(['$id', '!=', 'customerId'], $parsed->getValues());
+    }
+
+    public function testParseNestedJoinFromArray(): void
+    {
+        $parsed = Query::parseQuery([
+            'method' => 'leftJoin',
+            'attribute' => 'orders',
+            'values' => [
+                'ord',
+                ['method' => 'on', 'values' => ['$id', '=', 'customerId']],
+                ['method' => 'equal', 'attribute' => 'ord.status', 'values' => ['paid']],
+            ],
+        ]);
+
+        $this->assertTrue($parsed->isNestedJoin());
+        $this->assertSame('ord', $parsed->getJoinAlias());
+        $this->assertCount(2, $parsed->getJoinOnQueries());
+    }
+
     public function testRoundTripCrossJoin(): void
     {
         $original = Query::crossJoin('colors');

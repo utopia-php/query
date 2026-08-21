@@ -96,6 +96,7 @@ enum Method: string
     case CrossJoin = 'crossJoin';
     case FullOuterJoin = 'fullOuterJoin';
     case NaturalJoin = 'naturalJoin';
+    case On = 'on';
 
     // Union
     case Union = 'union';
