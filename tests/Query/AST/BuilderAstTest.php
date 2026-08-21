@@ -525,6 +525,73 @@ class BuilderAstTest extends TestCase
         $this->assertSame('LEFT JOIN', $ast->joins[0]->type);
     }
 
+    public function testToAstNestedJoinOn(): void
+    {
+        $builder = (new MySQL())
+            ->from('users')
+            ->filter([
+                Query::leftJoin('orders', 'ord', [
+                    Query::on('users.id', 'orders.user_id'),
+                    Query::equal('ord.status', ['paid']),
+                ]),
+            ]);
+
+        $ast = $builder->toAst();
+
+        $this->assertCount(1, $ast->joins);
+        $join = $ast->joins[0];
+        $this->assertSame('LEFT JOIN', $join->type);
+        $this->assertInstanceOf(Table::class, $join->table);
+        $this->assertSame('orders', $join->table->name);
+        $this->assertSame('ord', $join->table->alias);
+        $this->assertInstanceOf(Binary::class, $join->condition);
+        $this->assertSame('AND', $join->condition->operator);
+        $this->assertInstanceOf(Binary::class, $join->condition->left);
+        $this->assertSame('=', $join->condition->left->operator);
+        $this->assertInstanceOf(Column::class, $join->condition->left->left);
+        $this->assertSame('id', $join->condition->left->left->name);
+        $this->assertSame('users', $join->condition->left->left->table);
+    }
+
+    public function testToAstNestedJoinOnQualifiesUnqualifiedOperandsWithBaseAlias(): void
+    {
+        $builder = (new MySQL())
+            ->from('users', 'u')
+            ->filter([
+                Query::leftJoin('orders', 'ord', [
+                    Query::on('id', 'userId'),
+                ]),
+            ]);
+
+        $ast = $builder->toAst();
+
+        $this->assertCount(1, $ast->joins);
+        $condition = $ast->joins[0]->condition;
+        $this->assertInstanceOf(Binary::class, $condition);
+        $this->assertInstanceOf(Column::class, $condition->left);
+        $this->assertSame('id', $condition->left->name);
+        $this->assertSame('u', $condition->left->table);
+        $this->assertInstanceOf(Column::class, $condition->right);
+        $this->assertSame('userId', $condition->right->name);
+        $this->assertSame('u', $condition->right->table);
+    }
+
+    public function testToAstNestedJoinRejectsUnsupportedOnPredicate(): void
+    {
+        $builder = (new MySQL())
+            ->from('users')
+            ->filter([
+                Query::leftJoin('orders', 'ord', [
+                    Query::on('users.id', 'orders.user_id'),
+                    Query::search('ord.status', 'paid'),
+                ]),
+            ]);
+
+        $this->expectException(\Utopia\Query\Exception\ValidationException::class);
+        $this->expectExceptionMessage('Unsupported join ON condition: search');
+        $builder->toAst();
+    }
+
     public function testToAstCrossJoin(): void
     {
         $builder = (new MySQL())

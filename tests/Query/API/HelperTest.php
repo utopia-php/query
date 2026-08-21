@@ -50,6 +50,7 @@ class HelperTest extends TestCase
         $this->assertTrue(Query::isMethod('leftJoin'));
         $this->assertTrue(Query::isMethod('rightJoin'));
         $this->assertTrue(Query::isMethod('crossJoin'));
+        $this->assertTrue(Query::isMethod('on'));
         $this->assertTrue(Query::isMethod('union'));
         $this->assertTrue(Query::isMethod('unionAll'));
         $this->assertTrue(Query::isMethod('raw'));
