@@ -7,6 +7,7 @@ use Utopia\Query\Builder\Statement;
 use Utopia\Query\Exception\ValidationException;
 use Utopia\Query\Schema\Column;
 use Utopia\Query\Schema\IndexType;
+use Utopia\Query\Schema\Order;
 use Utopia\Query\Schema\Table;
 
 abstract class Schema
@@ -414,7 +415,7 @@ abstract class Schema
 
             if (isset($index->orders[$col])) {
                 $order = \strtoupper($index->orders[$col]);
-                if ($order !== OrderDirection::Asc->value && $order !== OrderDirection::Desc->value) {
+                if (Order::tryFrom($order) === null) {
                     throw new ValidationException('Invalid index order: ' . $index->orders[$col]);
                 }
                 $part .= ' ' . $order;
