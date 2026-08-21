@@ -1526,6 +1526,7 @@ abstract class Builder implements
         $parts = [];
 
         foreach ($onQueries as $onQuery) {
+            $this->assertJoinOnPredicate($onQuery);
             if ($onQuery->getMethod() === Method::On) {
                 $parts[] = $this->compileOn($onQuery);
                 continue;
@@ -2168,10 +2169,53 @@ abstract class Builder implements
 
         $exprs = [];
         foreach ($onQueries as $onQuery) {
+            $this->assertJoinOnPredicate($onQuery);
             $exprs[] = $this->queryToAstExpression($onQuery);
         }
 
         return $this->combineAstExpressions($exprs, 'AND');
+    }
+
+    private function assertJoinOnPredicate(Query $query): void
+    {
+        $method = $query->getMethod();
+        $allowed = match ($method) {
+            Method::On,
+            Method::Equal,
+            Method::NotEqual,
+            Method::GreaterThan,
+            Method::GreaterThanEqual,
+            Method::LessThan,
+            Method::LessThanEqual,
+            Method::Between,
+            Method::NotBetween,
+            Method::IsNull,
+            Method::IsNotNull,
+            Method::Contains,
+            Method::ContainsAny,
+            Method::NotContains,
+            Method::StartsWith,
+            Method::NotStartsWith,
+            Method::EndsWith,
+            Method::NotEndsWith,
+            Method::And,
+            Method::Or => true,
+            default => false,
+        };
+
+        if (! $allowed) {
+            throw new ValidationException('Unsupported join ON condition: ' . $method->value);
+        }
+
+        if ($method !== Method::And && $method !== Method::Or) {
+            return;
+        }
+
+        foreach ($query->getValues() as $child) {
+            if ($child instanceof Query) {
+                $this->assertJoinOnPredicate($child);
+            }
+        }
     }
 
     private function buildOnAstExpression(Query $query): Expression

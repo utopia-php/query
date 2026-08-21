@@ -297,6 +297,26 @@ class JoinTest extends TestCase
         Query::on('$id', 'customerId', 'LIKE')->compile(new MySQL());
     }
 
+    public function testNestedJoinRejectsSearchOnCompile(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Unsupported join ON condition: search');
+        Query::leftJoin('orders', 'ord', [
+            Query::on('$id', 'customerId'),
+            Query::search('ord.status', 'paid'),
+        ])->compile(new MySQL());
+    }
+
+    public function testNestedJoinRejectsRegexOnCompile(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Unsupported join ON condition: regex');
+        Query::leftJoin('orders', 'ord', [
+            Query::on('$id', 'customerId'),
+            Query::regex('ord.status', 'paid'),
+        ])->compile(new MySQL());
+    }
+
     public function testNestedJoinShapeIncludesOnQueries(): void
     {
         $query = Query::leftJoin('orders', 'ord', [

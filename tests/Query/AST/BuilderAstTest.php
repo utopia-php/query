@@ -553,6 +553,22 @@ class BuilderAstTest extends TestCase
         $this->assertSame('users', $join->condition->left->left->table);
     }
 
+    public function testToAstNestedJoinRejectsUnsupportedOnPredicate(): void
+    {
+        $builder = (new MySQL())
+            ->from('users')
+            ->filter([
+                Query::leftJoin('orders', 'ord', [
+                    Query::on('users.id', 'orders.user_id'),
+                    Query::search('ord.status', 'paid'),
+                ]),
+            ]);
+
+        $this->expectException(\Utopia\Query\Exception\ValidationException::class);
+        $this->expectExceptionMessage('Unsupported join ON condition: search');
+        $builder->toAst();
+    }
+
     public function testToAstCrossJoin(): void
     {
         $builder = (new MySQL())
